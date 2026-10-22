@@ -6,6 +6,7 @@ Verification/build.json. Keep the original LICENSE and NOTICE.
 
 ## Boundaries
 
+- `quick_menu.inc` and `gen_quick.py`: native quick-menu overlay and driver button discovery; original Android pixel art is generated into quick_icons.h with recorded source hashes.
 - `main.c`: SDL, controller events, emulator memory adapter, audio/video, save and
   lifecycle management. It translates buttons to companion actions.
 - `polished.h`: the Polished companion contract: identity, memory snapshot,

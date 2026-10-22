@@ -2,6 +2,7 @@
 #define POCKET_POLISHED_H
 #include "pd_canvas.h"
 #include "pd_snapshot.h"
+void pc_font(const unsigned char *, size_t, int);
 int pc_identify(const unsigned char *, size_t);
 bool pc_read(struct pd_snapshot *, pd_read_fn, void *);
 void pc_draw(struct pd_canvas *, const struct pd_snapshot *, int selected,

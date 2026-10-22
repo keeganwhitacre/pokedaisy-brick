@@ -1,5 +1,6 @@
 /* Native single-screen host for PokeDaisy. GPL-3.0, see ../NOTICE. */
 #include "../3ds/desktop/pd_png.h"
+#include "pd_font.h"
 #include "pd_menu.h"
 #include "pd_romart.h"
 #include "pd_settings.h"
@@ -10,6 +11,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/joystick.h>
 #include <mgba-util/vfs.h>
 #include <mgba/core/blip_buf.h>
 #include <mgba/core/core.h>
@@ -20,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -30,7 +33,8 @@ static color_t video[256 * 256];
 static struct pd_canvas canvas;
 static SDL_Window *window;
 static SDL_Renderer *renderer;
-static SDL_Texture *texture, *gameTexture;
+static SDL_Texture *texture, *gameTexture, *quickTexture;
+static int l3Button = -1, r3Button = -1;
 static uint32_t gamePixels[256 * 256];
 static SDL_Rect lastGameRect;
 static SDL_AudioDeviceID audio;
@@ -39,6 +43,8 @@ static bool muted;
 static int appError;
 #ifdef POCKET_TEST
 static unsigned audioNonzero;
+static bool testQuick, testFf;
+static int testQuickSelected, testMenu;
 #endif
 static const char *root = ".";
 static char message[128];
@@ -59,6 +65,8 @@ enum {
   L2,
   R2,
   MENU,
+  L3,
+  R3,
   NKEYS
 };
 static unsigned held, pressed;
@@ -143,6 +151,10 @@ static int keyboard(SDL_Keycode k) {
     return L2;
   case SDLK_2:
     return R2;
+  case SDLK_F3:
+    return L3;
+  case SDLK_F4:
+    return R3;
   case SDLK_ESCAPE:
     return MENU;
   default:
@@ -150,6 +162,10 @@ static int keyboard(SDL_Keycode k) {
   }
 }
 static int joy(int n) {
+  if (n == l3Button)
+    return L3;
+  if (n == r3Button)
+    return R3;
   static const int map[] = {B, A, Y, X, L, R, SELECT, START, MENU, -1, L2, R2};
   return n >= 0 && n < 12 ? map[n] : -1;
 }
@@ -222,7 +238,7 @@ static void present(void) {
 }
 // Gameplay scales in physical panel pixels; the companion keeps its 512x384
 // grid.
-static void present_game(unsigned gw, unsigned gh) {
+static void render_game(unsigned gw, unsigned gh) {
   int ow, oh;
   if (SDL_GetRendererOutputSize(renderer, &ow, &oh) < 0 || ow <= 0 || oh <= 0)
     return;
@@ -251,8 +267,13 @@ static void present_game(unsigned gw, unsigned gh) {
     notice(SDL_GetError());
     return;
   }
+  /* The caller may draw a quick-menu overlay before presenting. */
+}
+static void present_game(unsigned gw, unsigned gh) {
+  render_game(gw, gh);
   SDL_RenderPresent(renderer);
 }
+#include "quick_menu.inc"
 static bool capture_frame(const char *path, unsigned *lit) {
   int ow, oh;
   if (SDL_GetRendererOutputSize(renderer, &ow, &oh) < 0 || ow <= 0 || oh <= 0 ||
@@ -472,12 +493,15 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                         "Load state",
                         "Toggle fast-forward",
                         "Quit to game list",
-                        "About"};
+                        "About",
+                        "Quick menu"};
   const char *confirmOpts[] = {"Cancel", "Confirm"};
   struct pd_menu gameMenu, confirmMenu;
-  pd_menu_init(&gameMenu, "GAME", opts, 7);
+  pd_menu_init(&gameMenu, "GAME", opts, 8);
   pd_menu_init(&confirmMenu, "CONFIRM", confirmOpts, 2);
   int menuOpen = 0;
+  bool quickOpen = false;
+  int quickSelected = 0;
   bool companion = false, ff = false, leave = false;
   int focus = 0, frames = 0;
   struct pc_ui pcUi = {0};
@@ -487,6 +511,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     events();
     repeat_directions();
     if (down(X)) {
+      quickOpen = false;
       menuOpen = 0;
       companion = !companion;
       c->setKeys(c, 0);
@@ -495,15 +520,67 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     }
     if (down(MENU) || ((down(START) || down(SELECT)) &&
                        (held & (1u << START)) && (held & (1u << SELECT)))) {
+      quickOpen = false;
       menuOpen = menuOpen ? 0 : 1;
       companion = true;
       c->setKeys(c, 0);
       if (audio)
         SDL_ClearQueuedAudio(audio);
     }
-    if (down(Y) && !companion)
+    if (down(L3)) {
+      quickOpen = !quickOpen;
+      if (!quickOpen) {
+        held &= ~1023u;
+        c->setKeys(c, 0);
+      }
+      if (quickOpen) {
+        quickSelected = 0;
+        c->setKeys(c, 0);
+        if (audio)
+          SDL_ClearQueuedAudio(audio);
+      }
+    }
+    if (down(Y) && !companion && !quickOpen)
       ff = !ff;
-    if (companion) {
+    if (quickOpen) {
+      muted = true;
+      if (down(B))
+        quickOpen = false;
+      else {
+        if (down(UP))
+          quickSelected = 0;
+        if (down(RIGHT))
+          quickSelected = 1;
+        if (down(DOWN))
+          quickSelected = 2;
+        if (down(LEFT))
+          quickSelected = 3;
+        if (down(A)) {
+          if (quickSelected == 2) {
+            ff = !ff;
+            quickOpen = false;
+          }
+          if (quickSelected == 3) {
+            companion = true;
+            menuOpen = 0;
+            quickOpen = false;
+          }
+          if (quickSelected == 0 ||
+              (quickSelected == 1 && access(ss, F_OK) == 0)) {
+            companion = true;
+            menuOpen = quickSelected == 0 ? 5 : 2;
+            confirmMenu.selected = 0;
+            confirmMenu.title =
+                quickSelected == 0
+                    ? "Overwrite save state?"
+                    : "Load state? Current progress will rewind.";
+            quickOpen = false;
+          }
+        }
+      }
+      if (!quickOpen)
+        held &= ~1023u;
+    } else if (companion) {
       if (menuOpen) {
         if (menuOpen == 4) {
           if (down(B) || down(A))
@@ -554,6 +631,11 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                 break;
               case 6:
                 menuOpen = 4;
+                break;
+              case 7:
+                menuOpen = 1;
+                quickOpen = true;
+                quickSelected = 0;
                 break;
               }
             } else {
@@ -636,7 +718,10 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       pc_ui_observe(&pcUi, &snap);
     } else
       pd_snapshot_read(&snap, &game, read_memory, c);
-    if (companion) {
+    if (quickOpen) {
+      quick_present(gw, gh, quickSelected, ff, access(ss, F_OK) == 0, romdata,
+                    len, pc);
+    } else if (companion) {
       if (menuOpen) {
         if (menuOpen == 4) {
           pd_splash_draw(&canvas, "Based on PokeDaisy by Lidor Itzhari",
@@ -658,6 +743,10 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       present_game(gw, gh);
     }
 #ifdef POCKET_TEST
+    testQuick = quickOpen;
+    testFf = ff;
+    testQuickSelected = quickSelected;
+    testMenu = menuOpen;
     test_frame(c, &pc, companion, frames, &ui, &snap);
 #endif
     frames++;
@@ -714,7 +803,8 @@ int main(int argc, char **argv) {
     snprintf(path, sizeof path, "%s/%s", root, dirs[i]);
     mkdir(path, 0755);
   }
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK)) {
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK |
+               SDL_INIT_GAMECONTROLLER)) {
     fprintf(stderr, "SDL: %s\n", SDL_GetError());
     return 1;
   }
@@ -757,7 +847,13 @@ int main(int argc, char **argv) {
     SDL_PauseAudioDevice(audio, 0);
   else
     fprintf(stderr, "Audio unavailable: %s\n", SDL_GetError());
-  SDL_Joystick *js = SDL_NumJoysticks() ? SDL_JoystickOpen(0) : NULL;
+  SDL_GameController *pad = SDL_NumJoysticks() && SDL_IsGameController(0)
+                                ? SDL_GameControllerOpen(0)
+                                : NULL;
+  SDL_Joystick *js = pad                  ? SDL_GameControllerGetJoystick(pad)
+                     : SDL_NumJoysticks() ? SDL_JoystickOpen(0)
+                                          : NULL;
+  quick_bindings(js, pad);
   if (rom)
     run_game(rom, frames, shot);
   else {
@@ -803,8 +899,12 @@ int main(int argc, char **argv) {
     for (int i = 0; i < count; i++)
       free(names[i]);
   }
-  if (js)
+  if (pad)
+    SDL_GameControllerClose(pad);
+  else if (js)
     SDL_JoystickClose(js);
+  SDL_DestroyTexture(quickTexture);
+  quickTexture = NULL;
   if (audio)
     SDL_CloseAudioDevice(audio);
   SDL_DestroyTexture(texture);

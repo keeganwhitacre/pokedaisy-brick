@@ -10,7 +10,7 @@ static struct pd_glyph romFont[129];
 static const unsigned char *fontRom;
 static size_t fontSize;
 static int fontBuild = -1;
-static void pc_font(const unsigned char *rom, size_t n, int build) {
+void pc_font(const unsigned char *rom, size_t n, int build) {
   if (!rom || build < 0 || build >= (int)(sizeof builds / sizeof *builds)) {
     pd_font_set(NULL, 0);
     return;

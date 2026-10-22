@@ -5,7 +5,10 @@
 #include <assert.h>
 static unsigned lastCounter, pausedCounter;
 static bool gbaTest;
-static bool realRomTest;
+static bool realRomTest, quickTest;
+static char quickRoot[] = "/tmp/pd-quick-test-XXXXXX";
+static const char *quickRom;
+static unsigned quickPause, quickSaved;
 static void send_key(SDL_Keycode k) {
   SDL_Event e = {.type = SDL_KEYDOWN};
   e.key.keysym.sym = k;
@@ -13,8 +16,155 @@ static void send_key(SDL_Keycode k) {
   e.type = SDL_KEYUP;
   SDL_PushEvent(&e);
 }
+static void send_button(int button) {
+  SDL_Event e = {.type = SDL_JOYBUTTONDOWN};
+  e.jbutton.button = button;
+  SDL_PushEvent(&e);
+  e.type = SDL_JOYBUTTONUP;
+  SDL_PushEvent(&e);
+}
+static void quick_test_frame(struct mCore *c, bool companion, int frame) {
+  if (frame == 0 && getenv("POCKET_TEST_STATE"))
+    assert(state(c, getenv("POCKET_TEST_STATE"), false));
+  if (frame == 5) {
+    quickPause = c->frameCounter(c);
+    send_button(12);
+  }
+  if (frame == 6) {
+    assert(testQuick && c->frameCounter(c) == quickPause);
+    capture_frame("runtime-phase7-quick.png", NULL);
+    send_key(SDLK_RIGHT);
+  }
+  if (frame == 7) {
+    assert(testQuickSelected == 1);
+    send_key(SDLK_z);
+  }
+  if (frame == 8) {
+    assert(testQuick && !testMenu);
+    send_key(SDLK_DOWN);
+  }
+  if (frame == 9) {
+    assert(testQuickSelected == 2);
+    send_key(SDLK_z);
+  }
+  if (frame == 10) {
+    assert(!testQuick && testFf && c->frameCounter(c) == quickPause);
+    send_key(SDLK_F3);
+  }
+  if (frame == 11) {
+    assert(testQuick);
+    send_key(SDLK_UP);
+  }
+  if (frame == 12)
+    send_key(SDLK_z);
+  if (frame == 13) {
+    assert(!testQuick && companion && testMenu == 5);
+    send_key(SDLK_DOWN);
+    send_key(SDLK_z);
+    quickSaved = c->frameCounter(c);
+  }
+  if (frame == 14) {
+    assert(testMenu == 1);
+    char path[1400];
+    const char *name = strrchr(quickRom, '/');
+    name = name ? name + 1 : quickRom;
+    snprintf(path, sizeof path, "%s/states/%s.ss", quickRoot, name);
+    assert(access(path, F_OK) == 0);
+    send_key(SDLK_x);
+  }
+  if (frame == 17) {
+    assert(!companion && c->frameCounter(c) > quickSaved);
+    send_button(12);
+  }
+  if (frame == 18) {
+    assert(testQuick);
+    send_key(SDLK_RIGHT);
+  }
+  if (frame == 19)
+    send_key(SDLK_z);
+  if (frame == 20) {
+    assert(testMenu == 2);
+    send_key(SDLK_x);
+  }
+  if (frame == 21) {
+    assert(testMenu == 1);
+    send_key(SDLK_x);
+  }
+  if (frame == 24)
+    send_key(SDLK_F3);
+  if (frame == 25) {
+    assert(testQuick);
+    send_key(SDLK_RIGHT);
+  }
+  if (frame == 26)
+    send_key(SDLK_z);
+  if (frame == 27) {
+    assert(testMenu == 2);
+    send_key(SDLK_DOWN);
+    send_key(SDLK_z);
+  }
+  if (frame == 28) {
+    assert(c->frameCounter(c) == quickSaved && testMenu == 1);
+    send_key(SDLK_x);
+  }
+  if (frame == 31)
+    send_button(12);
+  if (frame == 32) {
+    assert(testQuick);
+    send_key(SDLK_LEFT);
+  }
+  if (frame == 33)
+    send_key(SDLK_z);
+  if (frame == 34) {
+    assert(companion && !testQuick && !testMenu);
+    send_key(SDLK_TAB);
+  }
+  if (frame == 37)
+    send_key(SDLK_F3);
+  if (frame == 38) {
+    assert(testQuick);
+    capture_frame("runtime-phase7-quick-ff.png", NULL);
+    send_key(SDLK_F3);
+  }
+  if (frame == 39)
+    assert(!testQuick);
+  if (frame >= 40 && frame < 60) {
+    if (frame % 2 == 0) {
+      assert(!testQuick);
+      quickPause = c->frameCounter(c);
+    } else
+      assert(testQuick && c->frameCounter(c) == quickPause);
+    send_button(12);
+  }
+  if (frame == 61)
+    send_key(SDLK_ESCAPE);
+  if (frame == 62) {
+    assert(companion && testMenu == 1);
+    send_key(SDLK_UP);
+    send_key(SDLK_z);
+  }
+  if (frame == 63) {
+    assert(testQuick);
+    send_key(SDLK_x);
+  }
+  if (frame == 64) {
+    assert(!testQuick && testMenu == 1);
+    send_key(SDLK_x);
+  }
+  if (frame == 65) {
+    assert(!companion);
+  }
+  if (frame == 66)
+    puts("PASS quick menu: raw L3/keyboard, D-pad, disabled load, FF, "
+         "save/load confirmation/cancel/round-trip, companion, pause/resume "
+         "and repeated toggles");
+}
 static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
                        struct pd_ui *u, struct pd_snapshot *s) {
+  if (quickTest) {
+    quick_test_frame(c, companion, frame);
+    return;
+  }
   if (realRomTest) {
     if (frame == 0 && getenv("POCKET_TEST_STATE"))
       assert(state(c, getenv("POCKET_TEST_STATE"), false));
@@ -271,6 +421,26 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
   }
 }
 int main(void) {
+  if (getenv("POCKET_TEST_QUICK")) {
+    quickTest = true;
+    unsigned char bits[(KEY_MAX + 7) / 8] = {0};
+    int codes[] = {BTN_A, BTN_THUMBL, BTN_THUMBR, KEY_ENTER};
+    for (int i = 0; i < 4; i++)
+      bits[codes[i] / 8] |= 1u << (codes[i] % 8);
+    int total = 0;
+    assert(quick_evdev_button(bits, BTN_THUMBL, &total) == 1 && total == 4);
+    assert(quick_evdev_button(bits, BTN_THUMBR, NULL) == 2);
+    assert(quick_evdev_button(bits, KEY_ENTER, NULL) == 3);
+    assert(mkdtemp(quickRoot));
+    setenv("POCKET_L3_BUTTON", "12", 1);
+    setenv("POCKET_R3_BUTTON", "13", 1);
+    quickRom = getenv("POCKET_TEST_ROM");
+    if (!quickRom)
+      quickRom = "diagnostic.gb";
+    char *args[] = {"pokedaisy-pocket", "--data", quickRoot, "--frames", "68",
+                    (char *)quickRom,   NULL};
+    return pocket_app_main(6, args);
+  }
   const char *personal = getenv("POCKET_TEST_ROM");
   if (personal) {
     realRomTest = true;

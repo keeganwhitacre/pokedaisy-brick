@@ -1,4 +1,4 @@
-# Polished Crystal Android parity boundary — Phase 6
+# Polished Crystal Android parity boundary — Phase 7
 
 This compares the native port with the **Polished Crystal path** at upstream
 `a64c9172828bb2e3824d5211655091e27f7ff73c`, rather than with Android features
@@ -19,6 +19,7 @@ user's matching cart. Full visual and behavioral parity is still unfinished.
 | Guide HERE | Live map/time encounter lists, all eight methods, badge-adjusted levels, caught marks; area finds and progress marks | More exact Android layout, per-entry icons and encounter-detail interactions |
 | Guide NEXT BOSS | Progress-dependent order, League/rematch rules, normal/faithful teams, type hints, moves/held-item answers | Per-Pokemon reveal instead of whole-team reveal; own-best-level comparison |
 | Guide TIPS / WHERE IS | All seven upstream tips, hints/answers; HM/key/gift-Pokemon lists with deduplication, locations and owned marks | Android's exact panel layout and further list ergonomics |
+| Quick menu | L3 ring; original Android icons; paused integer-scaled gameplay behind it; state confirmation, FF and companion | More actions only when their game-specific implementations are ported; physical button/overlay retest |
 | States/options | Existing host menu/state/FF controls | Multi-slot screenshot browser, broader options and remaining lifecycle integration |
 
 Guide definitions are generated from `GuidePolishedCrystal*.kt`; the original
@@ -31,4 +32,4 @@ retail companion support remain as before; this does not add Seaglass decoding.
 
 ## Expansion and shortcuts
 
-Retain the requested L3 quick-menu and R3 zoom bindings when those features are ported. Neither is implemented yet; existing L2/R2 state shortcuts are unchanged. Upstream pk_wide_gb.c supports retail Yellow and three retail Crystal ROM checksums. It does not include Polished Crystal. Reusing that renderer requires Polished-specific definitions and validation, not retail offsets applied to the hack.
+L3 now opens the quick-menu ring. R3 is retained for future zoom; zoom and expansion are not implemented yet; existing L2/R2 state shortcuts are unchanged. Upstream pk_wide_gb.c supports retail Yellow and three retail Crystal ROM checksums. It does not include Polished Crystal. Reusing that renderer requires Polished-specific definitions and validation, not retail offsets applied to the hack.

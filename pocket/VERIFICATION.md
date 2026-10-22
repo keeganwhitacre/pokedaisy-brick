@@ -1,4 +1,37 @@
-# Phase 6 verification
+# Phase 7 verification
+
+Phase 7 adds the L3 quick menu: original Android state/FF/companion pixel icons,
+D-pad ring navigation, genuine paused gameplay at its existing physical scale,
+disabled missing-state load, save/load confirmation and fast-forward/companion
+actions. Existing gameplay/companion textures retain their opaque RGB888 path;
+the additional overlay uses explicit ARGB alpha. R3 zoom is not implemented.
+
+Native Linux and the actual NextUI ARM build pass the new quick-menu test. The
+same real supported 3.2.3 ROM and genuine fresh-game starter state from the
+previous pass were loaded, without fixture/RAM injection. Tests check paused
+core frame counters, raw L3 and keyboard input, all directions/actions,
+confirmation/cancel and state round-trip, Menu fallback/back behavior, resuming
+and repeated open/close. Synthetic Linux key-bitmaps test SDL 2.26 evdev button
+ordering; real Brick device discovery remains unverified. The raw-button
+override is tested with buttons 12/13, which are test values, not assumed Brick
+indices. Native diagnostic GB/GBA regressions pass. ASan quick-menu testing
+completed without ASan errors; fully instrumented pinned mGBA still emits its
+known UBSan signed-arithmetic reports. No whole-core UBSan-clean or full leak
+check is claimed. LeakSanitizer was disabled.
+
+`runtime-phase7-quick*.png` captures show the actual supplied-ROM game paused
+behind the menu. They are software SDL captures, not photographs or hardware
+proof. Physical L3 detection, overlay alpha on the device backend, audible
+resume and sustained performance need a Brick retest. Use Menu > Quick menu
+if a driver does not label its L3 button; launch.log records detected bindings.
+
+Quick-menu icons are regenerated with `python3 pocket/gen_quick.py --check`.
+No PC/Fly/Bike/Rod/Repel/game-setting action is simulated. Existing state/SRAM
+rules remain unchanged, and all tests use separate disposable save directories.
+
+The Phase 6 results below describe the retained battle milestone.
+
+## Phase 6
 
 Phase 6 adds Battle INFO matchup labels, Suggestions, Foe Details and Foe Team. Native and ARM builds/decoder tests pass, including faithful moves, zero PP, fainted/egg exclusion, stable ranking ties, type immunity/dual types, seen-foe tracking/reset and controller back/selection. Active stats and held items are checked against upstream captured raw structs. ASan/UBSan decoder/render checks include matching-ROM rendering. The supplied 3.2.3 fresh-game and ARM SDL pause/resume path also pass.
 

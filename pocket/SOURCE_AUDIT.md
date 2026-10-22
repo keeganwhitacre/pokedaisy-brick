@@ -152,3 +152,7 @@ ROM, private RAM dumps, battery saves and savestates are excluded. The install
 binary contains none of this test route or test-only environment handling.
 
 GitHub work was deferred at the user's request. No fork or push was made.
+
+## Phase 7 quick menu
+
+Quick-menu behavior and pixel art adapted from Android QuickMenu.kt, QuickMenuSettings.kt and FieldHud.kt. Linux evdev button ordering was checked against SDL release-2.26.0 src/joystick/linux/SDL_sysjoystick.c ConfigureJoystick. SDL controller bindings take precedence, then explicit POCKET_L3_BUTTON/POCKET_R3_BUTTON overrides. Actual NextUI driver discovery still needs hardware verification. R3 zoom and Polished expansion remain unported.

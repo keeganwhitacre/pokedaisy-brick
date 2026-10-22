@@ -16,7 +16,9 @@ jobs:
       - run: git submodule update --init third_party/mgba
       - run: sudo apt-get update && sudo apt-get install -y cmake libsdl2-dev
       - name: Check generated upstream definitions
-        run: python3 pocket/gen_polished.py --check
+        run: |
+          python3 pocket/gen_polished.py --check
+          python3 pocket/gen_quick.py --check
       - name: Build Linux frontend and tests
         run: |
           cmake -S pocket -B pocket/build-ci -DCMAKE_BUILD_TYPE=Release -DPOCKET_TESTS=ON -DBUILD_LTO=OFF
@@ -30,6 +32,7 @@ jobs:
           python3 make_diagnostic.py
           build-ci/pocket-decoder-test ../app/src/test/resources/fixtures
           build-ci/pocket-runtime-test
+          POCKET_TEST_QUICK=1 build-ci/pocket-runtime-test
   brick:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -56,5 +59,6 @@ jobs:
           python3 make_diagnostic.py
           qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-decoder-test ../app/src/test/resources/fixtures
           qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-runtime-test
+          POCKET_TEST_QUICK=1 qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-runtime-test
       - name: Verify install package
         run: python3 pocket/package.py pocket/build-brick-ci/pokedaisy-pocket "$RUNNER_TEMP/PokeDaisy"
