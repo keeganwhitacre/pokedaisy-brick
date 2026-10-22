@@ -6,6 +6,59 @@
 #define POCKET_PIXEL_WIDGETS_H
 #include "party_art.h"
 #include "pd_canvas.h"
+static inline void pocket_fade_rect(struct pd_canvas *c, int x, int y, int w,
+                                    int h, uint32_t paper, int percent) {
+  if (percent < 0)
+    percent = 0;
+  if (percent > 100)
+    percent = 100;
+  int x0 = x > c->cx0 ? x : c->cx0, y0 = y > c->cy0 ? y : c->cy0;
+  int x1 = x + w < c->cx1 ? x + w : c->cx1;
+  int y1 = y + h < c->cy1 ? y + h : c->cy1;
+  for (int yy = y0; yy < y1; yy++)
+    for (int xx = x0; xx < x1; xx++) {
+      uint32_t color = c->px[yy * c->w + xx], faded = 0;
+      for (int shift = 0; shift < 24; shift += 8)
+        faded |= ((((color >> shift) & 255) * percent +
+                   ((paper >> shift) & 255) * (100 - percent)) /
+                  100)
+                 << shift;
+      c->px[yy * c->w + xx] = faded;
+    }
+}
+static inline int pocket_text_lines(struct pd_canvas *c, int width,
+                                    const char *text) {
+  if (width <= 0)
+    return 0;
+  struct pd_canvas measure = *c;
+  measure.cx1 = measure.cx0;
+  return pd_text_wrap(&measure, 0, 0, width, 18, 128, text, 0, PD_NO_SHADOW);
+}
+/* Scroll full wrapped text without truncating the last visible line. Reuse the
+ * canvas wrapper's exact word/font metrics for measurement and drawing. */
+static inline int pocket_text_page(struct pd_canvas *c, int x, int y, int width,
+                                   int lineHeight, int visibleLines,
+                                   const char *text, int *page, uint32_t ink,
+                                   uint32_t shadow) {
+  if (width <= 0 || lineHeight <= 0 || visibleLines <= 0)
+    return 0;
+  int lines = pocket_text_lines(c, width, text);
+  int pages = lines ? (lines + visibleLines - 1) / visibleLines : 1;
+  *page = *page < 0 ? 0 : *page % pages;
+  struct pd_canvas clipped = *c;
+  pd_clip(&clipped, x, y, width, visibleLines * lineHeight);
+  if (clipped.cx0 < c->cx0)
+    clipped.cx0 = c->cx0;
+  if (clipped.cy0 < c->cy0)
+    clipped.cy0 = c->cy0;
+  if (clipped.cx1 > c->cx1)
+    clipped.cx1 = c->cx1;
+  if (clipped.cy1 > c->cy1)
+    clipped.cy1 = c->cy1;
+  pd_text_wrap(&clipped, x, y - *page * visibleLines * lineHeight, width,
+               lineHeight, 128, text, ink, shadow);
+  return pages;
+}
 struct pocket_hp_palette {
   uint32_t frame, inner, label, green, yellow, red;
 };

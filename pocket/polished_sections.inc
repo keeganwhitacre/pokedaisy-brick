@@ -339,10 +339,11 @@ static int dex_position(int selected, const int *ids, int count) {
       return i;
   return 0;
 }
+#include "polished_dex_list.inc"
 static void pc_dex_filtered_draw(struct pd_canvas *c,
                                  const struct pd_snapshot *s, int selected,
                                  bool detail, const unsigned char *rom,
-                                 size_t n, int build, int filter) {
+                                 size_t n, int build, int filter, int *scroll) {
   header(c, PC_DEX);
   int count = pc_dex_count();
   if (selected < 0)
@@ -359,33 +360,12 @@ static void pc_dex_filtered_draw(struct pd_canvas *c,
     caught += pd_dex_caught(s, i);
   }
   char b[128];
-  snprintf(b, sizeof b, "Seen %d   Caught %d   Total %d", seen, caught, count);
-  txt(c, 12, 36, b);
   if (!detail) {
-    int ids[512], visible = dex_entries(s, filter, ids),
-                  pos = dex_position(selected, ids, visible);
-    int scroll = pos >= 11 ? pos - 10 : 0;
-    if (!visible)
-      txt(c, 20, 80, "No entries match this filter.");
-    for (int row = 0; row < 11 && scroll + row < visible; row++) {
-      int i = ids[scroll + row], id = dexOrder[i], y = 64 + row * 24;
-      if (i == selected)
-        pd_fill(c, 8, y, 496, 23, 0xdcdcdc);
-      snprintf(b, sizeof b, "%s %03d  %s", i == selected ? ">" : " ", i + 1,
-               pd_dex_seen(s, i + 1) ? names[id] : "----------");
-      pd_text_fit(c, 16, y + 2, 368, b, 0x181818, PD_NO_SHADOW);
-      pd_text_right(c, 492, y + 2,
-                    pd_dex_caught(s, i + 1) ? "CAUGHT"
-                    : pd_dex_seen(s, i + 1) ? "SEEN"
-                                            : "",
-                    0x181818, PD_NO_SHADOW);
-    }
-    const char *filters[] = {"ALL", "CAUGHT", "SEEN ONLY", "NOT SEEN"};
-    snprintf(b, sizeof b, "Y:%s (%d)  A:Entry", filters[filter], visible);
-    txt(c, 12, 346, b);
-    txt(c, 12, 366, "L/R:Section B/X:Play");
+    pc_dex_list(c, s, selected, rom, n, build, filter, scroll);
     return;
   }
+  snprintf(b, sizeof b, "Seen %d   Caught %d   Total %d", seen, caught, count);
+  txt(c, 12, 36, b);
   int id = dexOrder[selected];
   snprintf(b, sizeof b, "No.%03d  %s", selected + 1,
            pd_dex_seen(s, selected + 1) ? names[id] : "----------");
@@ -430,7 +410,8 @@ static void pc_dex_filtered_draw(struct pd_canvas *c,
 }
 void pc_dex_draw(struct pd_canvas *c, const struct pd_snapshot *s, int selected,
                  bool detail, const unsigned char *rom, size_t n, int build) {
-  pc_dex_filtered_draw(c, s, selected, detail, rom, n, build, 0);
+  int scroll = 0;
+  pc_dex_filtered_draw(c, s, selected, detail, rom, n, build, 0, &scroll);
 }
 static void pc_dex_text_draw(struct pd_canvas *c, const struct pd_snapshot *s,
                              int selected, const unsigned char *rom, size_t n,
@@ -479,11 +460,8 @@ static void pc_dex_text_draw(struct pd_canvas *c, const struct pd_snapshot *s,
   txt(c, 12, 346, "Up/Down:Mon Y:Picture");
   txt(c, 12, 366, "B:List X:Play");
 }
-void pc_item_draw(struct pd_canvas *c, int item, const unsigned char *rom,
-                  size_t n, int build) {
-  header(c, PC_BAG);
-  txt(c, 20, 50, item_name(item, build));
-  char text[1024] = {0};
+static void item_description(int item, const unsigned char *rom, size_t n,
+                             int build, char *text, size_t cap) {
   int table = 20, index = item - 1;
   if (item > 0x200) {
     table = 21;
@@ -500,8 +478,15 @@ void pc_item_draw(struct pd_canvas *c, int item, const unsigned char *rom,
           break;
         }
   }
-  if (!table_text(rom, n, build, table, index, text, sizeof text))
-    snprintf(text, sizeof text, "Description needs matching ROM.");
+  if (!table_text(rom, n, build, table, index, text, cap))
+    snprintf(text, cap, "Description needs matching ROM.");
+}
+void pc_item_draw(struct pd_canvas *c, int item, const unsigned char *rom,
+                  size_t n, int build) {
+  header(c, PC_BAG);
+  txt(c, 20, 50, item_name(item, build));
+  char text[1024] = {0};
+  item_description(item, rom, n, build, text, sizeof text);
   wrapped(c, 20, 88, 470, 11, text);
   txt(c, 12, 366, "B:Bag X:Play");
 }
@@ -704,19 +689,8 @@ bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
         u->selected += 2;
       u->selected = clamp_selection(u->selected, s->partyCount);
     }
-  } else if (u->section == PC_BAG && !u->detail) {
-    if (a == PC_LEFT || a == PC_RIGHT) {
-      u->pocket = (u->pocket + PD_POCKET_COUNT + (a == PC_RIGHT ? 1 : -1)) %
-                  PD_POCKET_COUNT;
-      u->item = 0;
-    }
-    if (a == PC_UP)
-      u->item--;
-    if (a == PC_DOWN)
-      u->item++;
-    u->item = clamp_selection(u->item, s->bag[u->pocket].count);
-    if (a == PC_CONFIRM && s->bag[u->pocket].count)
-      u->detail = true;
+  } else if (u->section == PC_BAG) {
+    bag_input(u, s, a);
   } else if (u->section == PC_DEX) {
     int ids[512];
     if (!u->detail && a == PC_ALTERNATE)
@@ -728,9 +702,9 @@ bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
     if (a == PC_DOWN)
       pos++;
     if (!u->detail && a == PC_LEFT)
-      pos -= 11;
+      pos -= 5;
     if (!u->detail && a == PC_RIGHT)
-      pos += 11;
+      pos += 5;
     if (count)
       u->dex = ids[clamp_selection(pos, count)];
     if (u->detail && a == PC_ALTERNATE)
@@ -750,7 +724,7 @@ void pc_ui_draw(struct pc_ui *u, struct pd_canvas *c,
     u->selected = clamp_selection(u->selected, s->partyCount);
     u->summary = u->moveOpen = false;
   }
-  u->item = clamp_selection(u->item, s->bag[u->pocket].count);
+
   if (u->section == PC_PARTY) {
     if (u->moveOpen && s->partyCount)
       pc_move_draw(c, &s->party[u->selected], u->move, rom, n, build);
@@ -761,10 +735,7 @@ void pc_ui_draw(struct pc_ui *u, struct pd_canvas *c,
       pc_party_draw(c, s, u->selected, false, rom, n, build,
                     ((u->animationMs / 167) % 2) ? 10 : 2);
   } else if (u->section == PC_BAG) {
-    if (u->detail && s->bag[u->pocket].count)
-      pc_item_draw(c, s->bag[u->pocket].items[u->item].id, rom, n, build);
-    else
-      pc_bag_draw(c, s, u->pocket, u->item, build);
+    pc_bag_pages(u, c, s, rom, n, build);
   } else if (u->section == PC_BATTLE)
     pc_battle_pages(u, c, s, rom, n, build);
   else if (u->section == PC_DEX) {
@@ -776,8 +747,8 @@ void pc_ui_draw(struct pc_ui *u, struct pd_canvas *c,
     if (u->detail && u->dexPage)
       pc_dex_text_draw(c, s, u->dex, rom, n, build);
     else
-      pc_dex_filtered_draw(c, s, u->dex, u->detail, rom, n, build,
-                           u->dexFilter);
+      pc_dex_filtered_draw(c, s, u->dex, u->detail, rom, n, build, u->dexFilter,
+                           &u->dexScroll);
   } else if (u->section == PC_MAP)
     pc_map_draw(u, c, s, rom, n, build);
   else if (u->section == PC_GUIDE)

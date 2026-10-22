@@ -3,7 +3,7 @@ on:
   push:
     branches: ['main', 'handheld/**']
   pull_request:
-    paths: ['app/src/main/cpp/pk_wide*', 'app/src/main/cpp/pk_savevf*', 'pocket/**', '3ds/**', 'app/src/main/kotlin/com/pokedaisy/app/companion/data/**', 'app/src/test/resources/fixtures/**', '.github/workflows/pocket.yml', 'third_party/mgba']
+    paths: ['app/src/main/cpp/pk_wide*', 'app/src/main/cpp/pk_savevf*', 'pocket/**', '3ds/**', 'app/src/main/kotlin/com/pokedaisy/app/companion/data/**', 'app/src/main/kotlin/com/pokedaisy/app/companion/ui/**', 'app/src/test/resources/fixtures/**', '.github/workflows/pocket.yml', 'third_party/mgba']
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,6 +21,7 @@ jobs:
           python3 pocket/gen_quick.py --check
           python3 pocket/gen_experience.py --check
           python3 pocket/gen_party.py --check
+          python3 pocket/gen_style.py --check
       - name: Build Linux frontend and tests
         run: |
           cmake -S pocket -B pocket/build-ci -DCMAKE_BUILD_TYPE=Release -DPOCKET_TESTS=ON -DBUILD_LTO=OFF

@@ -206,6 +206,8 @@ int main(int argc, char **argv) {
     char path[80];
     snprintf(path, sizeof path, "runtime-phase9-dex%d.png", filter);
     assert(pd_png_write(path, 512, 384, px));
+    snprintf(path, sizeof path, "runtime-phase13-dex%d.png", filter);
+    assert(pd_png_write(path, 512, 384, px));
   }
   u = (struct pc_ui){.section = PC_GUIDE,
                      .guidePage = 2,

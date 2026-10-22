@@ -72,3 +72,22 @@ the game has announced its next choice.
 On `MAP`, the four corners pulse around your selected place. The center stays
 clear so you can see your player marker. The game stays paused while you browse
 the map or open a summary. Press B to go back or X to resume playing.
+
+## Bag and Dex presentation
+
+The Polished Crystal bag uses the game's magenta stripes and folder tabs.
+You start on `All`. Left and Right change pocket, while Up and Down move through
+items and show the selected description. A opens or closes the description,
+B closes it before leaving, and Select pages longer text. Y cycles `Default`,
+`Name`, `Type` and `Count` sorting. This changes your companion view only.
+Duplicate stacks stay separate, and sorting keeps your selected stack.
+Favorites are not available on Brick yet.
+
+In Dex, the left column shows `SEEN`, `OWNED` and your four filters. The right
+column shows each entry's icon, number and name, with caught and seen marks.
+Entries you have not encountered are dimmed, like the Android companion.
+Up and Down scroll one entry, Left and Right move five, Y changes filter and
+A opens the entry. The native entry pages still have their earlier layout.
+
+The shoulder tabs use the Game Boy window style and stay at the top on Brick.
+The complete Android settings and state-browser layouts are not available yet.

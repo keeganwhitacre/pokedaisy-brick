@@ -388,6 +388,12 @@ fun companion(
     val sv = snap()
     val back = com.pokedaisy.app.companion.ui.CompanionBack().also { previewBack = it }
     val content: @Composable () -> Unit = {
+        // The activity owns this scope on device; the desktop preview has no activity.
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            val previous = com.pokedaisy.app.companion.ui.OptionColors.inGame
+            com.pokedaisy.app.companion.ui.OptionColors.inGame = true
+            onDispose { com.pokedaisy.app.companion.ui.OptionColors.inGame = previous }
+        }
         CompanionScreen(
             sv, FakeSlots(), FakeSettings(hints, initialTabs = barTabs, oneTap = oneTap, expandOffer = expandOffer, expand = expand), FakeBattleInput(busy), initialTab = tab,
             initialMonIndex = mon, initialCardBack = cardBack, back = back, initialSettingsRow = settingsRow, itemUse = if (items) PreviewItemUse(sv.party, bagFull) else null,
@@ -1022,8 +1028,11 @@ fun romArt() {
             listOf("pokefirered/pokefirered_rev1.gba", "pokeemerald/pokeemerald.gba").map { File(decomps, it).path })
     val dir = RomArt.dir(android.content.Context().filesDir)
     for (f in roms.filter { it.isNotBlank() }.map(::File).filter { it.isFile }.distinct()) {
-        if (RomArt.OUTPUTS.all { File(dir, it).isFile }) break
-        val wrote = RomArt.extractTo(f.readBytes(), dir)
+        val bytes = f.readBytes()
+        val gb = com.pokedaisy.app.companion.data.Gen2Art.extractTo(bytes, dir)
+        if (gb.isNotEmpty()) println("Gen 2 art: ${gb.size} files")
+        if (RomArt.OUTPUTS.all { File(dir, it).isFile }) continue
+        val wrote = RomArt.extractTo(bytes, dir)
         if (wrote.isNotEmpty()) println("rom art: ${wrote.size} files from ${f.name}")
     }
     RomArt.OUTPUTS.filter { !File(dir, it).isFile }.takeIf { it.isNotEmpty() }?.let { println("rom art missing (no ROM for it): $it") }
@@ -1072,6 +1081,39 @@ fun ndsSnapshot(): SnapshotView {
     // connected / game: what the Poller adds once it has detected the cart
     return com.pokedaisy.app.companion.data.buildSnapshotView(com.pokedaisy.app.companion.data.readGen4Telemetry(reader, cfg))
         .copy(connected = true, game = activeGame)
+}
+
+/** Real captured Gen 2 WRAM through the app's reader, never the demo snapshot. */
+fun gen2Snapshot(): SnapshotView {
+    val fixture = System.getProperty("gen2Fixture").orEmpty()
+    require(fixture.matches(Regex("[a-zA-Z0-9_]+")))
+    require(activeGame == GameKind.POLISHED_CRYSTAL) { "Gen 2 capture adapter currently verifies Polished only" }
+    val ram = File("../../test/resources/fixtures/$fixture/wramx.bin").readBytes()
+    require(ram.size == 32768)
+    val reader = object : com.pokedaisy.app.companion.data.MemoryReader {
+        override fun readCoreMemory(addr: Long, size: Int): ByteArray {
+            val bank = (addr ushr 16).toInt()
+            val bus = (addr and 65535).toInt()
+            val offset = if (bank == 0 && bus in 0xc000 until 0xd000) bus - 0xc000
+                else if (bank in 1..7 && bus in 0xd000 until 0xe000) bank * 4096 + bus - 0xd000
+                else error("Unsupported Gen 2 fixture read")
+            require(size >= 0 && offset + size <= ram.size)
+            return ram.copyOfRange(offset, offset + size)
+        }
+    }
+    val rom = File(System.getProperty("rom").orEmpty()).readBytes()
+    val hash = java.security.MessageDigest.getInstance("SHA-1").digest(rom).joinToString("") { "%02x".format(it) }
+    require(hash in com.pokedaisy.app.companion.data.TelemetrySampler.POLISHED_CRYSTAL_SHA1S)
+    val tables = requireNotNull(com.pokedaisy.app.companion.data.polishedCrystalPokedex(hash))
+    val base = if (hash in com.pokedaisy.app.companion.data.TelemetrySampler.POLISHED_CRYSTAL_FAITHFUL_SHA1S)
+        com.pokedaisy.app.companion.data.GEN2_POLISHED_CRYSTAL_FAITHFUL
+        else com.pokedaisy.app.companion.data.GEN2_POLISHED_CRYSTAL
+    val cfg = base.copy(pokedex = tables)
+    com.pokedaisy.app.companion.data.activeGen2 = cfg
+    com.pokedaisy.app.companion.data.Gen1Dex.rom = rom
+    val telemetry = com.pokedaisy.app.companion.data.readGen2Telemetry(reader, cfg)
+    return com.pokedaisy.app.companion.data.buildSnapshotView(telemetry).copy(game = activeGame, connected = true)
+
 }
 
 fun main(args: Array<String>) {
@@ -1172,7 +1214,15 @@ fun main(args: Array<String>) {
             onAllNodesWithText("STUCK?", ignoreCase = true).onFirst().performClick()
         },
     ) else emptyList()
-    val all = real + listOf(
+    val gen2Real = if (System.getProperty("gen2Fixture").orEmpty().isNotBlank()) listOf(
+        Shot("$g-real-items", bw, bh, bd, companion("ITEMS", snap = ::gen2Snapshot)),
+        Shot("$g-real-items-desc", bw, bh, bd, companion("ITEMS", snap = ::gen2Snapshot)) {
+            onNodeWithText("Potion").performClick()
+        },
+        Shot("$g-real-party", bw, bh, bd, companion("PARTY", snap = ::gen2Snapshot)),
+        Shot("$g-real-dex", bw, bh, bd, companion("DEX", snap = ::gen2Snapshot)),
+    ) else emptyList()
+    val all = real + gen2Real + listOf(
         Shot("$g-party", bw, bh, bd, companion("PARTY")),
         // The lead holds a Potion, the second a QUICK CLAW: the tag in each slot's corner and the game's marker by the icon.
         Shot("$g-party-held", bw, bh, bd, companion("PARTY") {

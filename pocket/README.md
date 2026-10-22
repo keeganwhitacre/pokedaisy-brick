@@ -1,10 +1,10 @@
-# PokeDaisy Pocket: Phase 12
+# PokeDaisy Pocket: Phase 13
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 
 Native SDL2 and mGBA prototype for TrimUI Brick / NextUI. The user has confirmed
 Phase 1 gameplay and a live party with a ROM sprite on physical Brick hardware.
-Phase 12 adds original-style HP bars throughout the Polished battle companion and the upstream pulsing map cursor. Shared pixel widgets accept game palettes without emulator or memory dependencies. Earlier party/summary, Guide, expansion/zoom, quick-menu and save/display features remain included. Tested with the supplied normal 3.2.3 ROM; hardware verification of this pass remains open.
+Phase 13 starts a direct Android visual-parity pass: Polished's Bag now uses its magenta backdrop, folder tabs, framed list and inline descriptions; Dex uses the original counts/filter column, icons and seen/caught marks. Shared navigation chips use the Game Boy window palette. The source desktop preview can now render Polished from the same captured memory and personal-ROM art for direct comparisons. Earlier emulator/companion features remain included. Full visual parity, hardware optimization and power integration remain unfinished.
 It does not yet reproduce the full Android application.
 
 Gameplay preserves the working opaque RGB888 format. Game scaling now uses the
@@ -196,3 +196,11 @@ The upstream Gen 2 party slots do not have an EXP bar, and its Dex list does not
 Battle INFO, SUGGESTIONS, FOE DETAILS and revealed FOE TEAM rows show health with the same HP lettering and Polished colors as the party. Names, level/OUT and health have separate space in team and suggestion rows. Unknown foes remain concealed. Map uses the upstream four-corner cursor, pulsing every 333 ms around the selected landmark or empty cell; its center stays transparent. The UI clock animates it while emulation stays paused.
 
 The parity checklist now reflects two upstream Gen 2 boundaries: there are no item icons and no announced-next-foe index in its reader. Gen 2 Party uses SpeciesIcon's first animation frame with selected-icon bobbing, which is already adapted. These are not missing features to invent. Additional battle panel styling and broader lifecycle/hardware work remain open.
+
+## Phase 13 visual pass: Bag and Dex list
+
+Bag opens All and shows only meaningful occupied-pocket tabs, like Android. Left/Right changes pocket; Up/Down moves the cursor and follows the selected item's description. A toggles the inline description, B closes it before returning to play, and Select pages a long description without losing text. Y cycles Default / Name / Type / Count sorting; sort keeps the same selected stack. Sorting is a read-only companion view, never a game-bag reorder. Individual stacks remain distinct even if they share an item id. Favorites are not adapted yet.
+
+Dex now places SEEN/OWNED counts and all four filters beside the numbered icon list. Caught/seen marks reuse upstream pixel artwork; unencountered entries remain visible but dim, as Android's DexRow does. The Brick stacks each row's number and name to keep full-size ROM text readable. Up/Down scrolls one entry, Left/Right moves five entries, Y changes filter and A opens the existing entry page. Entry-page composition still needs a later visual pass.
+
+Top navigation retains the existing five-chip shoulder workflow on Brick, now with upstream Game Boy chip frames and colors. Android's bottom placement, gear/MORE arrangement and complete settings/state browser are not claimed. Guide and battle panel composition also remain open. We will finish those visual comparisons before the performance and power/suspend/exit milestone; GBA companion expansion follows that work.

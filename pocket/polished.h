@@ -30,10 +30,11 @@ struct pc_ui {
   int section, selected, pocket, item, dex, dexPage, region, mapX, mapY, place,
       move, summaryPage, typePage, guidePage, guideMethod, guideRow,
       guideReveal, guideScroll, guideMon, guideBoss, battlePage, battleRow,
-      battleFoe, battleType, dexFilter;
+      battleFoe, battleType, dexFilter, bagSort, bagScroll, bagDescPage,
+      bagKeyPocket, bagKeySlot, dexScroll;
   unsigned battleSeen;
   uint32_t animationMs;
-  bool wasBattle;
+  bool wasBattle, bagStarted, bagReselect;
   bool summary, detail, mapSet, placesOpen, moveOpen, guideBossOpen;
 };
 enum pc_action {

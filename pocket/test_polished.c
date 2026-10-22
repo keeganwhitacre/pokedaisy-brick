@@ -288,6 +288,62 @@ static void test_experience(void) {
   puts("PASS six upstream EXP curves at every level, boundaries/clamps/MAX, "
        "Polished rate mapping and egg exclusion");
 }
+static void test_item_lists(void) {
+  // Codec/model cases only; synthetic stacks are never runtime screenshots.
+  struct pocket_item_ref original[] = {{"Zinc", 1, 3, 0, 0},
+                                       {"Apple", 2, 2, 1, 0},
+                                       {"Apple", 2, 2, 1, 1},
+                                       {"Berry", 3, 3, 0, 1}};
+  struct pocket_item_ref rows[4], scratch[4];
+  memcpy(rows, original, sizeof rows);
+  pocket_item_sort(rows, scratch, 4, POCKET_SORT_DEFAULT);
+  assert(!memcmp(rows, original, sizeof rows));
+  pocket_item_sort(rows, scratch, 4, POCKET_SORT_NAME);
+  assert(rows[0].pocket == 1 && rows[0].slot == 0 && rows[1].slot == 1);
+  assert(!strcmp(rows[2].name, "Berry") && !strcmp(rows[3].name, "Zinc"));
+  memcpy(rows, original, sizeof rows);
+  pocket_item_sort(rows, scratch, 4, POCKET_SORT_COUNT);
+  assert(!strcmp(rows[0].name, "Berry") && !strcmp(rows[1].name, "Zinc"));
+  assert(rows[2].slot == 0 && rows[3].slot == 1);
+  pocket_item_sort(rows, scratch, 4, POCKET_SORT_TYPE);
+  assert(rows[0].pocket == 0 && rows[1].pocket == 0 && rows[2].pocket == 1);
+  struct pd_snapshot s = {.bagOk = true};
+  struct pc_ui u = {.section = PC_BAG};
+  int tabs[6];
+  assert(bag_tabs(&s, tabs) == 1 && tabs[0] == -1);
+  assert(pc_ui_input(&u, &s, PC_CONFIRM) && !u.detail && u.pocket == -1);
+  s.bag[0].count = 1;
+  s.bag[1].count = 2;
+  s.bag[0].items[0] = (struct pd_item){25, 1};
+  s.bag[1].items[0] = (struct pd_item){1, 3};
+  s.bag[1].items[1] = (struct pd_item){1, 2};
+  struct pd_snapshot before = s;
+  struct pocket_item_ref all[640];
+  assert(bag_entries(&s, -1, 0, 0, all) == 3);
+  assert(all[0].id == 25 && all[1].slot == 0 && all[2].slot == 1);
+  assert(bag_entries(&s, -1, 3, 0, all) == 3 && all[0].quantity == 3);
+  assert(bag_tabs(&s, tabs) == 3 && tabs[1] == 0 && tabs[2] == 1);
+  assert(pc_ui_input(&u, &s, PC_DOWN) && u.item == 1 && u.detail);
+  assert(pc_ui_input(&u, &s, PC_BACK) && !u.detail);
+  assert(pc_ui_input(&u, &s, PC_RIGHT) && u.pocket == 0 && !u.item);
+  assert(pc_ui_input(&u, &s, PC_RIGHT) && u.pocket == 1);
+  assert(pc_ui_input(&u, &s, PC_RIGHT) && u.pocket == -1);
+  assert(!memcmp(&s, &before, sizeof s));
+  for (int p = 0; p < PD_POCKET_COUNT; p++) {
+    s.bag[p].count = PD_POCKET_SLOTS;
+    for (int i = 0; i < PD_POCKET_SLOTS; i++)
+      s.bag[p].items[i] = (struct pd_item){1, i + 1};
+  }
+  assert(bag_count(&s, -1) == 640);
+  assert(bag_entries(&s, -1, 3, 0, all) == 640);
+  assert(all[0].quantity == 128 && all[639].quantity == 1);
+  s.bag[0].count++;
+  assert(bag_entries(&s, -1, 0, 0, all) == 512);
+  puts("PASS read-only item models: stable duplicate stacks, all/present "
+       "pockets, "
+       "name/type/count sorting, boundaries, capacity and nested controller "
+       "Back");
+}
 static void test_pixel_widgets(void) {
   // Unknown, fainted, tiny positive, full and corrupt/out-of-range health.
   assert(!pocket_hp_fill(0, 100, 146));
@@ -319,8 +375,31 @@ static void test_pixel_widgets(void) {
     assert(px[outside * 512 + outside] == 0xffffff);
     assert(px[(outside - 1) * 512 + outside] == 0x123456);
   }
-  puts("PASS shared pixel widgets: HP boundaries/colors/saturation and map "
-       "pulse");
+  // Full descriptions must not paint outside the viewport or change clips.
+  pd_font_set(NULL, 0);
+  pd_fill(&c, 0, 0, 512, 384, 0x123456);
+  struct pd_canvas before = c;
+  int page = 0;
+  const char *text = "One two three four five six seven eight nine ten eleven "
+                     "twelve thirteen.";
+  int pages = pocket_text_page(&c, 20, 50, 100, 18, 2, text, &page, 0xffffff,
+                               PD_NO_SHADOW);
+  assert(pages > 1 && !memcmp(&before, &c, sizeof c));
+  for (int y = 0; y < 384; y++)
+    for (int x = 0; x < 512; x++)
+      if (x < 20 || x >= 120 || y < 50 || y >= 86)
+        assert(px[y * 512 + x] == 0x123456);
+  page = pages;
+  assert(pocket_text_page(&c, 20, 50, 100, 18, 2, text, &page, 0xffffff,
+                          PD_NO_SHADOW) == pages &&
+         !page);
+  pd_fill(&c, 0, 0, 512, 384, 0x000000);
+  pd_clip(&c, 10, 10, 4, 4);
+  pocket_fade_rect(&c, -10, -10, 100, 100, 0xffffff, 45);
+  assert(px[10 * 512 + 10] == 0x8c8c8c && px[9 * 512 + 10] == 0);
+  pd_unclip(&c);
+  puts("PASS shared pixel widgets: HP boundaries/colors, map pulse, clipped "
+       "full-text pagination and dimmed sprites");
 }
 int main(int argc, char **argv) {
   assert(argc == 2 || argc == 3);
@@ -328,6 +407,7 @@ int main(int argc, char **argv) {
   test_phase9();
   test_experience();
   test_pixel_widgets();
+  test_item_lists();
   unsigned char *cart = NULL;
   size_t romSize = 0;
   int build = 0;
@@ -398,6 +478,26 @@ int main(int argc, char **argv) {
       pd_canvas_init(&c, 512, 384, px);
       pc_draw(&c, &s, 0, false, NULL, 0, -1);
       pd_png_write("polished-fixture.png", 512, 384, px);
+      if (cart) {
+        struct pc_ui bag = {.section = PC_BAG};
+        pc_ui_draw(&bag, &c, &s, cart, romSize, build);
+        assert(bag.detail && bag.pocket == -1);
+        assert(pd_png_write("runtime-phase13-bag-inline-fixture.png", 512, 384,
+                            px));
+        assert(pc_ui_input(&bag, &s, PC_CONFIRM) && !bag.detail);
+        pc_ui_draw(&bag, &c, &s, cart, romSize, build);
+        assert(
+            pd_png_write("runtime-phase13-bag-list-fixture.png", 512, 384, px));
+        int keyPocket = bag.bagKeyPocket, keySlot = bag.bagKeySlot;
+        assert(pc_ui_input(&bag, &s, PC_ALTERNATE) && bag.bagSort == 1);
+        pc_ui_draw(&bag, &c, &s, cart, romSize, build);
+        assert(bag.bagKeyPocket == keyPocket && bag.bagKeySlot == keySlot);
+        assert(pd_png_write("runtime-phase13-bag-sorted-fixture.png", 512, 384,
+                            px));
+        struct pc_ui dexUi = {.section = PC_DEX};
+        pc_ui_draw(&dexUi, &c, &s, cart, romSize, build);
+        assert(pd_png_write("runtime-phase13-dex-fixture.png", 512, 384, px));
+      }
     }
   }
   const char *battleFixtures[] = {"polished_crystal_battle",

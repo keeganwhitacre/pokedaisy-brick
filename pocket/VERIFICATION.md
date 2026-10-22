@@ -1,4 +1,4 @@
-# Phase 12 verification
+# Phase 13 verification
 
 Phase 7 adds the L3 quick menu: original Android state/FF/companion pixel icons,
 D-pad ring navigation, genuine paused gameplay at its existing physical scale,
@@ -178,3 +178,13 @@ Native diagnostic GB/GBA regressions pass, including battery-marker persistence,
 No physical Brick testing occurred in this pass. Audible hardware output, sustained performance, RTC, suspend/power behavior and broad expansion-map coverage remain unverified. Full Android panel styling and feature parity remain unfinished. No ROM, loose extracted game assets, personal save or state is shipped. The screenshots are actual renderer output, not mockups.
 
 The isolated decoder/renderer harness also passes AddressSanitizer and UndefinedBehaviorSanitizer with the supplied ROM and captured fixtures. LeakSanitizer cannot inspect process threads in this environment and was disabled for the successful run; no leak-clean claim is made. This is not a sanitizer run of the full emulator. The manual checks, search tests and website documentation build (`make docs-check`) pass.
+
+## Phase 13 results (2026-10-22)
+
+Native Linux and actual NextUI Cortex-A53/AArch64 builds compile. Native and ARM/QEMU decoder tests cover All/occupied-pocket selection, stable duplicate stacks and all four sort modes, maximum 640-row capacity, malformed pocket counts, selection retention across sort, nested Back and read-only snapshot preservation. Shared text tests verify pagination wrap, clip preservation and no drawing outside the viewport; dimmed-sprite clipping and all previous HP/EXP/battle/Guide predicates pass. Generated styles and prior data/art pass freshness checks.
+
+The supplied normal 3.2.3 ROM passes the ordinary-input new-game test again. Native and ARM/QEMU SDL tests navigate Bag, Dex, Map and Summary while asserting paused core frame counters, return to gameplay and pass save-state round trips. The fresh starter has an empty bag: populated Bag captures are separately labeled upstream memory fixtures. Native diagnostic GB/GBA tests pass battery/state persistence and 100 companion toggles. The isolated decoder/renderer passes ASan/UBSan with leak detection disabled because this environment cannot support LeakSanitizer's thread inspection. This is not a full emulator sanitizer or physical-device test.
+
+The real upstream Compose desktop renderer builds and renders four reference screens from polished_crystal captured WRAM, using the supplied ROM for the Gen 2 font/art/text and its actual hash-selected tables. The four real-fixture captures complete without action failures. The earlier generic preview run had two favorite-interaction failures and is not used as parity evidence. Native Bag and Dex captures and these real-fixture references were inspected at the actual screen size. The comparison corrected the description box's measured height, the OWNED count label, and shared chip framing. It does not establish full-screen parity for the unreviewed screens.
+
+No physical Brick testing occurred. Full Guide/battle/Dex-entry/global-menu visual parity, sustained ARM performance, audio hardware, RTC, suspend/shutdown and power-loss behavior remain unfinished. No ROM, loose extracted commercial art, personal save or state is shipped. Reference and native screenshots are actual render output, explicitly labeled by source and whether memory fixtures were used.

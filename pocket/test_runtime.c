@@ -303,6 +303,16 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
     if (getenv("POCKET_TEST_STATE")) {
       if (frame >= 122 && frame < 122 + PC_MAP)
         send_key(SDLK_e);
+      if (frame == 123) {
+        assert(companion && pcUi->section == PC_BAG && s->bagOk);
+        assert(c->frameCounter(c) == pausedCounter);
+        assert(capture_frame("runtime-phase13-bag-sdl.png", NULL));
+      }
+      if (frame == 125) {
+        assert(companion && pcUi->section == PC_DEX && s->dexOk);
+        assert(c->frameCounter(c) == pausedCounter);
+        assert(capture_frame("runtime-phase13-dex-sdl.png", NULL));
+      }
       if (frame == 126) {
         assert(companion && pcUi->section == PC_MAP);
         assert(c->frameCounter(c) == pausedCounter);
@@ -460,13 +470,13 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
   }
   if (frame == 18) {
     assert(s->bagOk);
-    assert(pixels[25 * W + 110] == 0xffffff);
+    assert(pcUi->section == PC_BAG && pcUi->bagStarted && pcUi->pocket == -1);
     capture_frame("runtime-polished-bag-fixture.png", NULL);
     send_key(SDLK_RIGHT);
   }
   if (frame == 19) {
-    assert(pixels[50 * W + 110] == 0xdcdcdc);
-    capture_frame("runtime-polished-balls-fixture.png", NULL);
+    assert(pcUi->section == PC_BAG && pcUi->pocket == PD_POCKET_ITEMS);
+    capture_frame("runtime-phase13-bag-pocket-sdl-fixture.png", NULL);
     send_key(SDLK_TAB);
   }
   if (frame >= 20 && frame < 120)
@@ -495,13 +505,13 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
     send_key(SDLK_e);
   if (frame == 128) {
     assert(companion && s->inBattle && s->battlers[1].species == 161);
-    assert(pixels[25 * W + 210] == 0xffffff);
+    assert(pcUi->section == PC_BATTLE);
     capture_frame("runtime-polished-battle-fixture.png", NULL);
     send_key(SDLK_e);
   }
   if (frame == 129) {
     assert(s->dexOk);
-    assert(pixels[25 * W + 310] == 0xffffff);
+    assert(pcUi->section == PC_DEX);
   }
   if (frame >= 129 && frame <= 142)
     send_key(SDLK_RIGHT);

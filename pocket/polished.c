@@ -2,9 +2,11 @@
  * ROM art is decoded only from the user's SHA-1 matched ROM. */
 #include "polished.h"
 #include "experience.h"
+#include "item_list.h"
 #include "pd_font.h"
 #include "pixel_widgets.h"
 #include "polished_guide_tables.h"
+#include "polished_style.h"
 #include "polished_tables.h"
 #include "rom_identity.h"
 #include <stdio.h>
@@ -305,15 +307,21 @@ static const char *item_name(int id, int build) {
 }
 static void header(struct pd_canvas *c, int tab) {
   pd_fill(c, 0, 0, c->w, c->h, 0xffffff);
-  pd_fill(c, 4, 4, c->w - 8, 26, 0x181818);
   const char *labels[] = {"PARTY", "BAG", "BATTLE", "DEX", "MAP", "GUIDE"};
   int start = tab >= 5 ? tab - 4 : 0;
+  int used = 0, widths[5];
   for (int i = 0; i < 5; i++) {
-    if (i + start == tab)
-      pd_fill(c, 5 + i * 100, 7, 98, 20, 0xffffff);
-    pd_text(c, 4 + i * 100 + (100 - pd_text_width(labels[i + start])) / 2, 8,
-            labels[i + start], i + start == tab ? 0x181818 : 0xffffff,
-            PD_NO_SHADOW);
+    widths[i] = pd_text_width(labels[i + start]) + 16;
+    used += widths[i];
+  }
+  int extra = (488 - used) / 5, x = 4;
+  for (int i = 0; i < 5; i++) {
+    int w = i == 4 ? 508 - x : widths[i] + extra;
+    pd_layered_box(c, x, 2, w, 30, 6, pcBagEdge, 3,
+                   i + start == tab ? 0xdcdcdc : 0xffffff);
+    pd_text(c, x + (w - pd_text_width(labels[i + start])) / 2, 9,
+            labels[i + start], 0x181818, PD_NO_SHADOW);
+    x += w + 4;
   }
 }
 static void txt(struct pd_canvas *c, int x, int y, const char *s) {
@@ -379,51 +387,19 @@ void pc_draw(struct pd_canvas *c, const struct pd_snapshot *s, int selected,
              bool summary, const unsigned char *rom, size_t n, int build) {
   pc_party_draw(c, s, selected, summary, rom, n, build, 0);
 }
+#include "polished_bag.inc"
 void pc_bag_draw(struct pd_canvas *c, const struct pd_snapshot *s, int pocket,
                  int selected, int build) {
-  header(c, 1);
-  static const char *labels[] = {"ITEMS", "BALLS", "TM/HM", "BERRY", "KEY"};
-  if (pocket < 0 || pocket >= PD_POCKET_COUNT)
-    pocket = 0;
-  for (int i = 0; i < 5; i++) {
-    int x = 8 + i * 100;
-    pd_fill(c, x, 38, 96, 24, 0x181818);
-    pd_fill(c, x + 1, 39, 94, 22, i == pocket ? 0xdcdcdc : 0xffffff);
-    txt(c, x + 7, 41, labels[i]);
-  }
-  if (!s->bagOk) {
-    txt(c, 20, 90, "Bag data is not ready.");
-    return;
-  }
-  const struct pd_pocket_items *p = &s->bag[pocket];
-  if (selected < 0)
-    selected = 0;
-  if (selected >= p->count)
-    selected = p->count ? p->count - 1 : 0;
-  int scroll = selected >= 10 ? selected - 9 : 0;
-  if (!p->count)
-    txt(c, 20, 90, "This pocket is empty.");
-  for (int row = 0; row < 10 && scroll + row < p->count; row++) {
-    int i = scroll + row, y = 72 + row * 24;
-    if (i == selected) {
-      pd_fill(c, 8, y, 496, 23, 0xdcdcdc);
-      txt(c, 13, y + 2, ">");
-    }
-    pd_text_fit(c, 30, y + 2, 366, item_name(p->items[i].id, build), 0x181818,
-                PD_NO_SHADOW);
-    char qty[24];
-    snprintf(qty, sizeof qty, "x%d", p->items[i].quantity);
-    pd_text_right(c, 492, y + 2, qty, 0x181818, PD_NO_SHADOW);
-  }
-  char info[64];
-  snprintf(info, sizeof info, "Money: %ld    %d/%d", s->money,
-           p->count ? selected + 1 : 0, p->count);
-  txt(c, 12, 322, info);
-  txt(c, 12, 346, "D-pad:Browse A:Info");
-  txt(c, 12, 366, "L/R:Section B/X:Play");
+  struct pc_ui u = {.section = PC_BAG,
+                    .pocket = pocket,
+                    .item = selected,
+                    .bagStarted = true};
+  pc_bag_pages(&u, c, s, NULL, 0, build);
 }
 
 #define lz pc_lz
 #include "polished_sections.inc"
 
 #include "polished_parity.inc"
+
+#include "polished_bag_draw.inc"

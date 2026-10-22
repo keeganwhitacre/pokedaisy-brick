@@ -79,6 +79,7 @@ tasks.register<JavaExec>("render") {
     // (NdsArt), the snapshot read from that save fixture (app/src/test/resources/fixtures/<name>/mainram.bin).
     systemProperty("ndsRom", (project.findProperty("ndsRom") as String?) ?: "")
     systemProperty("ndsFixture", (project.findProperty("ndsFixture") as String?) ?: "")
+    systemProperty("gen2Fixture", (project.findProperty("gen2Fixture") as String?) ?: "")
     systemProperty("decomps", System.getenv("DECOMPS").orEmpty())
     // Asset paths are opened relative to workingDir, so pass the icon dir relative to it.
     val monIcons = (project.findProperty("monIcons") as String?) ?: System.getenv("MON_ICONS").orEmpty()

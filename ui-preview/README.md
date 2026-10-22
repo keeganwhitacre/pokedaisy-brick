@@ -91,3 +91,28 @@ step, so a miss prints `action failed`.
   device is still the final word.
 - If the compiler reports "Unresolved reference" for something that plainly
   exists, delete `build/kotlin` (stale incremental cache — happened once).
+
+## Polished Crystal reference captures
+
+The renderer rebuilds Gen 2 font, icons, held marks, town maps and player art
+from a matching `-Prom` cart using the unchanged Gen2Art extractor. Companion
+previews scope OptionColors.inGame as the device activity does, restoring it
+when the composition closes so Library/Settings previews keep their own look.
+
+For real captured Polished data instead of the demo party/items, use:
+
+```bash
+./gradlew -p ui-preview render -Pgame=POLISHED_CRYSTAL \
+  -Pgen2Fixture=polished_crystal -Prom=/path/polished.gbc \
+  -Ponly=polished_crystal-real- \
+  -PcompanionW=1024 -PcompanionH=768 -PcompanionDensity=2
+```
+
+This writes real-fixture Party, Bag, Bag-description and Dex reference captures.
+The adapter validates the ROM against upstream hashes, chooses normal/faithful
+configuration and ROM tables as Poller does, then uses readGen2Telemetry and
+buildSnapshotView over the fixture's banked WRAM. The non-battle polished_crystal
+fixture is verified; the adapter deliberately does not invent VRAM or ROM-bus
+responses for other capture types. These are actual Compose-source renders of
+captured memory, not Android-device screenshots or newly played game states.
+Do not commit the cart, extracted art or game screenshots.

@@ -98,3 +98,11 @@ New games should reuse host I/O, identity, controller events and emulator lifecy
 `pixel_widgets.h` adapts PartyScreen.drawHpBar, BattleLists.drawListHpBar and MapScreen.drawMapCursor as portable canvas operations. HP colors come from a caller-supplied palette; no game ids, offsets, ROM files, SDL calls or emulator timing enter the helpers. Polished supplies its upstream palette. Party and battle share the same health renderer, while `pc_ui_tick` supplies the map's 20-frame/333 ms cadence. Map cursor geometry follows the selected landmark dimensions and leaves the player visible. Future game adapters can reuse these widgets with their own verified palettes.
 
 The item/next-foe/animation parity audit is recorded in PARITY.md. Keep Gen 2 source boundaries separate from richer GBA/DS paths rather than supplying unsupported telemetry or assets.
+
+## Phase 13 repeatable visual parity
+
+`gen_style.py` records/extracts the PolishedCrystalBag/YellowBag frame layers, backdrop/underline palette, GbaMenu's Game Boy OPTION frame, and PixelIcons/PokedexScreen seen/caught marks. It records source hashes and fails on unexpected frame/palette shapes. `--check` is part of native CI. No ROM graphics are added to the source or package.
+
+`item_list.h` is a game-independent, stable O(n log n) view sort with caller-owned scratch. It orders Default/Name/Type/Count as ItemsScreen does and preserves duplicate stacks. Polished's memory-to-item adapter remains in polished_bag.inc; the SDL host has no new game-specific branches. Shared pixel_widgets provides clipped opacity and full-description pagination without SDL, allocations or emulation calls.
+
+The upstream `ui-preview` harness now also rebuilds Gen 2 ROM art and renders Polished captures with `-Pgen2Fixture=polished_crystal`, using readGen2Telemetry/buildSnapshotView and the exact upstream hash/faithful/table selection. In-game window scope is restored when each companion preview closes. See ui-preview/README.md. This provides source-rendered reference captures for future screens and avoids interpreting generic preview fallbacks as the Android game's actual style.
