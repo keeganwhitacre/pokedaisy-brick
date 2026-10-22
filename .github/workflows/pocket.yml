@@ -3,7 +3,7 @@ on:
   push:
     branches: ['main', 'handheld/**']
   pull_request:
-    paths: ['pocket/**', '3ds/**', 'app/src/main/kotlin/com/pokedaisy/app/companion/data/**', 'app/src/test/resources/fixtures/**', '.github/workflows/pocket.yml', 'third_party/mgba']
+    paths: ['app/src/main/cpp/pk_wide*', 'pocket/**', '3ds/**', 'app/src/main/kotlin/com/pokedaisy/app/companion/data/**', 'app/src/test/resources/fixtures/**', '.github/workflows/pocket.yml', 'third_party/mgba']
   workflow_dispatch:
 permissions:
   contents: read

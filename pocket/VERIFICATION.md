@@ -1,10 +1,10 @@
-# Phase 7 verification
+# Phase 8 verification
 
 Phase 7 adds the L3 quick menu: original Android state/FF/companion pixel icons,
 D-pad ring navigation, genuine paused gameplay at its existing physical scale,
 disabled missing-state load, save/load confirmation and fast-forward/companion
 actions. Existing gameplay/companion textures retain their opaque RGB888 path;
-the additional overlay uses explicit ARGB alpha. R3 zoom is not implemented.
+the additional overlay uses explicit ARGB alpha. Phase 8 adds R3 Original/Expand/Zoom (see results below).
 
 Native Linux and the actual NextUI ARM build pass the new quick-menu test. The
 same real supported 3.2.3 ROM and genuine fresh-game starter state from the
@@ -126,3 +126,19 @@ The install launcher continues to use the actual NextUI backends.
 
 The source is prepared for the user's pokedaisy-brick fork, retaining the shared
 upstream ancestor. Remote CI results must be read separately from local tests.
+
+## Phase 8 results (2026-10-22)
+
+Linux/x86-64 and actual NextUI GCC 8.3 Cortex-A53/AArch64 builds compile. The private user-supplied normal 3.2.3 ROM passes the original normal-input new-game route: Cyndaquil Lv5, 19/19 HP; 289 dex texts/front images, 373 descriptions, three region maps. No commercial ROM, extracted art, battery save or state is distributed.
+
+The SDL runtime test dismisses actual starter-event dialogue with ordinary input, then checks R3 via keyboard and raw button override. Expand draws 1020×760 and Zoom 1024×768 on the 1024×768 test surface; Original remains 800×720. Both expanded modes reach a 1000/1000 map-tile match. Every displayed expanded frame asserts that the entire original 160×144 PPU viewport is unchanged. Companion and quick-menu frames pause the core and resume correctly. Loading a state invalidates the render cache. Real runtime captures `runtime-phase8-expand.png` and `runtime-phase8-zoom.png` show Elm's laboratory, not synthetic game data.
+
+The ordinary captured-memory decoder, GB/GBA diagnostic runtime and L3 quick-menu regressions pass. Expanded modes were also run with the compiled ARM executable under QEMU; this is not physical hardware or performance validation. SDL software/offscreen rendering and dummy audio are test backends only. In-game menu fallback and post-state reset are checked by the extended private-ROM runtime test.
+
+Reproduce private expansion check after the normal new-game test creates a separate test state:
+
+```sh
+SDL_VIDEODRIVER=offscreen SDL_RENDER_DRIVER=software SDL_AUDIODRIVER=dummy POCKET_FULLSCREEN=1 POCKET_TEST_WIDE=1 POCKET_TEST_ROM=/private/game.gbc POCKET_TEST_STATE=/private/test.ss pocket/build-native/pocket-runtime-test
+```
+
+Limitations: only normal 3.2.3 expansion is verified; laboratory coverage does not establish all-map correctness. Connected-map terrain is adapted but lacks a broad playthrough. Unspawned and connected-map NPCs are deliberately omitted. Physical R3 discovery, long-run speed/audio, RTC, suspend and power-loss safety still need Brick testing. No new hardware test or full Android parity is claimed. See PARITY.md for the remaining Polished work before GBA.

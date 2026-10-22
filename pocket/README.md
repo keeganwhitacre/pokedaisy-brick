@@ -1,10 +1,10 @@
-# PokeDaisy Pocket: Phase 7
+# PokeDaisy Pocket: Phase 8
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 
 Native SDL2 and mGBA prototype for TrimUI Brick / NextUI. The user has confirmed
 Phase 1 gameplay and a live party with a ROM sprite on physical Brick hardware.
-Phase 7 adds the L3 quick-menu ring with working state, fast-forward and companion actions. The previous pass added battle effectiveness, Suggestions, Foe Details and Foe Team browsing. The previous pass added the Polished Crystal Guide: live encounters, area finds, progress-aware next bosses, tips and Where Is. It retains the original ROM font, all three region maps and two-column summaries. It has been tested using the supplied supported 3.2.3 ROM. It contains a real emulator and companion integration.
+Phase 8 adds Polished Crystal 3.2.3 expanded overworld rendering and R3 display cycling, using the existing upstream GB renderer. L3 retains the quick-menu ring with working state, fast-forward and companion actions. The previous pass added battle effectiveness, Suggestions, Foe Details and Foe Team browsing. The previous pass added the Polished Crystal Guide: live encounters, area finds, progress-aware next bosses, tips and Where Is. It retains the original ROM font, all three region maps and two-column summaries. It has been tested using the supplied supported 3.2.3 ROM. It contains a real emulator and companion integration.
 It does not yet reproduce the full Android application.
 
 Gameplay preserves the working opaque RGB888 format. Game scaling now uses the
@@ -40,7 +40,7 @@ and keep your `roms`, `saves` and `states` folders.
 | Start / Select | Game Start / Select | Normal menu navigation uses A/B |
 | X | Open companion | Return to game |
 | L3 | Quick-menu ring | Open / close quick menu |
-| R3 | Reserved for future zoom | No zoom action yet |
+| R3 | Cycle Original / Expand / Zoom | Display also available in game menu |
 | Y | Toggle fast-forward (2x default) | Screen-specific alternate action |
 | L1 / R1 | Game L / R on GBA | Previous / next section in either companion |
 | Menu | Open game menu | Open / close game menu |
@@ -153,7 +153,7 @@ will be recorded in `launch.log`.
 
 Read `VERIFICATION.md` for exact results. The supplied supported Polished Crystal 3.2.3 ROM was tested through a fresh game without fixture injection. The older 3.1.1 test remains emulation-only.
 The user has confirmed the Phase 1 gameplay/party/sprite path on a physical Brick.
-The Phase 7 quick menu and physical L3 detection still need a hardware retest. The supplied supported 3.2.3 ROM passes all 289 dex texts/front pictures, 373 item/TM/key descriptions, all three maps, and a normal-input new game to the starter. The ARM frontend reads that actual party and passes pause/resume and state tests without fixture injection.
+Physical L3/R3 detection, expansion performance and suspend behavior still need a hardware retest. The supplied supported 3.2.3 ROM passes all 289 dex texts/front pictures, 373 item/TM/key descriptions, all three maps, and a normal-input new game to the starter. The ARM frontend reads that actual party and passes pause/resume and state tests without fixture injection.
 Captures prefixed `runtime-live323` use the actual new game and matching ROM art. Captures named `fixture` use upstream captured memory. See the verification report for each capture's scope. The install binary
 contains no fixture injection and requires a supported game for real party data.
 The Polished Crystal layout uses the Android palette, six-slot party structure, ROM icons and the ROM font at crisp integer scaling. Summary uses Android's information/moves hierarchy. Remaining battle details/styling, list controls, multi-slot state browsing and exact screen/animation parity remain unfinished. Android’s Polished path does not currently provide IV/EV summary, LEARN/evolution tables or FieldItems actions. Read `PARITY.md` for the feature-by-feature boundary.
@@ -171,6 +171,6 @@ game art are distributed.
 
 L3 now opens the quick menu over paused gameplay. D-pad directions select the four actions; A runs one, B or L3 closes it. Save/load open the existing confirmation; loading is disabled until a state exists. Menu > Quick menu is also available. The original game image keeps its physical integer scale behind the overlay.
 
-R3 remains reserved for zoom. Zoom and expanded overworld rendering are not in this build. Upstream supports retail Crystal expansion, but Polished requires its own verified definitions.
+R3 cycles Original (160×144, 5× on Brick), Expand (204×152, 5×) and Zoom (256×192, 4×). Expansion is initially enabled only for the verified normal Polished Crystal 3.2.3 ROM, SHA1 `6930b48af5844d373e3c9130f26d6dd1084cf4ed`. Other companion-supported versions retain normal gameplay. Menus, dialogue, battles and uncertain map matches automatically use the original viewport. Display mode resets to Original when reopening a ROM. This is an initial expansion implementation: loaded NPCs are drawn, but unspawned and connected-map NPCs are not reconstructed. Indoor laboratory rendering is verified; broad outdoor/connection and hardware performance testing remain. Menu > Display offers the same cycle when R3 is unavailable.
 
-L3/R3 are discovered from SDL controller bindings or Linux joystick/evdev button codes. The launch log records the result. If a driver does not identify them, set `POCKET_L3_BUTTON` / `POCKET_R3_BUTTON` to its raw SDL button numbers (0–255) in launch.sh, or use Menu > Quick menu. No unverified raw index is assumed for these buttons. Keyboard F3 is the quick-menu shortcut for development.
+L3/R3 are discovered from SDL controller bindings or Linux joystick/evdev button codes. The launch log records the result. If a driver does not identify them, set `POCKET_L3_BUTTON` / `POCKET_R3_BUTTON` to its raw SDL button numbers (0–255) in launch.sh, or use Menu > Quick menu. No unverified raw index is assumed for these buttons. Keyboard F3 opens the quick menu; F4 cycles the display for development.

@@ -79,7 +79,7 @@ static void quick_bindings(SDL_Joystick *js, SDL_GameController *pad) {
   if (l3Button >= 0 && l3Button == r3Button)
     r3Button = -1;
   fprintf(stderr,
-          "Quick-menu bindings: L3 button %d, R3 button %d (zoom reserved); F3 "
+          "Quick-menu bindings: L3 button %d, R3 button %d (display cycle); F3/F4 "
           "keyboard/Menu > Quick menu fallback\n",
           l3Button, r3Button);
 }

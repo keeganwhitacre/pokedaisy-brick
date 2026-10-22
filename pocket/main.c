@@ -3,6 +3,7 @@
 #endif
 /* Native single-screen host for PokeDaisy. GPL-3.0, see ../NOTICE. */
 #include "../3ds/desktop/pd_png.h"
+#include "../app/src/main/cpp/pk_wide.h"
 #include "pd_font.h"
 #include "pd_menu.h"
 #include "pd_romart.h"
@@ -37,10 +38,55 @@ static color_t video[256 * 256];
 static struct pd_canvas canvas;
 static SDL_Window *window;
 static SDL_Renderer *renderer;
-static SDL_Texture *texture, *gameTexture, *quickTexture;
+static SDL_Texture *texture, *gameTexture, *quickTexture, *wideTexture;
 static int l3Button = -1, r3Button = -1;
 static uint32_t gamePixels[256 * 256];
 static SDL_Rect lastGameRect;
+/* Cache once per emulated frame; pause cannot advance the renderer. */
+static void notice(const char *text);
+static bool wideSupported, wideReady;
+static int wideMode; /* 0 original, 1 expand, 2 zoom. */
+static unsigned wideW, wideH;
+static uint32_t wideFrame[256 * 192], widePixels[256 * 192], gbFrame[160 * 144];
+static void wide_tick(struct mCore *c, bool skip) {
+  if (!wideSupported)
+    return;
+  for (int y = 0; y < 144; y++)
+    for (int x = 0; x < 160; x++)
+      gbFrame[y * 160 + x] = video[y * 256 + x];
+  wideW = wideMode == 1 ? 204 : 256;
+  wideH = wideMode == 1 ? 152 : 192;
+  struct PkWideView v = {(160 - (int)wideW) / 2, (144 - (int)wideH) / 2,
+                         (int)wideW, (int)wideH};
+  if (skip || !wideMode) {
+    pk_wide_gb_view(c, gbFrame, NULL, v, NULL);
+    wideReady = false;
+    return;
+  }
+  int mix = pk_wide_gb_view(c, gbFrame, wideFrame, v, NULL);
+  wideReady = mix == 256 && pk_wide_gb_last_mode() == PK_WIDE_MODE_MAP &&
+              !pk_wide_gb_wants_close();
+#ifdef POCKET_TEST
+  /* Pixels in the actual PPU viewport must survive expansion unchanged. */
+  if (wideReady)
+    for (int y = 0; y < 144; y++)
+      for (int x = 0; x < 160; x++)
+        if (wideFrame[(y + (wideH - 144) / 2) * wideW + x +
+                      (wideW - 160) / 2] != gbFrame[y * 160 + x])
+          abort();
+#endif
+}
+static void wide_cycle(void) {
+  if (!wideSupported) {
+    notice("Expansion unavailable for this ROM build");
+    return;
+  }
+  wideMode = (wideMode + 1) % 3;
+  wideReady = false;
+  notice(wideMode == 1   ? "Expand"
+         : wideMode == 2 ? "Zoom out"
+                         : "Original display");
+}
 static SDL_AudioDeviceID audio;
 static volatile sig_atomic_t running = 1;
 static bool muted;
@@ -255,19 +301,43 @@ static void render_game(unsigned gw, unsigned gh) {
   lastGameRect =
       (SDL_Rect){(ow - (int)gw * scale) / 2, (oh - (int)gh * scale) / 2,
                  (int)gw * scale, (int)gh * scale};
-  for (unsigned y = 0; y < gh; y++)
-    for (unsigned x = 0; x < gw; x++) {
-      uint32_t native = video[y * 256 + x];
-      gamePixels[y * 256 + x] =
-          ((native & 255) << 16) | (native & 0xff00) | ((native >> 16) & 255);
+  SDL_Texture *drawTexture = gameTexture;
+  if (wideReady) {
+    gw = wideW;
+    gh = wideH;
+    drawTexture = wideTexture;
+    scale = ow / (int)gw;
+    if (oh / (int)gh < scale)
+      scale = oh / (int)gh;
+    if (scale < 1)
+      scale = 1;
+    lastGameRect =
+        (SDL_Rect){(ow - (int)gw * scale) / 2, (oh - (int)gh * scale) / 2,
+                   (int)gw * scale, (int)gh * scale};
+    for (unsigned i = 0; i < gw * gh; i++) {
+      uint32_t n = wideFrame[i];
+      widePixels[i] = ((n & 255) << 16) | (n & 0xff00) | ((n >> 16) & 255);
     }
-  if (SDL_UpdateTexture(gameTexture, NULL, gamePixels, 256 * 4) < 0) {
-    notice(SDL_GetError());
-    return;
+    if (SDL_UpdateTexture(wideTexture, &(SDL_Rect){0, 0, (int)gw, (int)gh},
+                          widePixels, gw * 4) < 0) {
+      notice(SDL_GetError());
+      return;
+    }
+  } else {
+    for (unsigned y = 0; y < gh; y++)
+      for (unsigned x = 0; x < gw; x++) {
+        uint32_t n = video[y * 256 + x];
+        gamePixels[y * 256 + x] =
+            ((n & 255) << 16) | (n & 0xff00) | ((n >> 16) & 255);
+      }
+    if (SDL_UpdateTexture(gameTexture, NULL, gamePixels, 256 * 4) < 0) {
+      notice(SDL_GetError());
+      return;
+    }
   }
   SDL_RenderClear(renderer);
   SDL_Rect src = {0, 0, (int)gw, (int)gh};
-  if (SDL_RenderCopy(renderer, gameTexture, &src, &lastGameRect) < 0) {
+  if (SDL_RenderCopy(renderer, drawTexture, &src, &lastGameRect) < 0) {
     notice(SDL_GetError());
     return;
   }
@@ -338,6 +408,10 @@ static bool state(struct mCore *c, const char *path, bool save) {
   bool ok = save ? mCoreSaveStateNamed(c, f, SAVESTATE_RTC)
                  : mCoreLoadStateNamed(c, f, SAVESTATE_RTC);
   f->close(f);
+  if (ok && !save) {
+    pk_wide_gb_reset();
+    wideReady = false;
+  }
   if (save) {
     if (ok)
       ok = rename(tmp, path) == 0;
@@ -472,6 +546,12 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   for (int i = 0; i < 2; i++)
     blip_set_rates(c->getAudioChannel(c, i), c->frequency(c), 32768);
   c->reset(c);
+  uint32_t wideCrc = 0;
+  if (c->platform(c) == mPLATFORM_GB)
+    c->checksum(c, &wideCrc, mCHECKSUM_CRC32);
+  wideSupported = pk_wide_gb_configure(wideCrc);
+  wideReady = false;
+  wideMode = 0;
   unsigned gw, gh;
   c->desiredVideoDimensions(c, &gw, &gh);
   struct pd_game game;
@@ -498,10 +578,11 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                         "Toggle fast-forward",
                         "Quit to game list",
                         "About",
+                        "Display: Original / Expand / Zoom",
                         "Quick menu"};
   const char *confirmOpts[] = {"Cancel", "Confirm"};
   struct pd_menu gameMenu, confirmMenu;
-  pd_menu_init(&gameMenu, "GAME", opts, 8);
+  pd_menu_init(&gameMenu, "GAME", opts, 9);
   pd_menu_init(&confirmMenu, "CONFIRM", confirmOpts, 2);
   int menuOpen = 0;
   bool quickOpen = false;
@@ -544,6 +625,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           SDL_ClearQueuedAudio(audio);
       }
     }
+    if (down(R3) && !companion && !quickOpen)
+      wide_cycle();
     if (down(Y) && !companion && !quickOpen)
       ff = !ff;
     if (quickOpen) {
@@ -637,6 +720,9 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                 menuOpen = 4;
                 break;
               case 7:
+                wide_cycle();
+                break;
+              case 8:
                 menuOpen = 1;
                 quickOpen = true;
                 quickSelected = 0;
@@ -714,8 +800,11 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     } else {
       muted = ff;
       c->setKeys(c, held & 1023);
-      for (int i = 0; i < (ff ? settings.ffSpeed : 1); i++)
+      int count = ff ? settings.ffSpeed : 1;
+      for (int i = 0; i < count; i++) {
         c->runFrame(c);
+        wide_tick(c, i < count - 1);
+      }
     }
     if (pc >= 0) {
       pc_read(&snap, read_memory, c);
@@ -833,12 +922,15 @@ int main(int argc, char **argv) {
                               SDL_TEXTUREACCESS_STREAMING, W, H);
   gameTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888,
                                   SDL_TEXTUREACCESS_STREAMING, 256, 256);
-  if (!texture || !gameTexture) {
+  wideTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888,
+                                  SDL_TEXTUREACCESS_STREAMING, 256, 192);
+  if (!texture || !gameTexture || !wideTexture) {
     fprintf(stderr, "Texture: %s\n", SDL_GetError());
     return 1;
   }
   SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
   SDL_SetTextureBlendMode(gameTexture, SDL_BLENDMODE_NONE);
+  SDL_SetTextureBlendMode(wideTexture, SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
   pd_canvas_init(&canvas, W, H, pixels);
   SDL_AudioSpec want = {0};
@@ -913,6 +1005,7 @@ int main(int argc, char **argv) {
     SDL_CloseAudioDevice(audio);
   SDL_DestroyTexture(texture);
   SDL_DestroyTexture(gameTexture);
+  SDL_DestroyTexture(wideTexture);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
   SDL_Quit();

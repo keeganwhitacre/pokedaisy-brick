@@ -72,9 +72,6 @@ fallbacks: a shared game code does not mean shared memory structures.
 
 ## Fork status
 
-The current GitHub connector has no create-repository or fork operation. Source
-and commits are complete locally, but no fork or remote push is claimed. Create a
-fork named pokedaisy-pocket at https://github.com/lidor30/pokedaisy/fork; then the
-handheld branch can be pushed with its full upstream ancestry and no ROMs/saves.
+The fork is https://github.com/keeganwhitacre/pokedaisy-brick, branch `main`, retaining upstream ancestry. Keep `lidor30/pokedaisy` as `upstream`; merge and resolve the small native adapter in `pk_wide_gb.c` when that shared renderer changes. Generated Polished definitions remain version-pinned; companion compatibility does not automatically grant expansion compatibility.
 
 The SDK setup script pins both archive SHA-256 values and confines extraction to its destination. It preserves GCC linker scripts when overlaying target SDK headers/libraries. Neither the SDK nor private ROMs/saves belong in git.

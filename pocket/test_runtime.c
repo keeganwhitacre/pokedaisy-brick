@@ -5,7 +5,7 @@
 #include <assert.h>
 static unsigned lastCounter, pausedCounter;
 static bool gbaTest;
-static bool realRomTest, quickTest;
+static bool realRomTest, quickTest, wideTest;
 static char quickRoot[] = "/tmp/pd-quick-test-XXXXXX";
 static const char *quickRom;
 static unsigned quickPause, quickSaved;
@@ -159,8 +159,99 @@ static void quick_test_frame(struct mCore *c, bool companion, int frame) {
          "save/load confirmation/cancel/round-trip, companion, pause/resume "
          "and repeated toggles");
 }
+static void wide_test_frame(struct mCore *c, bool companion, int frame) {
+  if (frame == 0) {
+    assert(wideSupported);
+    assert(state(c, getenv("POCKET_TEST_STATE"), false));
+  }
+  if (frame < 1800 && (frame % 30 == 0 || frame % 30 == 10)) {
+    SDL_Event e = {.type = frame % 30 == 0 ? SDL_KEYDOWN : SDL_KEYUP};
+    e.key.keysym.sym = SDLK_z;
+    SDL_PushEvent(&e);
+  }
+  if (frame == 1801)
+    send_key(SDLK_F4);
+  if (frame == 1825) {
+    printf("expand ready=%d score=%d scene=%d\n", wideReady,
+           pk_wide_gb_last_score(), pk_wide_gb_scene());
+    fflush(stdout);
+    capture_frame("runtime-phase8-before.png", NULL);
+    assert(wideMode == 1 && wideReady);
+    assert(lastGameRect.w == 1020 && lastGameRect.h == 760);
+    assert(capture_frame("runtime-phase8-expand.png", NULL));
+    send_button(13);
+  }
+  if (frame == 1850) {
+    assert(wideMode == 2 && wideReady);
+    assert(lastGameRect.w == 1024 && lastGameRect.h == 768);
+    assert(capture_frame("runtime-phase8-zoom.png", NULL));
+    send_key(SDLK_TAB);
+    pausedCounter = c->frameCounter(c);
+  }
+  if (frame == 1851)
+    assert(companion && c->frameCounter(c) == pausedCounter);
+  if (frame == 1854) {
+    assert(companion && c->frameCounter(c) == pausedCounter);
+    send_key(SDLK_TAB);
+  }
+  if (frame == 1860) {
+    assert(!companion && wideReady);
+    send_key(SDLK_F3);
+    pausedCounter = c->frameCounter(c);
+  }
+  if (frame == 1861) {
+    assert(testQuick && c->frameCounter(c) == pausedCounter);
+    send_key(SDLK_F3);
+  }
+  if (frame == 1865)
+    send_key(SDLK_F4);
+  if (frame == 1866) {
+    assert(wideMode == 0 && !wideReady);
+    assert(lastGameRect.w == 800 && lastGameRect.h == 720);
+  }
+  if (frame == 1870)
+    send_key(SDLK_F4);
+  if (frame == 1890) {
+    assert(wideReady);
+    puts("PASS R3 keyboard/raw, expand/zoom/original sizes, companion and "
+         "wheel pause/resume");
+  }
+  if (frame == 1890 || frame == 1894) {
+    SDL_Event e = {.type = frame == 1890 ? SDL_KEYDOWN : SDL_KEYUP};
+    e.key.keysym.sym = SDLK_RETURN;
+    SDL_PushEvent(&e);
+  }
+  if (frame == 1896) {
+    assert(!wideReady && pk_wide_gb_wants_close());
+    assert(capture_frame("runtime-phase8-menu-fallback.png", NULL));
+    SDL_Event e = {.type = SDL_KEYDOWN};
+    e.key.keysym.sym = SDLK_x;
+    SDL_PushEvent(&e);
+  }
+  if (frame == 1902) {
+    SDL_Event e = {.type = SDL_KEYUP};
+    e.key.keysym.sym = SDLK_x;
+    SDL_PushEvent(&e);
+  }
+  if (frame == 1920) {
+    assert(wideReady);
+    assert(state(c, "/tmp/pd-wide-roundtrip.ss", true));
+    assert(state(c, "/tmp/pd-wide-roundtrip.ss", false));
+    assert(!wideReady);
+  }
+  if (frame == 1940) {
+    assert(wideReady);
+    unlink("/tmp/pd-wide-roundtrip.ss");
+    puts("PASS in-game menu fallback, state-load cache reset and exact PPU "
+         "centre preservation");
+  }
+}
 static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
                        struct pd_ui *u, struct pd_snapshot *s) {
+  if (wideTest) {
+    wide_test_frame(c, companion, frame);
+    return;
+  }
   if (quickTest) {
     quick_test_frame(c, companion, frame);
     return;
@@ -421,7 +512,8 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
   }
 }
 int main(void) {
-  if (getenv("POCKET_TEST_QUICK")) {
+  if (getenv("POCKET_TEST_QUICK") || getenv("POCKET_TEST_WIDE")) {
+    wideTest = getenv("POCKET_TEST_WIDE") != NULL;
     quickTest = true;
     unsigned char bits[(KEY_MAX + 7) / 8] = {0};
     int codes[] = {BTN_A, BTN_THUMBL, BTN_THUMBR, KEY_ENTER};
@@ -437,8 +529,9 @@ int main(void) {
     quickRom = getenv("POCKET_TEST_ROM");
     if (!quickRom)
       quickRom = "diagnostic.gb";
-    char *args[] = {"pokedaisy-pocket", "--data", quickRoot, "--frames", "68",
-                    (char *)quickRom,   NULL};
+    char *args[] = {
+        "pokedaisy-pocket",       "--data",         quickRoot, "--frames",
+        wideTest ? "1942" : "68", (char *)quickRom, NULL};
     return pocket_app_main(6, args);
   }
   const char *personal = getenv("POCKET_TEST_ROM");

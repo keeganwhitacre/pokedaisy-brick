@@ -1,4 +1,4 @@
-# Polished Crystal Android parity boundary — Phase 7
+# Polished Crystal Android parity boundary — Phase 8
 
 This compares the native port with the **Polished Crystal path** at upstream
 `a64c9172828bb2e3824d5211655091e27f7ff73c`, rather than with Android features
@@ -32,4 +32,16 @@ retail companion support remain as before; this does not add Seaglass decoding.
 
 ## Expansion and shortcuts
 
-L3 now opens the quick-menu ring. R3 is retained for future zoom; zoom and expansion are not implemented yet; existing L2/R2 state shortcuts are unchanged. Upstream pk_wide_gb.c supports retail Yellow and three retail Crystal ROM checksums. It does not include Polished Crystal. Reusing that renderer requires Polished-specific definitions and validation, not retail offsets applied to the hack.
+L3 opens the quick-menu ring. R3 cycles Original / Expand / Zoom, with a Menu > Display fallback. The existing `pk_wide_gb.c` renderer now has a native-only adapter for normal Polished Crystal 3.2.3, using official release symbols and the game's actual decompressed metatile/attribute banks. Original pixels are preserved. Menus/dialogue/battles return to the normal viewport. Other builds do not receive guessed addresses.
+
+Remaining expansion work: unspawned/connected-map NPC templates; broad outdoor, map-connection, weather/lighting and battle-transition verification; physical performance and button retest. The initial real-ROM verification covers Elm's laboratory, normal starter dialogue, display cycling, paused companion/wheel and state reset.
+
+## Next Polished work, before GBA companion expansion
+
+1. Hardware validation and wider exploration of this renderer, including connected maps.
+2. Remaining battle layout/weaknesses/active-party indication and foe-selection refinements.
+3. Dex filters/search, Guide individual reveals and own-level comparison.
+4. Party EXP bar/icon animation, item icons and exact widget styling.
+5. Multi-slot state browser and broader lifecycle/RTC/suspend verification.
+
+These are still open; Phase 8 does not claim full Android parity. GBA work is deferred.

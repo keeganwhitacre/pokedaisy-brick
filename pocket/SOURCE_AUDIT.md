@@ -155,4 +155,8 @@ GitHub work was deferred at the user's request. No fork or push was made.
 
 ## Phase 7 quick menu
 
-Quick-menu behavior and pixel art adapted from Android QuickMenu.kt, QuickMenuSettings.kt and FieldHud.kt. Linux evdev button ordering was checked against SDL release-2.26.0 src/joystick/linux/SDL_sysjoystick.c ConfigureJoystick. SDL controller bindings take precedence, then explicit POCKET_L3_BUTTON/POCKET_R3_BUTTON overrides. Actual NextUI driver discovery still needs hardware verification. R3 zoom and Polished expansion remain unported.
+Quick-menu behavior and pixel art adapted from Android QuickMenu.kt, QuickMenuSettings.kt and FieldHud.kt. Linux evdev button ordering was checked against SDL release-2.26.0 src/joystick/linux/SDL_sysjoystick.c ConfigureJoystick. SDL controller bindings take precedence, then explicit POCKET_L3_BUTTON/POCKET_R3_BUTTON overrides. Actual NextUI driver discovery still needs hardware verification. R3 display cycling and a Polished expansion adapter are added in Phase 8.
+
+## Phase 8 Polished overworld
+
+Reuse `app/src/main/cpp/pk_wide_gb.c`; native-only definitions leave Android game selection unchanged. Official v3.2.3 release symbols are pinned by SHA256 in `gen_polished_wide.py`; generated output contains addresses and identity only, no ROM graphics. Differences from retail Crystal: 7-byte headers, compressed map blocks, separate WRAM banks for 4096-byte metatiles/attributes, 34-byte loaded objects, packed 4-byte sprite headers and 1326-byte overworld buffer. Reuse the existing bounded Polished LZ codec. No writes to ROM, party, bag, events or map state. The host caches a render per emulated frame and clears it on state load. Only verified normal 3.2.3 expansion is enabled.

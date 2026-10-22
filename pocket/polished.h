@@ -51,3 +51,5 @@ bool pc_ui_input(struct pc_ui *, const struct pd_snapshot *, enum pc_action);
 void pc_ui_draw(struct pc_ui *, struct pd_canvas *, const struct pd_snapshot *,
                 const unsigned char *, size_t, int);
 #endif
+
+int pc_lz(const unsigned char*,size_t,size_t,unsigned char*,size_t);

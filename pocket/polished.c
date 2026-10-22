@@ -203,8 +203,8 @@ static size_t off(unsigned a) {
   unsigned b = a >> 16, v = a & 65535;
   return b ? b * 0x4000 + (v & 0x3fff) : v;
 }
-static int lz(const unsigned char *rom, size_t size, size_t p,
-              unsigned char *out, size_t capacity) {
+int pc_lz(const unsigned char *rom, size_t size, size_t p,
+          unsigned char *out, size_t capacity) {
   int used = 0;
 #define BYTE(v)                                                                \
   do {                                                                         \
@@ -289,7 +289,7 @@ static void icon(struct pd_canvas *c, int x, int y, int id,
     return;
   unsigned ptr = (rom[e] << 16) | rom[e + 1] | (rom[e + 2] << 8);
   unsigned char tiles[512];
-  if (lz(rom, n, off(ptr), tiles, sizeof tiles) < 128)
+  if (pc_lz(rom, n, off(ptr), tiles, sizeof tiles) < 128)
     return;
   uint32_t colors[4] = {0, rgb(rom + pa), rgb(rom + pa + 2), 0};
   for (int tile = 0; tile < 4; tile++)
@@ -452,6 +452,7 @@ void pc_bag_draw(struct pd_canvas *c, const struct pd_snapshot *s, int pocket,
   txt(c, 12, 366, "L/R:Section B/X:Play");
 }
 
+#define lz pc_lz
 #include "polished_sections.inc"
 
 #include "polished_parity.inc"
