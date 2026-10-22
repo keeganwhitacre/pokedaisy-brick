@@ -1,4 +1,4 @@
-# Phase 8 verification
+# Phase 9 verification
 
 Phase 7 adds the L3 quick menu: original Android state/FF/companion pixel icons,
 D-pad ring navigation, genuine paused gameplay at its existing physical scale,
@@ -142,3 +142,9 @@ SDL_VIDEODRIVER=offscreen SDL_RENDER_DRIVER=software SDL_AUDIODRIVER=dummy POCKE
 ```
 
 Limitations: only normal 3.2.3 expansion is verified; laboratory coverage does not establish all-map correctness. Connected-map terrain is adapted but lacks a broad playthrough. Unspawned and connected-map NPCs are deliberately omitted. Physical R3 discovery, long-run speed/audio, RTC, suspend and power-loss safety still need Brick testing. No new hardware test or full Android parity is claimed. See PARITY.md for the remaining Polished work before GBA.
+
+## Phase 9 results (2026-10-22)
+
+Linux and actual NextUI ARM builds compile. Decoder tests cover all four exact upstream Dex predicates, filtered cursor boundaries, return-to-list retention, empty-list entry blocking, battle 4x/2x/0x classification and sorting, five-page cycling and Guide egg exclusion/unavailable-party behavior. The supplied normal 3.2.3 ROM passes the normal-input new-game test and produces actual-memory Dex-filter and boss-level captures at 512x384. Battle-type captures use upstream captured trainer memory with the supplied ROM's font/art; they are explicitly marked `fixture` and are not presented as a live trainer playthrough.
+
+The ARM executable also passes these decoder tests and GB/GBA runtime/quick-menu regressions under QEMU. No physical Brick testing occurred in this pass. New captures were visually inspected at 512x384. No ROM, extracted art or test saves/states are packaged. Native controls, state/save behavior and the Phase 8 display architecture remain intact. Full Android parity and broad expansion-map coverage remain open in PARITY.md.

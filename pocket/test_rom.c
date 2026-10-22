@@ -160,6 +160,16 @@ int main(int argc, char **argv) {
     snprintf(path, sizeof path, "runtime-live323-map%d.png", i);
     pd_png_write(path, 512, 384, px);
   }
+  for (int filter = 0; filter < 4; filter++) {
+    u = (struct pc_ui){.section = PC_DEX, .dexFilter = filter};
+    pc_ui_draw(&u, &canvas, &s, rom, size, build);
+    char path[80];
+    snprintf(path, sizeof path, "runtime-phase9-dex%d.png", filter);
+    assert(pd_png_write(path, 512, 384, px));
+  }
+  u = (struct pc_ui){.section = PC_GUIDE, .guidePage = 2, .guideReveal = 1};
+  pc_ui_draw(&u, &canvas, &s, rom, size, build);
+  assert(pd_png_write("runtime-phase9-boss-compare.png", 512, 384, px));
   u = (struct pc_ui){.section = PC_DEX, .dex = 154, .detail = true};
   pc_ui_draw(&u, &canvas, &s, rom, size, build);
   pd_png_write("runtime-live323-dex.png", 512, 384, px);

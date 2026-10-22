@@ -12,6 +12,15 @@ static bool guide_flag(const struct pd_snapshot *s, int flag) {
   return flag < PC_EVENT_FLAG_BYTES * 8 &&
          ((s->flags[flag / 8] >> (flag % 8)) & 1);
 }
+static int guide_party_best(const struct pd_snapshot *s) {
+  int best = 0;
+  if (s->valid)
+    for (int i = 0; i < s->partyCount; i++)
+      if (s->party[i].species && s->party[i].species != 255 &&
+          s->party[i].level > best)
+        best = s->party[i].level;
+  return best;
+}
 static int guide_badges(const struct pd_snapshot *s) {
   int n = 0;
   for (int b = 0; b < 16; b++)
@@ -342,7 +351,21 @@ static void pc_guide_draw(struct pc_ui *u, struct pd_canvas *c,
                            item_name(team[k].item, build));
         }
       }
-      guide_prose(c, 140, b, &u->guideScroll);
+      int best = guide_party_best(s), boss = 0;
+      for (int k = 0; k < guideBosses[i].count; k++) {
+        int lv = guide_level(team[k].level, guide_badges(s));
+        if (lv > boss)
+          boss = lv;
+      }
+      char compare[128];
+      if (best)
+        snprintf(compare, sizeof compare, "Your best Lv%d / Boss Lv%d (%+d)",
+                 best, boss, best - boss);
+      else
+        snprintf(compare, sizeof compare, "Boss top Lv%d / Party unavailable",
+                 boss);
+      pd_text_fit(c, 12, 136, 488, compare, 0x181818, PD_NO_SHADOW);
+      guide_prose(c, 164, b, &u->guideScroll);
     } else {
       int start = u->guideRow >= 9 ? u->guideRow - 8 : 0;
       for (int row = 0; row < 9 && start + row < count; row++) {

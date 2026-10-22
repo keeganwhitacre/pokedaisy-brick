@@ -22,6 +22,29 @@ static int battle_pct(int type, int d1, int d2) {
   int pct = type_percent(type, d1);
   return d1 == d2 ? pct : pct * type_percent(type, d2) / 100;
 }
+/* TypeChartUtil categories; use live battler types, including changed types. */
+static int battle_matchups(const struct pd_battle_mon *foe, int group,
+                           int ids[18], int values[18]) {
+  int count = 0;
+  if (!foe->species)
+    return 0;
+  for (int t = 0; t < 18; t++) {
+    int pct = battle_pct(t, foe->type1, foe->type2);
+    if ((group == 0 && pct > 100) || (group == 1 && pct > 0 && pct < 100) ||
+        (group == 2 && !pct)) {
+      int at = count++;
+      while (at > 0 &&
+             (group == 0 ? values[at - 1] < pct : values[at - 1] > pct)) {
+        ids[at] = ids[at - 1];
+        values[at] = values[at - 1];
+        at--;
+      }
+      ids[at] = t;
+      values[at] = pct;
+    }
+  }
+  return count;
+}
 static const char *battle_verdict(int power, int pct) {
   return !power      ? "STATUS"
          : !pct      ? "IMMUNE"
@@ -147,7 +170,8 @@ static void pc_battle_pages(struct pc_ui *u, struct pd_canvas *c,
     return;
   }
   header(c, PC_BATTLE);
-  const char *pages[] = {"INFO", "SUGGESTIONS", "FOE DETAILS", "FOE TEAM"};
+  const char *pages[] = {"INFO", "SUGGESTIONS", "FOE DETAILS", "FOE TEAM",
+                         "FOE TYPES"};
   char b[256];
   snprintf(b, sizeof b, "%s  Y:Page", pages[u->battlePage]);
   txt(c, 12, 36, b);
@@ -181,7 +205,29 @@ static void pc_battle_pages(struct pc_ui *u, struct pd_canvas *c,
     }
   } else if (!target.species || !player->species)
     txt(c, 20, 94, "Battle data is not ready.");
-  else if (u->battlePage == 1) {
+  else if (u->battlePage == 4) {
+    const char *groups[] = {"WEAK TO", "RESISTS", "IMMUNE TO"};
+    snprintf(b, sizeof b, "%s Lv%d", names[target.species], target.level);
+    txt(c, 12, 66, b);
+    txt(c, 12, 96, groups[u->battleType]);
+    int ids[18], values[18],
+        count = battle_matchups(&target, u->battleType, ids, values);
+    int pages = count ? (count + 7) / 8 : 1;
+    if (u->battleRow >= pages)
+      u->battleRow = pages - 1;
+    if (!count)
+      txt(c, 20, 136, "None");
+    for (int j = 0; j < 8 && u->battleRow * 8 + j < count; j++) {
+      int at = u->battleRow * 8 + j, pct = values[at];
+      snprintf(b, sizeof b, "%s  %s", typeNames[ids[at]],
+               pct == 400   ? "x4"
+               : pct == 200 ? "x2"
+               : pct == 50  ? "x1/2"
+               : pct == 25  ? "x1/4"
+                            : "x0");
+      txt(c, 20, 130 + 24 * j, b);
+    }
+  } else if (u->battlePage == 1) {
     snprintf(b, sizeof b, "Against %s Lv%d", names[target.species],
              target.level);
     pd_text_fit(c, 12, 64, 488, b, 0x181818, PD_NO_SHADOW);
@@ -237,7 +283,9 @@ static void pc_battle_pages(struct pc_ui *u, struct pd_canvas *c,
     battle_moves_draw(c, player, &target, build);
   }
   txt(c, 12, 346,
-      u->battlePage == 3 ? "D-pad:Choose A:Details" : "Select:Live foe Y:Page");
+      u->battlePage == 3   ? "D-pad:Choose A:Details"
+      : u->battlePage == 4 ? "Left/Right:Group Up/Down:More"
+                           : "Select:Live foe Y:Page");
   txt(c, 12, 366,
       u->battlePage || u->battleFoe ? "L/R:Section B:Back X:Play"
                                     : "L/R:Section B/X:Play");

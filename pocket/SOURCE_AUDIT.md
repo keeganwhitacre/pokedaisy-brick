@@ -160,3 +160,7 @@ Quick-menu behavior and pixel art adapted from Android QuickMenu.kt, QuickMenuSe
 ## Phase 8 Polished overworld
 
 Reuse `app/src/main/cpp/pk_wide_gb.c`; native-only definitions leave Android game selection unchanged. Official v3.2.3 release symbols are pinned by SHA256 in `gen_polished_wide.py`; generated output contains addresses and identity only, no ROM graphics. Differences from retail Crystal: 7-byte headers, compressed map blocks, separate WRAM banks for 4096-byte metatiles/attributes, 34-byte loaded objects, packed 4-byte sprite headers and 1326-byte overworld buffer. Reuse the existing bounded Polished LZ codec. No writes to ROM, party, bag, events or map state. The host caches a render per emulated frame and clears it on state load. Only verified normal 3.2.3 expansion is enabled.
+
+## Phase 9 companion completion pass
+
+`PokedexScreen.kt` DexFilter/entries supplies exact ALL, CAUGHT, SEEN ONLY (excluding caught), NOT SEEN predicates. Filtered rows retain canonical Polished dex numbers and original ordering. `BattleInfoScreen.kt`/TypeChartUtil supplies weakness, resistance and immunity grouping/sorting; the native page uses actual battler types. `GuideScreen.kt` excludes eggs for party-best level and compares the maximum upstream badge-adjusted boss-team level. Existing original font, palette and native canvas are retained. These changes read snapshots only.

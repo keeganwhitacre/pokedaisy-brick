@@ -29,7 +29,8 @@ void pc_item_draw(struct pd_canvas *, int item, const unsigned char *, size_t,
 struct pc_ui {
   int section, selected, pocket, item, dex, dexPage, region, mapX, mapY, place,
       move, summaryPage, typePage, guidePage, guideMethod, guideRow,
-      guideReveal, guideScroll, battlePage, battleRow, battleFoe;
+      guideReveal, guideScroll, battlePage, battleRow, battleFoe, battleType,
+      dexFilter;
   unsigned battleSeen;
   bool wasBattle;
   bool summary, detail, mapSet, placesOpen, moveOpen;
@@ -50,6 +51,6 @@ void pc_ui_observe(struct pc_ui *, const struct pd_snapshot *);
 bool pc_ui_input(struct pc_ui *, const struct pd_snapshot *, enum pc_action);
 void pc_ui_draw(struct pc_ui *, struct pd_canvas *, const struct pd_snapshot *,
                 const unsigned char *, size_t, int);
-#endif
+int pc_lz(const unsigned char *, size_t, size_t, unsigned char *, size_t);
 
-int pc_lz(const unsigned char*,size_t,size_t,unsigned char*,size_t);
+#endif

@@ -177,9 +177,71 @@ static void test_battle_advice(void) {
   puts("PASS battle matchups, upstream ranking/ties, PP/fainted/egg exclusion, "
        "faithful moves, seen/reset and navigation");
 }
+static void test_phase9(void) {
+  struct pd_snapshot s = {.dexOk = true};
+  int ids[512];
+  s.dexSeen[0] = 0x7;
+  s.dexCaught[0] = 0x2;
+  assert(dex_entries(&s, 0, ids) == pc_dex_count());
+  assert(dex_entries(&s, 1, ids) == 1 && ids[0] == 1);
+  assert(dex_entries(&s, 2, ids) == 2 && ids[0] == 0 && ids[1] == 2);
+  assert(dex_entries(&s, 3, ids) == pc_dex_count() - 3 && ids[0] == 3);
+  struct pc_ui u = {.section = PC_DEX};
+  assert(pc_ui_input(&u, &s, PC_ALTERNATE) && u.dexFilter == 1 && u.dex == 1);
+  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.detail);
+  assert(pc_ui_input(&u, &s, PC_BACK) && !u.detail && u.dexFilter == 1);
+  assert(pc_ui_input(&u, &s, PC_ALTERNATE) && u.dexFilter == 2 && u.dex == 0);
+  assert(pc_ui_input(&u, &s, PC_DOWN) && u.dex == 2);
+  assert(pc_ui_input(&u, &s, PC_DOWN) && u.dex == 2);
+  memset(s.dexSeen, 0, sizeof s.dexSeen);
+  memset(s.dexCaught, 0, sizeof s.dexCaught);
+  assert(pc_ui_input(&u, &s, PC_CONFIRM) && !u.detail);
+  s.dexOk = false;
+  assert(dex_entries(&s, 0, ids) == 0);
+  struct pd_battle_mon foe = {.species = 1, .type1 = 11, .type2 = 8};
+  int values[18];
+  int n = battle_matchups(&foe, 0, ids, values), fire = -1;
+  for (int i = 0; i < n; i++) {
+    if (ids[i] == 9)
+      fire = i;
+    assert(values[i] > 100);
+    if (i)
+      assert(values[i - 1] >= values[i]);
+  }
+  assert(fire >= 0 && values[fire] == 400);
+  n = battle_matchups(&foe, 1, ids, values);
+  for (int i = 0; i < n; i++) {
+    assert(values[i] > 0 && values[i] < 100);
+    if (i)
+      assert(values[i - 1] <= values[i]);
+  }
+  foe.type1 = foe.type2 = 4;
+  n = battle_matchups(&foe, 2, ids, values);
+  assert(n == 1 && ids[0] == 12 && values[0] == 0);
+  u = (struct pc_ui){.section = PC_BATTLE, .battlePage = 3};
+  assert(pc_ui_input(&u, &s, PC_ALTERNATE) && u.battlePage == 4);
+  assert(pc_ui_input(&u, &s, PC_RIGHT) && u.battleType == 1);
+  assert(pc_ui_input(&u, &s, PC_LEFT) && u.battleType == 0);
+  assert(pc_ui_input(&u, &s, PC_ALTERNATE) && u.battlePage == 0);
+  s.valid = true;
+  s.partyCount = 3;
+  s.party[0].species = 155;
+  s.party[0].level = 5;
+  s.party[1].species = 255;
+  s.party[1].level = 99;
+  s.party[2].species = 16;
+  s.party[2].level = 10;
+  assert(guide_party_best(&s) == 10);
+  s.valid = false;
+  assert(!guide_party_best(&s));
+  puts(
+      "PASS Dex four upstream filters, filtered navigation/empty guard; battle "
+      "live-type groups/sorting/page wrap; Guide best level excludes eggs");
+}
 int main(int argc, char **argv) {
   assert(argc == 2 || argc == 3);
   test_battle_advice();
+  test_phase9();
   unsigned char *cart = NULL;
   size_t romSize = 0;
   int build = 0;
@@ -284,7 +346,7 @@ int main(int argc, char **argv) {
     pc_battle_draw(&testCanvas, &b, NULL, 0, 0);
     struct pc_ui ui = {.section = PC_BATTLE};
     pc_ui_observe(&ui, &b);
-    for (int page = 0; page < 4; page++) {
+    for (int page = 0; page < 5; page++) {
       ui.battlePage = page;
       pc_ui_draw(&ui, &testCanvas, &b, cart, romSize, build);
       if (cart) {
@@ -294,6 +356,17 @@ int main(int argc, char **argv) {
         pd_png_write(path, 512, 384, canvasPixels);
       }
     }
+    if (cart && i == 2)
+      for (int group = 0; group < 3; group++) {
+        ui.battlePage = 4;
+        ui.battleType = group;
+        ui.battleRow = 0;
+        pc_ui_draw(&ui, &testCanvas, &b, cart, romSize, build);
+        char path[128];
+        snprintf(path, sizeof path, "runtime-phase9-types%d-fixture.png",
+                 group);
+        assert(pd_png_write(path, 512, 384, canvasPixels));
+      }
     pc_dex_draw(&testCanvas, &b, 288, false, NULL, 0, 0);
     pc_dex_draw(&testCanvas, &b, 154, true, NULL, 0, 0);
     pc_item_draw(&testCanvas, 25, NULL, 0, 0);

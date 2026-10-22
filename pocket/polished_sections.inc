@@ -316,8 +316,29 @@ void pc_battle_draw(struct pd_canvas *c, const struct pd_snapshot *s,
   }
   txt(c, 12, 359, "L/R:Section B/X:Play");
 }
-void pc_dex_draw(struct pd_canvas *c, const struct pd_snapshot *s, int selected,
-                 bool detail, const unsigned char *rom, size_t n, int build) {
+/* Same ALL/CAUGHT/SEEN ONLY/NOT SEEN predicates as PokedexScreen.kt. */
+static int dex_entries(const struct pd_snapshot *s, int filter, int ids[512]) {
+  int count = 0;
+  if (!s->dexOk)
+    return 0;
+  for (int i = 0; i < pc_dex_count(); i++) {
+    bool seen = pd_dex_seen(s, i + 1), caught = pd_dex_caught(s, i + 1);
+    if (filter == 0 || (filter == 1 && caught) ||
+        (filter == 2 && seen && !caught) || (filter == 3 && !seen))
+      ids[count++] = i;
+  }
+  return count;
+}
+static int dex_position(int selected, const int *ids, int count) {
+  for (int i = 0; i < count; i++)
+    if (ids[i] == selected)
+      return i;
+  return 0;
+}
+static void pc_dex_filtered_draw(struct pd_canvas *c,
+                                 const struct pd_snapshot *s, int selected,
+                                 bool detail, const unsigned char *rom,
+                                 size_t n, int build, int filter) {
   header(c, PC_DEX);
   int count = pc_dex_count();
   if (selected < 0)
@@ -337,9 +358,13 @@ void pc_dex_draw(struct pd_canvas *c, const struct pd_snapshot *s, int selected,
   snprintf(b, sizeof b, "Seen %d   Caught %d   Total %d", seen, caught, count);
   txt(c, 12, 36, b);
   if (!detail) {
-    int scroll = selected >= 11 ? selected - 10 : 0;
-    for (int row = 0; row < 11 && scroll + row < count; row++) {
-      int i = scroll + row, id = dexOrder[i], y = 64 + row * 24;
+    int ids[512], visible = dex_entries(s, filter, ids),
+                  pos = dex_position(selected, ids, visible);
+    int scroll = pos >= 11 ? pos - 10 : 0;
+    if (!visible)
+      txt(c, 20, 80, "No entries match this filter.");
+    for (int row = 0; row < 11 && scroll + row < visible; row++) {
+      int i = ids[scroll + row], id = dexOrder[i], y = 64 + row * 24;
       if (i == selected)
         pd_fill(c, 8, y, 496, 23, 0xdcdcdc);
       snprintf(b, sizeof b, "%s %03d  %s", i == selected ? ">" : " ", i + 1,
@@ -351,7 +376,9 @@ void pc_dex_draw(struct pd_canvas *c, const struct pd_snapshot *s, int selected,
                                             : "",
                     0x181818, PD_NO_SHADOW);
     }
-    txt(c, 12, 346, "D-pad:Choose A:Entry");
+    const char *filters[] = {"ALL", "CAUGHT", "SEEN ONLY", "NOT SEEN"};
+    snprintf(b, sizeof b, "Y:%s (%d)  A:Entry", filters[filter], visible);
+    txt(c, 12, 346, b);
     txt(c, 12, 366, "L/R:Section B/X:Play");
     return;
   }
@@ -396,6 +423,10 @@ void pc_dex_draw(struct pd_canvas *c, const struct pd_snapshot *s, int selected,
   }
   txt(c, 12, 346, "Up/Down:Mon Y:Text");
   txt(c, 12, 366, "L/R:Section X:Play");
+}
+void pc_dex_draw(struct pd_canvas *c, const struct pd_snapshot *s, int selected,
+                 bool detail, const unsigned char *rom, size_t n, int build) {
+  pc_dex_filtered_draw(c, s, selected, detail, rom, n, build, 0);
 }
 static void pc_dex_text_draw(struct pd_canvas *c, const struct pd_snapshot *s,
                              int selected, const unsigned char *rom, size_t n,
@@ -513,7 +544,17 @@ bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
   }
   if (u->section == PC_BATTLE) {
     if (a == PC_ALTERNATE)
-      u->battlePage = (u->battlePage + 1) % 4;
+      u->battlePage = (u->battlePage + 1) % 5;
+    if (u->battlePage == 4) {
+      if (a == PC_LEFT || a == PC_RIGHT) {
+        u->battleType = (u->battleType + 3 + (a == PC_RIGHT ? 1 : -1)) % 3;
+        u->battleRow = 0;
+      }
+      if (a == PC_UP && u->battleRow > 0)
+        u->battleRow--;
+      if (a == PC_DOWN && u->battleRow < 2)
+        u->battleRow++;
+    }
     if (u->battlePage == 3) {
       if (a == PC_UP || a == PC_LEFT)
         u->battleRow--;
@@ -635,18 +676,24 @@ bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
     if (a == PC_CONFIRM && s->bag[u->pocket].count)
       u->detail = true;
   } else if (u->section == PC_DEX) {
+    int ids[512];
+    if (!u->detail && a == PC_ALTERNATE)
+      u->dexFilter = (u->dexFilter + 1) % 4;
+    int count = dex_entries(s, u->dexFilter, ids),
+        pos = dex_position(u->dex, ids, count);
     if (a == PC_UP)
-      u->dex--;
+      pos--;
     if (a == PC_DOWN)
-      u->dex++;
+      pos++;
     if (!u->detail && a == PC_LEFT)
-      u->dex -= 11;
+      pos -= 11;
     if (!u->detail && a == PC_RIGHT)
-      u->dex += 11;
-    u->dex = clamp_selection(u->dex, pc_dex_count());
+      pos += 11;
+    if (count)
+      u->dex = ids[clamp_selection(pos, count)];
     if (u->detail && a == PC_ALTERNATE)
       u->dexPage = 1 - u->dexPage;
-    if (a == PC_CONFIRM && !u->detail) {
+    if (a == PC_CONFIRM && !u->detail && count) {
       u->detail = true;
       u->dexPage = 0;
     }
@@ -678,10 +725,16 @@ void pc_ui_draw(struct pc_ui *u, struct pd_canvas *c,
   } else if (u->section == PC_BATTLE)
     pc_battle_pages(u, c, s, rom, n, build);
   else if (u->section == PC_DEX) {
+    int ids[512], count = dex_entries(s, u->dexFilter, ids);
+    if (count)
+      u->dex = ids[dex_position(u->dex, ids, count)];
+    else
+      u->detail = false;
     if (u->detail && u->dexPage)
       pc_dex_text_draw(c, s, u->dex, rom, n, build);
     else
-      pc_dex_draw(c, s, u->dex, u->detail, rom, n, build);
+      pc_dex_filtered_draw(c, s, u->dex, u->detail, rom, n, build,
+                           u->dexFilter);
   } else if (u->section == PC_MAP)
     pc_map_draw(u, c, s, rom, n, build);
   else if (u->section == PC_GUIDE)
