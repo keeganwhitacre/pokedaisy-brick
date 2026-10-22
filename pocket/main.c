@@ -572,7 +572,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           }
         }
       } else if (pc >= 0) {
-        static const int buttons[] = {UP, DOWN, LEFT, RIGHT, A, B, L, R, Y, SELECT};
+        static const int buttons[] = {UP, DOWN, LEFT, RIGHT, A,
+                                      B,  L,    R,    Y,     SELECT};
         for (unsigned action = 0; action < sizeof buttons / sizeof *buttons;
              action++)
           if (down(buttons[action]) &&
@@ -632,6 +633,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     }
     if (pc >= 0) {
       pc_read(&snap, read_memory, c);
+      pc_ui_observe(&pcUi, &snap);
     } else
       pd_snapshot_read(&snap, &game, read_memory, c);
     if (companion) {

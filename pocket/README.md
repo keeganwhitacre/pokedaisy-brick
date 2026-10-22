@@ -1,10 +1,10 @@
-# PokeDaisy Pocket: Phase 5
+# PokeDaisy Pocket: Phase 6
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 
 Native SDL2 and mGBA prototype for TrimUI Brick / NextUI. The user has confirmed
 Phase 1 gameplay and a live party with a ROM sprite on physical Brick hardware.
-This Phase 5 build adds the Polished Crystal Guide: live encounters, area finds, progress-aware next bosses, tips and Where Is. It retains the original ROM font, all three region maps and two-column summaries. It has been tested using the supplied supported 3.2.3 ROM. It contains a real emulator and companion integration.
+Phase 6 adds battle effectiveness, Suggestions, Foe Details and Foe Team browsing. The previous pass added the Polished Crystal Guide: live encounters, area finds, progress-aware next bosses, tips and Where Is. It retains the original ROM font, all three region maps and two-column summaries. It has been tested using the supplied supported 3.2.3 ROM. It contains a real emulator and companion integration.
 It does not yet reproduce the full Android application.
 
 Gameplay preserves the working opaque RGB888 format. Game scaling now uses the
@@ -53,7 +53,7 @@ follows the two-column grid and A opens a summary. Within a summary, Up/Down cha
 pocket and Up/Down scrolls through items. The Bag shows live quantities and
 money, including medicine grouped under Items, plus Balls, TMs/HMs, Berries and
 Key items. Press A for an item description read from the matching ROM. The Bag remains read-only; upstream does not provide Polished item-use actions.
-Battle shows both active Pokemon, HP, status, live types, moves and PP, plus trainer-party count. It does not send battle commands.
+Battle uses Y to cycle INFO, SUGGESTIONS, FOE DETAILS and FOE TEAM. INFO rates damaging moves against the selected foe. Suggestions uses upstream’s power/type/defensive-risk heuristic, not a full damage calculation. Foe Details shows actual active-battler stats, held item and moves; reserve stats are omitted because the Polished party reader does not provide them. On Foe Team use D-pad and A to inspect a member. Unannounced slots remain unnamed until selected; Select follows the live foe again. B returns to INFO, then gameplay. No battle commands or memory writes are introduced.
 Dex shows live seen/caught flags in Polished Crystal's 289-entry order. Up/Down chooses, Left/Right pages and A opens an entry. Up/Down browses entries and B returns to the list. Entry sprites, category, text, size and base stats read from the matching ROM. Y switches to the full-text/abilities page.
 Map displays Johto, Kanto and Orange with original ROM palettes, tile flips and player art. The D-pad moves its cursor; A changes region, Y recenters on the player, and Select opens Places. A on a place shows it on the map. Map is read-only; Fly is not implemented.
 Guide uses Left/Right to switch HERE: WILD, HERE: FINDS, NEXT BOSS, TIPS and WHERE IS. Up/Down chooses a row or scrolls an open answer. A reveals a hint, then an answer; B closes it. Y changes encounter method or Where Is category. A plus mark means caught/collected. The Guide follows the game clock and badges; it never changes game data. Upstream marks its guide data unverified, so entries may contain mistakes.
@@ -151,10 +151,10 @@ will be recorded in `launch.log`.
 
 Read `VERIFICATION.md` for exact results. The supplied supported Polished Crystal 3.2.3 ROM was tested through a fresh game without fixture injection. The older 3.1.1 test remains emulation-only.
 The user has confirmed the Phase 1 gameplay/party/sprite path on a physical Brick.
-The Phase 5 Guide changes still need a hardware retest. The supplied supported 3.2.3 ROM passes all 289 dex texts/front pictures, 373 item/TM/key descriptions, all three maps, and a normal-input new game to the starter. The ARM frontend reads that actual party and passes pause/resume and state tests without fixture injection.
+The Phase 6 battle changes still need a hardware retest. The supplied supported 3.2.3 ROM passes all 289 dex texts/front pictures, 373 item/TM/key descriptions, all three maps, and a normal-input new game to the starter. The ARM frontend reads that actual party and passes pause/resume and state tests without fixture injection.
 Captures prefixed `runtime-live323` use the actual new game and matching ROM art. Captures named `fixture` use upstream captured memory. See the verification report for each capture's scope. The install binary
 contains no fixture injection and requires a supported game for real party data.
-The Polished Crystal layout uses the Android palette, six-slot party structure, ROM icons and the ROM font at crisp integer scaling. Summary uses Android's information/moves hierarchy. Battle advice/foe panes, remaining list controls, multi-slot state browsing and exact screen/animation parity remain unfinished. Android’s Polished path does not currently provide IV/EV summary, LEARN/evolution tables or FieldItems actions. Read `PARITY.md` for the feature-by-feature boundary.
+The Polished Crystal layout uses the Android palette, six-slot party structure, ROM icons and the ROM font at crisp integer scaling. Summary uses Android's information/moves hierarchy. Remaining battle details/styling, list controls, multi-slot state browsing and exact screen/animation parity remain unfinished. Android’s Polished path does not currently provide IV/EV summary, LEARN/evolution tables or FieldItems actions. Read `PARITY.md` for the feature-by-feature boundary.
 
 For upstream updates and the generated-definition workflow, read `UPSTREAM.md`.
 
@@ -166,3 +166,5 @@ corresponding application source and pinned mGBA source are freely available at 
 repository and commit recorded in Source/SOURCE.md beside the install package. See
 `LICENSE`, `NOTICE` and the upstream license files. No commercial ROMs or extracted
 game art are distributed.
+
+Planned shortcut bindings remain L3 for the quick menu and R3 for zoom, as requested. These features and expanded overworld rendering are not in this build. Upstream supports retail Crystal expansion, but Polished requires its own verified definitions.

@@ -25,6 +25,9 @@ static bool battle_mon(struct pd_battle_mon *m, const unsigned char *p) {
   m->status = p[17];
   m->hp = be16(p + 19);
   m->maxHp = be16(p + 21);
+  m->heldItem = p[1];
+  for (int i = 0; i < 5; i++)
+    m->stats[i] = be16(p + 23 + 2 * i);
   m->type1 = p[33];
   m->type2 = p[34];
   for (int i = 0; i < 4; i++) {
@@ -95,6 +98,11 @@ static void read_sections(struct pd_snapshot *s, pd_read_fn read, void *ctx) {
         m->hp = be16(p + 34);
         m->maxHp = be16(p + 36);
         m->status = p[32];
+        m->heldItem = p[1];
+        for (int k = 0; k < 4; k++) {
+          m->moves[k] = p[2 + k];
+          m->pp[k] = p[22 + k] & 63;
+        }
         if (!p[0] || p[0] == 255 || m->species >= 512 || !names[m->species] ||
             m->level < 1 || m->level > 100 || m->hp > m->maxHp ||
             m->maxHp > 999) {
@@ -464,6 +472,8 @@ void pc_item_draw(struct pd_canvas *c, int item, const unsigned char *rom,
 }
 
 static const int *mon_types(int, int);
+static int type_percent(int, int);
+#include "polished_battle.inc"
 #include "polished_guide.inc"
 
 static int clamp_selection(int value, int count) {
@@ -478,6 +488,11 @@ bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
     return true;
   }
   if (a == PC_BACK) {
+    if (u->section == PC_BATTLE && (u->battlePage || u->battleFoe)) {
+      u->battlePage = 0;
+      u->battleFoe = 0;
+      return true;
+    }
     if (u->section == PC_GUIDE && u->guideReveal) {
       u->guideReveal = u->guideScroll = 0;
       return true;
@@ -496,7 +511,24 @@ bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
       return false;
     return true;
   }
-  if (u->section == PC_GUIDE) {
+  if (u->section == PC_BATTLE) {
+    if (a == PC_ALTERNATE)
+      u->battlePage = (u->battlePage + 1) % 4;
+    if (u->battlePage == 3) {
+      if (a == PC_UP || a == PC_LEFT)
+        u->battleRow--;
+      if (a == PC_DOWN || a == PC_RIGHT)
+        u->battleRow++;
+      u->battleRow = clamp_selection(u->battleRow, s->foeCount);
+      if (a == PC_CONFIRM && s->foeCount) {
+        u->battleFoe = u->battleRow + 1;
+        u->battleSeen |= 1u << u->battleRow;
+        u->battlePage = 2;
+      }
+    }
+    if (a == PC_PLACES)
+      u->battleFoe = 0;
+  } else if (u->section == PC_GUIDE) {
     if (a == PC_LEFT || a == PC_RIGHT) {
       u->guidePage = (u->guidePage + 5 + (a == PC_RIGHT ? 1 : -1)) % 5;
       u->guideRow = u->guideReveal = u->guideScroll = 0;
@@ -644,7 +676,7 @@ void pc_ui_draw(struct pc_ui *u, struct pd_canvas *c,
     else
       pc_bag_draw(c, s, u->pocket, u->item, build);
   } else if (u->section == PC_BATTLE)
-    pc_battle_draw(c, s, rom, n, build);
+    pc_battle_pages(u, c, s, rom, n, build);
   else if (u->section == PC_DEX) {
     if (u->detail && u->dexPage)
       pc_dex_text_draw(c, s, u->dex, rom, n, build);

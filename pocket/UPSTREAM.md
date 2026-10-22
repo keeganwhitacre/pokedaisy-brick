@@ -11,6 +11,7 @@ Verification/build.json. Keep the original LICENSE and NOTICE.
 - `polished.h`: the Polished companion contract: identity, memory snapshot,
   navigation state and drawing. No SDL or mGBA types leak into it.
 - `polished.c`: ROM identity, party/bag codecs, original mini-icon art and layouts.
+- `polished_battle.inc`: battle INFO/foe/team layout and the exact SuggestionsScreen ranking heuristic; optional live fields decoded from upstream Gen2Reader. `pc_ui_observe` tracks announced foes each emulated frame and resets between battles.
 - `polished_guide.inc`: GuideWorld/GuideScreen/GuideAreas adaptations. Guide source data is regenerated through `gen_polished_guide.py`, not edited in C tables.
 - `polished_parity.inc`: original ROM town-map/player extraction and the adapted Android summary.
 - `polished_sections.inc`: Gen2Reader/Gen2Dex adaptations: battle, dex, ROM text,

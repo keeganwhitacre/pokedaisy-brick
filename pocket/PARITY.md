@@ -1,4 +1,4 @@
-# Polished Crystal Android parity boundary — Phase 5
+# Polished Crystal Android parity boundary — Phase 6
 
 This compares the native port with the **Polished Crystal path** at upstream
 `a64c9172828bb2e3824d5211655091e27f7ff73c`, rather than with Android features
@@ -13,7 +13,7 @@ user's matching cart. Full visual and behavioral parity is still unfinished.
 | Party | Six slots, icons, gender, HP, status, held marker, egg handling | Icon bobbing, EXP bar and exact slot-frame details |
 | Summary | Left-info/right-moves hierarchy, held item, EXP, descriptions, type matchups, party cycling | Remaining styling/animation; Android's Polished decoder does not supply IV/EV stats or LEARN data |
 | Bag | All real quantities/pockets/money, matching-ROM descriptions | Further item-icon/layout parity; upstream FieldItems has no Polished USE/GIVE/TAKE implementation |
-| Battle | Actual active battlers, types, moves/PP, trainer-party count | INFO/foe-details/team and suggestions panes, move effectiveness labels and layout parity; upstream's GBA command controls are not Polished controls |
+| Battle | INFO effectiveness labels; upstream power/type/risk ranking; live foe item/stats/moves; browsable team with unseen slots; battle-scoped seen tracking | Remaining Android layout/HP-bar details, weaknesses, active-party marker and automatic next-foe selection; upstream GBA command controls are not Polished controls |
 | Dex | Real flags/order, front sprites, descriptions, dimensions/base stats, species abilities | Filters/search and remaining navigation/styling; upstream's Polished dex has no evolution table |
 | Map | All three ROM maps, palettes/flips, live location/player, cursor, regions, Places | Cursor blink and precise location refinements; Polished Fly is not provided by upstream FieldItems |
 | Guide HERE | Live map/time encounter lists, all eight methods, badge-adjusted levels, caught marks; area finds and progress marks | More exact Android layout, per-entry icons and encounter-detail interactions |
@@ -28,3 +28,7 @@ There are no invented memory offsets or device-side downloaded assets.
 
 No DS, achievements, cloud or new ROM-hack support was added. GBA gameplay and
 retail companion support remain as before; this does not add Seaglass decoding.
+
+## Expansion and shortcuts
+
+Retain the requested L3 quick-menu and R3 zoom bindings when those features are ported. Neither is implemented yet; existing L2/R2 state shortcuts are unchanged. Upstream pk_wide_gb.c supports retail Yellow and three retail Crystal ROM checksums. It does not include Polished Crystal. Reusing that renderer requires Polished-specific definitions and validation, not retail offsets applied to the hack.

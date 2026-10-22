@@ -43,6 +43,8 @@ struct pd_battle_mon {
     uint32_t status;
     int moves[PD_NUM_MOVES];
     int pp[PD_NUM_MOVES];
+    // Optional live Gen 2 battle fields, in Attack/Defense/Speed/Sp.Atk/Sp.Def order.
+    int heldItem, stats[5];
 };
 
 #define PD_POS_PLAYER_LEFT 0

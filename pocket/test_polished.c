@@ -120,8 +120,81 @@ static void test_guide(void) {
          "badge levels, progress and League rules\n",
          checked, substitutions);
 }
+static void test_battle_advice(void) {
+  assert(battle_pct(9, 11, 8) == 400); // Fire vs Grass/Steel
+  assert(battle_pct(12, 4, 4) == 0);   // Electric vs Ground
+  assert(battle_pct(9, 10, 15) == 25); // Fire vs Water/Dragon
+  assert(!strcmp(battle_verdict(0, 0), "STATUS"));
+  struct pd_snapshot s = {
+      .partyCount = 3, .inBattle = true, .foeCount = 2, .foeActive = 0};
+  s.party[0] =
+      (struct pd_mon){.species = 155, .hp = 19, .moves = {52}, .pp = {25}};
+  s.party[1] =
+      (struct pd_mon){.species = 158, .hp = 20, .moves = {55}, .pp = {25}};
+  s.party[2] =
+      (struct pd_mon){.species = 16, .hp = 15, .moves = {16}, .pp = {25}};
+  struct pd_battle_mon foe = {.species = 152, .type1 = 11, .type2 = 11};
+  struct battle_pick picks[6];
+  int count = battle_rank(&s, &foe, 0, picks);
+  assert(count == 3 && picks[0].slot == 0 && picks[1].slot == 2 &&
+         picks[2].slot == 1);
+  assert(picks[0].pct == 200 && picks[0].risk == 50);
+  s.party[0].pp[0] = 0;
+  s.party[2].hp = 0;
+  assert(battle_rank(&s, &foe, 0, picks) == 1 && picks[0].slot == 1);
+  s.party[1].species = 255;
+  assert(!battle_rank(&s, &foe, 0, picks));
+  const char *name;
+  int type, power;
+  battle_move(249, 0, &name, &type, &power);
+  assert(!strcmp(name, "Brick Break"));
+  int faithful = -1;
+  for (unsigned i = 0; i < sizeof builds / sizeof *builds; i++)
+    if (builds[i].faithful)
+      faithful = (int)i;
+  battle_move(249, faithful, &name, &type, &power);
+  assert(!strcmp(name, "Rock Smash"));
+  struct pc_ui u = {0};
+  pc_ui_observe(&u, &s);
+  assert(u.battleSeen == 1);
+  s.foeActive = 1;
+  pc_ui_observe(&u, &s);
+  assert(u.battleSeen == 3);
+  s.inBattle = false;
+  pc_ui_observe(&u, &s);
+  assert(!u.battleSeen && !u.wasBattle);
+  s.inBattle = true;
+  pc_ui_observe(&u, &s);
+  assert(u.battleSeen == 2);
+  u.section = PC_BATTLE;
+  u.battlePage = 3;
+  u.battleRow = 100;
+  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.battleFoe == 2 &&
+         u.battlePage == 2);
+  assert(pc_ui_input(&u, &s, PC_PLACES) && !u.battleFoe);
+  assert(pc_ui_input(&u, &s, PC_BACK) && !u.battlePage);
+  assert(!pc_ui_input(&u, &s, PC_BACK));
+  puts("PASS battle matchups, upstream ranking/ties, PP/fainted/egg exclusion, "
+       "faithful moves, seen/reset and navigation");
+}
 int main(int argc, char **argv) {
-  assert(argc == 2);
+  assert(argc == 2 || argc == 3);
+  test_battle_advice();
+  unsigned char *cart = NULL;
+  size_t romSize = 0;
+  int build = 0;
+  if (argc == 3) {
+    FILE *f = fopen(argv[2], "rb");
+    assert(f);
+    fseek(f, 0, SEEK_END);
+    romSize = ftell(f);
+    rewind(f);
+    cart = malloc(romSize);
+    assert(cart && fread(cart, 1, romSize, f) == romSize);
+    fclose(f);
+    build = pc_identify(cart, romSize);
+    assert(build >= 0);
+  }
   test_guide();
   char hash[41];
   sha1((const unsigned char *)"abc", 3, hash);
@@ -200,10 +273,27 @@ int main(int argc, char **argv) {
       assert(b.isTrainer && b.foeCount == 1 && b.foes[0].species == 152 &&
              b.foeActive == 0);
     assert(b.dexOk);
+    unsigned char battleRaw[35];
+    assert(read_fixture(NULL, PC_RAM_enemyMon, battleRaw, sizeof battleRaw));
+    assert(b.battlers[1].heldItem == battleRaw[1]);
+    for (int k = 0; k < 5; k++)
+      assert(b.battlers[1].stats[k] == be16(battleRaw + 23 + 2 * k));
     uint32_t canvasPixels[512 * 384];
     struct pd_canvas testCanvas;
     pd_canvas_init(&testCanvas, 512, 384, canvasPixels);
     pc_battle_draw(&testCanvas, &b, NULL, 0, 0);
+    struct pc_ui ui = {.section = PC_BATTLE};
+    pc_ui_observe(&ui, &b);
+    for (int page = 0; page < 4; page++) {
+      ui.battlePage = page;
+      pc_ui_draw(&ui, &testCanvas, &b, cart, romSize, build);
+      if (cart) {
+        char path[128];
+        snprintf(path, sizeof path, "runtime-phase6-%s-page%d-fixture.png",
+                 battleFixtures[i], page);
+        pd_png_write(path, 512, 384, canvasPixels);
+      }
+    }
     pc_dex_draw(&testCanvas, &b, 288, false, NULL, 0, 0);
     pc_dex_draw(&testCanvas, &b, 154, true, NULL, 0, 0);
     pc_item_draw(&testCanvas, 25, NULL, 0, 0);
@@ -327,5 +417,6 @@ int main(int argc, char **argv) {
   struct pd_snapshot s;
   assert(!pc_read(&s, read_fixture, NULL));
   puts("PASS invalid party count and SHA-1 known vector");
+  free(cart);
   return 0;
 }

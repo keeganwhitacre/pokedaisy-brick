@@ -28,7 +28,9 @@ void pc_item_draw(struct pd_canvas *, int item, const unsigned char *, size_t,
 struct pc_ui {
   int section, selected, pocket, item, dex, dexPage, region, mapX, mapY, place,
       move, summaryPage, typePage, guidePage, guideMethod, guideRow,
-      guideReveal, guideScroll;
+      guideReveal, guideScroll, battlePage, battleRow, battleFoe;
+  unsigned battleSeen;
+  bool wasBattle;
   bool summary, detail, mapSet, placesOpen, moveOpen;
 };
 enum pc_action {
@@ -43,6 +45,7 @@ enum pc_action {
   PC_ALTERNATE,
   PC_PLACES
 };
+void pc_ui_observe(struct pc_ui *, const struct pd_snapshot *);
 bool pc_ui_input(struct pc_ui *, const struct pd_snapshot *, enum pc_action);
 void pc_ui_draw(struct pc_ui *, struct pd_canvas *, const struct pd_snapshot *,
                 const unsigned char *, size_t, int);

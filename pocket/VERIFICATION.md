@@ -1,4 +1,10 @@
-# Phase 5 verification
+# Phase 6 verification
+
+Phase 6 adds Battle INFO matchup labels, Suggestions, Foe Details and Foe Team. Native and ARM builds/decoder tests pass, including faithful moves, zero PP, fainted/egg exclusion, stable ranking ties, type immunity/dual types, seen-foe tracking/reset and controller back/selection. Active stats and held items are checked against upstream captured raw structs. ASan/UBSan decoder/render checks include matching-ROM rendering. The supplied 3.2.3 fresh-game and ARM SDL pause/resume path also pass.
+
+Battle screenshots named `runtime-phase6-*-fixture.png` combine upstream captured battle RAM with the supplied matching ROM’s graphics/font. They are regression captures, not newly played battles in the user’s save. The private fresh game remains starter-stage; no newly played battle or physical Phase 6 Brick test is claimed.
+
+The Phase 5 results below remain applicable to the reused Guide, ROM codecs and emulator foundation.
 
 ## Result and limits
 
@@ -17,7 +23,7 @@ uses no injected party, bag, progress flags or external save. Separate test stat
 and diagnostics never touch the user's existing saves.
 
 The user confirmed base gameplay/party/sprites on a physical Brick. The agent
-has no Brick hardware. Phase 5 requires a device retest; Linux/QEMU audio uses
+has no Brick hardware. Phase 6 requires a device retest; Linux/QEMU audio uses
 the dummy backend, so audible quality, real controls/power and performance are
 not newly hardware verified. Full Android parity is not claimed; see PARITY.md.
 
@@ -81,7 +87,7 @@ The install launcher continues to use the actual NextUI backends.
 ## Next priorities
 
 1. Hardware Guide/control/normal-save/reload/exit retest.
-2. Remaining Polished Battle INFO, foe-team/details and suggestion panes.
+2. Remaining battle layout, weaknesses, active-party marker and next-foe selection.
 3. Dex filters, Guide per-entry reveals/icons and remaining summary/EXP styling.
 4. Multi-slot state browser, long-session performance, RTC and suspend/power.
 
