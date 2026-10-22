@@ -164,3 +164,7 @@ Reuse `app/src/main/cpp/pk_wide_gb.c`; native-only definitions leave Android gam
 ## Phase 9 companion completion pass
 
 `PokedexScreen.kt` DexFilter/entries supplies exact ALL, CAUGHT, SEEN ONLY (excluding caught), NOT SEEN predicates. Filtered rows retain canonical Polished dex numbers and original ordering. `BattleInfoScreen.kt`/TypeChartUtil supplies weakness, resistance and immunity grouping/sorting; the native page uses actual battler types. `GuideScreen.kt` excludes eggs for party-best level and compares the maximum upstream badge-adjusted boss-team level. Existing original font, palette and native canvas are retained. These changes read snapshots only.
+
+## Phase 10 integration audit
+
+Reviewed upstream 1.3.1 changes through 54d8f4867501feb32b7ee139a5616b7c6301f044. Merged the original source history. Reused pk_savevf.c unchanged, with Pocket's independent host wrapper retaining read/write-only save admission and making I/O errors visible. Did not enable Android MAKEOVER, DS or new GBA companions. Per-game display settings follow ROM SHA-1 and are atomic separate config files. The SHA-1 codec was moved unchanged from polished.c into rom_identity.h. GuideScreen bossPage and GuideUiState.tap now map to separate selected Pokemon entries rather than revealing a whole team. Single-entry reveals close on entry/page/progress changes.

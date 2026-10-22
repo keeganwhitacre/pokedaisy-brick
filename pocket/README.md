@@ -1,10 +1,10 @@
-# PokeDaisy Pocket: Phase 9
+# PokeDaisy Pocket: Phase 10
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 
 Native SDL2 and mGBA prototype for TrimUI Brick / NextUI. The user has confirmed
 Phase 1 gameplay and a live party with a ROM sprite on physical Brick hardware.
-Phase 9 adds Polished Crystal 3.2.3 expanded overworld rendering and R3 display cycling, using the existing upstream GB renderer. L3 retains the quick-menu ring with working state, fast-forward and companion actions. The previous pass added battle effectiveness, Suggestions, Foe Details and Foe Team browsing. The previous pass added the Polished Crystal Guide: live encounters, area finds, progress-aware next bosses, tips and Where Is. It retains the original ROM font, all three region maps and two-column summaries. It has been tested using the supplied supported 3.2.3 ROM. It contains a real emulator and companion integration.
+Phase 10 merges upstream 1.3.1-era history, remembers display mode per ROM, reuses upstream's save-mapping fallback with native error reporting, and adds individual boss-Pokemon Guide hints/answers. It retains live Polished party, summaries, bag, battle advice, Dex filters, maps, Guide, expansion/zoom and the L3 quick menu. It contains a real mGBA emulator and companion integration, tested with the supplied normal 3.2.3 ROM.
 It does not yet reproduce the full Android application.
 
 Gameplay preserves the working opaque RGB888 format. Game scaling now uses the
@@ -29,7 +29,7 @@ The original aspect ratio is preserved, with no stretching, filtering or crop.
 No Android runtime, touchscreen or mouse is used.
 
 When updating an existing installation, merge the updated files into the pak
-and keep your `roms`, `saves` and `states` folders.
+and keep your `roms`, `saves`, `states` and `display` folders and `settings.ini`.
 
 ## Controls
 
@@ -58,7 +58,7 @@ Key items. Press A for an item description read from the matching ROM. The Bag r
 Battle uses Y to cycle INFO, SUGGESTIONS, FOE DETAILS, FOE TEAM and FOE TYPES. FOE TYPES uses Left/Right for weaknesses, resistances and immunities, with Up/Down for more rows. INFO rates damaging moves against the selected foe. Suggestions uses upstream’s power/type/defensive-risk heuristic, not a full damage calculation. Foe Details shows actual active-battler stats, held item and moves; reserve stats are omitted because the Polished party reader does not provide them. On Foe Team use D-pad and A to inspect a member. Unannounced slots remain unnamed until selected; Select follows the live foe again. B returns to INFO, then gameplay. No battle commands or memory writes are introduced.
 In the Dex list, Y cycles ALL, CAUGHT, SEEN ONLY (seen but not caught) and NOT SEEN. Filters are retained when returning from an entry or switching companion sections. Empty results cannot open an entry. Dex shows live seen/caught flags in Polished Crystal's 289-entry order. Up/Down chooses, Left/Right pages and A opens an entry. Up/Down browses entries and B returns to the list. Entry sprites, category, text, size and base stats read from the matching ROM. Y switches to the full-text/abilities page.
 Map displays Johto, Kanto and Orange with original ROM palettes, tile flips and player art. The D-pad moves its cursor; A changes region, Y recenters on the player, and Select opens Places. A on a place shows it on the map. Map is read-only; Fly is not implemented.
-The opened NEXT BOSS panel compares your highest non-egg party level with the boss ace; this is a level comparison, not a win prediction. Guide uses Left/Right to switch HERE: WILD, HERE: FINDS, NEXT BOSS, TIPS and WHERE IS. Up/Down chooses a row or scrolls an open answer. A reveals a hint, then an answer; B closes it. Y changes encounter method or Where Is category. A plus mark means caught/collected. The Guide follows the game clock and badges; it never changes game data. Upstream marks its guide data unverified, so entries may contain mistakes.
+The opened NEXT BOSS panel compares your highest non-egg party level with the boss ace; this is a level comparison, not a win prediction. Guide uses Left/Right to switch HERE: WILD, HERE: FINDS, NEXT BOSS, TIPS and WHERE IS. Up/Down chooses a row or scrolls an open answer. A reveals a hint, then an answer; B closes it. On NEXT BOSS, A first opens the team list. Choose a Pokemon with Up/Down, then A reveals only its hint and answer. Y selects the next Pokemon and closes the previous reveal. B closes the entry, then the team, then returns to gameplay. Y changes encounter method or Where Is category. A plus mark means caught/collected. The Guide follows the game clock and badges; it never changes game data. Upstream marks its guide data unverified, so entries may contain mistakes.
 D-pad and A activate the existing GBA controls through their recorded hit regions.
 Long lists use repeated directions to move and scroll. Maps need further controller
 work; this build does not promise complete access to every point on a map.
@@ -171,10 +171,16 @@ game art are distributed.
 
 L3 now opens the quick menu over paused gameplay. D-pad directions select the four actions; A runs one, B or L3 closes it. Save/load open the existing confirmation; loading is disabled until a state exists. Menu > Quick menu is also available. The original game image keeps its physical integer scale behind the overlay.
 
-R3 cycles Original (160×144, 5× on Brick), Expand (204×152, 5×) and Zoom (256×192, 4×). Expansion is initially enabled only for the verified normal Polished Crystal 3.2.3 ROM, SHA1 `6930b48af5844d373e3c9130f26d6dd1084cf4ed`. Other companion-supported versions retain normal gameplay. Menus, dialogue, battles and uncertain map matches automatically use the original viewport. Display mode resets to Original when reopening a ROM. This is an initial expansion implementation: loaded NPCs are drawn, but unspawned and connected-map NPCs are not reconstructed. Indoor laboratory rendering is verified; broad outdoor/connection and hardware performance testing remain. Menu > Display offers the same cycle when R3 is unavailable.
+R3 cycles Original (160×144, 5× on Brick), Expand (204×152, 5×) and Zoom (256×192, 4×). Expansion is initially enabled only for the verified normal Polished Crystal 3.2.3 ROM, SHA1 `6930b48af5844d373e3c9130f26d6dd1084cf4ed`. Other companion-supported versions retain normal gameplay. Menus, dialogue, battles and uncertain map matches automatically use the original viewport. Display mode is remembered per ROM content hash, including after a rename. Missing or corrupt preferences use Original. Preferences are stored separately under `display/`; state loading preserves the selected mode but resets the renderer cache. This is an initial expansion implementation: loaded NPCs are drawn, but unspawned and connected-map NPCs are not reconstructed. Indoor laboratory rendering is verified; broad outdoor/connection and hardware performance testing remain. Menu > Display offers the same cycle when R3 is unavailable.
 
 L3/R3 are discovered from SDL controller bindings or Linux joystick/evdev button codes. The launch log records the result. If a driver does not identify them, set `POCKET_L3_BUTTON` / `POCKET_R3_BUTTON` to its raw SDL button numbers (0–255) in launch.sh, or use Menu > Quick menu. No unverified raw index is assumed for these buttons. Keyboard F3 opens the quick menu; F4 cycles the display for development.
 
-## Phase 9 additions
+## Existing companion features
 
 Adds the four upstream Pokedex filters, live-foe type-matchup groups and Guide best-party/boss-ace level comparison. All Phase 8 expansion and quick-menu features remain included. No GBA feature development or game-memory writes are added. Full Android parity remains unfinished; see PARITY.md.
+
+## Phase 10 integration
+
+Upstream history is merged through `54d8f4867501feb32b7ee139a5616b7c6301f044` (1.3.1-era source). The native build reuses upstream `pk_savevf.c` unchanged for memory-mapping fallback. `host_io.c` adds shared error handling around the underlying save file, and content-keyed atomic display preferences. A save must still open read/write. I/O failures stop emulation and are reported; the existing pre-launch `.bak` is retained when one was made. This is not power-loss protection. No battery-save migration is performed.
+
+Android-only 1.3.1 features remain available in the source for later adaptation; merging their source does not enable MAKEOVER, DS or new GBA companions on Brick. Polished's generated decoding/data remains isolated from the Linux host.

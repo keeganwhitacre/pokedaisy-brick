@@ -505,6 +505,7 @@ void pc_item_draw(struct pd_canvas *c, int item, const unsigned char *rom,
 static const int *mon_types(int, int);
 static int type_percent(int, int);
 #include "polished_battle.inc"
+static int clamp_selection(int value, int count);
 #include "polished_guide.inc"
 
 static int clamp_selection(int value, int count) {
@@ -524,9 +525,16 @@ bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
       u->battleFoe = 0;
       return true;
     }
-    if (u->section == PC_GUIDE && u->guideReveal) {
-      u->guideReveal = u->guideScroll = 0;
-      return true;
+    if (u->section == PC_GUIDE) {
+      if (u->guideReveal) {
+        u->guideReveal = u->guideScroll = 0;
+        return true;
+      }
+      if (u->guideBossOpen) {
+        u->guideBossOpen = false;
+        u->guideMon = 0;
+        return true;
+      }
     }
     if (u->placesOpen) {
       u->placesOpen = false;
@@ -572,21 +580,48 @@ bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
   } else if (u->section == PC_GUIDE) {
     if (a == PC_LEFT || a == PC_RIGHT) {
       u->guidePage = (u->guidePage + 5 + (a == PC_RIGHT ? 1 : -1)) % 5;
-      u->guideRow = u->guideReveal = u->guideScroll = 0;
+      u->guideRow = u->guideReveal = u->guideScroll = u->guideMon = 0;
+      u->guideBossOpen = false;
     }
-    if (a == PC_UP || a == PC_DOWN) {
+    if (u->guidePage == 2 && u->guideBossOpen) {
+      int boss = guide_pending_boss(s, u->guideRow);
+      if (boss < 0 || boss != u->guideBoss) {
+        u->guideBossOpen = false;
+        u->guideReveal = 0;
+        return true;
+      }
+      int count = guideBosses[boss].count;
+      if (a == PC_ALTERNATE) {
+        u->guideMon = (u->guideMon + 1) % count;
+        u->guideReveal = u->guideScroll = 0;
+      }
+      if (a == PC_UP || a == PC_DOWN) {
+        int *pos = u->guideReveal ? &u->guideScroll : &u->guideMon;
+        *pos = clamp_selection(*pos + (a == PC_DOWN ? 1 : -1),
+                               u->guideReveal ? 4097 : count);
+      }
+    } else if (a == PC_UP || a == PC_DOWN) {
       int *position = u->guideReveal ? &u->guideScroll : &u->guideRow;
-      *position += a == PC_DOWN ? 1 : -1;
-      if (*position < 0)
-        *position = 0;
-      if (*position > 4096)
-        *position = 4096;
+      *position = clamp_selection(*position + (a == PC_DOWN ? 1 : -1), 4097);
     }
     if (a == PC_ALTERNATE && (u->guidePage == 0 || u->guidePage == 4)) {
       u->guideMethod = (u->guideMethod + 1) % (u->guidePage == 0 ? 8 : 3);
-      u->guideRow = u->guideReveal = u->guideScroll = 0;
+      u->guideRow = u->guideReveal = u->guideScroll = u->guideMon = 0;
+      u->guideBossOpen = false;
     }
-    if (a == PC_CONFIRM && u->guidePage != 0) {
+    if (a == PC_CONFIRM && u->guidePage == 2) {
+      int boss = guide_pending_boss(s, u->guideRow);
+      if (boss >= 0) {
+        if (!u->guideBossOpen) {
+          u->guideBossOpen = true;
+          u->guideBoss = boss;
+          u->guideMon = 0;
+          u->guideReveal = 0;
+        } else
+          u->guideReveal = (u->guideReveal + 1) % 3;
+        u->guideScroll = 0;
+      }
+    } else if (a == PC_CONFIRM && u->guidePage != 0) {
       int tip = clamp_selection(u->guideRow,
                                 (int)(sizeof guideTips / sizeof *guideTips));
       int steps = u->guidePage == 3 && !*guideTips[tip].hint ? 2 : 3;

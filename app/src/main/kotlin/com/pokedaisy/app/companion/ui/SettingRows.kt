@@ -1,6 +1,14 @@
 package com.pokedaisy.app.companion.ui
 
 import androidx.compose.foundation.layout.Column
+import kotlinx.coroutines.launch
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onGloballyPositioned
 import com.pokedaisy.app.companion.i18n.tk
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +49,8 @@ class SettingRow(
     val keywords: String = "",
     /** The row opens a page of its own (not a pick-list): a pixel chevron at its right end. */
     val opensPage: Boolean = false,
+    /** A group title drawn to stand out ([featuredGroupTitle]). */
+    val featured: Boolean = false,
     val onClick: () -> Unit,
 )
 
@@ -134,6 +144,12 @@ val SETTING_KEYWORDS: Map<String, String> = mapOf(
     "SCENE SPEEDS" to "battle speed text speed instant text fast text menu speed overworld speed faster battles quality of life qol bike speed surf speed faster bike faster surfing",
     "AUTO-RUN" to "auto run autorun running shoes run sprint dash always run hold b",
     "RUN INDOORS" to "run inside buildings indoor running shoes houses",
+    "MAKEOVER" to "makeover look looks style customize customise appearance costume outfit skin dress up player rival",
+    "FOLLOWER" to "follower following pokemon walking pokemon partner companion pet behind you lead heartgold soulsilver yellow pikachu",
+    "DAY AND NIGHT" to "day and night daytime nighttime night time dusk dawn sunset evening clock time of day tint darker dark lighting dns",
+    "TEXT LOOK" to "text look text box textbox dialogue dialog box message box window frame font letters typeface firered emerald",
+    "RIVAL LOOK" to "rival look rival costume outfit skin sprite appearance dress up brendan may other hero opponent",
+    "PLAYER LOOK" to "player look hero heroine character protagonist trainer costume outfit skin sprite appearance swap play as another game red leaf brendan may",
     "REUSABLE TMS" to "reusable tm tms technical machine machines reuse infinite unlimited keep tm single use consumed used up teach moves",
     "WILD ENCOUNTERS" to "wild encounters encounter rate random battles grass caves repel no encounters fewer battles",
 )
@@ -143,6 +159,10 @@ private fun fold(s: String): String =
 
 /** A group's title row in [GroupedRows]. */
 fun groupTitle(label: String) = SettingRow(label, null, header = true) {}
+
+/** A group's title that stands out from the others (MAKEOVER, the user's call): a framed blue band with gold stars and
+ * [tagline] under the title. */
+fun featuredGroupTitle(label: String, tagline: String) = SettingRow(label, null, header = true, subtitle = tagline, featured = true) {}
 
 /**
  * A settings list in groups, shared by both screens' SETTINGS: group titles (red, like
@@ -167,7 +187,143 @@ fun GroupedRows(
     firstRowFocus: androidx.compose.ui.focus.FocusRequester? = null,
     /** Row i took the D-pad's focus: the cursor follows it, so only one row is white. */
     onFocused: ((Int) -> Unit)? = null,
+    /** A column of the group titles on the left ([GroupTabs]) where the window is wide enough: a tap scrolls the list
+     * to that group. For a long list (SETTINGS' home pages); it's still one list. */
+    groupTabs: Boolean = false,
     footer: @Composable () -> Unit = {},
+) {
+    val groups = if (groupTabs) rows.indices.filter { rows[it].header } else emptyList()
+    if (groups.size < MIN_GROUP_TABS) {
+        GroupedRowsList(rows, m, cursor, onClick, scroll, labelWeight, reveal, onRevealed, firstRowFocus, onFocused, null, footer)
+        return
+    }
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        if (maxWidth < GROUP_TABS_MIN_WIDTH || maxWidth < maxHeight) {
+            GroupedRowsList(rows, m, cursor, onClick, scroll, labelWeight, reveal, onRevealed, firstRowFocus, onFocused, null, footer)
+            return@BoxWithConstraints
+        }
+        // Each group title's top in the list (content pixels), as laid out.
+        val tops = remember { androidx.compose.runtime.mutableStateMapOf<Int, Int>() }
+        // The row the player last moved to (the D-pad's focus, the cursor): its group's tab lights, even while the
+        // scroll still shows the group before at the top (DOWN from a group's last row onto the next group's first).
+        var follow by remember { mutableStateOf(-1) }
+        // The cursor it opened on doesn't count: the list may have been dragged away from it before.
+        var opened by remember { mutableStateOf(false) }
+        LaunchedEffect(cursor) {
+            if (opened && cursor >= 0) follow = cursor
+            opened = true
+        }
+        val focused: (Int) -> Unit = { i -> follow = i; onFocused?.invoke(i) }
+        androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
+            GroupTabs(rows, groups, tops, scroll, follow, m)
+            androidx.compose.foundation.layout.Box(Modifier.weight(1f).fillMaxSize()) {
+                GroupedRowsList(rows, m, cursor, onClick, scroll, labelWeight, reveal, onRevealed, firstRowFocus, focused, tops, footer)
+            }
+        }
+    }
+}
+
+/** [GroupedRows]' tabs need this many groups, and a window this wide (and wider than tall). */
+private const val MIN_GROUP_TABS = 3
+private val GROUP_TABS_MIN_WIDTH = 400.dp
+
+/**
+ * [GroupedRows]' group tabs: the group titles down the window's left edge, the one the list is showing lit like a
+ * selected tab; a tap scrolls the list to that group. Touch only (the D-pad walks the rows). The group of the row the
+ * player last moved to ([follow]) or the tab last tapped stays lit until the list is dragged; then the group at the top
+ * decides (at the list's very end, the last).
+ */
+@Composable
+private fun GroupTabs(
+    rows: List<SettingRow>,
+    groups: List<Int>,
+    tops: Map<Int, Int>,
+    scroll: ScrollState,
+    follow: Int,
+    m: GbaTextMetrics,
+) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var picked by remember { mutableStateOf(-1) }
+    // A row moved to: its group, wherever the scroll left the group titles.
+    LaunchedEffect(follow) { if (follow >= 0) groups.lastOrNull { it <= follow }?.let { picked = it } }
+    // Dragging the list hands the choice back to the scroll.
+    LaunchedEffect(scroll) {
+        scroll.interactionSource.interactions.collect { if (it is androidx.compose.foundation.interaction.DragInteraction.Start) picked = -1 }
+    }
+    val atEnd = scroll.maxValue > 0 && scroll.value >= scroll.maxValue - 1
+    val slack = with(androidx.compose.ui.platform.LocalDensity.current) { (m.u * 4).roundToPx() }
+    val shown = groups.lastOrNull { (tops[it] ?: Int.MAX_VALUE) <= scroll.value + slack } ?: groups.first()
+    // At the very end the last group is on screen whatever reached the top.
+    val current = picked.takeIf { it >= 0 } ?: if (atEnd) groups.last() else shown
+    val small = rememberGbaTextMetrics(1f)
+    androidx.compose.foundation.layout.Column(
+        Modifier
+            .width(androidx.compose.foundation.layout.IntrinsicSize.Max)
+            .fillMaxHeight()
+            .drawBehind {
+                // A dashed rule between the tabs and the list, like the rows' dividers.
+                val px = m.u.toPx()
+                var y = 4 * px
+                while (y < size.height - 4 * px) {
+                    drawRect(OptionColors.divider, androidx.compose.ui.geometry.Offset(size.width - px, y), androidx.compose.ui.geometry.Size(px, 2 * px))
+                    y += 4 * px
+                }
+            }
+            .verticalScroll(rememberScrollState())
+            .padding(start = m.u * 4, end = m.u * 6, top = m.u * 4, bottom = m.u * 4),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(m.u * 2),
+    ) {
+        for (g in groups) {
+            GroupTab(tr(rows[g].label), g == current, small) {
+                picked = g
+                val top = tops[g] ?: return@GroupTab
+                scope.launch { scroll.animateScrollTo(top.coerceAtMost(scroll.maxValue)) }
+            }
+        }
+    }
+}
+
+/** One of [GroupTabs]: a tab chip's frame (white with a red label when [selected], like the tab bar's) at the list's
+ * smaller text. */
+@Composable
+private fun GroupTab(label: String, selected: Boolean, m: GbaTextMetrics, onClick: () -> Unit) {
+    val u = m.u
+    androidx.compose.foundation.layout.Box(
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .drawBehind {
+                val px = u.toPx()
+                drawLayeredBox(OptionColors.chipLayers.inPx(px), if (selected) OptionColors.tabSelectedFill else OptionColors.tabIdleFill, radius = 3 * px)
+            }
+            .focusProperties { canFocus = false }
+            .soundClickable(onClick = onClick)
+            .padding(horizontal = u * 6, vertical = u * 4),
+    ) {
+        GbaText(
+            label,
+            if (selected) OptionColors.value else OptionColors.label,
+            if (selected) OptionColors.valueShadow else OptionColors.labelShadow,
+            m, bold = gameBoldLabels(),
+        )
+    }
+}
+
+@Composable
+private fun GroupedRowsList(
+    rows: List<SettingRow>,
+    m: GbaTextMetrics,
+    cursor: Int,
+    onClick: (Int) -> Unit,
+    scroll: ScrollState,
+    labelWeight: Float,
+    reveal: Int,
+    onRevealed: () -> Unit,
+    firstRowFocus: androidx.compose.ui.focus.FocusRequester?,
+    onFocused: ((Int) -> Unit)?,
+    /** Each group title's top in the list, for [GroupTabs]. */
+    tops: MutableMap<Int, Int>?,
+    footer: @Composable () -> Unit,
 ) {
     val firstRow = rows.indexOfFirst { !it.header }
     // A game font is set larger to match Pixel Operator's letters (Gen 1's 7px capitals): its line is taller for the same
@@ -178,18 +334,22 @@ fun GroupedRows(
     val subtitleLine = if (gameScale == 1f) m.lineHeight else subtitleMetrics(m).lineHeight + m.u * 2
     Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
         rows.forEachIndexed { i, row ->
-            if (row.header) {
+            if (row.header && row.featured) {
+                val track = if (tops == null) Modifier else Modifier.onGloballyPositioned { tops[i] = it.positionInParent().y.toInt() }
+                FeaturedTitle(row, m, top = if (i == 0) 1 else 6, modifier = track)
+            } else if (row.header) {
+                val track = if (tops == null) Modifier else Modifier.onGloballyPositioned { tops[i] = it.positionInParent().y.toInt() }
                 val band = OptionColors.groupTitleFill
                 if (band == null) {
                     GbaText(
                         tr(row.label), OptionColors.value, OptionColors.valueShadow, m,
-                        modifier = Modifier.padding(start = m.u * 8, top = m.u * (if (i == 0) 1 else 6), bottom = m.u),
+                        modifier = track.padding(start = m.u * 8, top = m.u * (if (i == 0) 1 else 6), bottom = m.u),
                     )
                 } else {
                     // Black text on white rows (Gen 1): the title is a black band, so it can't pass for a row.
                     GbaText(
                         tr(row.label), OptionColors.groupTitleText, OptionColors.groupTitleShadow, m,
-                        modifier = Modifier
+                        modifier = track
                             .padding(start = m.u * 2, end = m.u * 2, top = m.u * (if (i == 0) 1 else 6), bottom = m.u * 2)
                             .fillMaxWidth()
                             .drawBehind { drawPixelRoundRect(band, radius = m.u.toPx() * 2, step = m.u.toPx()) }
@@ -203,7 +363,10 @@ fun GroupedRows(
                         .then(if (i == firstRow && firstRowFocus != null) Modifier.focusRequester(firstRowFocus) else Modifier)
                         // The companion's window: the D-pad starts on the cursor row.
                         .focusStart(i == cursor),
-                    height = if (row.subtitle != null) rowHeight + subtitleLine else rowHeight,
+                    // A one-line row's letters sit low in their line (room above the capitals, none under): a little more
+                    // under them, so the space below matches the space above.
+                    height = if (row.subtitle != null) rowHeight + subtitleLine else rowHeight + m.u * ONE_LINE_ROW_EXTRA,
+                    bottomPadding = if (row.subtitle != null) 0.dp else m.u * ONE_LINE_ROW_EXTRA,
                     divider = rows.getOrNull(i + 1)?.header == false, labelBadge = row.labelBadge, labelIcon = row.labelIcon,
                     valueBadge = row.badge, enabled = row.enabled, subtitle = row.subtitle, labelWeight = labelWeight,
                     chevron = row.opensPage,
@@ -212,6 +375,36 @@ fun GroupedRows(
             }
         }
         footer()
+    }
+}
+
+/** GBA pixels added under a [GroupedRows] row without a subtitle. */
+private const val ONE_LINE_ROW_EXTRA = 2
+
+/** [featuredGroupTitle]'s band: the title between two gold stars, its tagline under it, in a field-move blue frame. */
+@Composable
+private fun FeaturedTitle(row: SettingRow, m: GbaTextMetrics, top: Int, modifier: Modifier = Modifier) {
+    val u = m.u
+    val small = subtitleMetrics(m)
+    Column(
+        modifier
+            .padding(start = u * 2, end = u * 2, top = u * top, bottom = u * 2)
+            .fillMaxWidth()
+            .drawBehind {
+                val px = u.toPx()
+                drawLayeredBox(OptionColors.fieldMoveLayers.inPx(px), OptionColors.featureFill, radius = 3 * px)
+            }
+            .padding(horizontal = u * 8, vertical = u * 4),
+    ) {
+        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            ShadowedPixelIcon(PixelIcons.star, OptionColors.favorite, OptionColors.featureShadow, m)
+            GbaText(
+                tr(row.label), OptionColors.featureText, OptionColors.featureShadow, m,
+                modifier = Modifier.padding(horizontal = u * 4),
+            )
+            ShadowedPixelIcon(PixelIcons.star, OptionColors.favorite, OptionColors.featureShadow, m)
+        }
+        row.subtitle?.let { GbaText(tr(it), OptionColors.label, OptionColors.labelShadow, small, modifier = Modifier.padding(top = u)) }
     }
 }
 

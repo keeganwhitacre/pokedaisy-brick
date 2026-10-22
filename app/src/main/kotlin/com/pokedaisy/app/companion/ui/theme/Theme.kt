@@ -228,6 +228,8 @@ object AppColors {
         // Pokémon Prism's own types (none of the official games has them): colours of ours.
         "Gas" to Color(0xFF9C8CB4), "Sound" to Color(0xFF58A8C0), "Tri" to Color(0xFFC89878),
         "Prism" to Color(0xFFE070D8),
+        // Pokémon Odyssey's AETHER (type 9): ours too.
+        "Aether" to Color(0xFF9DB7F5),
     )
 
     /** By the game's own type name: title-cased ("Fire"), or Gen 1's capitals ("FIRE", and its unused BIRD as Flying). */
@@ -419,15 +421,19 @@ private fun backdropColors(game: GameKind): IntArray? = when (game) {
     else -> null
 }
 
-/** [bmp] (FireRed's backdrop) with [FIRERED_BACKDROP] swapped for [to]; or, with no FireRed art yet, its stripes alone. */
-private fun recolorBackdrop(bmp: android.graphics.Bitmap?, to: IntArray): android.graphics.Bitmap {
+/** Emerald's party backdrop's three colours (light / mid stripe, the border), as RomArt rebuilds it. */
+private val EMERALD_BACKDROP = intArrayOf(0xFFCED67B.toInt(), 0xFFB5B55A.toInt(), 0xFF8C9C29.toInt())
+
+/** [bmp] (FireRed's backdrop, or another whose colours are [from]) with [from] swapped for [to]; or, with no art yet,
+ * its stripes alone. */
+private fun recolorBackdrop(bmp: android.graphics.Bitmap?, to: IntArray, from: IntArray = FIRERED_BACKDROP): android.graphics.Bitmap {
     val w = bmp?.width ?: 240
     val h = bmp?.height ?: 160
     val px = IntArray(w * h)
     if (bmp != null) {
         bmp.getPixels(px, 0, w, 0, 0, w, h)
         for (i in px.indices) {
-            val k = FIRERED_BACKDROP.indexOf(px[i] or (0xFF shl 24))
+            val k = from.indexOf(px[i] or (0xFF shl 24))
             if (k >= 0) px[i] = to[k]
         }
     } else {
@@ -472,6 +478,14 @@ private fun buildGameBackground(context: android.content.Context, game: GameKind
     }
     backdropColors(game)?.let { to ->
         return GameBackground(recolorBackdrop(GameArt.get(context, "partybg/firered.png"), to).asImageBitmap(), false)
+    }
+    // Team Rocket Edition: Dragonsden's party menu is Emerald's backdrop in FireRed's three teals (sampled headless):
+    // FireRed's own art where a FireRed ROM has made it, else Emerald's recoloured.
+    if (game == GameKind.TEAM_ROCKET) {
+        GameArt.get(context, "partybg/firered.png")?.let { return GameBackground(it.asImageBitmap(), false) }
+        GameArt.get(context, "partybg/emerald.png")?.let {
+            return GameBackground(recolorBackdrop(it, FIRERED_BACKDROP, from = EMERALD_BACKDROP).asImageBitmap(), false)
+        }
     }
     val (asset, tiled) = when (game) {
         // Recharged Emerald's own (teal stripes), from its ROM.

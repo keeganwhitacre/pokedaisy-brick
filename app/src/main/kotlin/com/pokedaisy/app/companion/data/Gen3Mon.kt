@@ -66,10 +66,18 @@ data class PartyMonLayout(
     val hasStats: Boolean = size == MON_STRUCT_SIZE,
     /** The egg bit in the [flags] byte (vanilla's isEgg is 0x04). */
     val eggMask: Int = 0x04,
+    /** Shiny when (OT ID's halves ^ PID's halves) is below this; 0 = not read. Only where the party menu draws shiny icons:
+     * SoulGold (256 - its odds are 1 in 256, checked headless on v1.1.4 and v1.2: 255 shiny, 256 not). */
+    val shinyBelow: Int = 0,
+    /** The nickname's length at +8 and where the language byte is (SoulGold: 12 letters, language +0x14). */
+    val nicknameLen: Int = 10,
+    val language: Int = 0x12,
     /** R.O.W.E.'s bit-packed struct ([ROWE_PARTY_MON], [decodeRoweMon]) rather than a box of substructs. */
     val rowe: Boolean = false,
     /** Elite Redux's bit-packed struct ([ELITE_REDUX_PARTY_MON], [decodeEliteReduxMon]). */
     val eliteRedux: Boolean = false,
+    /** Expansion's Mints: +0x12's bits above the language are a nature XORed in. Off where that byte holds other flags. */
+    val natureModifier: Boolean = true,
 )
 
 val VANILLA_PARTY_MON = PartyMonLayout()
@@ -99,6 +107,14 @@ val ELITE_REDUX_PARTY_MON = PartyMonLayout(
     size = 0x4C, status = 0x38, level = 0x3C, hp = 0x3E, maxHp = 0x40, flags = 0x15, eggMask = 0x80, hasStats = true,
     eliteRedux = true,
 )
+
+/**
+ * Pokémon Team Rocket Edition: Dragonsden Version's struct Pokemon: vanilla's 100 bytes, encryption and substructs, but
+ * the language and the flags share one byte at +0x12 (language bits 0-2, hasSpecies bit 4, isEgg bit 5 - an egg given
+ * headless read 0x31, every other mon 0x12) and the OT name starts a byte early (+0x13). No Mints: nature is PID % 25
+ * (the save's Crobat is Adamant by its stats; the XOR would make it Lonely).
+ */
+val TEAM_ROCKET_PARTY_MON = PartyMonLayout(flags = 0x12, eggMask = 0x20, natureModifier = false)
 
 private fun decodeEliteReduxMon(raw: ByteArray, off: Int): Mon? {
     val w08 = u32(raw, off + 0x08)
@@ -167,6 +183,7 @@ val QUETZAL_PARTY_MON = PartyMonLayout(
 )
 val SOULGOLD_PARTY_MON = PartyMonLayout(
     size = 96, status = 0x4C, level = 0x50, hp = 0x52, maxHp = 0x54, flags = 0x15, plainSpeciesMask = 0x07FF,
+    nicknameLen = 12, language = 0x14, shinyBelow = 256,
     plainItemMask = 0x03FF,   // heldItem:10 - Cyndaquil's 0x0400 read as an "Item#1024" tag on its party slot
 )
 
@@ -224,7 +241,25 @@ fun decodePartyMon(raw: ByteArray, off: Int, layout: PartyMonLayout = VANILLA_PA
         personality = u32(raw, off),
         stats = if (layout.hasStats) monStats(raw, off, layout, evs, ivWord) else null,
         heldItem = heldItem,
+        nickname = gen3Nickname(raw, off, layout),
+        shiny = layout.shinyBelow > 0 && shinyValue(u32(raw, off), u32(raw, off + 4)) < layout.shinyBelow,
     )
+}
+
+/** Gen 3's shiny value: the OT ID's and the personality's halves XORed together. */
+internal fun shinyValue(personality: Long, otId: Long): Int =
+    ((otId ushr 16) xor (otId and 0xFFFF) xor (personality ushr 16) xor (personality and 0xFFFF)).toInt()
+
+/**
+ * The nickname at +8, as the party menu prints it; null when it can't be read as the game's text: a
+ * Japanese Pokémon (language 1) in a Western game or the other way round (kana and letters share bytes),
+ * or a byte the table doesn't know.
+ */
+internal fun gen3Nickname(raw: ByteArray, off: Int, layout: PartyMonLayout): String? {
+    val japanese = (raw[off + layout.language].toInt() and 0xFF) == 1
+    if (japanese != (romLanguage == 'J')) return null
+    val s = Gen3Text.decode(raw, off + 8, layout.nicknameLen).trim()
+    return s.takeIf { it.isNotEmpty() && Gen3Text.UNKNOWN !in it }
 }
 
 /**
@@ -236,7 +271,8 @@ private fun monStats(raw: ByteArray, off: Int, layout: PartyMonLayout, evs: List
     val pidNature = (u32(raw, off) % 25).toInt()
     // pokeemerald-expansion's Mints: hiddenNatureModifier sits above the 3
     // language bits at +0x12 (0 in every other game) and is XORed in.
-    val nature = (pidNature xor ((raw[off + 0x12].toInt() and 0xFF) ushr 3)).takeIf { it < 25 } ?: pidNature
+    val nature = if (!layout.natureModifier) pidNature
+        else (pidNature xor ((raw[off + 0x12].toInt() and 0xFF) ushr 3)).takeIf { it < 25 } ?: pidNature
     return MonStats(
         ivs = List(6) { ((ivWord shr (5 * it)) and 0x1F).toInt() },
         evs = evs,
@@ -353,6 +389,14 @@ val ELITE_REDUX_BATTLE_MON = BattleMonLayout(
     ability = 0x28, abilityU16 = true, item = 0x3A,
     species = 0x14, stats = 0x16, statStages = 0x3C,
 )
+
+/**
+ * Pokémon Team Rocket Edition: Dragonsden Version's 0x5C-byte struct BattlePokemon: expansion's fields where
+ * [EXPANSION_BATTLE_MON] has them (a third type byte at +0x24, PP from +0x25, HP +0x2A, level +0x2C, item +0x30), then the
+ * nickname, OT name, experience +0x48, personality +0x4C, status1 +0x50, status2, otId +0x58 (its battle dump's lead
+ * matched its party struct field for field).
+ */
+val TEAM_ROCKET_BATTLE_MON = EXPANSION_BATTLE_MON.copy(size = 0x5C)
 
 /** R.O.W.E.'s: expansion's layout, the species' form id in its top 5 bits. */
 val ROWE_BATTLE_MON = EXPANSION_BATTLE_MON.copy(speciesMask = 0x7FF)

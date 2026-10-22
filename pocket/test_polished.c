@@ -234,6 +234,26 @@ static void test_phase9(void) {
   assert(guide_party_best(&s) == 10);
   s.valid = false;
   assert(!guide_party_best(&s));
+  s.pcProgressOk = true;
+  s.pcBadges = 0;
+  memset(s.flags, 0, sizeof s.flags);
+  u = (struct pc_ui){.section = PC_GUIDE, .guidePage = 2};
+  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideBossOpen && !u.guideReveal);
+  assert(pc_ui_input(&u, &s, PC_DOWN) && u.guideMon == 1);
+  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideReveal == 1);
+  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideReveal == 2);
+  assert(pc_ui_input(&u, &s, PC_ALTERNATE) && u.guideMon == 2 &&
+         !u.guideReveal);
+  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideReveal == 1);
+  assert(pc_ui_input(&u, &s, PC_BACK) && u.guideBossOpen && !u.guideReveal);
+  assert(pc_ui_input(&u, &s, PC_BACK) && !u.guideBossOpen);
+  assert(!pc_ui_input(&u, &s, PC_BACK));
+  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideBossOpen);
+  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideReveal == 1);
+  s.flags[PC_EVENT_BEAT_FALKNER / 8] |= 1u << (PC_EVENT_BEAT_FALKNER % 8);
+  assert(pc_ui_input(&u, &s, PC_DOWN) && !u.guideBossOpen && !u.guideReveal);
+  puts("PASS Guide individual boss entries: select/hint/answer, next closes "
+       "previous, nested back");
   puts(
       "PASS Dex four upstream filters, filtered navigation/empty guard; battle "
       "live-type groups/sorting/page wrap; Guide best level excludes eggs");
@@ -259,9 +279,9 @@ int main(int argc, char **argv) {
   }
   test_guide();
   char hash[41];
-  sha1((const unsigned char *)"abc", 3, hash);
+  pocket_rom_sha1((const unsigned char *)"abc", 3, hash);
   assert(!strcmp(hash, "a9993e364706816aba3e25717850c26c9cd0d89d"));
-  sha1((const unsigned char *)"", 0, hash);
+  pocket_rom_sha1((const unsigned char *)"", 0, hash);
   assert(!strcmp(hash, "da39a3ee5e6b4b0d3255bfef95601890afd80709"));
   char flowed[128] = "anger-\ned fire-\ntype Poke-\nmon";
   rom_flow(flowed);

@@ -1,4 +1,4 @@
-# Phase 9 verification
+# Phase 10 verification
 
 Phase 7 adds the L3 quick menu: original Android state/FF/companion pixel icons,
 D-pad ring navigation, genuine paused gameplay at its existing physical scale,
@@ -148,3 +148,13 @@ Limitations: only normal 3.2.3 expansion is verified; laboratory coverage does n
 Linux and actual NextUI ARM builds compile. Decoder tests cover all four exact upstream Dex predicates, filtered cursor boundaries, return-to-list retention, empty-list entry blocking, battle 4x/2x/0x classification and sorting, five-page cycling and Guide egg exclusion/unavailable-party behavior. The supplied normal 3.2.3 ROM passes the normal-input new-game test and produces actual-memory Dex-filter and boss-level captures at 512x384. Battle-type captures use upstream captured trainer memory with the supplied ROM's font/art; they are explicitly marked `fixture` and are not presented as a live trainer playthrough.
 
 The ARM executable also passes these decoder tests and GB/GBA runtime/quick-menu regressions under QEMU. No physical Brick testing occurred in this pass. New captures were visually inspected at 512x384. No ROM, extracted art or test saves/states are packaged. Native controls, state/save behavior and the Phase 8 display architecture remain intact. Full Android parity and broad expansion-map coverage remain open in PARITY.md.
+
+## Phase 10 results (2026-10-22)
+
+Linux and actual NextUI Cortex-A53/AArch64 builds compile. The shared host test verifies upstream mapping passthrough and a forced map-failure memory copy, zero fill, file-position preservation, writeback and ownership. Faults in read/write/sync/truncate/close latch an error; subsequent fallback writes are inhibited. Preferences are isolated by content hash, written through rename, and reject invalid/corrupt content. These are explicit I/O fault tests, not hardware failure claims.
+
+Native and ARM/QEMU diagnostic GB/GBA emulator tests pass both normally and with all save mappings forced to fail. Battery marker persistence, state round trips, controller navigation and 100 companion toggles pass. Quick-menu regressions pass. A private normal 3.2.3 ROM passes the normal-input starter route and provides real individual Guide entry/list/hint/answer captures at 512x384. Decoder tests cover individual selection, reveal steps, close-on-next, nested Back and boss identity changes.
+
+The private-ROM display test passes natively and on ARM/QEMU: exact PPU viewport preservation, display cycling, menu fallback, state cache invalidation, companion/wheel pause, and remembered display mode after actual emulator teardown/reopening. The ARM run also forces save-mapping failure. No physical Brick testing occurred. SD-card failure behavior, sustained hardware speed/audio, RTC and suspend/power remain unverified. No ROM, extracted commercial art or private save/state is distributed.
+
+CI includes pocket-host-test and forced-map-failure diagnostics in both native and ARM jobs. Check Actions separately for remote status. Shared sources are merged, but only features compiled into the native host are claimed.

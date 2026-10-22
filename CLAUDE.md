@@ -132,7 +132,11 @@ reason about Compose layout blind. Two ways, same screens:
    tab (via `CompanionScreen(initialTab = …)` — Paparazzi can't tap the tab bar) plus the
    shared `OptionSelector`/`OptionConfirm`, at the Thor bottom screen's 1240x1080 (landscape); `DuoLiteCompanionScreenshotTest`
 re-runs them at the Retroid Pocket Duo Lite's 1280x960 (4:3: ~120 px less height - the summary moves its types beside the
-icon, STATES flattens its thumbnails, both only when the full layout doesn't fit);
+icon, STATES flattens its thumbnails, both only when the full layout doesn't fit); `RgDsCompanionScreenshotTest` at the RG DS's
+640x480 - a **short companion** (`isShortCompanion`: under 280 GBA pixels tall; the pixel font can't go below 2 screen px a GBA
+pixel, so there its text was as large for the screen as on a GBA): `LocalTextStep` -1, `LocalShortCompanion` (smaller
+`NavButtonSize` / `SETTINGS_CHIP_WIDTH`, one-line summary moves, the DEX's HT over WT); ui-preview: `-PcompanionW=640
+-PcompanionH=480 -PcompanionDensity=1.5`;
    `WideCompanionScreenshotTest` re-runs all of them at the top screen's 1920x1080 (where SWAP SCREENS puts
    the companion; density 2.0, the closest bucket layoutlib has). Wide-screen rules so far: `PartyGrid` goes
    to 3 columns past 2.0:1 (1.6 caught the Duo Lite's 4:3 grid, ~1.56-1.75) (a measuring `Layout` - BoxWithConstraints composed the slots late and FireRed's
@@ -495,7 +499,8 @@ applied at configure time - edit the submodule, then `git -C third_party/melonds
 `app/src/main/cpp/nds/` (core, field read, function caller, EXPAND from the game's own polygons, STEADY = a second melonDS
 from the game's state with its ARM9 stopped, its ARM7 FIFO drained every frame), `Gen4*.kt` / `NdsArt.kt` (reads from the
 SaveData in RAM; art, DEX pages from the player's cart, never bundled), the DS bottom screen on the bottom display
-(`NdsBottomScreen.kt`; SWAP SCREENS trades the two: the stage to the second display, `NdsBottomHost` as the activity's content). Addresses from pret's pokeplatinum / pokeheartgold `.xMAP`s; headless with
+(`NdsBottomScreen.kt`; SWAP SCREENS trades the two: the stage to the second display, `NdsBottomHost` as the activity's content; on one screen - GitHub #244 - the touch screen takes the companion's place, `DsTouchPane`: the side
+panel locked at half the screen sideways, `SidePanel.setDsScreen`, the dock under the game upright). Addresses from pret's pokeplatinum / pokeheartgold `.xMAP`s; headless with
 `native-capture/nds_dump` (its README); docs/DEVELOPMENT.md's "Nintendo DS". DEX on both (`POKEDEX_PLATINUM` /
 `_HEARTGOLD`, pages from the cart); GUIDE on both (`GuidePlatinum.kt`, `GuideHeartGold.kt` over `Gen4World`:
 `scripts/gen_gen4_guide.py` writes the wild sets, boss teams and HERE's items from the decomps; gym leaders go by badge -
@@ -542,6 +547,26 @@ TMs never run out by themselves (checked headless), so `ReusableTms.BUILT_IN` sh
 list beside the cheats' in `pk_cheats.c` (`sOptions`: loading cheats never drops them), with the same overlay / RA swap, so the
 Poller's hash and RetroAchievements' see the file; they don't pause achievements. Played headless with mgba_dump's `rompatch`
 (docs/ROM_FEATURES.md note 15). The newer-engine hacks build the check another way: each needs its own site.
+**PLAYER LOOK** (2026-10-22, the companion's MAKEOVER group - first, a blue-framed `featuredGroupTitle`, only in a game it works in; per ROM: `Prefs.playerLookFor`, NEW tag; `PlayerLook.kt`,
+`PlayerLookRunner.kt`, docs/DEVELOPMENT.md's "PLAYER LOOK"): play retail FireRed / LeafGreen / Ruby / Sapphire / Emerald (and Kaizo, Legacy, Imperium, Ultra
+Violet: `PlayerLook.HACKS`) as another game's hero, picked from tiles of the heroes walking (`PlayerLookPicker`),
+its graphics found by fingerprint in the player's own ROMs (`scripts/gen_player_look_sigs.py`; kept in `rom-art/look/`, never
+bundled) and patched into the running ROM in memory as blocks (`pk_cheats_block`, overlaid for the Poller / RA hashes like the
+options' patches; mgba_dump `romblocks` / `romunblock`). The player's palette slot is shared with the surf blob, shadows, arrows
+and Emerald's FLY bird: across games their colours stay and the hero is remapped into the rest (`PlayerLook.wear`) - a plain
+palette swap recoloured the blob. Loaded palettes are swapped in RAM on toggle and after state loads (`pk_cheats_repalette`).
+The companion's MAP head and CARD follow `PlayerLook.worn`. Ruby / Sapphire are a third engine (`LookEngine.RUBY`: Emerald's
+sheets, walking + running in one, front and back palettes on one tag); a hack is offered only once played dressed up.
+Heart and Soul's Gold / Kris are worn by the others (`LookEngine.HEART_AND_SOUL`, never a host; smol front pictures).
+The party's Pokémon too (`MonArt`: the follower sprites of Heart and Soul, R.O.W.E., Recharged Yellow, Seaglass; `buildMon` makes the hero's records 32x32 over
+new frame tables, frames picked by the records' own animations). RIVAL LOOK (`Prefs.rivalLook`, on): Emerald / R/S's rival (the other gender's hero: same sheets, palette tag,
+trainer pic) wears the look's `counterpart`, built in the same patch (`build(rival = true)`, `settleBoth`). TEXT LOOK
+(`TextLook.kt`, same group and patch): FireRed's / Emerald's dialogue box and font in the other; FireRed's box in Emerald
+needs Emerald's frame routines swapped for `scripts/text_look_dialogue.s` (assembled bytes in `TextLook.DIALOGUE_CODE`).
+FOLLOWER (same group): the party lead walks behind the player as one more hardware sprite put in at line 0 and taken
+out after line 159 (pk_wide.c `followBegin` / `followEnd`: OBJ tiles 1008-1023, a free OAM entry and palette slot).
+DAY AND NIGHT (`DayNight.kt`, same group, any GBA game): the renderer's BG palettes 0-12 + OBJ tinted at line 0 through
+`writePalette` (pk_wide.c `tintPalettes`, palette RAM untouched; text windows 13-15 kept), eased by the engine on the field.
 **QoL batch 2**: PC anywhere on every language + FireRed rev 0 + Ruby / Sapphire (`port_field_items.py` maps PcFns, each
 checked against its gSpecials; R/S's special is ShowPokemonStorageSystem, 60, same opcodes) and so on the hacks using those
 tables (CFRU, Gaia, Odyssey, Orange Islands, Ultra Violet: retail's gSpecials, checked). The field reads take the WIDE
@@ -855,7 +880,10 @@ a controller on both devices); REPEL too when the bag holds more than one kind (
 used at once, and it's dimmed while one works (the steps left, below). BIKE / ROD use the game's SELECT register (`KeyItems`): the item
 into `SaveBlock1.registeredItem` (= `moneyOff` + 6 in every retail layout: 0x296 / 0x496), SELECT pressed 2 frames through
 `GbaInput.setPress` (not setScript: BattleInputController rewrites that every frame), the player's own registration put back 20 frames
-later - no per-game function table; FIRERED / EMERALD kinds with a retail money offset only (`keyItemsWork`). Using a bike while riding
+later - no per-game function table; FIRERED / EMERALD kinds with a retail money offset only (`keyItemsWork`). SoulGold (GitHub #242) has no single register: SELECT opens a wheel of four registered key items
+(SaveBlock1 +0x3484: up, right, down, left), so BIKE / ROD write the item into its DOWN slot, press SELECT, then DOWN 8 frames
+later, and put the slot back (`KeyItems.selectWheel`); its REPEL uses its own ids 114..116 and its Lure bit (`FieldItemFns.repelItems`
+/ `repelLureBit`, `scripts/find_field_items_soulgold.py`). Using a bike while riding
 gets off in every Gen 3 game (GetOnOffBike), so BIKE reads GET OFF while `EmulatorEngine.riding` (pkFieldState's AVATAR + BIKE). A stick still tilted when it closes stays away from the game until centred
 (`quickStickHold`: on the ring the stick aims, so A came while tilted and the bike rode off - and FireRed drops SELECT at full bike
 speed, GetPlayerSpeed() == FASTEST); `pressSelect` presses again only where taking it shows for sure (riding flips, or the field
@@ -986,8 +1014,10 @@ alone matched the formula within 1 per channel; the filters compiled and ran in 
 **RetroAchievements** (`achievements/RetroAchievements.kt` + `RaNative.kt`, native
 `app/src/main/cpp/pokedaisy_ra.c`): rcheevos' `rc_client` over the player's core (`pkMainCore()`,
 never `rg`), read through RA's GBA map ($0 IWRAM / $8000 EWRAM / $48000 save RAM, via
-`getMemoryBlock`); the hash is MD5 of the ROM bytes mGBA mapped (= the file, verified on the host:
-retail FireRed rev 1 = game 515, Emerald = 668, Unbound v2.1.1.1 = 17530).
+`getMemoryBlock`; a DS game: melonDS's main RAM at $0, its data TCM at $1000000); the game is loaded by the ROM
+*file's* hash (`RomIdentity.raHash`: its MD5, a DS cart's by RA's DS method - retail FireRed rev 1 = game 515, Emerald
+= 668, Unbound v2.1.1.1 = 17530, Platinum = 11732, HG / SS = 7212), never the core's ROM: a state load writes the cart's
+GPIO registers into it (0xC4-0xC9), so a resumed game hashed to nothing (GitHub #197).
 Kotlin does the HTTP (`User-Agent: PokeDaisy/<versionName> (Android <ver>) rcheevos/12.5`); answers
 are queued natively and `RetroAchievements.onFrame` (after every `pkRunFrame`) delivers them before
 `rc_client_do_frame`, because rc_client reads game memory while finishing a game load - with no core
@@ -1246,6 +1276,17 @@ wild switch 0x0203D214 / 0x0203D21C (2.65.4.1b reads the player's coordinates be
 11 lines now). Its R button is an auto run of its own. Trainer battles: gBattleTypeFlags' TRAINER is vanilla's 8, gEnemyParty the same packed mons (`elite_redux_trainer*` fixtures); a single
 battle never opens the target screen (no move targets user-or-selected), so its handler was read in a forced double battle.
 No field items, FLY or card; its START menu has its own PC.
+**Team Rocket Edition: Dragonsden Version 1.5 (2026-10-21)** (`GameKind.TEAM_ROCKET`, `NATIVE_TEAM_ROCKET`; not FireRed Rocket
+Edition): DragonsdenTV's closed BPEE build (32 MB, gcc) on an older pokeemerald-expansion - vanilla struct shapes with expansion's
+ids (National Dex species to 1395 = SPECIES_EGG, 755 moves, expansion's items in vanilla's 44-byte gItems, 36-byte base stats).
+Mapped from its one save (`~/Downloads/Game ROMs & Emulation/rom saves from discord/mGBA Romhack Saves/Pokemon - Team Rocket
+Edition.srm`) and the ROM; the version is on its START menu. Gotchas: the party mon is vanilla's encrypted 100 bytes but
+language + flags share +0x12 (hasSpecies bit 4, isEgg bit 5) and the OT name starts at +0x13, so expansion's Mint XOR must stay off
+(`PartyMonLayout.natureModifier`); BattlePokemon is 0x5C (a third type at +0x24); monToSwitchIntoId is gBattleStruct + 0x62; its
+setwildbattle takes a second mon's fields (ScriptContext_SetupScript 0x080CEDC5); its Kanto / Johto towns are Hoenn maps under
+Kanto names (the save's "Rustboro" is CELADON CITY, mapsec 0x5E); gItems has a few slots whose itemId is another's (names go by
+slot). Its party menu is Emerald's slots on FireRed's teal backdrop (`buildGameBackground`). No DEX (a regional order of its own:
+the summary shows CROBAT as No. 067), region map, EXPAND, field reads or field items yet; GUIDE is HERE only.
 **Emerald Legacy v1.1.4 (2026-10-14)**: BPEE, 16 MB, but a rebuild - its public source (`$DECOMPS/pokelegacy`, tag V1.1.4)
 built with agbcc is the release byte for byte, so take every address from that ELF (`nm`) and every struct offset / constant
 from agbcc compiling `offsetof` against its headers, never from retail. Runs as `GameKind.EMERALD` under `LEGACY_TEXT`
@@ -1475,7 +1516,21 @@ speed / refreshes per frame, `ffFramesPerRefresh`: 2x is 1 a refresh on 120 Hz -
 (EXPAND's window too), so every displayed frame advances the same number of game frames. Timer-paced FF (frames every
 4.17 ms with ms sleeps, EXPAND drawn every 12 ms) gave the 60 Hz screen steps of 3, 3, 5 - the user's "not as smooth as
 RetroArch", measured on the Thor at 4x; the compositor itself presented every 16.6 ms. Other speeds (1.5x, below 1x,
-uncapped) stay on the timer. The `fps=` log line carries refresh / paced / ffPerTick / late / work / underruns.
+uncapped) stay on the timer. The `fps=` log line carries refresh / paced / ffPerTick / late / work / underruns, the
+companion's samples (`sample=count:avg/worst`) and the audio made / taken by the track / played (`audio=`); a debug build on
+the RP6 (same SoC as the Thor) reads them with `adb logcat | grep fps=`.
+**Pacing fixes (1.3.1, GitHub #215 / #216, measured on the RP6)**: (1) the companion's full sample no longer decodes on the
+emu thread - it took 3-15 ms between two frames (GBA) and every one past ~8 ms cost a refresh: the emu thread copies the RAM
+(`RamSnapshot`: EWRAM + IWRAM, a DS's 4 MB main RAM, `pkReadInto` into kept buffers, < 1 ms) and `PokeDaisyActivity.startSample`
+decodes it on `pokedaisy-sample`, handing `afterSample` back through `EmulatorEngine.postToEmu`; `TelemetryStore.refresh` is
+synchronized (a savestate's copy still refreshes on the emu thread); Game Boy games still sample on the emu thread. (2) A DS
+frame (4-20 ms) is never waited for by the GL thread (`onVsync` returns 0 for `nds`): drawn a refresh later, a frame of
+latency - waited for within 60% of a refresh, 45 of 120 were late. (3) FF on the refresh fits its group to the device
+(`FfGroupFit`: a running average of group time; a frame goes only while the smaller group keeps 3/4 of the late one's
+throughput, frames are tried back with a doubling back-off) and SPED-UP divides by the group really run. DS audio is
+resampled by `NDS_FPS` (59.83), not the GBA's. (4) A GBA game whose frames keep missing the wait (3+ late draws in two 120-frame
+windows: Radical Red, 5-9 ms frames with 12-14 ms ones, GitHub #63) goes the DS way until it closes (`slowFrames`, latched -
+flipping back skips / repeats a frame; the `fps=` line says `paced=1 (slow: not waited for)`).
 **FPS / CPU** (SETTINGS on either screen, SCREEN group, `Prefs.showPerformance`, off): flush in the game screen's
 top-left corner on a small dark box (the HUD's messages moved top-right) - frames the core ran per second
 (`EmulatorEngine.framesRun`, ~60.0 on a 60 / 120 Hz screen, 59.7 on the timer) and the app's share of the whole CPU
@@ -1541,8 +1596,7 @@ mGBA's parser (`pkCheatsCheck`, no core needed) and a bad one is reported, never
 reach the core, and taking them out undoes hooks and ROM patches (`pk_cheats_clear`), so with none on the ROM is the
 file. They work with `USE_DEBUGGERS OFF` (frame-end refresh + the cheat device's BKPT component; checked headless with
 mgba_dump's `cheat`, built against the app's flags). A hook / ROM patch would change what identifies the game, so
-`pk_cheats.c` keeps the original bytes: `pkReadBytes` overlays them (the Poller's hack SHA1) and `raLoadGame` swaps them
-in for RA's hash. RetroAchievements pauses while any cheat is loaded (`rc_client_idle` instead of `do_frame`; CHEATS ON /
+`pk_cheats.c` keeps the original bytes: `pkReadBytes` overlays them (the Poller's hack SHA1); RA hashes the file. RetroAchievements pauses while any cheat is loaded (`rc_client_idle` instead of `do_frame`; CHEATS ON /
 OFF popups, PAUSED badge on the ACHIEVEMENTS tab). The render core `rg` never gets cheats.
 
 **Instant companion on a resume** (`SnapshotCache`, `<state>.companion` beside every savestate, a few KB): a launch
@@ -1558,7 +1612,7 @@ game being detected mid-launch no longer sends a player who opened SETTINGS back
 `pkStateMatchesSave`: if the file changed since the state was made (RetroArch played it, the saves
 folder moved, a save copied in), the state is set aside as `resume.replaced` and the game boots
 from the file (a real report: a resume state from a blank first boot wiped an Unbound save to all
-0xFF). Every start also copies the save to `<saves>/pokedaisy-backups/` first (`SaveBackups`, newest
+0xFF). The save reaches mGBA through `pk_save_vf` (`pk_savevf.c`): mGBA maps it with a shared writable mmap and never checks the result, so a save opened read-only (another app's file without All files access) gave it NULL and the first flash read crashed (GBASavedataReadFlash on Crashlytics); a map the file can't give is a copy in memory now, written back on sync / unmap. Every start also copies the save to `<saves>/pokedaisy-backups/` first (`SaveBackups`, newest
 10 distinct), which the library's RESTORE BACKUP lists. Never add a path that writes the save
 without both.
 A save the game is writing always finishes before the core stops (`pkFinishSave`, from EmulatorEngine before the suspend
@@ -1709,6 +1763,23 @@ The site's REPORT A BUG / REQUEST A GAME / SUGGEST A FEATURE go there (it links 
 (`companion`, `display / expand`, ...), status `fixed in next release` / `needs info` / `planned`. `rom_request.yml` stays
 only for older apps' ASK FOR SUPPORT; its issues get converted to Game requests. Astro needs Node 22.12+ (this Mac's
 default 22.1 can't build it: use `~/.nvm/versions/node/v22.23.3/bin`).
+**Answering GitHub issues** (the user's rules, gathered from every issue batch so far):
+- **Draft first, post after.** Show the user every reply (in a batch: all of them at once, issue by issue) and post
+  only after a clear OK. Then post, add the label, and close if they say so ("post and close" is the usual).
+- **Short and plain.** Two or three sentences: thanks, what the player will see, when. No causes, internals, file
+  names, emulator terms, measurements or a list of what was changed. The reporter wants to know it's handled, not how.
+- **Future tense until it ships.** A fix that isn't released yet must never read as if it's out: "will show under GBC
+  starting with v1.3.1", never "now shows under GBC" or "is fixed".
+- **Name the next version** ("v1.3.1": `versionName` in `app/build.gradle.kts` once it's bumped; ask if it isn't).
+- **No follow-up promises.** Never "I'll post here when it's out": the user doesn't go back to closed issues. Point to
+  the repo's releases instead: "To get notified when it's out, watch the repo's releases (Watch > Custom > Releases)."
+- **Their words, their game names.** Call a game what the reporter called it (no added "Pokemon"); thank anyone who
+  added useful details in the thread by @name.
+- **No "é", ever.** Pokemon, PokeDaisy, Pokedex, Poke Ball: anything with "Poke" in it is written without the accent in
+  every reply (issues, discussions, PRs), whatever the app's own UI says.
+- **Not fixed yet?** Ask for exactly what's needed, as a short numbered list, and leave it open (`needs info`).
+- Labels: `fixed in next release` on a fixed one. Game requests and ideas go to Discussions (above); exact duplicates
+  are closed pointing at the original.
 
 **Library order + NEW** (`LibraryOrder.kt`): the header's sort button picks NAME / LAST PLAYED / DATE ADDED
 (`Prefs.librarySort`, a `LibrarySort` id). LAST PLAYED reads `Prefs.romLastPlayed` (set by `pushRecentRom`, so frontend

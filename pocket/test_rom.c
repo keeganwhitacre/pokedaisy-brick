@@ -161,13 +161,27 @@ int main(int argc, char **argv) {
     pd_png_write(path, 512, 384, px);
   }
   for (int filter = 0; filter < 4; filter++) {
+    for (int level = 0; level < 3; level++) {
+      u = (struct pc_ui){.section = PC_GUIDE,
+                         .guidePage = 2,
+                         .guideBossOpen = true,
+                         .guideMon = 1,
+                         .guideReveal = level};
+      pc_ui_draw(&u, &canvas, &s, rom, size, build);
+      char path[80];
+      snprintf(path, sizeof path, "runtime-phase10-boss-entry%d.png", level);
+      assert(pd_png_write(path, 512, 384, px));
+    }
     u = (struct pc_ui){.section = PC_DEX, .dexFilter = filter};
     pc_ui_draw(&u, &canvas, &s, rom, size, build);
     char path[80];
     snprintf(path, sizeof path, "runtime-phase9-dex%d.png", filter);
     assert(pd_png_write(path, 512, 384, px));
   }
-  u = (struct pc_ui){.section = PC_GUIDE, .guidePage = 2, .guideReveal = 1};
+  u = (struct pc_ui){.section = PC_GUIDE,
+                     .guidePage = 2,
+                     .guideBossOpen = true,
+                     .guideReveal = 1};
   pc_ui_draw(&u, &canvas, &s, rom, size, build);
   assert(pd_png_write("runtime-phase9-boss-compare.png", 512, 384, px));
   u = (struct pc_ui){.section = PC_DEX, .dex = 154, .detail = true};
@@ -184,7 +198,10 @@ int main(int argc, char **argv) {
     snprintf(path, sizeof path, "runtime-live323-guide-%s.png", guideShots[i]);
     pd_png_write(path, 512, 384, px);
   }
-  u = (struct pc_ui){.section = PC_GUIDE, .guidePage = 2, .guideReveal = 2};
+  u = (struct pc_ui){.section = PC_GUIDE,
+                     .guidePage = 2,
+                     .guideBossOpen = true,
+                     .guideReveal = 2};
   pc_ui_draw(&u, &canvas, &s, rom, size, build);
   pd_png_write("runtime-live323-guide-team.png", 512, 384, px);
   assert(pc_ui_input(&u, &s, PC_DOWN) && u.guideScroll == 1);

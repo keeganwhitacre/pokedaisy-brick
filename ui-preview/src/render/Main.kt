@@ -189,8 +189,37 @@ class FakeSettings(showHintsInitially: Boolean = true, initialTabs: List<String>
     override fun setReusableTms(on: Boolean) { reusableTmsOn = on }
     override val reusableTmsSupported get() = true
     override val reusableTmsBuiltIn get() = com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.ReusableTms.BUILT_IN
+    // PLAYER LOOK: the other games' heroes kept, the player in their own.
+    private var lookWorn: String? = null
+    override val playerLookSupported get() = true
+    override val playerLooks get() =
+        (if (com.pokedaisy.app.companion.data.activeGame == com.pokedaisy.app.companion.data.GameKind.EMERALD) listOf("RED", "LEAF", "MAY", "RS_BRENDAN", "RS_MAY", "GOLD", "KRIS")
+        else listOf("LEAF", "BRENDAN", "MAY", "RS_BRENDAN", "RS_MAY", "GOLD", "KRIS")) + listOf("MON:25", "MON:258", "MON:384")
+    override fun playerLookLabel(name: String) = when (name) { "MON:25" -> "PIKACHU"; "MON:258" -> "MUDKIP"; "MON:384" -> "RAYQUAZA"; else -> super.playerLookLabel(name) }
+    override val playerLook get() = lookWorn
+    override val playerLookOwn get() =
+        if (com.pokedaisy.app.companion.data.activeGame == com.pokedaisy.app.companion.data.GameKind.EMERALD) "BRENDAN" else "RED"
+    override fun setPlayerLook(look: String?) { lookWorn = look }
+    override val rivalLookSupported get() = com.pokedaisy.app.companion.data.activeGame == com.pokedaisy.app.companion.data.GameKind.EMERALD
+    private var rivalOn = true
+    override val rivalLook get() = rivalOn
+    override fun setRivalLook(on: Boolean) { rivalOn = on }
+    private var followerOn = false
+    override val followerSupported get() = true
+    override val followerReady get() = true
+    override val follower get() = followerOn
+    override fun setFollower(on: Boolean) { followerOn = on }
+    private var dayNightOn = false
+    override val dayNightSupported get() = true
+    override val dayNight get() = dayNightOn
+    override fun setDayNight(on: Boolean) { dayNightOn = on }
+    private var textOn: String? = null
+    override val textLooks get() =
+        listOf(if (com.pokedaisy.app.companion.data.activeGame == com.pokedaisy.app.companion.data.GameKind.EMERALD) "FIRERED" else "EMERALD")
+    override val textLook get() = textOn
+    override fun setTextLook(style: String?) { textOn = style }
     override fun gbaControlBindings() = GbaControls.Btn.entries.associateWith {
-        listOf(when (it) { GbaControls.Btn.START2 -> "BUTTON_X"; GbaControls.Btn.SELECT2 -> "BUTTON_Y"; else -> "BUTTON_${it.name}" })
+        listOf(when (it) { GbaControls.Btn.X -> "BUTTON_X"; GbaControls.Btn.Y -> "BUTTON_Y"; else -> "BUTTON_${it.name}" })
     }
     override fun setGbaControlBinding(btn: GbaControls.Btn, keyName: String) {}
     override val keyCapture get() = previewCapture
@@ -603,7 +632,8 @@ fun dexShots(game: GameKind, live: ((SnapshotView) -> SnapshotView)?, w: Int, h:
                     val ui = androidx.compose.runtime.remember {
                         com.pokedaisy.app.companion.ui.DexUiState(androidx.compose.foundation.lazy.LazyListState()).apply { open = entry; this.section = section }
                     }
-                    com.pokedaisy.app.companion.ui.PokedexEntryScreen(dex, ui, entry, guide = s.guideTables)
+                    // As CompanionScreen sets it up (a short screen: the RG DS's -PcompanionH=480).
+                    com.pokedaisy.app.companion.ui.CompanionScreenSize { com.pokedaisy.app.companion.ui.PokedexEntryScreen(dex, ui, entry, guide = s.guideTables) }
                 }
             }
             content
@@ -997,6 +1027,26 @@ fun romArt() {
         if (wrote.isNotEmpty()) println("rom art: ${wrote.size} files from ${f.name}")
     }
     RomArt.OUTPUTS.filter { !File(dir, it).isFile }.takeIf { it.isNotEmpty() }?.let { println("rom art missing (no ROM for it): $it") }
+    // PLAYER LOOK's heroes, kept from the same ROMs (the `*-look` shots wear one).
+    val filesDir = android.content.Context().filesDir
+    // Ruby's build is retail byte for byte: Ruby / Sapphire's two heroes.
+    for (f in (roms + File(decomps, "pokeruby/pokeruby_rev1.gba").path).filter { it.isNotBlank() }.map(::File).filter { it.isFile }.distinct()) {
+        if (com.pokedaisy.app.companion.data.LookArt.available(filesDir).size == com.pokedaisy.app.companion.data.LookChar.entries.size) break
+        val kept = com.pokedaisy.app.companion.data.LookArt.keep(filesDir, com.pokedaisy.app.companion.data.PlayerLook.scan(f.readBytes()))
+        if (kept.isNotEmpty()) println("player look: $kept from ${f.name}")
+    }
+    // Its Pokémon, from the hacks with following Pokémon among them (each species from the first MonArt.Source that has it).
+    for (f in roms.filter { it.isNotBlank() }.map(::File).filter { it.isFile }) {
+        val n = com.pokedaisy.app.companion.data.MonArt.keep(filesDir, f.readBytes())
+        if (n > 0) println("player look: $n Pokémon from ${f.name}")
+    }
+}
+
+/** [content] with PLAYER LOOK's [look] worn (the other game's hero: Red in Emerald, Brendan in FireRed). */
+fun wearing(game: GameKind, content: () -> (@Composable () -> Unit)): () -> (@Composable () -> Unit) = {
+    com.pokedaisy.app.companion.data.PlayerLook.worn.value =
+        if (game == GameKind.EMERALD) com.pokedaisy.app.companion.data.LookChar.RED else com.pokedaisy.app.companion.data.LookChar.BRENDAN
+    content()
 }
 
 /** The game's home town, which its own region map shows (Emerald has no Pallet Town rect). */
@@ -1061,7 +1111,10 @@ fun main(args: Array<String>) {
     val panelW = System.getProperty("companionW").orEmpty().toIntOrNull()
     val bh = System.getProperty("companionH").orEmpty().toIntOrNull() ?: 1080
     val bw = panelW ?: 1240
-    val bd = if (panelW != null) com.pokedaisy.app.companion.ui.sidePanelDensity(bw, bh) else 2.625f
+    // -PcompanionDensity: a second screen of its own size at the device's density (the RG DS: -PcompanionW=640
+    // -PcompanionH=480 -PcompanionDensity=1.5), not a side panel's.
+    val bd = System.getProperty("companionDensity").orEmpty().toFloatOrNull()
+        ?: if (panelW != null) com.pokedaisy.app.companion.ui.sidePanelDensity(bw, bh) else 2.625f
     val tw = 1920; val th = 1080; val td = 2.5f
     val real = if (System.getProperty("ndsFixture").orEmpty().isNotBlank()) listOf(
         Shot("$g-real-party", bw, bh, bd, companion("PARTY", snap = ::ndsSnapshot)),
@@ -1125,6 +1178,13 @@ fun main(args: Array<String>) {
         Shot("$g-party-held", bw, bh, bd, companion("PARTY") {
             snapshot().let { s -> s.copy(party = s.party.mapIndexed { i, m -> m.copy(heldItemId = listOf(13, 183).getOrElse(i) { 0 }) }) }
         }),
+        // The second Pokémon nicknamed (GitHub #228): the slot shows the nickname, the summary adds the species.
+        Shot("$g-party-nickname", bw, bh, bd, companion("PARTY") {
+            snapshot().let { s -> s.copy(party = s.party.mapIndexed { i, m -> if (i == 1) m.copy(nickname = "Skyler") else m }) }
+        }),
+        Shot("$g-party-detail-nickname", bw, bh, bd, companion("PARTY", mon = 1) {
+            snapshot().let { s -> s.copy(party = s.party.mapIndexed { i, m -> if (i == 1) m.copy(nickname = "Skyler") else m }) }
+        }),
         // The second Pokémon's summary with its QUICK CLAW: TAKE, or BAG FULL where the bag has no room for it.
         Shot("$g-party-detail-take", bw, bh, bd, companion("PARTY", mon = 1, items = true)),
         Shot("$g-party-detail-bagfull", bw, bh, bd, companion("PARTY", mon = 1, items = true, bagFull = true)),
@@ -1139,6 +1199,12 @@ fun main(args: Array<String>) {
         Shot("$g-settings-battery-low", bw, bh, bd, companion("SETTINGS", battery = BatteryStatus(9, charging = false))),
         Shot("$g-settings-battery-charging", bw, bh, bd, companion("SETTINGS", battery = BatteryStatus(100, charging = true))),
         Shot("$g-card", bw, bh, bd, companion("CARD", snap = ::card)),
+        // PLAYER LOOK worn: the other game's hero on the card and the map, as the game's own now show them.
+        Shot("$g-card-look", bw, bh, bd, wearing(game, companion("CARD", snap = ::card))),
+        Shot("$g-map-look", bw, bh, bd, wearing(game, companion("MAP") {
+            val sec = homeMapsec(game)
+            snapshot().copy(location = lookupLocation(sec), regionMapSectionId = sec)
+        })),
         Shot("$g-card-back", bw, bh, bd, companion("CARD", cardBack = true, snap = ::card)),
         Shot("$g-map", bw, bh, bd, companion("MAP") {
             val sec = homeMapsec(game)
@@ -1399,6 +1465,10 @@ fun main(args: Array<String>) {
         Shot("$g-settings-close", bw, bh, bd, companion("SETTINGS")) {
             onNodeWithText("CLOSE GAME").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         },
+        // The D-pad onto FF, the first row of FF / SPEED, while MAKEOVER still fills the top: FF / SPEED's group tab lights.
+        Shot("$g-settings-group-follow", bw, bh, bd, companion("SETTINGS")) {
+            onNodeWithText("FF").performSemanticsAction(SemanticsActions.RequestFocus)
+        },
         // The COMPANION group, ONE-TAP MOVES under BATTLE HINTS.
         Shot("$g-settings-companion", bw, bh, bd, companion("SETTINGS")) {
             onNodeWithText("ONE-TAP MOVES").performScrollTo()
@@ -1411,6 +1481,13 @@ fun main(args: Array<String>) {
         Shot("$g-settings-reusable-tms", bw, bh, bd, companion("SETTINGS")) {
             // Scrolled to AUTO-RUN, the row under it: a greyed row (Unbound's, Radical Red's: BUILT_IN) won't scroll to itself here.
             onNodeWithText(com.pokedaisy.app.companion.i18n.tr("AUTO-RUN")).performScrollTo()
+        },
+        // PLAYER LOOK under REUSABLE TMS, then its tiles (OFF = the player's own hero, then the other games' heroes).
+        Shot("$g-settings-player-look", bw, bh, bd, companion("SETTINGS")) {
+            onNodeWithText(com.pokedaisy.app.companion.i18n.tr("RUN INDOORS")).performScrollTo()
+        },
+        Shot("$g-settings-player-look-pick", bw, bh, bd, companion("SETTINGS")) {
+            onNodeWithText(com.pokedaisy.app.companion.i18n.tr("PLAYER LOOK")).performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         },
         Shot("$g-settings-wild", bw, bh, bd, companion("SETTINGS")) {
             onNodeWithText("WILD ENCOUNTERS").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
@@ -2096,6 +2173,7 @@ fun main(args: Array<String>) {
         if (only.isNotEmpty() && only.none { shot.name.contains(it) }) continue
         try {
             com.pokedaisy.app.companion.FavoriteItems.load(emptySet()) {} // a shot's stars don't carry into the next
+            com.pokedaisy.app.companion.data.PlayerLook.worn.value = null
             val content = shot.content()
             runSkikoComposeUiTest(Size(shot.w.toFloat(), shot.h.toFloat()), Density(shot.density)) {
                 // Manual clock: the party icons / map highlight animate forever,
@@ -2209,7 +2287,7 @@ val PREVIEW_BUTTONS: Map<GbaControls.Btn, List<String>> = GbaControls.Btn.entrie
         GbaControls.Btn.A -> listOf("BUTTON_A", "Z"); GbaControls.Btn.B -> listOf("BUTTON_B", "X")
         GbaControls.Btn.L -> listOf("BUTTON_L1", "A"); GbaControls.Btn.R -> listOf("BUTTON_R1", "S")
         GbaControls.Btn.START -> listOf("BUTTON_START", "ENTER"); GbaControls.Btn.SELECT -> listOf("BUTTON_SELECT")
-        GbaControls.Btn.START2 -> listOf("BUTTON_X"); GbaControls.Btn.SELECT2 -> listOf("BUTTON_Y")
+        GbaControls.Btn.X -> listOf("BUTTON_X"); GbaControls.Btn.Y -> listOf("BUTTON_Y")
         GbaControls.Btn.TURBO_A, GbaControls.Btn.TURBO_B -> emptyList()
     }
 }

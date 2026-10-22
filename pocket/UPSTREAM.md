@@ -75,3 +75,14 @@ fallbacks: a shared game code does not mean shared memory structures.
 The fork is https://github.com/keeganwhitacre/pokedaisy-brick, branch `main`, retaining upstream ancestry. Keep `lidor30/pokedaisy` as `upstream`; merge and resolve the small native adapter in `pk_wide_gb.c` when that shared renderer changes. Generated Polished definitions remain version-pinned; companion compatibility does not automatically grant expansion compatibility.
 
 The SDK setup script pins both archive SHA-256 values and confines extraction to its destination. It preserves GCC linker scripts when overlaying target SDK headers/libraries. Neither the SDK nor private ROMs/saves belong in git.
+
+## Phase 10 synchronization and boundaries
+
+Upstream merged through `54d8f4867501feb32b7ee139a5616b7c6301f044` with both parents retained. All source changes are preserved for later game ports. The GB renderer's native adapter remains separate; no upstream Polished address changes were required. `gen_quick.py` refreshed its input hashes against the new FieldHud source; extracted icon pixels are unchanged.
+
+- `app/src/main/cpp/pk_savevf.c/.h`: upstream implementation, byte-for-byte unchanged. Keep it shared; do not copy it into a game decoder.
+- `pocket/host_io.c/.h`: Linux host policy around that VFile (error latch, write inhibition after failed reads, ownership tracking), plus per-content display preferences. No Pokemon memory definitions or ROM art.
+- `pocket/rom_identity.h`: the existing verified Pocket SHA-1 implementation moved out of Polished and reused for host identity. Changing a filename does not change preferences.
+- `pc_ui`/Guide: controller adaptation of upstream GuideUiState single-open-entry, hint, answer and close behavior. No emulator calls enter the companion renderer.
+
+New games should reuse host I/O, identity, controller events and emulator lifecycle. Add game-specific memory definitions behind snapshots and reuse the upstream game implementation/assets; do not add ROM-specific save/display branches to main.c.

@@ -26,7 +26,7 @@ package com.pokedaisy.app.companion.data
 // NativeReader.kt. Heart and Soul and Lazarus now have their own
 // ROM-extracted tables (*Hns.kt / *Lazarus.kt, scripts/gen_expansion_tables.py).
 enum class GameKind { FIRERED, EMERALD, UNBOUND, GAIA, RADICAL_RED, ODYSSEY, HEART_AND_SOUL, LAZARUS, ROWE, EMERALD_ROGUE, AMETHYST, EMERALD_SEAGLASS, CELIA, TMT2, SOULGOLD, YELLOW, GLAZED, IMPERIUM, QUETZAL, ORANGE_ISLANDS, RECHARGED_YELLOW, MARIOMON, SWORD_SHIELD, GS_CHRONICLES, CRYSTAL, CRYSTAL_CLEAR, PRISM,
-    GOLD, SILVER, RED, BLUE, ELITE_REDUX, POLISHED_CRYSTAL, PLATINUM, HEARTGOLD, SOULSILVER }
+    GOLD, SILVER, RED, BLUE, ELITE_REDUX, POLISHED_CRYSTAL, PLATINUM, HEARTGOLD, SOULSILVER, TEAM_ROCKET }
 
 @Volatile
 var activeGame: GameKind = GameKind.FIRERED
@@ -222,17 +222,17 @@ private inline val rogue get() = activeGame == GameKind.EMERALD_ROGUE
 // Pokémon Elite Redux: its own species / moves / items / map sections (gen_elite_redux_tables.py); 2.65.3b's few
 // differences over 2.65.4.1b's when [eliteRedux265_3] (set by the Poller).
 private inline val eliteRedux get() = activeGame == GameKind.ELITE_REDUX
+// Pokémon Team Rocket Edition: Dragonsden Version: its own species / moves / items / map sections (gen_team_rocket_tables.py).
+private inline val teamRocket get() = activeGame == GameKind.TEAM_ROCKET
 
 /** Elite Redux 2.65.3b is running (its few names / types / moves over 2.65.4.1b's). Set with [activeGame] by the Poller. */
 var eliteRedux265_3 = false
 
 // Odyssey reuses vanilla's unused "???" type (9) as Fairy (CLEFAIRY is 9/9).
-private val typeNamesOdyssey: Map<Int, String> by lazy { typeNames + (9 to "Fairy") }
 
-private val speciesNamesOdysseyMerged: Map<Int, String> by lazy { speciesNames + speciesNamesOdyssey }
 
 val activeSpeciesNames: Map<Int, String> get() = localText?.species ?: when {
-    gen4 -> speciesNamesPlatinum
+    gen4 -> NdsArt.names?.speciesMerged ?: speciesNamesPlatinum   // the cart's own words (GitHub #230)
     yellow -> speciesNamesYellow
     polished -> speciesNamesPolishedCrystal
     prism -> speciesNamesPrism
@@ -240,7 +240,8 @@ val activeSpeciesNames: Map<Int, String> get() = localText?.species ?: when {
     unbound -> speciesNamesUnbound
     gaia -> speciesNamesGaia
     radicalRed -> speciesNamesRadicalRed
-    odyssey -> speciesNamesOdysseyMerged
+    // Odyssey rewrote ~120 of FireRed's species slots in place (OdysseyGen.kt, gen_firered_hack_tables.py odyssey).
+    odyssey -> fireRedHackOdyssey.speciesMerged
     // Rogue's ids are National Dex numbers only up to 905 (forms, then Gen 9 from 1289): its own names.
     rogue -> speciesNamesRogue
     nationalDexSpecies -> speciesNamesNationalDex
@@ -260,10 +261,11 @@ val activeSpeciesNames: Map<Int, String> get() = localText?.species ?: when {
     rechargedYellow -> speciesNamesRechargedYellow
     mariomon -> if (mariomonV13) speciesNamesMariomonV13 else speciesNamesMariomon
     eliteRedux -> if (eliteRedux265_3) speciesNamesEliteRedux265_3 else speciesNamesEliteRedux
+    teamRocket -> speciesNamesTeamRocket
     else -> frHack?.speciesMerged ?: speciesNames
 }
 val activeMoveData: Map<Int, MoveInfo> get() = localText?.moveData ?: when {
-    gen4 -> moveDataPlatinum
+    gen4 -> NdsArt.names?.movesMerged ?: moveDataPlatinum
     yellow -> moveDataYellow
     polished -> if (faithful) moveDataPolishedCrystalFaithful else moveDataPolishedCrystal
     prism -> moveDataPrism
@@ -288,11 +290,13 @@ val activeMoveData: Map<Int, MoveInfo> get() = localText?.moveData ?: when {
     mariomon -> if (mariomonV13) moveDataMariomonV13 else moveDataMariomon
     amethyst -> moveDataAmethyst   // both versions' (GitHub #96: past Gen 3's 354 they read "Move#N")
     eliteRedux -> if (eliteRedux265_3) moveDataEliteRedux265_3 else moveDataEliteRedux
+    teamRocket -> moveDataTeamRocket
+    odyssey -> fireRedHackOdyssey.movesMerged
     else -> frHack?.movesMerged ?: moveData
 }
 val activeItemNames: Map<Int, String> get() = localText?.items ?: when {
-    heartGold -> itemNamesHeartGold
-    platinum -> itemNamesPlatinum
+    heartGold -> NdsArt.names?.itemsMerged(true) ?: itemNamesHeartGold
+    platinum -> NdsArt.names?.itemsMerged(false) ?: itemNamesPlatinum
     yellow -> itemNamesYellow
     polished -> if (faithful) itemNamesPolishedCrystalFaithful else itemNamesPolishedCrystal
     prism -> itemNamesPrism
@@ -319,6 +323,8 @@ val activeItemNames: Map<Int, String> get() = localText?.items ?: when {
     rechargedYellow -> itemNamesRechargedYellow
     mariomon -> itemNamesMariomon
     eliteRedux -> if (eliteRedux265_3) itemNamesEliteRedux265_3 else itemNamesEliteRedux
+    teamRocket -> itemNamesTeamRocket
+    odyssey -> fireRedHackOdyssey.itemsMerged
     else -> frHack?.itemsMerged ?: itemNames
 }
 val activeSpeciesTypeData: Map<Int, SpeciesTypes> get() = when {
@@ -346,6 +352,8 @@ val activeSpeciesTypeData: Map<Int, SpeciesTypes> get() = when {
     mariomon -> if (mariomonV13) speciesTypeDataMariomonV13 else speciesTypeDataMariomon
     emeraldLegacy -> speciesTypeDataEmeraldLegacy
     eliteRedux -> if (eliteRedux265_3) speciesTypeDataEliteRedux265_3 else speciesTypeDataEliteRedux
+    teamRocket -> speciesTypeDataTeamRocket
+    odyssey -> fireRedHackOdyssey.typesMerged   // its regional forms (GitHub #206)
     else -> frHack?.typesMerged ?: speciesTypeData
 }
 /** Emerald Legacy: retail's types (unchanged, checked against its gSpeciesInfo), plus its Deoxys forms at 412-414. */
@@ -374,6 +382,8 @@ val activeTypeEffectiveness: Map<Int, Int> get() = when {
     orangeIslands -> typeEffectivenessOrangeIslands
     mariomon -> typeEffectivenessMariomon
     eliteRedux -> typeEffectivenessEliteRedux
+    teamRocket -> typeEffectivenessTeamRocket
+    odyssey -> fireRedHackOdyssey.typeChart ?: typeEffectiveness
     else -> frHack?.typeChart ?: typeEffectiveness
 }
 val activeTypeNames: Map<Int, String> get() = when {
@@ -382,7 +392,7 @@ val activeTypeNames: Map<Int, String> get() = when {
     prism -> typeNamesPrism
     crystal -> typeNamesCrystal
     unbound || cfruTypes -> typeNamesUnbound
-    odyssey -> typeNamesOdyssey
+    odyssey -> fireRedHackOdyssey.typeNamesMerged   // 9 is AETHER there (GitHub #206), not FireRed's ???
     seaglass -> typeNamesHns
     tmt2 -> typeNamesTmt2
     hns -> typeNamesHns
@@ -397,6 +407,7 @@ val activeTypeNames: Map<Int, String> get() = when {
     orangeIslands -> typeNamesOrangeIslands
     mariomon -> typeNamesMariomon
     eliteRedux -> typeNamesEliteRedux
+    teamRocket -> typeNamesTeamRocket
     else -> frHack?.typeNamesMerged ?: typeNames
 }
 val activeMapSecData: Map<Int, MapSecInfo> get() = localText?.mapSecData ?: when {
@@ -428,6 +439,8 @@ val activeMapSecData: Map<Int, MapSecInfo> get() = localText?.mapSecData ?: when
     mariomon -> if (mariomonV13) mapSecDataMariomonV13 else mapSecDataMariomon
     // Emerald's Hoenn sections and rects (and its own few past them), on Emerald's map.
     eliteRedux -> mapSecDataEliteRedux
+    // Its own sections' names; no map of its own is drawn yet (it has several), so none is "on the map".
+    teamRocket -> mapSecDataTeamRocket
     else -> frHack?.mapSecsMerged ?: mapSecData
 }
 /**
@@ -537,6 +550,8 @@ val activeRegionMapImages: Array<String> get() = when {
     mariomon -> regionMapImagesMariomon
     // Their own maps (the Orange Archipelago, Galar), drawn from the ROM (RomRegionMap) - none bundled.
     orangeIslands || swordShield || gsChronicles || frHack?.ownRegionMap == true -> emptyArray()
+    // Team Rocket Edition: Dragonsden's Kanto / Sevii / Johto maps aren't read yet - the MAP tab names the place.
+    teamRocket -> emptyArray()
     else -> regionMapImages
 }
 
@@ -595,6 +610,7 @@ fun GameKind.displayName(): String = when (this) {
     GameKind.SWORD_SHIELD -> "Sword and Shield Ultimate Plus"
     GameKind.GS_CHRONICLES -> "Pokémon GS Chronicles"
     GameKind.ELITE_REDUX -> "Pokémon Elite Redux"
+    GameKind.TEAM_ROCKET -> "Pokémon Team Rocket Edition: Dragonsden Version"
     GameKind.RECHARGED_YELLOW -> "Pokémon Recharged Yellow"
     GameKind.MARIOMON -> "Super Mariomon"
     GameKind.CRYSTAL -> "Pokémon Crystal"

@@ -66,6 +66,7 @@ class BestEffortTest {
         Game("Pokemon GS Chronicles (v2.7.6).gba", "gs_chronicles", "BPRE", "GS_CHRONICLES"),
         Game("Super Mariomon (v1.5.1 Anniversary).gba", "mariomon_v1_5_1", "BPEE", "MARIOMON_V1_5_1"),
         Game("Pokemon Elite Redux (2.65.4.1b).gba", "elite_redux", "BPEE", "ELITE_REDUX_V2_65_4_1B"),
+        Game("Pokemon Team Rocket Dragonsden Version.gba", "team_rocket", "BPEE", "TEAM_ROCKET"),
         Game("Super Mariomon (v1.3).gba", "mariomon_v1_3", "BPEE", "MARIOMON_V1_3"),
     )
 
@@ -83,6 +84,9 @@ class BestEffortTest {
         "orange_islands" to GameKind.FIRERED, "odyssey" to GameKind.FIRERED, "rocket_edition" to GameKind.ORANGE_ISLANDS,
         "ash_gray" to GameKind.ORANGE_ISLANDS, "sword_shield_up" to GameKind.AMETHYST,
         "gs_chronicles" to GameKind.UNBOUND,
+        // Orange Islands is FireRed rev 0 edited in place (97% of its names); Odyssey used to tie with it on
+        // FireRed's names until its own were read (GitHub #206).
+        "firered_vanilla" to GameKind.ORANGE_ISLANDS, "leafgreen_rev1" to GameKind.ORANGE_ISLANDS,
     )
 
     private class Loaded(val reader: MemoryReader, val size: Long, val text: BestEffort.RomText)

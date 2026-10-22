@@ -208,6 +208,16 @@ static void guide_prose(struct pd_canvas *c, int y, const char *text,
     pd_text_fit(c, 20, y + 20 * i, 472, lines[*scroll + i], 0x181818,
                 PD_NO_SHADOW);
 }
+static int guide_pending_boss(const struct pd_snapshot *s, int row) {
+  int count = 0, last = -1;
+  for (int i = 0; i < GUIDE_COUNT(guideBosses); i++)
+    if (!guide_boss_done(s, i)) {
+      last = i;
+      if (count++ == row)
+        return i;
+    }
+  return last;
+}
 static void pc_guide_draw(struct pc_ui *u, struct pd_canvas *c,
                           const struct pd_snapshot *s, const unsigned char *rom,
                           size_t n, int build) {
@@ -314,9 +324,13 @@ static void pc_guide_draw(struct pc_ui *u, struct pd_canvas *c,
         ids[count++] = i;
     if (u->guideRow >= count)
       u->guideRow = count ? count - 1 : 0;
+    if (u->guideBossOpen && (!count || u->guideBoss != ids[u->guideRow])) {
+      u->guideBossOpen = false;
+      u->guideReveal = u->guideScroll = 0;
+    }
     if (!count)
       txt(c, 20, 110, "Every boss is beaten.");
-    else if (u->guideReveal) {
+    else if (u->guideBossOpen) {
       int i = ids[u->guideRow];
       pd_text_fit(c, 12, 88, 488, guideBosses[i].title, 0x181818, PD_NO_SHADOW);
       pd_text_fit(c, 12, 112, 488, guideBosses[i].where, 0x181818,
@@ -324,32 +338,28 @@ static void pc_guide_draw(struct pc_ui *u, struct pd_canvas *c,
       const struct guide_team_mon *team =
           build_ok(build) && builds[build].faithful ? guideBosses[i].faithful
                                                     : guideBosses[i].normal;
-      size_t used = 0;
-      for (int k = 0; k < guideBosses[i].count; k++) {
-        int id = team[k].species;
-        if (u->guideReveal == 1) {
-          const int *types = mon_types(id, build);
-          used +=
-              snprintf(b + used, sizeof b - used, "Pokemon %d: Lv%d %s%s%s\n",
-                       k + 1, guide_level(team[k].level, guide_badges(s)),
-                       typeNames[types[1]], types[1] != types[2] ? " / " : "",
-                       types[1] != types[2] ? typeNames[types[2]] : "");
-        } else {
-          used += snprintf(b + used, sizeof b - used, "%s Lv%d\n", names[id],
-                           guide_level(team[k].level, guide_badges(s)));
-          for (int j = 0; j < 4; j++)
-            if (team[k].moves[j]) {
-              int m = team[k].moves[j];
-              const char *name = build_ok(build) && builds[build].faithful &&
-                                         faithfulMoves[m].name
-                                     ? faithfulMoves[m].name
-                                     : moves[m].name;
-              used += snprintf(b + used, sizeof b - used, "%s%s", j ? ", " : "",
-                               name ? name : "?");
-            }
-          used += snprintf(b + used, sizeof b - used, "\nHolds: %s\n\n",
-                           item_name(team[k].item, build));
-        }
+      u->guideMon = clamp_selection(u->guideMon, guideBosses[i].count);
+      int k = u->guideMon, id = team[k].species;
+      b[0] = 0;
+      if (u->guideReveal == 1) {
+        const int *types = mon_types(id, build);
+        snprintf(b, sizeof b, "%s%s%s TYPE", typeNames[types[1]],
+                 types[1] != types[2] ? " / " : "",
+                 types[1] != types[2] ? typeNames[types[2]] : "");
+      } else if (u->guideReveal == 2) {
+        size_t used = snprintf(b, sizeof b, "%s\n", names[id]);
+        for (int j = 0; j < 4; j++)
+          if (team[k].moves[j]) {
+            int m = team[k].moves[j];
+            const char *name = build_ok(build) && builds[build].faithful &&
+                                       faithfulMoves[m].name
+                                   ? faithfulMoves[m].name
+                                   : moves[m].name;
+            used +=
+                snprintf(b + used, sizeof b - used, "%s\n", name ? name : "?");
+          }
+        snprintf(b + used, sizeof b - used, "Holds: %s",
+                 item_name(team[k].item, build));
       }
       int best = guide_party_best(s), boss = 0;
       for (int k = 0; k < guideBosses[i].count; k++) {
@@ -365,7 +375,25 @@ static void pc_guide_draw(struct pc_ui *u, struct pd_canvas *c,
         snprintf(compare, sizeof compare, "Boss top Lv%d / Party unavailable",
                  boss);
       pd_text_fit(c, 12, 136, 488, compare, 0x181818, PD_NO_SHADOW);
-      guide_prose(c, 164, b, &u->guideScroll);
+      if (!u->guideReveal) {
+        for (int j = 0; j < guideBosses[i].count; j++) {
+          int y = 170 + 26 * j;
+          if (j == u->guideMon)
+            pd_fill(c, 8, y - 2, 496, 25, 0xdcdcdc);
+          char row[64];
+          snprintf(row, sizeof row, "Pokemon %d  Lv%d", j + 1,
+                   guide_level(team[j].level, guide_badges(s)));
+          txt(c, 16, y, row);
+        }
+      } else {
+        char label[80];
+        snprintf(label, sizeof label, "Pokemon %d  Lv%d", k + 1,
+                 guide_level(team[k].level, guide_badges(s)));
+        txt(c, 12, 170, label);
+        if (u->guideReveal == 2)
+          icon(c, 464, 164, id, rom, n, build);
+        guide_prose(c, 204, b, &u->guideScroll);
+      }
     } else {
       int start = u->guideRow >= 9 ? u->guideRow - 8 : 0;
       for (int row = 0; row < 9 && start + row < count; row++) {
@@ -377,7 +405,11 @@ static void pc_guide_draw(struct pc_ui *u, struct pd_canvas *c,
         pd_text_fit(c, 16, y, 480, b, 0x181818, PD_NO_SHADOW);
       }
     }
-    txt(c, 12, 346, "A:Types/Team Up/Down:Scroll");
+    txt(c, 12, 346,
+        !u->guideBossOpen     ? "A:Team"
+        : !u->guideReveal     ? "D-pad:Choose A:Hint"
+        : u->guideReveal == 1 ? "A:Answer Y:Next Up/Down:Scroll"
+                              : "A:Close Y:Next Up/Down:Scroll");
   } else if (u->guidePage == 4) {
     const char *categories[] = {"HMs", "KEY ITEMS", "GIFT POKEMON"};
     int ids[1024], category = u->guideMethod % 3;

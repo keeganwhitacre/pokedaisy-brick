@@ -4,6 +4,7 @@
 #include "pd_font.h"
 #include "polished_guide_tables.h"
 #include "polished_tables.h"
+#include "rom_identity.h"
 #include <stdio.h>
 #include <string.h>
 static struct pd_glyph romFont[129];
@@ -42,56 +43,9 @@ void pc_font(const unsigned char *rom, size_t n, int build) {
   pd_font_set(romFont, 129);
 }
 static int landmark(unsigned map);
-static uint32_t rol(uint32_t x, int n) { return (x << n) | (x >> (32 - n)); }
-static void sha1(const unsigned char *p, size_t n, char hex[41]) {
-  uint32_t h[5] = {0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0};
-  size_t blocks = (n + 9 + 63) / 64;
-  for (size_t b = 0; b < blocks; b++) {
-    uint32_t w[80] = {0};
-    for (int j = 0; j < 64; j++) {
-      size_t k = b * 64 + j;
-      unsigned v = k < n ? p[k] : k == n ? 128 : 0;
-      if (k >= blocks * 64 - 8)
-        v = (unsigned)(((uint64_t)n * 8) >> (8 * (blocks * 64 - 1 - k))) & 255;
-      w[j / 4] |= v << (24 - 8 * (j % 4));
-    }
-    for (int j = 16; j < 80; j++)
-      w[j] = rol(w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16], 1);
-    uint32_t a = h[0], c = h[2], d = h[3], e = h[4], bb = h[1];
-    for (int j = 0; j < 80; j++) {
-      uint32_t f, k;
-      if (j < 20) {
-        f = (bb & c) | (~bb & d);
-        k = 0x5a827999;
-      } else if (j < 40) {
-        f = bb ^ c ^ d;
-        k = 0x6ed9eba1;
-      } else if (j < 60) {
-        f = (bb & c) | (bb & d) | (c & d);
-        k = 0x8f1bbcdc;
-      } else {
-        f = bb ^ c ^ d;
-        k = 0xca62c1d6;
-      }
-      uint32_t t = rol(a, 5) + f + e + k + w[j];
-      e = d;
-      d = c;
-      c = rol(bb, 30);
-      bb = a;
-      a = t;
-    }
-    h[0] += a;
-    h[1] += bb;
-    h[2] += c;
-    h[3] += d;
-    h[4] += e;
-  }
-  for (int j = 0; j < 5; j++)
-    snprintf(hex + j * 8, 9, "%08x", h[j]);
-}
 int pc_identify(const unsigned char *rom, size_t n) {
   char hash[41];
-  sha1(rom, n, hash);
+  pocket_rom_sha1(rom, n, hash);
   for (unsigned i = 0; i < sizeof(builds) / sizeof(*builds); i++)
     if (!strcmp(hash, builds[i].sha))
       return (int)i;
@@ -203,8 +157,8 @@ static size_t off(unsigned a) {
   unsigned b = a >> 16, v = a & 65535;
   return b ? b * 0x4000 + (v & 0x3fff) : v;
 }
-int pc_lz(const unsigned char *rom, size_t size, size_t p,
-          unsigned char *out, size_t capacity) {
+int pc_lz(const unsigned char *rom, size_t size, size_t p, unsigned char *out,
+          size_t capacity) {
   int used = 0;
 #define BYTE(v)                                                                \
   do {                                                                         \

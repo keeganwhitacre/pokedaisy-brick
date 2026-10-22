@@ -4,6 +4,7 @@
 /* Native single-screen host for PokeDaisy. GPL-3.0, see ../NOTICE. */
 #include "../3ds/desktop/pd_png.h"
 #include "../app/src/main/cpp/pk_wide.h"
+#include "host_io.h"
 #include "pd_font.h"
 #include "pd_menu.h"
 #include "pd_romart.h"
@@ -11,6 +12,7 @@
 #include "pd_ui.h"
 #include "pd_ui_internal.h"
 #include "polished.h"
+#include "rom_identity.h"
 #include <SDL.h>
 #include <dirent.h>
 #include <dlfcn.h>
@@ -44,6 +46,8 @@ static uint32_t gamePixels[256 * 256];
 static SDL_Rect lastGameRect;
 /* Cache once per emulated frame; pause cannot advance the renderer. */
 static void notice(const char *text);
+static const char *root = ".";
+static char displayKey[41];
 static bool wideSupported, wideReady;
 static int wideMode; /* 0 original, 1 expand, 2 zoom. */
 static unsigned wideW, wideH;
@@ -83,6 +87,10 @@ static void wide_cycle(void) {
   }
   wideMode = (wideMode + 1) % 3;
   wideReady = false;
+  if (!pocket_display_save(root, displayKey, wideMode)) {
+    notice("Display preference could not be saved");
+    return;
+  }
   notice(wideMode == 1   ? "Expand"
          : wideMode == 2 ? "Zoom out"
                          : "Original display");
@@ -92,11 +100,16 @@ static volatile sig_atomic_t running = 1;
 static bool muted;
 static int appError;
 #ifdef POCKET_TEST
+static void *test_no_map(struct VFile *vf, size_t size, int flags) {
+  (void)vf;
+  (void)size;
+  (void)flags;
+  return NULL;
+}
 static unsigned audioNonzero;
 static bool testQuick, testFf;
 static int testQuickSelected, testMenu;
 #endif
-static const char *root = ".";
 static char message[128];
 static unsigned messageUntil;
 enum {
@@ -525,19 +538,27 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     notice("ROM load failed");
     return;
   }
+  struct pocket_save_status saveStatus = {0};
+  struct VFile *sv = NULL;
+  bool backupMade = false;
   char sav[1024], ss[1024];
   const char *name = strrchr(path, '/');
   name = name ? name + 1 : path;
   snprintf(sav, sizeof sav, "%s/saves/%s.sav", root, name);
   snprintf(ss, sizeof ss, "%s/states/%s.ss", root, name);
+  bool hadSave = access(sav, F_OK) == 0;
   if (!copy_backup(sav)) {
     notice("Save backup failed; game not opened");
     goto cleanup;
   }
-  struct VFile *sv = VFileOpen(sav, O_CREAT | O_RDWR);
-  if (!sv || !c->loadSave(c, sv)) {
-    if (sv)
-      sv->close(sv);
+  backupMade = hadSave;
+  struct VFile *rawSave = VFileOpen(sav, O_CREAT | O_RDWR);
+#ifdef POCKET_TEST
+  if (rawSave && getenv("POCKET_TEST_NO_MMAP"))
+    rawSave->map = test_no_map;
+#endif
+  sv = pocket_save_wrap(rawSave, &saveStatus);
+  if (!sv || !c->loadSave(c, sv) || saveStatus.failed) {
     notice("Save file unavailable; game not opened");
     goto cleanup;
   }
@@ -551,7 +572,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     c->checksum(c, &wideCrc, mCHECKSUM_CRC32);
   wideSupported = pk_wide_gb_configure(wideCrc);
   wideReady = false;
-  wideMode = 0;
+  pocket_rom_sha1(romdata, (size_t)len, displayKey);
+  wideMode = wideSupported ? pocket_display_load(root, displayKey) : 0;
   unsigned gw, gh;
   c->desiredVideoDimensions(c, &gw, &gh);
   struct pd_game game;
@@ -804,7 +826,11 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       for (int i = 0; i < count; i++) {
         c->runFrame(c);
         wide_tick(c, i < count - 1);
+        if (saveStatus.failed)
+          break;
       }
+      if (saveStatus.failed)
+        break;
     }
     if (pc >= 0) {
       pc_read(&snap, read_memory, c);
@@ -868,8 +894,31 @@ cleanup:
   c->unloadROM(c);
   mCoreConfigDeinit(&c->config);
   c->deinit(c);
+  if (sv && !saveStatus.closed)
+    sv->close(sv); /* GBA leaves caller-owned save open. */
   free(romdata);
   held = pressed = 0;
+  if (saveStatus.failed) {
+    appError = 1;
+    notice(backupMade ? "Save I/O failed. Pre-launch backup retained."
+                      : "Save I/O failed. Check storage.");
+#ifndef POCKET_TEST
+    if (!maxFrames) {
+      pd_font_set(NULL, 0);
+      pd_splash_draw(&canvas, "COULD NOT SAVE",
+                     backupMade ? "Check SD card. Pre-launch backup retained."
+                                : "Check SD card space and permissions.",
+                     "A/B: Return");
+      present();
+      while (running) {
+        events();
+        if (down(A) || down(B) || down(X) || down(MENU))
+          break;
+        SDL_Delay(16);
+      }
+    }
+#endif
+  }
 }
 static int cmp(const void *a, const void *b) {
   return strcasecmp(*(char *const *)a, *(char *const *)b);

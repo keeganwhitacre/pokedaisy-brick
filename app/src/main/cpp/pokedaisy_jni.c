@@ -25,6 +25,7 @@
 
 #include "pk_cheats.h"
 #include "pk_rewind.h"
+#include "pk_savevf.h"
 #include "pk_wide.h"
 #include "pk_gb_field.h"
 #include "nds/pk_nds.h"
@@ -164,6 +165,7 @@ static void pkTeardown(void) {
         bool coreClosesSave = !pk_is_gba(g.core);
         pk_cheats_clear(g.core);        // and forgets the ROM bytes it kept
         pk_cheats_unpatch(g.core);      // the game options' (REUSABLE TMS) too
+        pk_cheats_unblock(g.core);      // and PLAYER LOOK's blocks
         g.core->deinit(g.core);         // unloads ROM, flushes save VFile
         g.core = NULL;
         if (coreClosesSave) {
@@ -336,6 +338,9 @@ Java_com_pokedaisy_app_MgbaCore_pkInit(JNIEnv* env, jobject thiz,
             }
         }
         (*env)->ReleaseStringUTFChars(env, jSavePath, savePath);
+        // A map the file can't give (read-only, or a file system without shared mappings) becomes a copy in memory:
+        // mGBA never checks its map, and a NULL one crashed the first flash read (pk_savevf.c).
+        saveVf = pk_save_vf(saveVf);
         if (saveVf) {
             core->loadSave(core, saveVf);
         } else {
@@ -552,6 +557,41 @@ Java_com_pokedaisy_app_MgbaCore_pkFieldState(JNIEnv* env, jobject thiz, jboolean
         return pk_nds_field_bits();
     }
     return g.core && pk_is_gba(g.core) ? pk_field_state(g.core, runIndoors, wildKeep) : 0;
+}
+
+// PLAYER LOOK: the player's sprite set up again from its graphics record (after the look changed, or a state loaded).
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkLookRefresh(JNIEnv* env, jobject thiz, jbyteArray pal) {
+    if (!g.core || !pk_is_gba(g.core)) return JNI_FALSE;
+    jbyte* p = pal && (*env)->GetArrayLength(env, pal) == 32 ? (*env)->GetByteArrayElements(env, pal, NULL) : NULL;
+    int ok = pk_look_refresh(g.core, (const uint8_t*) p);
+    if (p) (*env)->ReleaseByteArrayElements(env, pal, p, JNI_ABORT);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+// FOLLOWER: its frames + palette (null = none), and whether it's shown this frame. Emu thread.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkFollowerSet(JNIEnv* env, jobject thiz, jbyteArray frames, jbyteArray pal) {
+    if (!frames || !pal || (*env)->GetArrayLength(env, frames) != 3072 || (*env)->GetArrayLength(env, pal) != 32) {
+        pk_follower_set(NULL, NULL);
+        return;
+    }
+    jbyte* f = (*env)->GetByteArrayElements(env, frames, NULL);
+    jbyte* p = (*env)->GetByteArrayElements(env, pal, NULL);
+    pk_follower_set((const uint8_t*) f, (const uint8_t*) p);
+    (*env)->ReleaseByteArrayElements(env, frames, f, JNI_ABORT);
+    (*env)->ReleaseByteArrayElements(env, pal, p, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkFollowerShow(JNIEnv* env, jobject thiz, jboolean on) {
+    if (g.core && pk_is_gba(g.core)) pk_follower_show(g.core, on);
+}
+
+// DAY AND NIGHT: the map's and sprites' palettes tinted (256 = as is). Emu thread.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkSetTint(JNIEnv* env, jobject thiz, jint r, jint gr, jint b) {
+    if (g.core && pk_is_gba(g.core)) pk_tint_set(g.core, r, gr, b);
 }
 
 // SCENE SPEEDS' TEXT / AUTO-RUN / RUN INDOORS / WILD ENCOUNTERS: whether the field reads know the ROM with this CRC32.
@@ -1145,6 +1185,40 @@ static bool pk_gb_read_banked(struct mCore* core, uint32_t addr, uint8_t* dst, i
     return true;
 }
 
+// pkReadBytes / pkReadInto: [len] bytes at [addr] into [dst], under the core lock; false with no core up.
+static bool pk_read_any(uint32_t addr, uint8_t* dst, int len) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    bool ok = g.core != NULL || pk_nds_active();
+    if (pk_nds_active()) {
+        pk_nds_read(addr, dst, len);
+    } else if (ok && pk_gb_read_banked(g.core, addr, dst, len)) {
+        // a Color cart's WRAM bank, read by bank
+    } else if (ok) {
+        pk_read_range(g.core, addr, dst, len);
+        // The ROM as the file has it, under any cheat's hook or ROM patch: the
+        // Poller identifies hacks by hashing it (see pk_cheats.c).
+        pk_cheats_overlay(addr, dst, len);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+    return ok;
+}
+
+// [dst]'s length of bytes at [addr], into [dst] (no new array: RamSnapshot copies the game's RAM with it each sample).
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkReadInto(JNIEnv* env, jobject thiz, jlong addr, jbyteArray dst) {
+    jsize len = (*env)->GetArrayLength(env, dst);
+    if (len <= 0 || len > (1 << 24)) {
+        return JNI_FALSE;
+    }
+    uint8_t* p = (*env)->GetPrimitiveArrayCritical(env, dst, NULL);
+    if (!p) {
+        return JNI_FALSE;
+    }
+    bool ok = pk_read_any((uint32_t) addr, p, len);
+    (*env)->ReleasePrimitiveArrayCritical(env, dst, p, 0);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT jbyteArray JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkReadBytes(JNIEnv* env, jobject thiz, jlong addr, jint len) {
     if (len <= 0 || len > (1 << 24)) {
@@ -1154,19 +1228,7 @@ Java_com_pokedaisy_app_MgbaCore_pkReadBytes(JNIEnv* env, jobject thiz, jlong add
     if (!tmp) {
         return NULL;
     }
-    pthread_rwlock_rdlock(&pk_coreLock);
-    bool ok = g.core != NULL || pk_nds_active();
-    if (pk_nds_active()) {
-        pk_nds_read((uint32_t) addr, tmp, len);
-    } else if (ok && pk_gb_read_banked(g.core, (uint32_t) addr, tmp, len)) {
-        // a Color cart's WRAM bank, read by bank
-    } else if (ok) {
-        pk_read_range(g.core, (uint32_t) addr, tmp, len);
-        // The ROM as the file has it, under any cheat's hook or ROM patch: the
-        // Poller identifies hacks by hashing it (see pk_cheats.c).
-        pk_cheats_overlay((uint32_t) addr, tmp, len);
-    }
-    pthread_rwlock_unlock(&pk_coreLock);
+    bool ok = pk_read_any((uint32_t) addr, tmp, len);
     jbyteArray out = ok ? (*env)->NewByteArray(env, len) : NULL;
     if (out) {
         (*env)->SetByteArrayRegion(env, out, 0, len, (const jbyte*) tmp);
@@ -1364,13 +1426,71 @@ Java_com_pokedaisy_app_MgbaCore_pkRomUnpatch(JNIEnv* env, jobject thiz) {
     pthread_rwlock_unlock(&pk_coreLock);
 }
 
-// For pokedaisy_ra.c: the file's ROM bytes in and out around RA's hash (emu thread).
-void pkRomSwapCheats(void) {
+// Emu thread: PLAYER LOOK's blocks (PlayerLook.kt) in place of any before - block i is
+// `lens[i]` bytes of `data` (back to back) at `addrs[i]`, only where the ROM's CRC32 there is
+// `crcs[i]`. All or none: returns how many went in, or -1 (and none in) if one didn't.
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkRomBlocks(JNIEnv* env, jobject thiz, jintArray jAddrs, jintArray jLens,
+                                            jintArray jCrcs, jbyteArray jData) {
+    jsize n = (*env)->GetArrayLength(env, jAddrs);
+    if (n != (*env)->GetArrayLength(env, jLens) || n != (*env)->GetArrayLength(env, jCrcs)) {
+        return -1;
+    }
+    jint* addrs = (*env)->GetIntArrayElements(env, jAddrs, NULL);
+    jint* lens = (*env)->GetIntArrayElements(env, jLens, NULL);
+    jint* crcs = (*env)->GetIntArrayElements(env, jCrcs, NULL);
+    jsize size = (*env)->GetArrayLength(env, jData);
+    jbyte* data = (*env)->GetByteArrayElements(env, jData, NULL);
+    int done = 0;
     pthread_rwlock_wrlock(&pk_coreLock);
-    if (g.core && pk_cheats_rom_patched()) {
-        pk_cheats_swap_rom(g.core);
+    if (g.core) {
+        pk_cheats_unblock(g.core);
+        jsize at = 0;
+        for (; done < n; done++) {
+            if (lens[done] < 1 || at + lens[done] > size ||
+                !pk_cheats_block(g.core, (uint32_t) addrs[done], (const uint8_t*) data + at, lens[done], (uint32_t) crcs[done])) {
+                break;
+            }
+            at += lens[done];
+        }
+        if (done < n) {
+            pk_cheats_unblock(g.core);
+        }
     }
     pthread_rwlock_unlock(&pk_coreLock);
+    (*env)->ReleaseByteArrayElements(env, jData, data, JNI_ABORT);
+    (*env)->ReleaseIntArrayElements(env, jCrcs, crcs, JNI_ABORT);
+    (*env)->ReleaseIntArrayElements(env, jLens, lens, JNI_ABORT);
+    (*env)->ReleaseIntArrayElements(env, jAddrs, addrs, JNI_ABORT);
+    return done == n ? n : -1;
+}
+
+// Emu thread: every PLAYER LOOK block out again.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkRomUnblock(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core) {
+        pk_cheats_unblock(g.core);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+// Emu thread: the 32-byte palettes in `from` (back to back) swapped for `to` wherever the
+// game has one loaded (pk_cheats_repalette). Returns how many.
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkRepalette(JNIEnv* env, jobject thiz, jbyteArray jFrom, jbyteArray jTo) {
+    jsize n = (*env)->GetArrayLength(env, jFrom) / 32;
+    if (n < 1 || (*env)->GetArrayLength(env, jTo) != 32) {
+        return 0;
+    }
+    jbyte* from = (*env)->GetByteArrayElements(env, jFrom, NULL);
+    uint8_t to[32];
+    (*env)->GetByteArrayRegion(env, jTo, 0, 32, (jbyte*) to);
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int swapped = g.core ? pk_cheats_repalette(g.core, (const uint8_t*) from, n, to) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    (*env)->ReleaseByteArrayElements(env, jFrom, from, JNI_ABORT);
+    return swapped;
 }
 
 // --- Nintendo DS (nds/pk_nds.cpp) --------------------------------------------

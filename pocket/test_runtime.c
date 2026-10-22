@@ -5,7 +5,7 @@
 #include <assert.h>
 static unsigned lastCounter, pausedCounter;
 static bool gbaTest;
-static bool realRomTest, quickTest, wideTest;
+static bool realRomTest, quickTest, wideTest, wideReopen;
 static char quickRoot[] = "/tmp/pd-quick-test-XXXXXX";
 static const char *quickRom;
 static unsigned quickPause, quickSaved;
@@ -160,6 +160,12 @@ static void quick_test_frame(struct mCore *c, bool companion, int frame) {
          "and repeated toggles");
 }
 static void wide_test_frame(struct mCore *c, bool companion, int frame) {
+  if (wideReopen) {
+    assert(wideMode == 1);
+    if (!frame)
+      puts("PASS remembered display after emulator teardown/reopen");
+    return;
+  }
   if (frame == 0) {
     assert(wideSupported);
     assert(state(c, getenv("POCKET_TEST_STATE"), false));
@@ -177,6 +183,7 @@ static void wide_test_frame(struct mCore *c, bool companion, int frame) {
     fflush(stdout);
     capture_frame("runtime-phase8-before.png", NULL);
     assert(wideMode == 1 && wideReady);
+    assert(pocket_display_load(root, displayKey) == 1);
     assert(lastGameRect.w == 1020 && lastGameRect.h == 760);
     assert(capture_frame("runtime-phase8-expand.png", NULL));
     send_button(13);
@@ -532,7 +539,13 @@ int main(void) {
     char *args[] = {
         "pokedaisy-pocket",       "--data",         quickRoot, "--frames",
         wideTest ? "1942" : "68", (char *)quickRom, NULL};
-    return pocket_app_main(6, args);
+    int result = pocket_app_main(6, args);
+    if (wideTest) {
+      wideReopen = true;
+      args[4] = "3";
+      result |= pocket_app_main(6, args);
+    }
+    return result;
   }
   const char *personal = getenv("POCKET_TEST_ROM");
   if (personal) {
