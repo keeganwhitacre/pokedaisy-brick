@@ -111,8 +111,9 @@ still a hardware verification item.
 
 ## Build from source
 
-This delivery includes the exact source tree, including the pinned mGBA source.
-For a fresh git checkout, initialize only its mGBA submodule:
+Complete corresponding source is published at https://github.com/keeganwhitacre/pokedaisy-brick.
+Each install archive records its exact source commit and mGBA pin in Source/SOURCE.md.
+Clone that commit and initialize only its mGBA submodule:
 
 ```
 git submodule update --init third_party/mgba
@@ -161,6 +162,7 @@ For upstream updates and the generated-definition workflow, read `UPSTREAM.md`.
 
 GPL-3.0, with upstream's attribution requirement preserved in `NOTICE` and About.
 mGBA is MPL-2.0, blip_buf LGPL-2.1, inih BSD, and Pixel Operator CC0. The complete
-corresponding application and mGBA source is included with this delivery. See
+corresponding application source and pinned mGBA source are freely available at the
+repository and commit recorded in Source/SOURCE.md beside the install package. See
 `LICENSE`, `NOTICE` and the upstream license files. No commercial ROMs or extracted
 game art are distributed.
