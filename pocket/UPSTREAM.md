@@ -36,7 +36,7 @@ git remote set-url origin https://github.com/keeganwhitacre/pokedaisy-brick.git
 git remote add upstream https://github.com/lidor30/pokedaisy.git
 # If upstream already exists, leave it in place.
 git fetch upstream main
-git switch handheld/brick-phase1
+git switch main
 git merge upstream/main
 python3 pocket/gen_polished.py
 python3 pocket/gen_polished.py --check
