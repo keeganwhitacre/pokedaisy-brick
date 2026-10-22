@@ -1,3 +1,7 @@
+> **TrimUI Brick / NextUI port:** see [Pocket installation and controls](pocket/README.md),
+> [verification](pocket/VERIFICATION.md), and [upstream maintenance](pocket/UPSTREAM.md).
+> The original Android project and its documentation follow below.
+
 <div align="center">
 
 <img src="https://pokedaisy.com/og.png" alt="PokeDaisy: Game Boy, Game Boy Color, GBA and DS player with a live companion, on two screens or one, for Pokemon games and ROM hacks, free and open source" width="100%">

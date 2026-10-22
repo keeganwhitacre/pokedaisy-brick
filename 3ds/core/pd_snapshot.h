@@ -31,6 +31,9 @@ struct pd_mon {
     int moves[PD_NUM_MOVES];
     int pp[PD_NUM_MOVES];
     uint32_t personality;
+    // Optional live fields used by the native Gen 2 companion.
+    uint32_t experience;
+    int heldItem;
 };
 
 struct pd_battle_mon {
@@ -45,8 +48,8 @@ struct pd_battle_mon {
 #define PD_POS_PLAYER_LEFT 0
 #define PD_POS_OPPONENT_LEFT 1
 
-// A pocket's slots: every pocket of FireRed's and Emerald's bag holds at most 64.
-#define PD_POCKET_SLOTS 64
+// Retail GBA pockets fit 64; Polished items + medicine can hold 112 entries.
+#define PD_POCKET_SLOTS 128
 #define PD_NATIONAL_COUNT 386
 #define PD_DEX_BYTES 52
 #define PD_FLAG_BYTES 0x12C // Emerald's; FireRed's 0x120 fit
@@ -110,6 +113,11 @@ struct pd_snapshot {
     uint32_t gameStats[PD_GAME_STATS];
     uint16_t museumWinners[5];
     uint16_t battlePoints;
+
+    // Polished Crystal guide: read-only progress banks from Gen2Reader.
+    bool pcProgressOk;
+    uint16_t pcBadges, pcTrades;
+    uint8_t pcTimeOfDay;
 };
 
 bool pd_flag(const struct pd_snapshot* s, int flag);

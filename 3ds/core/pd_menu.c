@@ -43,8 +43,12 @@ void pd_menu_draw(struct pd_menu* m, struct pd_canvas* c) {
     int y = LIST_Y + LIST_FRAME + 2;
     if (m->count == 0) {
         pd_text(c, x + 6, y, "No games found.", PD_LABEL, PD_LABEL_SHADOW);
+        #ifdef POCKET_NATIVE
+        pd_text(c, x + 6, y + ROW_H, "Put .gb / .gbc / .gba files in roms/", PD_MUTED, PD_MUTED_SHADOW);
+#else
         pd_text(c, x + 6, y + ROW_H, "Put .gba files in", PD_MUTED, PD_MUTED_SHADOW);
         pd_text(c, x + 6, y + 2 * ROW_H, "sdmc:/pokedaisy/roms/", PD_VALUE, PD_VALUE_SHADOW);
+#endif
         return;
     }
     for (int r = 0; r < rows && m->scroll + r < m->count; r++) {

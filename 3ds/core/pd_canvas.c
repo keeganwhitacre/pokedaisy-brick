@@ -90,7 +90,15 @@ static uint32_t next_codepoint(const char** s) {
     return cp;
 }
 
+static const struct pd_glyph* custom_font;
+static int custom_count;
+void pd_font_set(const struct pd_glyph* glyphs, int count) {
+    custom_font = glyphs;
+    custom_count = glyphs && count > 0 ? count : 0;
+}
 const struct pd_glyph* pd_font_glyph(uint32_t cp) {
+    for (int i = 0; i < custom_count; i++)
+        if (custom_font[i].codepoint == cp) return &custom_font[i];
     if (cp >= 32 && cp < 127) return &pd_font_glyphs[cp - 32];
     for (int i = 95; i < pd_font_glyph_count; i++) {
         if (pd_font_glyphs[i].codepoint == cp) return &pd_font_glyphs[i];

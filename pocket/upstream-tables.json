@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "inputs": {
+    "Gen2Art.kt": "14836ca7205402d0175d3703547c6a470d3871e9809aaa9f1b29345eb217fb64",
+    "Gen2Dex.kt": "df918fea49cee5dea7c79f11563495b79c2da599a03aa4e541113c8041ba19d1",
+    "Gen2PolishedCrystalGen.kt": "9743da581f14264947d8f0175faaaf63e535b3c3ac816c1cca4916a168faaf76",
+    "Gen2Reader.kt": "8ec656a7687c9c9375964e5b4df7186abf6f4da6eb2b0b57d416d47b6d6e798c",
+    "Gen2SpeciesPolishedCrystal.kt": "6d528202efeaad1a064eddc0a6e59989857ff491a1938fbf7ddee1d18ae30b80",
+    "GuidePolishedCrystal.kt": "fbd3764316592b018b85fcd701bb3cfad249fc1d49f7045570e8782ad8fa45b9",
+    "GuidePolishedCrystalGen.kt": "c96404d2d48bb0612edf4cc252af7c5e454249493a7f294097c22e1310ec7a91",
+    "ItemNamesPolishedCrystal.kt": "8cde37ee3b42a496b1b6b3c35227fc3fb2447d6cf9d3622bc9efc8692a065c6d",
+    "MapSecDataPolishedCrystal.kt": "efa6252b993e535a9476b8b3b58e77171318c80de4f1f6ac7956e1023950f66b",
+    "MoveDataPolishedCrystal.kt": "c1a6fb91bf95ae8c7b78f803dbc905177c8bc129a7cedb8f0bade044f718d7c0",
+    "SpeciesNamesPolishedCrystal.kt": "55889aa32344a0613e2caf99be5f11155277cdfd07f38d1db1adf4873fd0b1d8",
+    "SpeciesTypesPolishedCrystal.kt": "39c2c5551cfc1040a989622be10e758d9fa2b5b8893d158ffd3994594cd707b5",
+    "TypeChartPolishedCrystal.kt": "6d848b742583f10e00046595934f65b3d644e7e035ba45850c47437a246249fa"
+  },
+  "ram_fields": 27,
+  "builds": 16,
+  "dex_entries": 289
+}

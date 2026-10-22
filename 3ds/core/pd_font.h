@@ -16,6 +16,9 @@ struct pd_glyph {
 extern const struct pd_glyph pd_font_glyphs[];
 extern const int pd_font_glyph_count;
 
+// Caller-owned ROM font. NULL restores the portable Pixel Operator default.
+void pd_font_set(const struct pd_glyph* glyphs, int count);
+
 // The glyph for a codepoint ('?' when the font lacks it).
 const struct pd_glyph* pd_font_glyph(uint32_t codepoint);
 
