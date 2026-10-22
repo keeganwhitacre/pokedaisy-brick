@@ -1,11 +1,16 @@
-# PokeDaisy Pocket: Phase 13
+# PokeDaisy Pocket: Phase 14
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 
-Native SDL2 and mGBA prototype for TrimUI Brick / NextUI. The user has confirmed
-Phase 1 gameplay and a live party with a ROM sprite on physical Brick hardware.
-Phase 13 starts a direct Android visual-parity pass: Polished's Bag now uses its magenta backdrop, folder tabs, framed list and inline descriptions; Dex uses the original counts/filter column, icons and seen/caught marks. Shared navigation chips use the Game Boy window palette. The source desktop preview can now render Polished from the same captured memory and personal-ROM art for direct comparisons. Earlier emulator/companion features remain included. Full visual parity, hardware optimization and power integration remain unfinished.
-It does not yet reproduce the full Android application.
+Native SDL2 and mGBA port for TrimUI Brick / NextUI. The user has confirmed
+gameplay, expanded/zoomed overworlds, companion menus, saves and the quick menu
+on physical hardware. Those working paths are retained.
+
+Phase 14 adapts Android's Guide page selector and inline rows, combining HERE's
+encounters, people and items. It preserves unseen/hidden entry names until you
+reveal them, uses the original owned balls and per-entry Pokémon icons, and
+lists boss teams directly with hint/answer steps. Full Android parity,
+performance optimization and power integration remain unfinished.
 
 Gameplay preserves the working opaque RGB888 format. Game scaling now uses the
 physical panel resolution independently of the companion's logical UI grid.
@@ -50,7 +55,7 @@ and keep your `roms`, `saves`, `states` and `display` folders and `settings.ini`
 The game menu also offers resume, party, state saving/loading, fast-forward,
 quit and About. Loading a state and quitting require confirmation. Save inside
 the game before choosing Quit; quitting does not perform the game's save action.
-In Polished Crystal, L/R cycles Party, Bag, Battle, Dex and Map. In Party, the D-pad
+In Polished Crystal, L/R cycles Party, Bag, Battle, Dex, Map and Guide. In Party, the D-pad
 follows the two-column grid and A opens a summary. Within a summary, Up/Down changes Pokemon, Left/Right selects a move, A opens its ROM description, Y cycles Info/Weaknesses/Resistances/Immunities, and Select pages long matchup lists. B returns one level. Eggs conceal their moves. In Bag, Left/Right changes
 pocket and Up/Down scrolls through items. The Bag shows live quantities and
 money, including medicine grouped under Items, plus Balls, TMs/HMs, Berries and
@@ -58,7 +63,13 @@ Key items. Press A for an item description read from the matching ROM. The Bag r
 Battle uses Y to cycle INFO, SUGGESTIONS, FOE DETAILS, FOE TEAM and FOE TYPES. FOE TYPES uses Left/Right for weaknesses, resistances and immunities, with Up/Down for more rows. INFO rates damaging moves against the selected foe. Suggestions uses upstream’s power/type/defensive-risk heuristic, not a full damage calculation. Foe Details shows actual active-battler stats, held item and moves; reserve stats are omitted because the Polished party reader does not provide them. On Foe Team use D-pad and A to inspect a member. Unannounced slots remain unnamed until selected; Select follows the live foe again. B returns to INFO, then gameplay. No battle commands or memory writes are introduced.
 In the Dex list, Y cycles ALL, CAUGHT, SEEN ONLY (seen but not caught) and NOT SEEN. Filters are retained when returning from an entry or switching companion sections. Empty results cannot open an entry. Dex shows live seen/caught flags in Polished Crystal's 289-entry order. Up/Down chooses, Left/Right pages and A opens an entry. Up/Down browses entries and B returns to the list. Entry sprites, category, text, size and base stats read from the matching ROM. Y switches to the full-text/abilities page.
 Map displays Johto, Kanto and Orange with original ROM palettes, tile flips and player art. The D-pad moves its cursor; A changes region, Y recenters on the player, and Select opens Places. A on a place shows it on the map. Map is read-only; Fly is not implemented.
-The opened NEXT BOSS panel compares your highest non-egg party level with the boss ace; this is a level comparison, not a win prediction. Guide uses Left/Right to switch HERE: WILD, HERE: FINDS, NEXT BOSS, TIPS and WHERE IS. Up/Down chooses a row or scrolls an open answer. A reveals a hint, then an answer; B closes it. On NEXT BOSS, A first opens the team list. Choose a Pokemon with Up/Down, then A reveals only its hint and answer. Y selects the next Pokemon and closes the previous reveal. B closes the entry, then the team, then returns to gameplay. Y changes encounter method or Where Is category. A plus mark means caught/collected. The Guide follows the game clock and badges; it never changes game data. Upstream marks its guide data unverified, so entries may contain mistakes.
+The Guide uses Android's HERE, NEXT BOSS, TIPS and WHERE IS pages with inline
+entries. HERE combines present encounter methods, PEOPLE and ITEMS. Unseen
+encounters and uncollected hidden-item names stay concealed until revealed.
+NEXT BOSS lists each remaining team's Pokémon directly, with a type hint and
+species/moves/held-item answer. See Phase 14 Guide controls below. The Guide
+follows the game clock, badges and read-only progress; upstream marks its data
+unverified, so entries may contain mistakes.
 D-pad and A activate the existing GBA controls through their recorded hit regions.
 Long lists use repeated directions to move and scroll. Maps need further controller
 work; this build does not promise complete access to every point on a map.
@@ -204,3 +215,17 @@ Bag opens All and shows only meaningful occupied-pocket tabs, like Android. Left
 Dex now places SEEN/OWNED counts and all four filters beside the numbered icon list. Caught/seen marks reuse upstream pixel artwork; unencountered entries remain visible but dim, as Android's DexRow does. The Brick stacks each row's number and name to keep full-size ROM text readable. Up/Down scrolls one entry, Left/Right moves five entries, Y changes filter and A opens the existing entry page. Entry-page composition still needs a later visual pass.
 
 Top navigation retains the existing five-chip shoulder workflow on Brick, now with upstream Game Boy chip frames and colors. Android's bottom placement, gear/MORE arrangement and complete settings/state browser are not claimed. Guide and battle panel composition also remain open. We will finish those visual comparisons before the performance and power/suspend/exit milestone; GBA companion expansion follows that work.
+
+## Phase 14 Guide controls
+
+L/R reaches GUIDE. Left focuses its page selector; Up/Down changes pages there,
+and Right or A returns to the entries. Y is a direct next-page shortcut.
+Up/Down walks entries, skipping headings. A cycles closed, hint, answer, closed
+(or directly to the answer if the source has no hint). Reveals stay inline and
+only one entry opens at once. Select scrolls a tall answer; B closes the current
+reveal, then returns to gameplay. X always returns to gameplay.
+
+HERE includes all encounter methods present on the current map, then PEOPLE
+and ITEMS for the area including its buildings. Collected area rows sort last.
+The guide uses upstream's data, which upstream labels AI-assisted and unverified.
+Preserve `roms`, `saves`, `states`, `display` and `settings.ini` when updating.

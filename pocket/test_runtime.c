@@ -330,25 +330,57 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
         assert(capture_frame("runtime-phase12-summary-sdl.png", NULL));
         send_key(SDLK_x);
       }
+      if (frame == 134)
+        send_key(SDLK_q);
+      if (frame == 135) {
+        assert(companion && pcUi->section == PC_GUIDE);
+        assert(c->frameCounter(c) == pausedCounter);
+        assert(capture_frame("runtime-phase14-guide-here-sdl.png", NULL));
+        send_key(SDLK_LEFT);
+      }
+      if (frame == 136) {
+        assert(pcUi->guidePagesFocused);
+        send_key(SDLK_DOWN);
+      }
+      if (frame == 137) {
+        assert(pcUi->guidePage == 2);
+        send_key(SDLK_RIGHT);
+      }
+      if (frame == 138)
+        send_key(SDLK_z);
+      if (frame == 139) {
+        assert(pcUi->guideReveal == 1);
+        assert(capture_frame("runtime-phase14-guide-hint-sdl.png", NULL));
+        send_key(SDLK_z);
+      }
+      if (frame == 140) {
+        assert(pcUi->guideReveal == 2);
+        assert(c->frameCounter(c) == pausedCounter);
+        assert(capture_frame("runtime-phase14-guide-answer-sdl.png", NULL));
+        send_key(SDLK_x);
+      }
+      if (frame == 141)
+        assert(!pcUi->guideReveal && companion);
     }
-    if (frame == 138) {
+    int exitAt = getenv("POCKET_TEST_STATE") ? 148 : 138;
+    if (frame == exitAt) {
       assert(c->frameCounter(c) == pausedCounter);
       SDL_Event e = {.type = SDL_JOYBUTTONDOWN};
       e.jbutton.button = 0;
       SDL_PushEvent(&e);
     }
-    if (frame == 139) {
+    if (frame == exitAt + 1) {
       assert(!companion);
       SDL_Event e = {.type = SDL_JOYBUTTONUP};
       e.jbutton.button = 0;
       SDL_PushEvent(&e);
     }
-    if (frame == 140) {
+    if (frame == exitAt + 2) {
       assert(c->frameCounter(c) > pausedCounter);
       assert(state(c, "/tmp/pd-personal-rom-test-state", true));
       lastCounter = c->frameCounter(c);
     }
-    if (frame == 145) {
+    if (frame == exitAt + 7) {
       assert(state(c, "/tmp/pd-personal-rom-test-state", false));
       assert(c->frameCounter(c) == lastCounter);
     }

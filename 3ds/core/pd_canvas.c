@@ -173,13 +173,14 @@ int pd_text_wrap(struct pd_canvas* c, int x, int y, int max_w, int lineH, int ma
     while (lines < maxLines) {
         while (*s == ' ') s++;
         if (!*s) break;
+        if (*s == '\n') { ++s; ++lines; continue; }
         // The longest run of whole words that fits; a single word too long
         // for the line is taken whole and cut.
         const char* end = NULL;
         const char* p = s;
         for (;;) {
             const char* wordEnd = p;
-            while (*wordEnd && *wordEnd != ' ') wordEnd++;
+            while (*wordEnd && *wordEnd != ' ' && *wordEnd != '\n') wordEnd++;
             size_t n = (size_t) (wordEnd - s);
             if (n >= sizeof(line)) break;
             memcpy(line, s, n);
@@ -188,12 +189,12 @@ int pd_text_wrap(struct pd_canvas* c, int x, int y, int max_w, int lineH, int ma
             end = wordEnd;
             p = wordEnd;
             while (*p == ' ') p++;
-            if (!*p) break;
+            if (!*p || *p == '\n') break;
         }
         bool cut = false;
         if (!end) {
             end = s;
-            while (*end && *end != ' ') end++;
+            while (*end && *end != ' ' && *end != '\n') end++;
             cut = true;
         }
         size_t n = (size_t) (end - s);
@@ -201,6 +202,7 @@ int pd_text_wrap(struct pd_canvas* c, int x, int y, int max_w, int lineH, int ma
         memcpy(line, s, n);
         line[n] = 0;
         s = end;
+        if (*s == '\n') ++s;
         while (*s == ' ') s++;
         if (lines == maxLines - 1 && *s) {
             // The last line takes the rest, cut with "...".

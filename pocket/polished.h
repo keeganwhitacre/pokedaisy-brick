@@ -28,14 +28,16 @@ void pc_item_draw(struct pd_canvas *, int item, const unsigned char *, size_t,
 // Game-specific navigation stays out of the emulator/SDL host.
 struct pc_ui {
   int section, selected, pocket, item, dex, dexPage, region, mapX, mapY, place,
-      move, summaryPage, typePage, guidePage, guideMethod, guideRow,
-      guideReveal, guideScroll, guideMon, guideBoss, battlePage, battleRow,
-      battleFoe, battleType, dexFilter, bagSort, bagScroll, bagDescPage,
-      bagKeyPocket, bagKeySlot, dexScroll;
+      move, summaryPage, typePage, guidePage, guideRow, guideReveal,
+      guideScroll, battlePage, battleRow, battleFoe, battleType, dexFilter,
+      bagSort, bagScroll, bagDescPage, bagKeyPocket, bagKeySlot, dexScroll;
   unsigned battleSeen;
+  uint64_t guideOpenKey;
+  int guideRowScroll, guideRowScrollMax, guideBuild, guideOpenPage;
+  bool guidePagesFocused;
   uint32_t animationMs;
   bool wasBattle, bagStarted, bagReselect;
-  bool summary, detail, mapSet, placesOpen, moveOpen, guideBossOpen;
+  bool summary, detail, mapSet, placesOpen, moveOpen;
 };
 enum pc_action {
   PC_UP,

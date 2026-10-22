@@ -188,3 +188,41 @@ The supplied normal 3.2.3 ROM passes the ordinary-input new-game test again. Nat
 The real upstream Compose desktop renderer builds and renders four reference screens from polished_crystal captured WRAM, using the supplied ROM for the Gen 2 font/art/text and its actual hash-selected tables. The four real-fixture captures complete without action failures. The earlier generic preview run had two favorite-interaction failures and is not used as parity evidence. Native Bag and Dex captures and these real-fixture references were inspected at the actual screen size. The comparison corrected the description box's measured height, the OWNED count label, and shared chip framing. It does not establish full-screen parity for the unreviewed screens.
 
 No physical Brick testing occurred. Full Guide/battle/Dex-entry/global-menu visual parity, sustained ARM performance, audio hardware, RTC, suspend/shutdown and power-loss behavior remain unfinished. No ROM, loose extracted commercial art, personal save or state is shipped. Reference and native screenshots are actual render output, explicitly labeled by source and whether memory fixtures were used.
+
+
+## Phase 14 Guide source fidelity pass
+
+Reference implementation: retained upstream `54d8f4867501feb32b7ee139a5616b7c6301f044`,
+`GuideScreen.kt` (GuideUiState, herePage, bossPage, SectionHeading, EntryRow),
+`GuideAreas.kt` (generatedWhereIs) and the existing Polished GuideWorld tables.
+
+Completed checks in this pass:
+
+- Native release frontend/test targets and NextUI AArch64 release targets build.
+- Native and ARM captured-memory regression tests cover the five supported
+  release/faithful fixtures, wild/trainer battle fixtures and 2,776 encounter
+  map/method/clock cases, plus 36 time-dependent fish slots.
+- Guide checks cover spoiler-safe wild names/icons, hidden item kind-only
+  titles until reveal, owned-state changes, stable unique entry keys, four-page
+  navigation, one open hint/answer, page visits retaining the open key, and
+  progress invalidating the old boss reveal.
+- User's normal 3.2.3 ROM is hash matched. A fresh game reads the actual starter,
+  level 5 / HP 19/19, its received event flag and the first pending boss without
+  fixture injection. Guide captures and long-answer tail/wrap checks pass.
+- Native and ARM SDL event tests visit HERE, focus the page selector, choose
+  NEXT BOSS, reveal hint and answer, close it, resume and round-trip a state.
+- Existing native/ARM runtime regressions retain GB/GBA gameplay, battery
+  marker/state handling, quick menu confirmations and 100 companion toggles.
+- Native full-resolution expansion checks pass Original/Expand/Zoom, unchanged
+  PPU-center pixels, fallback menus, state-load reset and teardown/reopen mode
+  persistence. These are emulator checks, additional to user hardware reports.
+- AddressSanitizer/UndefinedBehaviorSanitizer captured-memory and ROM-art checks
+  pass. LeakSanitizer is disabled because this container cannot inspect `/proc`
+  tasks; this is not a leak-check claim.
+- All existing generated data/art/style checks pass. Manual parse/link,
+  terminology and search checks pass (7 website tests).
+
+Hardware evidence: the user reports that gameplay, expansion/zoom, companion
+menus, saves and quick menu work on their actual Brick. The newly adapted Guide
+has not yet been retested on the device. No new hardware power, suspend, RTC,
+shutdown or sustained-speed claims are made.

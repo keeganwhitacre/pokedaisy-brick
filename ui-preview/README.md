@@ -108,7 +108,9 @@ For real captured Polished data instead of the demo party/items, use:
   -PcompanionW=1024 -PcompanionH=768 -PcompanionDensity=2
 ```
 
-This writes real-fixture Party, Bag, Bag-description and Dex reference captures.
+This writes real-fixture Party, Bag, Bag-description, Dex and Guide reference captures.
+Guide includes HERE, NEXT BOSS, its first Pokémon hint/answer, TIPS and WHERE IS.
+Filter with `-Ponly=polished_crystal-real-guide` for the Guide set.
 The adapter validates the ROM against upstream hashes, chooses normal/faithful
 configuration and ROM tables as Poller does, then uses readGen2Telemetry and
 buildSnapshotView over the fixture's banked WRAM. The non-battle polished_crystal

@@ -1,4 +1,4 @@
-# Polished Crystal Android parity boundary — Phase 13
+# Polished Crystal Android parity boundary — Phase 14
 
 This compares the native port with the **Polished Crystal path** at upstream
 `54d8f4867501feb32b7ee139a5616b7c6301f044`, rather than with Android features
@@ -7,7 +7,7 @@ user's matching cart. Full visual and behavioral parity is still unfinished.
 
 | Area | Current native behavior | Remaining work |
 | --- | --- | --- |
-| Gameplay | mGBA, integer scaling, audio, input, saves/states, fast-forward | Sustained hardware performance, RTC, suspend/power verification |
+| Gameplay | mGBA, integer scaling, audio, input, saves/states, fast-forward | Base gameplay, saves, expansion/zoom, companion and quick menu confirmed on Brick by the user; sustained performance, RTC and suspend/power verification remain |
 | Identity | Upstream's 16 exact normal/faithful/debug build hashes | Import and test future builds |
 | Font | Original ROM font and Gen2Art mapping, crisp logical 2x glyphs | Remaining per-widget spacing/animations |
 | Party | Six slots, rounded upstream frames, original HP lettering, larger ROM icons, selected-icon bobbing, gender/status/held markers and egg handling | Remaining fine layout details; upstream Gen 2 EXP bar is on Summary |
@@ -16,10 +16,10 @@ user's matching cart. Full visual and behavioral parity is still unfinished.
 | Battle | INFO effectiveness labels; upstream power/type/risk ranking; live foe item/stats/moves and type-matchup groups; browsable team with unseen slots; battle-scoped seen tracking and exact active-party OUT marker and original-style HP bars | Remaining Android panel layout; Gen 2 supplies no announced-next-foe index; upstream GBA command controls are not Polished controls |
 | Dex | Upstream counts/filter + icon-list layout, original caught/seen marks and muted unseen entries; real flags/order, four filters, front sprites, descriptions, dimensions/base stats, species abilities | Entry-page layout, held-button navigation/repeat and further styling; upstream PokedexScreen has no name-search feature; upstream's Polished dex has no evolution table |
 | Map | All three ROM maps, palettes/flips, live location/player, pulsing landmark cursor, regions, Places | Precise location refinements; Polished Fly is not provided by upstream FieldItems |
-| Guide HERE | Live map/time encounter lists, all eight methods, badge-adjusted levels, caught marks; area finds and progress marks | More exact Android layout, per-entry icons and encounter-detail interactions |
-| Guide NEXT BOSS | Progress-dependent order, League/rematch rules, normal/faithful teams, type hints, individual Pokemon hint/answer entries, moves/held-item answers, own-best-level comparison | Exact Android panel styling |
-| Guide TIPS / WHERE IS | All seven upstream tips, hints/answers; HM/key/gift-Pokemon lists with deduplication, locations and owned marks | Android's exact panel layout and further list ergonomics |
-| Quick menu | L3 ring; original Android icons; paused integer-scaled gameplay behind it; state confirmation, FF and companion | More actions only when their game-specific implementations are ported; physical button/overlay retest |
+| Guide HERE | Android left page selector and inline sections for every present encounter method, PEOPLE and ITEMS; caught counts/balls, owned-last area rows, time/badge levels, encounter icons and spoiler-safe reveals | First-use guide notice, small-text sizing and fine layout/scroll-animation differences |
+| Guide NEXT BOSS | Progress-dependent order, League/rematch rules, normal/faithful teams, type hints, individual Pokemon hint/answer entries, moves/held-item answers, own-best-level comparison | Shared OPTION frames and inline per-Pokémon entries now adapted; fine text metrics and controller scrolling differences remain |
+| Guide TIPS / WHERE IS | All seven upstream tips, hints/answers; HM/key/gift-Pokemon lists with deduplication, locations and owned marks | Inline hint/answer rows with source page/category hierarchy now adapted; fine text metrics and first-use guide notice remain |
+| Quick menu | L3 ring; original Android icons; paused integer-scaled gameplay behind it; state confirmation, FF and companion | More actions only when their game-specific implementations are ported; User confirms quick menu on Brick; new UI changes still require hardware retesting |
 | States/options | Existing host menu/state/FF controls | Multi-slot screenshot browser, broader options and remaining lifecycle integration |
 
 Guide definitions are generated from `GuidePolishedCrystal*.kt`; the original
@@ -34,17 +34,17 @@ retail companion support remain as before; this does not add Seaglass decoding.
 
 L3 opens the quick-menu ring. R3 cycles Original / Expand / Zoom, with a Menu > Display fallback. The existing `pk_wide_gb.c` renderer now has a native-only adapter for normal Polished Crystal 3.2.3, using official release symbols and the game's actual decompressed metatile/attribute banks. Original pixels are preserved. Menus/dialogue/battles return to the normal viewport. Other builds do not receive guessed addresses.
 
-Remaining expansion work: unspawned/connected-map NPC templates; broad outdoor, map-connection, weather/lighting and battle-transition verification; physical performance and button retest. The initial real-ROM verification covers Elm's laboratory, normal starter dialogue, display cycling, paused companion/wheel and state reset.
+Remaining expansion work: unspawned/connected-map NPC templates; broad outdoor, map-connection, weather/lighting and battle-transition verification; User confirms expansion/zoom and quick-menu operation on Brick; broader performance, lifecycle and new-UI retests remain. The initial real-ROM verification covers Elm's laboratory, normal starter dialogue, display cycling, paused companion/wheel and state reset.
 
 ## Next Polished work, before GBA companion expansion
 
 1. Hardware validation and wider exploration of this renderer, including connected maps.
 2. Remaining battle panel layout and foe-selection ergonomics.
-3. Remaining Dex entry/Guide layouts, Bag favorites and shared menu composition.
-4. Remaining exact widget styling and per-entry Guide icons.
+3. Remaining Dex entry layouts, Bag favorites, Guide notice and shared menu composition.
+4. Remaining exact widget styling and small-text metrics.
 5. Multi-slot state browser and broader lifecycle/RTC/suspend verification.
 
-These are still open; Phase 13 does not claim full Android parity. GBA work is deferred.
+These are still open; Phase 14 does not claim full Android parity. GBA work is deferred.
 
 Phase 11 remembers display mode per ROM content identity and reuses upstream's save mapping fallback with native I/O failure reporting. A new shared host module owns those policies; Polished readers/renderers remain independent. Upstream 1.3.1 source history is merged, but Android feature breadth is not implied by that merge.
 
@@ -56,4 +56,33 @@ Phase 12 audits ActiveTables.activeItemSpriteDir (the `crystal` predicate includ
 
 Phase 13 extends the upstream desktop preview with matching-ROM Gen 2 art and a captured-Polished-WRAM adapter. Both app UIs can now render the same fixture through their own real decoders, using the same ROM font/icons/text. The reference harness sets and restores the activity's in-game window palette during companion composition. This removes two preview fallbacks that previously hid the actual Game Boy style.
 
-Bag and Dex list have now received this comparison. The Brick keeps top shoulder tabs and control hints, while Android has bottom tabs plus MORE/settings. Dex number/name rows wrap on Brick; long item descriptions page rather than making the whole tab too short. Those adaptations are documented rather than described as pixel-identical parity. Party/Summary, Guide, battle panels, Dex entry pages and global menus still need the same full side-by-side pass. Performance, RTC, suspend/power and state-browser work remain separate unfinished milestones before GBA.
+Bag and Dex list have now received this comparison. The Brick keeps top shoulder tabs and control hints, while Android has bottom tabs plus MORE/settings. Dex number/name rows wrap on Brick; long item descriptions page rather than making the whole tab too short. Those adaptations are documented rather than described as pixel-identical parity. Party/Summary, battle panels, Dex entry pages and global menus still need the same full side-by-side pass. Guide reference capture support was added in Phase 14. Performance, RTC, suspend/power and state-browser work remain separate unfinished milestones before GBA.
+
+## Phase 14: Guide source translation
+
+`GuideScreen.kt` is the reference for page/section order, `GuideUiState.tap`,
+`herePage`, `bossPage`, `SectionHeading` and `EntryRow`. `GuideAreas.kt`
+`generatedWhereIs` supplies category and location wording. Native HERE now
+combines all present encounter methods and area finds; NEXT BOSS lists each
+remaining team as sections rather than a separate team modal. TIPS and WHERE
+IS reveal inline. Unseen wild names/icons and uncollected hidden-item names
+remain concealed as on Android. Only one entry can be open; its stable key
+survives a tab/page visit and becomes invalid if its map/boss disappears.
+
+`gen_style.py` imports exact Guide method titles/order and page labels and
+records the UI input hash. Its checks fail if upstream changes those source
+shapes. The portable canvas now handles explicit paragraph breaks and includes
+Pixel Operator's actual middle-dot glyph as the existing font fallback.
+No game memory, save handling, expansion or SDL hardware policy was changed.
+
+Unavoidable current adaptations: the companion retains shoulder tabs above
+its content on the single Brick screen. The left column approximates Android's
+34/66 split on a 512x384 logical canvas. Inline title/detail/tag lines wrap to
+keep the 16-pixel ROM font readable rather than reproducing Compose's smaller
+secondary text. Left focuses pages, Right/A returns to entries, Y advances a
+page, A reveals, and Select scrolls an answer taller than the viewport. B
+closes a current reveal and otherwise returns to gameplay. Scrolling is
+controller-driven rather than Compose touch/kinetic scrolling. The original
+first-use GuideNotice/persisted acceptance is still missing and explicitly
+remains a gap. The source guide's AI-assisted/unverified limitation still
+applies; this port does not validate or replace its data.

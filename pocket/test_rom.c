@@ -190,17 +190,6 @@ int main(int argc, char **argv) {
     }
   }
   for (int filter = 0; filter < 4; filter++) {
-    for (int level = 0; level < 3; level++) {
-      u = (struct pc_ui){.section = PC_GUIDE,
-                         .guidePage = 2,
-                         .guideBossOpen = true,
-                         .guideMon = 1,
-                         .guideReveal = level};
-      pc_ui_draw(&u, &canvas, &s, rom, size, build);
-      char path[80];
-      snprintf(path, sizeof path, "runtime-phase10-boss-entry%d.png", level);
-      assert(pd_png_write(path, 512, 384, px));
-    }
     u = (struct pc_ui){.section = PC_DEX, .dexFilter = filter};
     pc_ui_draw(&u, &canvas, &s, rom, size, build);
     char path[80];
@@ -209,40 +198,53 @@ int main(int argc, char **argv) {
     snprintf(path, sizeof path, "runtime-phase13-dex%d.png", filter);
     assert(pd_png_write(path, 512, 384, px));
   }
-  u = (struct pc_ui){.section = PC_GUIDE,
-                     .guidePage = 2,
-                     .guideBossOpen = true,
-                     .guideReveal = 1};
-  pc_ui_draw(&u, &canvas, &s, rom, size, build);
-  assert(pd_png_write("runtime-phase9-boss-compare.png", 512, 384, px));
   u = (struct pc_ui){.section = PC_DEX, .dex = 154, .detail = true};
   pc_ui_draw(&u, &canvas, &s, rom, size, build);
   pd_png_write("runtime-live323-dex.png", 512, 384, px);
   u.dexPage = 1;
   pc_ui_draw(&u, &canvas, &s, rom, size, build);
   pd_png_write("runtime-live323-dex-text.png", 512, 384, px);
-  const char *guideShots[] = {"wild", "finds", "bosses", "tips", "where"};
-  for (int i = 0; i < 5; i++) {
-    u = (struct pc_ui){.section = PC_GUIDE, .guidePage = i};
+  const int guidePages[] = {0, 2, 3, 4};
+  const char *guideShots[] = {"here", "bosses", "tips", "where"};
+  for (int i = 0; i < 4; i++) {
+    u = (struct pc_ui){.section = PC_GUIDE, .guidePage = guidePages[i]};
     pc_ui_draw(&u, &canvas, &s, rom, size, build);
     char path[128];
-    snprintf(path, sizeof path, "runtime-live323-guide-%s.png", guideShots[i]);
-    pd_png_write(path, 512, 384, px);
+    snprintf(path, sizeof path, "runtime-phase14-guide-%s.png", guideShots[i]);
+    assert(pd_png_write(path, 512, 384, px));
   }
-  u = (struct pc_ui){.section = PC_GUIDE,
-                     .guidePage = 2,
-                     .guideBossOpen = true,
-                     .guideReveal = 2};
-  pc_ui_draw(&u, &canvas, &s, rom, size, build);
-  pd_png_write("runtime-live323-guide-team.png", 512, 384, px);
-  assert(pc_ui_input(&u, &s, PC_DOWN) && u.guideScroll == 1);
-  assert(pc_ui_input(&u, &s, PC_BACK) && !u.guideReveal);
-  assert(pc_ui_input(&u, &s, PC_LEFT) && u.guidePage == 1);
+  u = (struct pc_ui){.section = PC_GUIDE, .guidePage = 2};
+  for (int level = 0; level < 3; level++) {
+    pc_ui_draw(&u, &canvas, &s, rom, size, build);
+    char path[128];
+    snprintf(path, sizeof path, "runtime-phase14-guide-boss-entry%d.png",
+             level);
+    assert(pd_png_write(path, 512, 384, px));
+    assert(pc_ui_input(&u, &s, PC_CONFIRM));
+  }
+  assert(!u.guideReveal);
+  assert(pc_ui_input(&u, &s, PC_LEFT) && u.guidePagesFocused);
+  assert(pc_ui_input(&u, &s, PC_DOWN) && u.guidePage == 3);
+  assert(pc_ui_input(&u, &s, PC_RIGHT) && !u.guidePagesFocused);
   assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideReveal == 1);
   assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideReveal == 2);
+  pc_ui_draw(&u, &canvas, &s, rom, size, build);
+  assert(u.guideRowScrollMax > 0);
+  assert(pc_ui_input(&u, &s, PC_PLACES));
+  pc_ui_draw(&u, &canvas, &s, rom, size, build);
+  assert(pd_png_write("runtime-phase14-guide-long-answer.png", 512, 384, px));
+  assert(u.guideRowScroll > 0 && u.guideRowScroll <= u.guideRowScrollMax);
+  for (int i = 0; i < 128 && u.guideRowScroll < u.guideRowScrollMax; i++) {
+    pc_ui_input(&u, &s, PC_PLACES);
+    pc_ui_draw(&u, &canvas, &s, rom, size, build);
+  }
+  assert(u.guideRowScroll == u.guideRowScrollMax);
+  assert(pc_ui_input(&u, &s, PC_PLACES) && !u.guideRowScroll);
+  assert(pc_ui_input(&u, &s, PC_BACK) && !u.guideReveal);
   assert(pc_ui_input(&u, &s, PC_NEXT) && u.section == PC_PARTY);
   assert(pc_ui_input(&u, &s, PC_PREVIOUS) && u.section == PC_GUIDE);
-  puts("PASS guide page/reveal/back/scroll and six-section wrap");
+  puts("PASS Guide inline reveal, page focus, long answer scroll, back and "
+       "section wrap");
   int defaultWidth = pd_text_width("A");
   pc_font(rom, size, build);
   assert(pd_text_width("A") == 16);

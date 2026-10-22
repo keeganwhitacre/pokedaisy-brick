@@ -165,314 +165,487 @@ static bool guide_boss_done(const struct pd_snapshot *s, int i) {
            (guide_badges(s) == 16 && guide_flag(s, guideBosses[i].flag));
   return guide_flag(s, guideBosses[i].flag);
 }
-// Scroll full guide prose at the original 16-pixel font; never shrink
-// paragraphs.
-static void guide_prose(struct pd_canvas *c, int y, const char *text,
-                        int *scroll) {
-  char lines[96][512] = {{0}};
-  int count = 0;
-  const char *p = text;
-  while (*p && count < 96) {
-    int len = 0;
-    while (*p && *p != '\n') {
-      while (*p == ' ')
-        p++;
-      if (!*p || *p == '\n')
-        break;
-      const char *end = p;
-      while (*end && *end != ' ' && *end != '\n')
-        end++;
-      int bytes = (int)(end - p);
-      if (len + bytes + 2 >= 512)
-        break;
-      char word[512];
-      memcpy(word, p, bytes);
-      word[bytes] = 0;
-      if (len && pd_text_width(lines[count]) + 16 + pd_text_width(word) > 472)
-        break;
-      if (len)
-        lines[count][len++] = ' ';
-      memcpy(lines[count] + len, p, bytes);
-      len += bytes;
-      lines[count][len] = 0;
-      p = end;
-    }
-    if (*p == '\n')
-      p++;
-    count++;
-  }
-  int visible = (332 - y) / 20;
-  if (*scroll > count - visible)
-    *scroll = count > visible ? count - visible : 0;
-  for (int i = 0; i < visible && *scroll + i < count; i++)
-    pd_text_fit(c, 20, y + 20 * i, 472, lines[*scroll + i], 0x181818,
-                PD_NO_SHADOW);
+// The source GuideScreen builds four pages of sections/entries, with one
+// stable open key. Keep that model independent of the emulator and SDL.
+enum guide_row_kind { G_HEADING, G_WILD, G_AREA, G_BOSS, G_TIP, G_WHERE };
+struct guide_row {
+  int kind, ref, aux;
+  struct guide_encounter encounter;
+  uint64_t key;
+};
+#define GUIDE_ROWS 1024
+struct guide_entry {
+  char title[256], detail[128], hint[512], answer[2048];
+  int icon, steps;
+  bool owned;
+};
+static bool guide_seen(const struct pd_snapshot *s, int id) {
+  if (!s->dexOk)
+    return true; // GuideScreen's dex == null rule.
+  if (id > 291 && id - 292 < GUIDE_COUNT(variants))
+    id = variants[id - 292] >> 8;
+  for (int i = 0; i < pc_dex_count(); i++)
+    if (dexOrder[i] == id)
+      return pd_dex_seen(s, i + 1);
+  return false;
 }
-static int guide_pending_boss(const struct pd_snapshot *s, int row) {
-  int count = 0, last = -1;
-  for (int i = 0; i < GUIDE_COUNT(guideBosses); i++)
-    if (!guide_boss_done(s, i)) {
-      last = i;
-      if (count++ == row)
-        return i;
+static const char *guide_place(int area) {
+  return area > 0 && area < GUIDE_COUNT(places) ? places[area].name
+                                                : "THIS MAP";
+}
+static uint64_t guide_key(int kind, int ref, int aux) {
+  return ((uint64_t)(kind + 1) << 56) | ((uint64_t)(unsigned)ref << 24) |
+         (unsigned)aux;
+}
+static void guide_add(struct guide_row *rows, int *count, int kind, int ref,
+                      int aux) {
+  if (*count >= GUIDE_ROWS)
+    return;
+  rows[(*count)++] = (struct guide_row){
+      .kind = kind, .ref = ref, .aux = aux, .key = guide_key(kind, ref, aux)};
+}
+// Heading refs: 0 area, 1..8 methods, 9 PEOPLE, 10 ITEMS, 11 TIPS,
+// 12..14 WHERE IS categories, 100+ boss. Stable owned-last order is upstream.
+static int guide_rows(const struct pd_snapshot *s, int page, int build,
+                      struct guide_row rows[GUIDE_ROWS]) {
+  int count = 0;
+  if (page == 0) {
+    guide_add(rows, &count, G_HEADING, 0, 0);
+    for (int j = 0; j < 8; j++) {
+      int method = pcGuideMethodOrder[j];
+      struct guide_encounter enc[32] = {{0}};
+      int n = guide_encounters(s, method, enc);
+      if (n)
+        guide_add(rows, &count, G_HEADING, method + 1, 0);
+      for (int i = 0; i < n; i++) {
+        guide_add(rows, &count, G_WILD, method, enc[i].species);
+        rows[count - 1].encounter = enc[i];
+        rows[count - 1].key = guide_key(G_WILD, s->mapGroup * 256 + s->mapNum,
+                                        method * 512 + enc[i].species);
+      }
     }
-  return last;
+    for (int group = 0; group < 2; group++) {
+      bool heading = false;
+      for (int done = 0; done < 2; done++)
+        for (int i = 0; i < GUIDE_COUNT(guideAreas); i++) {
+          int k = guideAreas[i].kind;
+          if (guideAreas[i].area != s->mapsec || (k <= 1) != (group == 1) ||
+              guide_area_done(s, i) != done)
+            continue;
+          if (!heading) {
+            guide_add(rows, &count, G_HEADING, group ? 10 : 9, 0);
+            heading = true;
+          }
+          guide_add(rows, &count, G_AREA, i, 0);
+        }
+    }
+  } else if (page == 2) {
+    bool first = true;
+    for (int i = 0; i < GUIDE_COUNT(guideBosses); i++)
+      if (!guide_boss_done(s, i)) {
+        guide_add(rows, &count, G_HEADING, 100 + i, first);
+        first = false;
+        for (int k = 0; k < guideBosses[i].count; k++)
+          guide_add(rows, &count, G_BOSS, i, k);
+      }
+    if (!count)
+      guide_add(rows, &count, G_HEADING, 15, 0);
+  } else if (page == 3) {
+    guide_add(rows, &count, G_HEADING, 11, 0);
+    for (int i = 0; i < GUIDE_COUNT(guideTips); i++)
+      guide_add(rows, &count, G_TIP, i, 0);
+  } else {
+    for (int cat = 0; cat < 3; cat++) {
+      int ids[1024], n = guide_where(cat, build, ids);
+      if (n)
+        guide_add(rows, &count, G_HEADING, 12 + cat, 0);
+      for (int j = 0; j < n; j++)
+        guide_add(rows, &count, G_WHERE, ids[j], 0);
+    }
+  }
+  return count;
+}
+static void guide_entry(const struct guide_row *r, const struct pd_snapshot *s,
+                        int build, struct guide_entry *e) {
+  memset(e, 0, sizeof *e);
+
+  if (r->kind == G_HEADING) {
+    int h = r->ref;
+    const char *labels[] = {"PEOPLE",    "ITEMS",        "TIPS",    "HMs",
+                            "KEY ITEMS", "GIFT POKéMON", "ALL DONE"};
+    if (h == 0) {
+      snprintf(e->title, sizeof e->title, "%s", guide_place(s->mapsec));
+      bool any = false;
+      bool species[512] = {0};
+      int total = 0, caught = 0;
+      for (int method = 0; method < 8; method++) {
+        struct guide_encounter enc[32] = {{0}};
+        int n = guide_encounters(s, method, enc);
+        any |= n > 0;
+        for (int i = 0; i < n; i++)
+          if (!species[enc[i].species]) {
+            species[enc[i].species] = true;
+            total++;
+            caught += guide_caught(s, enc[i].species);
+          }
+      }
+      if (any && s->dexOk)
+        snprintf(e->answer, sizeof e->answer, "%d of %d caught here. ", caught,
+                 total);
+      else if (!any)
+        snprintf(e->answer, sizeof e->answer, "No wild POKéMON on this map. ");
+      bool finds = false;
+      for (int i = 0; i < GUIDE_COUNT(guideAreas); i++)
+        finds |= guideAreas[i].area == s->mapsec;
+      snprintf(e->answer + strlen(e->answer),
+               sizeof e->answer - strlen(e->answer), "%sA ball = done.",
+               finds ? "Its buildings included. " : "");
+    } else if (h <= 8) {
+      snprintf(e->title, sizeof e->title, "%s", pcGuideMethods[h - 1]);
+      if (h == 1) {
+        const char *times[] = {"MORNING", "DAY", "NIGHT", "EVENING"};
+        snprintf(e->answer, sizeof e->answer, "For your game's clock: %s.",
+                 times[s->pcTimeOfDay]);
+      }
+    } else if (h < 100) {
+      snprintf(e->title, sizeof e->title, "%s", labels[h - 9]);
+      if (h == 9)
+        snprintf(e->answer, sizeof e->answer,
+                 "Some want something done first.");
+      if (h == 15)
+        snprintf(e->answer, sizeof e->answer, "Every boss is beaten.");
+    } else {
+      int i = h - 100, best = guide_party_best(s), top = 0;
+      const struct guide_team_mon *team =
+          build_ok(build) && builds[build].faithful ? guideBosses[i].faithful
+                                                    : guideBosses[i].normal;
+      for (int k = 0; k < guideBosses[i].count; k++) {
+        int level = guide_level(team[k].level, guide_badges(s));
+        if (level > top)
+          top = level;
+      }
+      snprintf(e->title, sizeof e->title, "%s%s", r->aux ? "NEXT: " : "",
+               guideBosses[i].title);
+      snprintf(e->answer, sizeof e->answer, "%s · %d POKéMON · UP TO LV %d",
+               guideBosses[i].where, guideBosses[i].count, top);
+      if (r->aux && best)
+        snprintf(e->answer + strlen(e->answer),
+                 sizeof e->answer - strlen(e->answer), " · YOUR BEST LV %d",
+                 best);
+    }
+    return;
+  }
+  if (r->kind == G_WILD) {
+    int id = r->encounter.species;
+    bool seen = guide_seen(s, id);
+    snprintf(e->title, sizeof e->title, "%s", seen ? names[id] : "???");
+    if (!seen)
+      snprintf(e->answer, sizeof e->answer, "%s", names[id]);
+    if (r->encounter.min == r->encounter.max)
+      snprintf(e->detail, sizeof e->detail, "LV %d  %d%%", r->encounter.min,
+               r->encounter.percent);
+    else
+      snprintf(e->detail, sizeof e->detail, "LV %d-%d  %d%%", r->encounter.min,
+               r->encounter.max, r->encounter.percent);
+    e->icon = id;
+    e->owned = guide_caught(s, id);
+  } else if (r->kind == G_BOSS) {
+    int i = r->ref, k = r->aux;
+    const struct guide_team_mon *team =
+        build_ok(build) && builds[build].faithful ? guideBosses[i].faithful
+                                                  : guideBosses[i].normal;
+    int id = team[k].species;
+    const int *types = mon_types(id, build);
+    snprintf(e->title, sizeof e->title, "POKéMON %d", k + 1);
+    snprintf(e->detail, sizeof e->detail, "LV %d",
+             guide_level(team[k].level, guide_badges(s)));
+    snprintf(e->hint, sizeof e->hint, "%s%s%s TYPE", typeNames[types[1]],
+             types[1] != types[2] ? " / " : "",
+             types[1] != types[2] ? typeNames[types[2]] : "");
+    snprintf(e->answer, sizeof e->answer, "%s", names[id]);
+    for (int j = 0; j < 4; j++)
+      if (team[k].moves[j]) {
+        int m = team[k].moves[j];
+        const char *name =
+            build_ok(build) && builds[build].faithful && faithfulMoves[m].name
+                ? faithfulMoves[m].name
+                : moves[m].name;
+        snprintf(e->answer + strlen(e->answer),
+                 sizeof e->answer - strlen(e->answer), "%s%s", j ? " · " : "\n",
+                 name ? name : "?");
+      }
+    if (team[k].item)
+      snprintf(e->answer + strlen(e->answer),
+               sizeof e->answer - strlen(e->answer), "\nHOLDS %s",
+               item_name(team[k].item, build));
+    e->icon = id;
+  } else if (r->kind == G_TIP) {
+    snprintf(e->title, sizeof e->title, "%s", guideTips[r->ref].title);
+    snprintf(e->hint, sizeof e->hint, "%s", guideTips[r->ref].hint);
+    snprintf(e->answer, sizeof e->answer, "%s", guideTips[r->ref].answer);
+  } else {
+    int i = r->ref, id = guideAreas[i].id, k = guideAreas[i].kind;
+    e->owned = guide_area_done(s, i);
+    const char *name = k >= 4 ? names[id] : item_name(id, build);
+    char at[256], qty[24] = "";
+    if (guideAreas[i].qty > 1)
+      snprintf(qty, sizeof qty, " x%d", guideAreas[i].qty);
+    if (*guideAreas[i].where)
+      snprintf(at, sizeof at, "in the %s", guideAreas[i].where);
+    else
+      snprintf(at, sizeof at, "around %s", guide_place(guideAreas[i].area));
+    snprintf(e->title, sizeof e->title, "%s%s", name ? name : "?", qty);
+    if (r->kind == G_WHERE) {
+      guide_where_name(i, build, e->title, sizeof e->title);
+      snprintf(e->hint, sizeof e->hint, "In %s.",
+               guide_place(guideAreas[i].area));
+      if (*guideAreas[i].where)
+        snprintf(e->answer, sizeof e->answer, "%s in the %s (%s).",
+                 k == 0 ? "Lying" : "Someone", guideAreas[i].where,
+                 guide_place(guideAreas[i].area));
+      else
+        snprintf(e->answer, sizeof e->answer, "%s around %s.",
+                 k == 0 ? "Lying" : "Someone", guide_place(guideAreas[i].area));
+    } else if (k == 1 && !e->owned) {
+      snprintf(e->title, sizeof e->title, "HIDDEN ITEM");
+      snprintf(e->hint, sizeof e->hint, "Buried %s.", at);
+      snprintf(e->answer, sizeof e->answer, "%s%s", name, qty);
+    } else if (k <= 1)
+      snprintf(e->answer, sizeof e->answer, "%s %s.", k ? "Hidden" : "Lying",
+               at);
+    else if (k == 5) {
+      snprintf(e->title, sizeof e->title, "AN EGG");
+      snprintf(e->answer, sizeof e->answer,
+               "Someone %s gives you an EGG. It hatches into %s.", at, name);
+    } else if (k == 6) {
+      snprintf(e->title, sizeof e->title, "TRADE FOR %s", name);
+      snprintf(e->answer, sizeof e->answer, "Someone %s trades it for your %s.",
+               at, names[guideAreas[i].wants]);
+      e->icon = id;
+    } else {
+      snprintf(e->answer, sizeof e->answer,
+               k == 4 ? "Someone %s gives you this POKéMON."
+                      : "Someone %s gives it to you.",
+               at);
+      if (k == 4)
+        e->icon = id;
+    }
+  }
+  e->steps = *e->answer ? (*e->hint ? 2 : 1) : 0;
+}
+static int guide_first_entry(const struct guide_row *rows, int count, int start,
+                             int dir) {
+  for (int i = start; i >= 0 && i < count; i += dir)
+    if (rows[i].kind != G_HEADING)
+      return i;
+  return -1;
+}
+static void guide_sync(struct pc_ui *u, const struct pd_snapshot *s, int build,
+                       struct guide_row *rows, int *count) {
+  *count = guide_rows(s, u->guidePage, build, rows);
+  if (u->guideRow < 0 || u->guideRow >= *count ||
+      rows[u->guideRow].kind == G_HEADING) {
+    int first = guide_first_entry(rows, *count, 0, 1);
+    u->guideRow = first < 0 ? 0 : first;
+  }
+  bool found = false;
+  for (int i = 0; i < *count; i++)
+    found |= rows[i].key == u->guideOpenKey;
+  if (!found && u->guideOpenPage == u->guidePage) {
+    u->guideOpenKey = 0;
+    u->guideReveal = 0;
+  }
+}
+static void guide_input(struct pc_ui *u, const struct pd_snapshot *s,
+                        enum pc_action a) {
+  const int pages[] = {0, 2, 3, 4};
+  int page = 0;
+  for (int i = 0; i < 4; i++)
+    if (u->guidePage == pages[i])
+      page = i;
+  if (a == PC_LEFT) {
+    u->guidePagesFocused = true;
+    return;
+  }
+  if (a == PC_RIGHT || (a == PC_CONFIRM && u->guidePagesFocused)) {
+    u->guidePagesFocused = false;
+    return;
+  }
+  if (a == PC_ALTERNATE ||
+      (u->guidePagesFocused && (a == PC_UP || a == PC_DOWN))) {
+    page = (page + 4 + (a == PC_UP ? -1 : 1)) % 4;
+    u->guidePage = pages[page];
+    u->guideRow = u->guideScroll = u->guideRowScroll = 0;
+    return;
+  }
+  struct guide_row rows[GUIDE_ROWS];
+  int count;
+  // Game build does not change the selected row in HERE/NEXT BOSS/TIPS.
+  // WHERE IS ordering is identical for faithful; title spelling comes from
+  // draw.
+  guide_sync(u, s, u->guideBuild, rows, &count);
+  if (a == PC_UP || a == PC_DOWN) {
+    int next =
+        guide_first_entry(rows, count, u->guideRow + (a == PC_DOWN ? 1 : -1),
+                          a == PC_DOWN ? 1 : -1);
+    if (next >= 0) {
+      u->guideRow = next;
+      u->guideRowScroll = 0;
+    }
+  }
+  if (a == PC_PLACES)
+    u->guideRowScroll =
+        u->guideRowScroll >= u->guideRowScrollMax ? 0 : u->guideRowScroll + 180;
+  if (a == PC_CONFIRM && count && rows[u->guideRow].kind != G_HEADING) {
+    struct guide_entry e;
+    guide_entry(&rows[u->guideRow], s, u->guideBuild, &e);
+    if (e.steps) {
+      if (u->guideOpenKey != rows[u->guideRow].key)
+        u->guideReveal = 0;
+      u->guideReveal = (u->guideReveal + 1) % (e.steps + 1);
+      u->guideOpenKey = u->guideReveal ? rows[u->guideRow].key : 0;
+      u->guideOpenPage = u->guidePage;
+      u->guideRowScroll = 0;
+    }
+  }
+}
+// SectionHeading + EntryRow: same title/detail/tag, owned ball and hidden-icon
+// rules as Compose. The 16px cart font stays readable; details wrap on Brick.
+static int guide_row_draw(struct pd_canvas *c, int y, const struct guide_row *r,
+                          const struct guide_entry *e, int level, bool selected,
+                          const unsigned char *rom, size_t n, int build) {
+  int top = y;
+  if (r->kind == G_HEADING) {
+    y += 12;
+    y += 20 * pd_text_wrap(c, 206, y, 278, 20, 128, e->title, 0x181818,
+                           PD_NO_SHADOW);
+    if (*e->answer) {
+      y += 4;
+      y += 20 * pd_text_wrap(c, 206, y, 278, 20, 128, e->answer, 0x787878,
+                             PD_NO_SHADOW);
+    }
+    return y - top + 8;
+  }
+  struct pd_canvas measure = *c;
+  measure.cx1 = measure.cx0;
+  if (selected) {
+    int h = guide_row_draw(&measure, y, r, e, level, false, rom, n, build);
+    pd_fill(c, 204, y, 288, h, 0xdcdcdc);
+  }
+  y += 8;
+  int x = 208;
+  bool answer = e->steps > 0 && level >= e->steps;
+  if (e->owned) {
+    dex_mark(c, x, y + 2, true, true);
+    x += 18;
+  }
+  bool showIcon = e->icon && (!e->steps || answer);
+  if (showIcon) {
+    icon(c, x, y, e->icon, rom, n, build);
+    x += 36;
+  }
+  int titleH = 20 * pd_text_wrap(c, x, y, 488 - x, 20, 128, e->title, 0x181818,
+                                 PD_NO_SHADOW);
+  y += showIcon && titleH < 32 ? 32 : titleH;
+  if (*e->detail || (e->steps && !answer)) {
+    y += 4;
+    if (*e->detail)
+      y += 20 * pd_text_wrap(c, 208, y, 278, 20, 128, e->detail, 0x181818,
+                             PD_NO_SHADOW);
+    if (e->steps && !answer) {
+      pd_text(c, 208, y, *e->hint && !level ? "HINT" : "ANSWER", 0x787878,
+              PD_NO_SHADOW);
+      y += 20;
+    }
+  }
+  if (*e->hint && level >= 1) {
+    char hint[600];
+    snprintf(hint, sizeof hint, "HINT: %s", e->hint);
+    y += 4;
+    y += 20 *
+         pd_text_wrap(c, 208, y, 278, 20, 128, hint, 0x787878, PD_NO_SHADOW);
+  }
+  if (answer) {
+    y += 4;
+    y += 20 * pd_text_wrap(c, 208, y, 278, 20, 128, e->answer, 0x181818,
+                           PD_NO_SHADOW);
+  }
+  pd_fill(c, 208, y + 6, 276, 2, 0xb0b0b0);
+  return y - top + 14;
 }
 static void pc_guide_draw(struct pc_ui *u, struct pd_canvas *c,
                           const struct pd_snapshot *s, const unsigned char *rom,
                           size_t n, int build) {
+  u->guideBuild = build;
   header(c, PC_GUIDE);
-  const char *pages[] = {"HERE: WILD", "HERE: FINDS", "NEXT BOSS", "TIPS",
-                         "WHERE IS"};
-  char b[2048];
-  snprintf(b, sizeof b, "< %s >", pages[u->guidePage]);
-  txt(c, 12, 36, b);
+  pd_layered_box(c, 8, 38, 176, 44, 4, pcOptionFrame, 5, 0xffffff);
+  txt(c, 22, 52, "GUIDE");
+  pd_layered_box(c, 8, 86, 176, 248, 4, pcOptionFrame, 5, 0xffffff);
+  const int pages[] = {0, 2, 3, 4};
+  for (int i = 0; i < 4; i++) {
+    int y = 102 + i * 48;
+    if (u->guidePage == pages[i])
+      pd_fill(c, 20, y, 152, 38, 0xdcdcdc);
+    txt(c, 30, y + 12, pcGuidePages[i]);
+    if (u->guidePagesFocused && u->guidePage == pages[i])
+      pd_triangle(c, 20, y + 14, 6, PD_RIGHT, 0x181818);
+  }
+  pd_layered_box(c, 192, 38, 312, 296, 4, pcOptionFrame, 5, 0xffffff);
   if (!s->pcProgressOk || !s->posOk) {
-    txt(c, 20, 90, "Guide data is not ready.");
-    txt(c, 12, 366, "L/R:Section B/X:Play");
+    pd_text_wrap(c, 208, 60, 276, 20, 5, "Guide data is not ready.", 0x787878,
+                 PD_NO_SHADOW);
     return;
   }
-  const char *times[] = {"MORNING", "DAY", "NIGHT", "EVENING"};
-  const char *where = s->mapsec > 0 && s->mapsec < GUIDE_COUNT(places)
-                          ? places[s->mapsec].name
-                          : "Unknown area";
-  snprintf(b, sizeof b, "%s - %d badges", times[s->pcTimeOfDay],
-           guide_badges(s));
-  txt(c, 12, 60, b);
-  if (u->guidePage == 0) {
-    const char *methods[] = {"GRASS / CAVE",  "SURFING",   "OLD ROD",
-                             "GOOD ROD",      "SUPER ROD", "HEADBUTT",
-                             "RARE HEADBUTT", "ROCK SMASH"};
-    pd_text_fit(c, 12, 84, 488, where, 0x181818, PD_NO_SHADOW);
-    txt(c, 12, 108, methods[u->guideMethod]);
-    struct guide_encounter rows[32] = {{0}};
-    int count = guide_encounters(s, u->guideMethod, rows);
-    if (u->guideRow >= count)
-      u->guideRow = count ? count - 1 : 0;
-    int start = u->guideRow >= 7 ? u->guideRow - 6 : 0;
-    for (int i = start; i < count && i < start + 7; i++) {
-      int y = 140 + (i - start) * 26;
-      if (i == u->guideRow)
-        pd_fill(c, 8, y - 2, 496, 25, 0xdcdcdc);
-      int id = rows[i].species;
-      snprintf(b, sizeof b, "%s%s Lv%d-%d %d%%",
-               guide_caught(s, id) ? "+ " : "  ",
-               id > 0 && id < 512 && names[id] ? names[id] : "?", rows[i].min,
-               rows[i].max, rows[i].percent);
-      pd_text_fit(c, 16, y, 480, b, 0x181818, PD_NO_SHADOW);
+  struct guide_row rows[GUIDE_ROWS];
+  int count;
+  guide_sync(u, s, build, rows, &count);
+  int heights[GUIDE_ROWS], total = 0, selectedTop = 0, selectedH = 0;
+  struct pd_canvas measure = *c;
+  measure.cx1 = measure.cx0;
+  for (int i = 0; i < count; i++) {
+    struct guide_entry e;
+    guide_entry(&rows[i], s, build, &e);
+    int level = rows[i].key == u->guideOpenKey ? u->guideReveal : 0;
+    heights[i] =
+        guide_row_draw(&measure, 0, &rows[i], &e, level, false, NULL, 0, -1);
+    if (i == u->guideRow) {
+      selectedTop = total;
+      selectedH = heights[i];
     }
-    if (!count)
-      txt(c, 20, 150, "No encounters for this method.");
-    txt(c, 12, 346, "Y:Method +:Caught Up/Down:List");
-  } else if (u->guidePage == 1) {
-    pd_text_fit(c, 12, 84, 488, where, 0x181818, PD_NO_SHADOW);
-    int ids[1024], count = 0;
-    for (int i = 0; i < GUIDE_COUNT(guideAreas) && count < 1024; i++)
-      if (guideAreas[i].area == s->mapsec)
-        ids[count++] = i;
-    if (u->guideRow >= count)
-      u->guideRow = count ? count - 1 : 0;
-    if (!count)
-      txt(c, 20, 140, "No area finds listed here.");
-    else if (u->guideReveal) {
-      int i = ids[u->guideRow], id = guideAreas[i].id;
-      const char *name = guideAreas[i].kind >= 4
-                             ? (id < 512 && names[id] ? names[id] : "?")
-                             : item_name(id, build);
-      snprintf(b, sizeof b, "%s%s", guide_area_done(s, i) ? "DONE: " : "",
-               name);
-      pd_text_fit(c, 20, 114, 472, b, 0x181818, PD_NO_SHADOW);
-      if (u->guideReveal == 1) {
-        const char *kinds[] = {
-            "Lying around this area.",  "Hidden in this area.",
-            "Someone here gives this.", "A key item from someone here.",
-            "A gift Pokemon here.",     "An Egg from someone here.",
-            "A Pokemon trade here."};
-        snprintf(b, sizeof b, "%s Press A for the location.",
-                 kinds[guideAreas[i].kind]);
-      } else if (guideAreas[i].kind == 6) {
-        int wants = guideAreas[i].wants;
-        snprintf(b, sizeof b, "%s\nTrade for %s.",
-                 *guideAreas[i].where ? guideAreas[i].where : where,
-                 wants > 0 && wants < 512 && names[wants] ? names[wants] : "?");
-      } else
-        snprintf(b, sizeof b, "%s\nQuantity: %d",
-                 *guideAreas[i].where ? guideAreas[i].where : where,
-                 guideAreas[i].qty);
-      guide_prose(c, 146, b, &u->guideScroll);
-    } else {
-      int start = u->guideRow >= 8 ? u->guideRow - 7 : 0;
-      const char *kinds[] = {"ITEM",     "HIDDEN", "GIFT", "KEY",
-                             "GIFT MON", "EGG",    "TRADE"};
-      for (int row = 0; row < 8 && start + row < count; row++) {
-        int i = ids[start + row], id = guideAreas[i].id, y = 116 + 26 * row;
-        if (start + row == u->guideRow)
-          pd_fill(c, 8, y - 2, 496, 25, 0xdcdcdc);
-        const char *name = guideAreas[i].kind >= 4
-                               ? (id < 512 && names[id] ? names[id] : "?")
-                               : item_name(id, build);
-        snprintf(b, sizeof b, "%s %s: %s", guide_area_done(s, i) ? "+" : " ",
-                 kinds[guideAreas[i].kind], name);
-        pd_text_fit(c, 16, y, 480, b, 0x181818, PD_NO_SHADOW);
-      }
-    }
-    txt(c, 12, 346, "A:Hint/Answer +:Done");
-  } else if (u->guidePage == 2) {
-    int ids[32], count = 0;
-    for (int i = 0; i < GUIDE_COUNT(guideBosses); i++)
-      if (!guide_boss_done(s, i))
-        ids[count++] = i;
-    if (u->guideRow >= count)
-      u->guideRow = count ? count - 1 : 0;
-    if (u->guideBossOpen && (!count || u->guideBoss != ids[u->guideRow])) {
-      u->guideBossOpen = false;
-      u->guideReveal = u->guideScroll = 0;
-    }
-    if (!count)
-      txt(c, 20, 110, "Every boss is beaten.");
-    else if (u->guideBossOpen) {
-      int i = ids[u->guideRow];
-      pd_text_fit(c, 12, 88, 488, guideBosses[i].title, 0x181818, PD_NO_SHADOW);
-      pd_text_fit(c, 12, 112, 488, guideBosses[i].where, 0x181818,
-                  PD_NO_SHADOW);
-      const struct guide_team_mon *team =
-          build_ok(build) && builds[build].faithful ? guideBosses[i].faithful
-                                                    : guideBosses[i].normal;
-      u->guideMon = clamp_selection(u->guideMon, guideBosses[i].count);
-      int k = u->guideMon, id = team[k].species;
-      b[0] = 0;
-      if (u->guideReveal == 1) {
-        const int *types = mon_types(id, build);
-        snprintf(b, sizeof b, "%s%s%s TYPE", typeNames[types[1]],
-                 types[1] != types[2] ? " / " : "",
-                 types[1] != types[2] ? typeNames[types[2]] : "");
-      } else if (u->guideReveal == 2) {
-        size_t used = snprintf(b, sizeof b, "%s\n", names[id]);
-        for (int j = 0; j < 4; j++)
-          if (team[k].moves[j]) {
-            int m = team[k].moves[j];
-            const char *name = build_ok(build) && builds[build].faithful &&
-                                       faithfulMoves[m].name
-                                   ? faithfulMoves[m].name
-                                   : moves[m].name;
-            used +=
-                snprintf(b + used, sizeof b - used, "%s\n", name ? name : "?");
-          }
-        snprintf(b + used, sizeof b - used, "Holds: %s",
-                 item_name(team[k].item, build));
-      }
-      int best = guide_party_best(s), boss = 0;
-      for (int k = 0; k < guideBosses[i].count; k++) {
-        int lv = guide_level(team[k].level, guide_badges(s));
-        if (lv > boss)
-          boss = lv;
-      }
-      char compare[128];
-      if (best)
-        snprintf(compare, sizeof compare, "Your best Lv%d / Boss Lv%d (%+d)",
-                 best, boss, best - boss);
-      else
-        snprintf(compare, sizeof compare, "Boss top Lv%d / Party unavailable",
-                 boss);
-      pd_text_fit(c, 12, 136, 488, compare, 0x181818, PD_NO_SHADOW);
-      if (!u->guideReveal) {
-        for (int j = 0; j < guideBosses[i].count; j++) {
-          int y = 170 + 26 * j;
-          if (j == u->guideMon)
-            pd_fill(c, 8, y - 2, 496, 25, 0xdcdcdc);
-          char row[64];
-          snprintf(row, sizeof row, "Pokemon %d  Lv%d", j + 1,
-                   guide_level(team[j].level, guide_badges(s)));
-          txt(c, 16, y, row);
-        }
-      } else {
-        char label[80];
-        snprintf(label, sizeof label, "Pokemon %d  Lv%d", k + 1,
-                 guide_level(team[k].level, guide_badges(s)));
-        txt(c, 12, 170, label);
-        if (u->guideReveal == 2)
-          icon(c, 464, 164, id, rom, n, build);
-        guide_prose(c, 204, b, &u->guideScroll);
-      }
-    } else {
-      int start = u->guideRow >= 9 ? u->guideRow - 8 : 0;
-      for (int row = 0; row < 9 && start + row < count; row++) {
-        int i = ids[start + row], y = 88 + 26 * row;
-        if (start + row == u->guideRow)
-          pd_fill(c, 8, y - 2, 496, 25, 0xdcdcdc);
-        snprintf(b, sizeof b, "%s%s",
-                 start + row ? "" : "NEXT: ", guideBosses[i].title);
-        pd_text_fit(c, 16, y, 480, b, 0x181818, PD_NO_SHADOW);
-      }
-    }
-    txt(c, 12, 346,
-        !u->guideBossOpen     ? "A:Team"
-        : !u->guideReveal     ? "D-pad:Choose A:Hint"
-        : u->guideReveal == 1 ? "A:Answer Y:Next Up/Down:Scroll"
-                              : "A:Close Y:Next Up/Down:Scroll");
-  } else if (u->guidePage == 4) {
-    const char *categories[] = {"HMs", "KEY ITEMS", "GIFT POKEMON"};
-    int ids[1024], category = u->guideMethod % 3;
-    int count = guide_where(category, build, ids);
-    txt(c, 12, 84, categories[category]);
-    if (u->guideRow >= count)
-      u->guideRow = count ? count - 1 : 0;
-    if (!count)
-      txt(c, 20, 130, "No entries in this category.");
-    else if (u->guideReveal) {
-      int i = ids[u->guideRow];
-      char title[128];
-      guide_where_name(i, build, title, sizeof title);
-      pd_text_fit(c, 20, 114, 472, title, 0x181818, PD_NO_SHADOW);
-      int area = guideAreas[i].area;
-      const char *place = area > 0 && area < GUIDE_COUNT(places)
-                              ? places[area].name
-                              : "Unknown area";
-      if (u->guideReveal == 1)
-        snprintf(b, sizeof b, "In %s.", place);
-      else
-        snprintf(b, sizeof b, "%s%s%s",
-                 *guideAreas[i].where ? guideAreas[i].where
-                                      : "Someone around this area.",
-                 *guideAreas[i].where ? " - " : " ", place);
-      guide_prose(c, 146, b, &u->guideScroll);
-    } else {
-      int start = u->guideRow >= 8 ? u->guideRow - 7 : 0;
-      for (int row = 0; row < 8 && start + row < count; row++) {
-        int i = ids[start + row], y = 116 + 26 * row;
-        char title[128];
-        guide_where_name(i, build, title, sizeof title);
-        if (start + row == u->guideRow)
-          pd_fill(c, 8, y - 2, 496, 25, 0xdcdcdc);
-        snprintf(b, sizeof b, "%s %s", guide_area_done(s, i) ? "+" : " ",
-                 title);
-        pd_text_fit(c, 16, y, 480, b, 0x181818, PD_NO_SHADOW);
-      }
-    }
-    txt(c, 12, 346, "Y:Category A:Hint/Answer");
-  } else {
-    int count = GUIDE_COUNT(guideTips);
-    if (u->guideRow >= count)
-      u->guideRow = count - 1;
-    if (u->guideReveal) {
-      snprintf(b, sizeof b, "%s\n\n%s", guideTips[u->guideRow].title,
-               u->guideReveal == 1 && *guideTips[u->guideRow].hint
-                   ? guideTips[u->guideRow].hint
-                   : guideTips[u->guideRow].answer);
-      guide_prose(c, 88, b, &u->guideScroll);
-    } else {
-      int start = u->guideRow >= 5 ? u->guideRow - 4 : 0;
-      for (int i = start; i < count && i < start + 5; i++) {
-        int y = 88 + 48 * (i - start);
-        if (i == u->guideRow)
-          pd_fill(c, 8, y - 2, 496, 46, 0xdcdcdc);
-        wrapped(c, 16, y, 480, 2, guideTips[i].title);
-      }
-    }
-    txt(c, 12, 346, "A:Hint/Answer Up/Down:Scroll");
+    total += heights[i];
   }
-  txt(c, 12, 366, "Left/Right:Page B:Back X:Play");
-  (void)rom;
-  (void)n;
+  const int visible = 272;
+  int maxRowScroll = selectedH > visible ? selectedH - visible : 0;
+  u->guideRowScrollMax = maxRowScroll;
+  if (u->guideRowScroll > maxRowScroll)
+    u->guideRowScroll = maxRowScroll;
+  if (selectedH > visible)
+    u->guideScroll = selectedTop + u->guideRowScroll;
+  else if (selectedTop < u->guideScroll)
+    u->guideScroll = selectedTop;
+  else if (selectedTop + selectedH > u->guideScroll + visible)
+    u->guideScroll = selectedTop + selectedH - visible;
+  if (u->guideScroll > total - visible)
+    u->guideScroll = total > visible ? total - visible : 0;
+  if (u->guideScroll < 0)
+    u->guideScroll = 0;
+  pd_clip(c, 204, 50, 288, visible);
+  int y = 50 - u->guideScroll;
+  for (int i = 0; i < count; i++) {
+    if (y + heights[i] > 50 && y < 322) {
+      struct guide_entry e;
+      guide_entry(&rows[i], s, build, &e);
+      guide_row_draw(c, y, &rows[i], &e,
+                     rows[i].key == u->guideOpenKey ? u->guideReveal : 0,
+                     i == u->guideRow && !u->guidePagesFocused, rom, n, build);
+    }
+    y += heights[i];
+  }
+  pd_unclip(c);
+  pd_text_fit(c, 12, 346, 488,
+              u->guidePagesFocused ? "Up/Down:Page Right:Entries"
+                                   : "A:Reveal Select:Scroll",
+              0x181818, PD_NO_SHADOW);
+  txt(c, 12, 366, "Left:Pages B:Back L/R:Tabs");
 }
 #undef GUIDE_COUNT

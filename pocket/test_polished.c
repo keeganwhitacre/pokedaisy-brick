@@ -70,6 +70,54 @@ static void test_guide(void) {
       assert(strcmp(a, b) < 0);
     }
   }
+  // GuideScreen.herePage: seen-only naming; hidden items show only kind;
+  // owned items sort last, unique keys survive duplicate titles.
+  struct guide_row model[GUIDE_ROWS];
+  struct guide_entry e;
+  s = (struct pd_snapshot){.pcProgressOk = true,
+                           .posOk = true,
+                           .dexOk = true,
+                           .pcTimeOfDay = PC_DAY,
+                           .mapGroup = 3,
+                           .mapNum = 2,
+                           .mapsec = landmark(3 * 256 + 2)};
+  int count = guide_rows(&s, 0, 0, model), wild = 0;
+  for (int i = 0; i < count; i++) {
+    for (int j = 0; j < i; j++)
+      assert(model[i].key != model[j].key);
+    guide_entry(&model[i], &s, 0, &e);
+    if (model[i].kind == G_WILD) {
+      wild++;
+      assert(!strcmp(e.title, "???") && e.steps == 1 && *e.answer && e.icon);
+      for (int d = 0; d < pc_dex_count(); d++)
+        if (dexOrder[d] == model[i].encounter.species) {
+          s.dexSeen[d / 8] |= 1u << (d % 8);
+          s.dexCaught[d / 8] |= 1u << (d % 8);
+        }
+      guide_entry(&model[i], &s, 0, &e);
+      assert(strcmp(e.title, "???") && !e.steps && !*e.answer && e.owned);
+    }
+  }
+  assert(wild > 0);
+  for (int i = 0; i < (int)(sizeof guideAreas / sizeof *guideAreas); i++)
+    if (guideAreas[i].kind == 1 && guideAreas[i].flag) {
+      struct guide_row hidden = {.kind = G_AREA, .ref = i};
+      guide_entry(&hidden, &s, 0, &e);
+      assert(!strcmp(e.title, "HIDDEN ITEM") && e.steps == 2 && !e.owned);
+      s.flags[guideAreas[i].flag / 8] |= 1u << (guideAreas[i].flag % 8);
+      guide_entry(&hidden, &s, 0, &e);
+      assert(strcmp(e.title, "HIDDEN ITEM") && e.steps == 1 && e.owned);
+      break;
+    }
+  u = (struct pc_ui){.section = PC_GUIDE};
+  assert(pc_ui_input(&u, &s, PC_LEFT) && u.guidePagesFocused);
+  assert(pc_ui_input(&u, &s, PC_DOWN) && u.guidePage == 2);
+  assert(pc_ui_input(&u, &s, PC_RIGHT) && !u.guidePagesFocused);
+  for (int i = 0; i < 4; i++)
+    pc_ui_input(&u, &s, PC_ALTERNATE);
+  assert(u.guidePage == 2);
+  puts("PASS Guide HERE spoiler/owned/icon rules, stable keys, four-page "
+       "controller navigation");
   int checked = 0, substitutions = 0;
   for (unsigned i = 0; i < sizeof guideWild / sizeof *guideWild; i++) {
     if (i && guideWild[i].map == guideWild[i - 1].map &&
@@ -238,22 +286,24 @@ static void test_phase9(void) {
   s.pcBadges = 0;
   memset(s.flags, 0, sizeof s.flags);
   u = (struct pc_ui){.section = PC_GUIDE, .guidePage = 2};
-  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideBossOpen && !u.guideReveal);
-  assert(pc_ui_input(&u, &s, PC_DOWN) && u.guideMon == 1);
   assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideReveal == 1);
+  uint64_t firstKey = u.guideOpenKey;
+  assert(pc_ui_input(&u, &s, PC_ALTERNATE) && u.guidePage == 3);
+  assert(pc_ui_input(&u, &s, PC_DOWN) && u.guideOpenKey == firstKey);
+  for (int i = 0; i < 3; i++)
+    pc_ui_input(&u, &s, PC_ALTERNATE);
+  assert(u.guidePage == 2 && u.guideReveal == 1 && u.guideOpenKey == firstKey);
   assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideReveal == 2);
-  assert(pc_ui_input(&u, &s, PC_ALTERNATE) && u.guideMon == 2 &&
-         !u.guideReveal);
-  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideReveal == 1);
-  assert(pc_ui_input(&u, &s, PC_BACK) && u.guideBossOpen && !u.guideReveal);
-  assert(pc_ui_input(&u, &s, PC_BACK) && !u.guideBossOpen);
+  assert(pc_ui_input(&u, &s, PC_DOWN) && u.guideOpenKey == firstKey);
+  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideReveal == 1 &&
+         u.guideOpenKey != firstKey);
+  assert(pc_ui_input(&u, &s, PC_BACK) && !u.guideReveal && !u.guideOpenKey);
   assert(!pc_ui_input(&u, &s, PC_BACK));
-  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideBossOpen);
   assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.guideReveal == 1);
   s.flags[PC_EVENT_BEAT_FALKNER / 8] |= 1u << (PC_EVENT_BEAT_FALKNER % 8);
-  assert(pc_ui_input(&u, &s, PC_DOWN) && !u.guideBossOpen && !u.guideReveal);
-  puts("PASS Guide individual boss entries: select/hint/answer, next closes "
-       "previous, nested back");
+  assert(pc_ui_input(&u, &s, PC_DOWN) && !u.guideReveal && !u.guideOpenKey);
+  puts("PASS Guide inline boss entries: select/hint/answer, one open key, "
+       "back and progress invalidation");
   puts(
       "PASS Dex four upstream filters, filtered navigation/empty guard; battle "
       "live-type groups/sorting/page wrap; Guide best level excludes eggs");
@@ -398,6 +448,10 @@ static void test_pixel_widgets(void) {
   pocket_fade_rect(&c, -10, -10, 100, 100, 0xffffff, 45);
   assert(px[10 * 512 + 10] == 0x8c8c8c && px[9 * 512 + 10] == 0);
   pd_unclip(&c);
+  assert(pd_text_wrap(NULL, 0, 0, 100, 20, 128, "A\nB", 0, PD_NO_SHADOW) == 2);
+  assert(pd_text_wrap(NULL, 0, 0, 100, 20, 128, "A\n\nB", 0, PD_NO_SHADOW) ==
+         3);
+  assert(pd_font_glyph(0xB7)->codepoint == 0xB7);
   puts("PASS shared pixel widgets: HP boundaries/colors, map pulse, clipped "
        "full-text pagination and dimmed sprites");
 }
@@ -494,6 +548,25 @@ int main(int argc, char **argv) {
         assert(bag.bagKeyPocket == keyPocket && bag.bagKeySlot == keySlot);
         assert(pd_png_write("runtime-phase13-bag-sorted-fixture.png", 512, 384,
                             px));
+        const int pages[] = {0, 2, 3, 4};
+        const char *labels[] = {"here", "boss", "tips", "where"};
+        for (int page = 0; page < 4; page++) {
+          struct pc_ui guide = {.section = PC_GUIDE, .guidePage = pages[page]};
+          pc_ui_draw(&guide, &c, &s, cart, romSize, build);
+          char path[128];
+          snprintf(path, sizeof path, "runtime-phase14-guide-%s-fixture.png",
+                   labels[page]);
+          assert(pd_png_write(path, 512, 384, px));
+          if (page == 1)
+            for (int step = 1; step <= 2; step++) {
+              assert(pc_ui_input(&guide, &s, PC_CONFIRM));
+              pc_ui_draw(&guide, &c, &s, cart, romSize, build);
+              snprintf(path, sizeof path,
+                       "runtime-phase14-guide-boss-%s-fixture.png",
+                       step == 1 ? "hint" : "answer");
+              assert(pd_png_write(path, 512, 384, px));
+            }
+        }
         struct pc_ui dexUi = {.section = PC_DEX};
         pc_ui_draw(&dexUi, &c, &s, cart, romSize, build);
         assert(pd_png_write("runtime-phase13-dex-fixture.png", 512, 384, px));

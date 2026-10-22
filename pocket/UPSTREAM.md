@@ -106,3 +106,24 @@ The item/next-foe/animation parity audit is recorded in PARITY.md. Keep Gen 2 so
 `item_list.h` is a game-independent, stable O(n log n) view sort with caller-owned scratch. It orders Default/Name/Type/Count as ItemsScreen does and preserves duplicate stacks. Polished's memory-to-item adapter remains in polished_bag.inc; the SDL host has no new game-specific branches. Shared pixel_widgets provides clipped opacity and full-description pagination without SDL, allocations or emulation calls.
 
 The upstream `ui-preview` harness now also rebuilds Gen 2 ROM art and renders Polished captures with `-Pgen2Fixture=polished_crystal`, using readGen2Telemetry/buildSnapshotView and the exact upstream hash/faithful/table selection. In-game window scope is restored when each companion preview closes. See ui-preview/README.md. This provides source-rendered reference captures for future screens and avoids interpreting generic preview fallbacks as the Android game's actual style.
+
+## Phase 14: Guide translation and portable text
+
+The Android UI remains unchanged. The native Guide adapts GuideScreen's
+page/section/entry hierarchy and single open-key model on the existing canvas.
+`gen_style.py` now extracts Guide page labels and method order directly and
+tracks GuideScreen's hash. GuideWorld tables continue to come from the existing
+strict data generator. No new ROM offsets or game actions are introduced.
+
+The shared canvas gains explicit newlines; the existing font generator adds
+the middle dot from upstream's bundled Pixel Operator, used as a fallback when
+the cart font lacks it. This is reusable by future Linux game adapters.
+A larger shared Compose/C UI schema could reduce duplication but would change
+the original rendering architecture and introduce a new synchronization
+surface. This pass intentionally keeps that deferred: small source-derived
+definitions, shared pixel primitives and matching-source captures provide an
+incremental contribution boundary without replacing the working emulator host.
+
+User hardware confirmation now covers gameplay, expansion/zoom, companion,
+saves and quick menu. It does not imply the new Guide layout, sustained
+performance, RTC or power handling have been verified on the device.

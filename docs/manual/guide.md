@@ -94,3 +94,18 @@ HERE, NEXT BOSS and EVOLUTIONS are read straight from your game, so they match w
 
 > [!NOTE]
 > Spotted a mistake in a guide? Report it on the [feedback page](https://pokedaisy.com/feedback/) (no GitHub account needed), and say which game and which entry.
+
+## Guide on the Linux Brick port
+
+The experimental Linux/NextUI port uses `HERE`, `NEXT BOSS`, `TIPS` and
+`WHERE IS` for Polished Crystal. Press Left to focus the page list, Up or Down
+to choose a page, and Right or A to browse its entries. Y advances a page.
+
+Press A to reveal an entry's hint, then its answer. Entries without a hint go
+straight to the answer. Up and Down move through the list. Select scrolls a
+long answer. B closes an open reveal, then returns to gameplay. X returns to
+gameplay directly. L and R change companion tabs.
+
+The port preserves the original guide data and its limitations. Its first-use
+notice is still being adapted, and Android's other pages remain the reference
+for ongoing parity work.

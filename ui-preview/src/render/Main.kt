@@ -1221,6 +1221,24 @@ fun main(args: Array<String>) {
         },
         Shot("$g-real-party", bw, bh, bd, companion("PARTY", snap = ::gen2Snapshot)),
         Shot("$g-real-dex", bw, bh, bd, companion("DEX", snap = ::gen2Snapshot)),
+        Shot("$g-real-guide-here", bw, bh, bd, companion("GUIDE", snap = ::gen2Snapshot)),
+        Shot("$g-real-guide-boss", bw, bh, bd, companion("GUIDE", snap = ::gen2Snapshot)) {
+            onAllNodesWithText("NEXT BOSS", ignoreCase = true).onFirst().performClick()
+        },
+        Shot("$g-real-guide-boss-hint", bw, bh, bd, companion("GUIDE", snap = ::gen2Snapshot)) {
+            onAllNodesWithText("NEXT BOSS", ignoreCase = true).onFirst().performClick()
+            onAllNodesWithText("POKéMON 1", ignoreCase = true).onFirst().performClick()
+        },
+        Shot("$g-real-guide-boss-answer", bw, bh, bd, companion("GUIDE", snap = ::gen2Snapshot)) {
+            onAllNodesWithText("NEXT BOSS", ignoreCase = true).onFirst().performClick()
+            repeat(2) { onAllNodesWithText("POKéMON 1", ignoreCase = true).onFirst().performClick() }
+        },
+        Shot("$g-real-guide-tips", bw, bh, bd, companion("GUIDE", snap = ::gen2Snapshot)) {
+            onAllNodesWithText("TIPS", ignoreCase = true).onFirst().performClick()
+        },
+        Shot("$g-real-guide-where", bw, bh, bd, companion("GUIDE", snap = ::gen2Snapshot)) {
+            onAllNodesWithText("WHERE IS", ignoreCase = true).onFirst().performClick()
+        },
     ) else emptyList()
     val all = real + gen2Real + listOf(
         Shot("$g-party", bw, bh, bd, companion("PARTY")),
