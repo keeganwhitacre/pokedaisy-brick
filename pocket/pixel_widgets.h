@@ -59,6 +59,16 @@ static inline int pocket_text_page(struct pd_canvas *c, int x, int y, int width,
                lineHeight, 128, text, ink, shadow);
   return pages;
 }
+/* GbaMenu.drawRowDivider: 6u ink, 2u gap, 2u stroke. */
+static inline void pocket_row_divider(struct pd_canvas *c, int x, int y,
+                                      int width, int unit, uint32_t color) {
+  if (unit <= 0 || width <= 0)
+    return;
+  for (int at = 0; at < width; at += 8 * unit) {
+    int dash = width - at < 6 * unit ? width - at : 6 * unit;
+    pd_fill(c, x + at, y, dash, 2 * unit, color);
+  }
+}
 struct pocket_hp_palette {
   uint32_t frame, inner, label, green, yellow, red;
 };

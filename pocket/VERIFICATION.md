@@ -226,3 +226,11 @@ Hardware evidence: the user reports that gameplay, expansion/zoom, companion
 menus, saves and quick menu work on their actual Brick. The newly adapted Guide
 has not yet been retested on the device. No new hardware power, suspend, RTC,
 shutdown or sustained-speed claims are made.
+
+Actual Compose-source reference captures completed for the matching upstream
+WRAM and ROM: HERE, NEXT BOSS, first boss entry hint/answer, TIPS and WHERE IS.
+They confirm the page/section/reveal structure and source spoiler rules. The
+comparison exposed solid native dividers; the final pass reuses upstream's
+6u/2u dash pattern and 2u stroke via a shared canvas helper. Remaining text
+metrics, wrapping and single-screen navigation differences stay documented
+in PARITY.md. The package includes labeled source/native comparisons.

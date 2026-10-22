@@ -86,3 +86,10 @@ controller-driven rather than Compose touch/kinetic scrolling. The original
 first-use GuideNotice/persisted acceptance is still missing and explicitly
 remains a gap. The source guide's AI-assisted/unverified limitation still
 applies; this port does not validate or replace its data.
+
+Phase 14's actual same-fixture Compose renders cover HERE, NEXT BOSS and its
+hint/answer states, TIPS and WHERE IS. Source/native inspection corrected the
+row and page-selector dividers to GbaMenu's 6u/2u dash geometry. The full-sized
+ROM text makes some native details wrap below the title rather than sit on the
+same line as Android. That difference remains explicit, with comparisons in
+the package; this is not a pixel-identical claim.

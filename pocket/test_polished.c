@@ -448,6 +448,13 @@ static void test_pixel_widgets(void) {
   pocket_fade_rect(&c, -10, -10, 100, 100, 0xffffff, 45);
   assert(px[10 * 512 + 10] == 0x8c8c8c && px[9 * 512 + 10] == 0);
   pd_unclip(&c);
+  pd_fill(&c, 0, 0, 512, 384, 0);
+  pd_clip(&c, 10, 10, 15, 4);
+  pocket_row_divider(&c, 10, 10, 25, 2, 0xffffff);
+  assert(px[10 * 512 + 10] == 0xffffff && px[10 * 512 + 21] == 0xffffff);
+  assert(px[10 * 512 + 22] == 0 && px[10 * 512 + 25] == 0 &&
+         px[14 * 512 + 10] == 0);
+  pd_unclip(&c);
   assert(pd_text_wrap(NULL, 0, 0, 100, 20, 128, "A\nB", 0, PD_NO_SHADOW) == 2);
   assert(pd_text_wrap(NULL, 0, 0, 100, 20, 128, "A\n\nB", 0, PD_NO_SHADOW) ==
          3);

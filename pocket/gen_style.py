@@ -52,6 +52,7 @@ page_labels=[re.search(r'private val '+k+r' = tk\("([^"\n]+)"\)',g).group(1) for
 out+='static const char *pcGuidePages[]={'+','.join(json.dumps(v) for v in page_labels)+'};\n'
 assert 'weight(0.34f)' in g and 'weight(0.66f)' in g
 assert 'if (open == key) level else 0' in g and 'e.steps == 0 || showAnswer' in g
+assert 'floatArrayOf(6 * u, 2 * u)' in files['GbaMenu.kt'] and 'strokeWidth = 2 * u' in files['GbaMenu.kt']
 out+='/* Input SHA256: '+json.dumps({k:hashlib.sha256(v.encode()).hexdigest() for k,v in files.items()},sort_keys=True)+' */\n'
 p=Path(__file__).with_name('polished_style.h')
 if '--check' in sys.argv:assert p.read_text()==out,'Run gen_style.py'

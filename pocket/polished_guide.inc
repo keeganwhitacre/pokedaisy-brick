@@ -193,6 +193,15 @@ static const char *guide_place(int area) {
   return area > 0 && area < GUIDE_COUNT(places) ? places[area].name
                                                 : "THIS MAP";
 }
+// GuideScreen uppercases map headings/names; keep ROM-backed spelling.
+static void guide_upper(char *s) {
+  for (unsigned char *p = (unsigned char *)s; *p; p++) {
+    if (*p >= 'a' && *p <= 'z')
+      *p -= 32;
+    else if (*p == 0xc3 && p[1] == 0xa9)
+      p[1] = 0x89; // é -> É
+  }
+}
 static uint64_t guide_key(int kind, int ref, int aux) {
   return ((uint64_t)(kind + 1) << 56) | ((uint64_t)(unsigned)ref << 24) |
          (unsigned)aux;
@@ -275,6 +284,7 @@ static void guide_entry(const struct guide_row *r, const struct pd_snapshot *s,
                             "KEY ITEMS", "GIFT POKéMON", "ALL DONE"};
     if (h == 0) {
       snprintf(e->title, sizeof e->title, "%s", guide_place(s->mapsec));
+      guide_upper(e->title);
       bool any = false;
       bool species[512] = {0};
       int total = 0, caught = 0;
@@ -387,25 +397,25 @@ static void guide_entry(const struct guide_row *r, const struct pd_snapshot *s,
     int i = r->ref, id = guideAreas[i].id, k = guideAreas[i].kind;
     e->owned = guide_area_done(s, i);
     const char *name = k >= 4 ? names[id] : item_name(id, build);
-    char at[256], qty[24] = "";
+    char at[256], qty[24] = "", place[128];
+    snprintf(place, sizeof place, "%s", guide_place(guideAreas[i].area));
+    guide_upper(place);
     if (guideAreas[i].qty > 1)
       snprintf(qty, sizeof qty, " x%d", guideAreas[i].qty);
     if (*guideAreas[i].where)
       snprintf(at, sizeof at, "in the %s", guideAreas[i].where);
     else
-      snprintf(at, sizeof at, "around %s", guide_place(guideAreas[i].area));
+      snprintf(at, sizeof at, "around %s", place);
     snprintf(e->title, sizeof e->title, "%s%s", name ? name : "?", qty);
     if (r->kind == G_WHERE) {
       guide_where_name(i, build, e->title, sizeof e->title);
-      snprintf(e->hint, sizeof e->hint, "In %s.",
-               guide_place(guideAreas[i].area));
+      snprintf(e->hint, sizeof e->hint, "In %s.", place);
       if (*guideAreas[i].where)
         snprintf(e->answer, sizeof e->answer, "%s in the %s (%s).",
-                 k == 0 ? "Lying" : "Someone", guideAreas[i].where,
-                 guide_place(guideAreas[i].area));
+                 k == 0 ? "Lying" : "Someone", guideAreas[i].where, place);
       else
         snprintf(e->answer, sizeof e->answer, "%s around %s.",
-                 k == 0 ? "Lying" : "Someone", guide_place(guideAreas[i].area));
+                 k == 0 ? "Lying" : "Someone", place);
     } else if (k == 1 && !e->owned) {
       snprintf(e->title, sizeof e->title, "HIDDEN ITEM");
       snprintf(e->hint, sizeof e->hint, "Buried %s.", at);
@@ -570,7 +580,7 @@ static int guide_row_draw(struct pd_canvas *c, int y, const struct guide_row *r,
     y += 20 * pd_text_wrap(c, 208, y, 278, 20, 128, e->answer, 0x181818,
                            PD_NO_SHADOW);
   }
-  pd_fill(c, 208, y + 6, 276, 2, 0xb0b0b0);
+  pocket_row_divider(c, 208, y + 6, 276, 2, 0xb0b0b0);
   return y - top + 14;
 }
 static void pc_guide_draw(struct pc_ui *u, struct pd_canvas *c,
@@ -587,6 +597,7 @@ static void pc_guide_draw(struct pc_ui *u, struct pd_canvas *c,
     if (u->guidePage == pages[i])
       pd_fill(c, 20, y, 152, 38, 0xdcdcdc);
     txt(c, 30, y + 12, pcGuidePages[i]);
+    pocket_row_divider(c, 20, y + 38, 152, 2, 0xb0b0b0);
     if (u->guidePagesFocused && u->guidePage == pages[i])
       pd_triangle(c, 20, y + 14, 6, PD_RIGHT, 0x181818);
   }
