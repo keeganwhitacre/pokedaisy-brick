@@ -196,12 +196,15 @@ static void pc_battle_pages(struct pc_ui *u, struct pd_canvas *c,
         continue;
       }
       icon(c, 16, y + 3, m->species, rom, n, build);
-      snprintf(b, sizeof b, "%s Lv%d%s", names[m->species], m->level,
-               i == s->foeActive ? " OUT" : "");
-      pd_text_fit(c, 60, y + 2, 428, b, 0x181818, PD_NO_SHADOW);
+      snprintf(b, sizeof b, "%s", names[m->species]);
+      pd_text_fit(c, 60, y + 2, 240, b, 0x181818, PD_NO_SHADOW);
       snprintf(b, sizeof b, "HP %d/%d %s", m->hp, m->maxHp,
                m->hp ? pd_status_label(m->status) : "FAINTED");
-      txt(c, 60, y + 22, b);
+      pd_text_fit(c, 60, y + 22, 244, b, 0x181818, PD_NO_SHADOW);
+      pocket_hp_bar(c, 340, y + 2, 154, m->hp, m->maxHp, &polishedHp);
+      snprintf(b, sizeof b, "Lv%d%s", m->level,
+               i == s->foeActive ? " OUT" : "");
+      pd_text_right(c, 494, y + 22, b, 0x181818, PD_NO_SHADOW);
     }
   } else if (!target.species || !player->species)
     txt(c, 20, 94, "Battle data is not ready.");
@@ -241,17 +244,21 @@ static void pc_battle_pages(struct pc_ui *u, struct pd_canvas *c,
       int y = 96 + i * 76;
       pd_fill(c, 8, y, 496, 72, 0xececec);
       icon(c, 16, y + 8, m->species, rom, n, build);
-      snprintf(b, sizeof b, "%d. %s Lv%d%s", i + 1, names[m->species], m->level,
-               p.slot == s->partyActive ? " OUT" : "");
-      txt(c, 60, y + 4, b);
+      snprintf(b, sizeof b, "%d. %s", i + 1, names[m->species]);
+      pd_text_fit(c, 60, y + 4, 240, b, 0x181818, PD_NO_SHADOW);
+      pocket_hp_bar(c, 340, y + 4, 154, m->hp, m->maxHp, &polishedHp);
       const char *name;
       int t, power;
       battle_move(m->moves[p.move], build, &name, &t, &power);
-      snprintf(b, sizeof b, "%s  %s", name, battle_verdict(power, p.pct));
-      pd_text_fit(c, 60, y + 27, 430, b, 0x181818, PD_NO_SHADOW);
-      snprintf(b, sizeof b, "HP %d/%d  Foe types:%d%%", m->hp, m->maxHp,
+      pd_text_fit(c, 60, y + 22, 430, name, 0x181818, PD_NO_SHADOW);
+      snprintf(b, sizeof b, "%s  Foe types:%d%%", battle_verdict(power, p.pct),
                p.risk);
-      txt(c, 60, y + 49, b);
+      pd_text_fit(c, 60, y + 40, 430, b, 0x181818, PD_NO_SHADOW);
+      snprintf(b, sizeof b, "HP %d/%d", m->hp, m->maxHp);
+      txt(c, 60, y + 56, b);
+      snprintf(b, sizeof b, "Lv%d%s", m->level,
+               p.slot == s->partyActive ? " OUT" : "");
+      pd_text_right(c, 494, y + 56, b, 0x181818, PD_NO_SHADOW);
     }
     txt(c, 12, 326, "Type/power estimate only.");
   } else if (u->battlePage == 2) {
@@ -259,7 +266,8 @@ static void pc_battle_pages(struct pc_ui *u, struct pd_canvas *c,
              target.level, target.hp, target.maxHp);
     pd_text_fit(c, 12, 66, 488, b, 0x181818, PD_NO_SHADOW);
     snprintf(b, sizeof b, "Held: %s", item_name(target.heldItem, build));
-    pd_text_fit(c, 12, 90, 488, b, 0x181818, PD_NO_SHADOW);
+    pd_text_fit(c, 12, 90, 302, b, 0x181818, PD_NO_SHADOW);
+    pocket_hp_bar(c, 346, 88, 154, target.hp, target.maxHp, &polishedHp);
     // Stats exist for the active battler only: no fabricated party stats.
     if (!u->battleFoe || u->battleFoe - 1 == s->foeActive) {
       snprintf(b, sizeof b, "Atk%d Def%d Spd%d SpA%d SpD%d", target.stats[0],
@@ -279,7 +287,8 @@ static void pc_battle_pages(struct pc_ui *u, struct pd_canvas *c,
       pd_text_fit(c, 58, y, 442, b, 0x181818, PD_NO_SHADOW);
       snprintf(b, sizeof b, "HP %d/%d %s", m->hp, m->maxHp,
                pd_status_label(m->status));
-      txt(c, 58, y + 18, b);
+      pd_text_fit(c, 58, y + 18, 250, b, 0x181818, PD_NO_SHADOW);
+      pocket_hp_bar(c, 346, y + 18, 154, m->hp, m->maxHp, &polishedHp);
     }
     battle_moves_draw(c, player, &target, build);
   }

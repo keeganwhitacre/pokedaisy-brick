@@ -1,4 +1,4 @@
-# Phase 11 verification
+# Phase 12 verification
 
 Phase 7 adds the L3 quick menu: original Android state/FF/companion pixel icons,
 D-pad ring navigation, genuine paused gameplay at its existing physical scale,
@@ -166,3 +166,15 @@ Linux and actual NextUI Cortex-A53/AArch64 builds compile. Generated experience 
 The supplied normal 3.2.3 ROM passes the ordinary-input fresh-game route, produces actual 512x384 party/summary captures, and reads real Cyndaquil Lv5 HP19/19 EXP135. Paired UI-clock captures assert that only the selected sprite region changes. The empty EXP bar at this starter's level boundary is intentional, not placeholder data. Battle OUT captures are labeled upstream trainer-memory fixtures, not a live trainer playthrough.
 
 Native and ARM/QEMU runtime tests pass game/companion pause/resume, state round trips and quick-menu regressions. The supplied-ROM runtime also passes on both architectures without fixture injection. Physical Brick controls, sustained performance, RTC and suspend remain unverified for this pass. Full Android styling/feature parity remains open in PARITY.md. No commercial ROM or private save/state is shipped.
+
+## Phase 12 results (2026-10-22)
+
+Native Linux and the actual NextUI Cortex-A53/AArch64 builds compile without new compiler warnings. Native and ARM/QEMU decoder tests pass, including HP zero/unknown/tiny-positive/full/overfull and integer-limit handling, original green/amber/red thresholds, pixel bounds, and transparent-center map pulses. The existing generated-table freshness checks pass.
+
+The private normal 3.2.3 ROM passes the normal-input new-game route and produces new map pulse captures at 512x384. Native and ARM/QEMU SDL runtime tests load the genuine starter state, navigate from Party through all intermediate sections to Map and back using individual shoulder events, open Summary, and assert the emulator frame counter remains unchanged throughout. Both resume and pass the save-state round trip. No fixture RAM is injected in this path. Captures show the actual software SDL renderer at 1024x768; logical-resolution companions are exact 2x reductions for inspection.
+
+Native diagnostic GB/GBA regressions pass, including battery-marker persistence, states, section navigation and 100 companion toggles. Native quick-menu and host I/O fault/preference regressions pass. Battle screenshots are separately labeled upstream trainer-WRAM fixtures with artwork/font decoded from the supplied matching ROM; this pass does not claim a newly played trainer encounter. New battle/map captures were visually inspected at 512x384 and the labels adjusted to avoid overlap.
+
+No physical Brick testing occurred in this pass. Audible hardware output, sustained performance, RTC, suspend/power behavior and broad expansion-map coverage remain unverified. Full Android panel styling and feature parity remain unfinished. No ROM, loose extracted game assets, personal save or state is shipped. The screenshots are actual renderer output, not mockups.
+
+The isolated decoder/renderer harness also passes AddressSanitizer and UndefinedBehaviorSanitizer with the supplied ROM and captured fixtures. LeakSanitizer cannot inspect process threads in this environment and was disabled for the successful run; no leak-clean claim is made. This is not a sanitizer run of the full emulator. The manual checks, search tests and website documentation build (`make docs-check`) pass.

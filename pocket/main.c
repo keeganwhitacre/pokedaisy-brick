@@ -488,7 +488,7 @@ static void focus_draw(struct pd_ui *u, int focus) {
 }
 #ifdef POCKET_TEST
 static void test_frame(struct mCore *, int *, bool, int, struct pd_ui *,
-                       struct pd_snapshot *);
+                       struct pd_snapshot *, const struct pc_ui *);
 #endif
 static void run_game(const char *path, int maxFrames, const char *shot) {
   FILE *f = fopen(path, "rb");
@@ -867,7 +867,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     testFf = ff;
     testQuickSelected = quickSelected;
     testMenu = menuOpen;
-    test_frame(c, &pc, companion, frames, &ui, &snap);
+    test_frame(c, &pc, companion, frames, &ui, &snap, &pcUi);
 #endif
     frames++;
     if (maxFrames && frames >= maxFrames) {

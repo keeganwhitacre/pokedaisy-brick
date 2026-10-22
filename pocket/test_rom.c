@@ -181,6 +181,13 @@ int main(int argc, char **argv) {
     char path[64];
     snprintf(path, sizeof path, "runtime-live323-map%d.png", i);
     pd_png_write(path, 512, 384, px);
+    for (int frame = 0; frame < 2; frame++) {
+      pc_ui_tick(&u, frame * 333);
+      pc_ui_draw(&u, &canvas, &s, rom, size, build);
+      snprintf(path, sizeof path, "runtime-phase12-map%d-pulse%d.png", i,
+               frame);
+      assert(pd_png_write(path, 512, 384, px));
+    }
   }
   for (int filter = 0; filter < 4; filter++) {
     for (int level = 0; level < 3; level++) {

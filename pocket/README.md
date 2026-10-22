@@ -1,10 +1,10 @@
-# PokeDaisy Pocket: Phase 11
+# PokeDaisy Pocket: Phase 12
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 
 Native SDL2 and mGBA prototype for TrimUI Brick / NextUI. The user has confirmed
 Phase 1 gameplay and a live party with a ROM sprite on physical Brick hardware.
-Phase 11 adapts the upstream Polished party-slot frames, HP lettering, larger ROM icons and selected-icon bobbing. Summary adds the original EXP progress/NEXT/MAX display and HP bar; battle Suggestions marks the actual active party slot OUT. Earlier live companion, expansion/zoom, quick-menu and shared save/display features remain included. Tested with the supplied normal 3.2.3 ROM; hardware verification of this pass remains open.
+Phase 12 adds original-style HP bars throughout the Polished battle companion and the upstream pulsing map cursor. Shared pixel widgets accept game palettes without emulator or memory dependencies. Earlier party/summary, Guide, expansion/zoom, quick-menu and save/display features remain included. Tested with the supplied normal 3.2.3 ROM; hardware verification of this pass remains open.
 It does not yet reproduce the full Android application.
 
 Gameplay preserves the working opaque RGB888 format. Game scaling now uses the
@@ -190,3 +190,9 @@ Android-only 1.3.1 features remain available in the source for later adaptation;
 Party slots use the upstream PartyScreen geometry/palette and pixel HP label. The selected icon bobs at the upstream ten-frame cadence while the game remains paused. No extra Poke Ball art is introduced: the Polished palette makes it transparent. Summary uses the game's real total EXP, the upstream six experience tables and Polished's own growth rates. NEXT shows the remaining EXP; level 100 shows MAX. Eggs hide the EXP bar. Suggestions' OUT marker uses the game-specific generated current-party-index address and is omitted if the index cannot be read safely.
 
 The upstream Gen 2 party slots do not have an EXP bar, and its Dex list does not provide name search; earlier parity notes suggesting otherwise were corrected.
+
+## Phase 12 battle and map
+
+Battle INFO, SUGGESTIONS, FOE DETAILS and revealed FOE TEAM rows show health with the same HP lettering and Polished colors as the party. Names, level/OUT and health have separate space in team and suggestion rows. Unknown foes remain concealed. Map uses the upstream four-corner cursor, pulsing every 333 ms around the selected landmark or empty cell; its center stays transparent. The UI clock animates it while emulation stays paused.
+
+The parity checklist now reflects two upstream Gen 2 boundaries: there are no item icons and no announced-next-foe index in its reader. Gen 2 Party uses SpeciesIcon's first animation frame with selected-icon bobbing, which is already adapted. These are not missing features to invent. Additional battle panel styling and broader lifecycle/hardware work remain open.

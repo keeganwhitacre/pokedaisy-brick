@@ -120,10 +120,14 @@ static void pc_map_draw(struct pc_ui *u, struct pd_canvas *c,
     player_head(c, 96 + places[s->mapsec].x * 16 - 8,
                 52 + places[s->mapsec].y * 16 - 8, s->gender, rom, n, build);
   int cx = 96 + u->mapX * 16, cy = 52 + u->mapY * 16;
-  pd_fill(c, cx, cy, 16, 2, 0x181818);
-  pd_fill(c, cx, cy + 14, 16, 2, 0x181818);
-  pd_fill(c, cx, cy, 2, 16, 0x181818);
-  pd_fill(c, cx + 14, cy, 2, 16, 0x181818);
+  // MapScreen frames the selected landmark, or one cell in empty space.
+  int w = p ? places[p].w : 1, h = p ? places[p].h : 1;
+  if (p) {
+    cx = 96 + places[p].x * 16;
+    cy = 52 + places[p].y * 16;
+  }
+  pocket_map_cursor(c, cx, cy, cx + w * 16, cy + h * 16, 2,
+                    (u->animationMs / 333) % 2, 0xffffff);
   txt(c, 12, 346, "A:Region Y:Me Select:Places");
   txt(c, 12, 366, "D-pad:Look B/X:Play");
 }

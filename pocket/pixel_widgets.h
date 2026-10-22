@@ -1,0 +1,54 @@
+/* GPL-3.0. Portable adaptations of upstream PartyScreen.drawHpBar,
+ * BattleLists.drawListHpBar and MapScreen.drawMapCursor. No game memory or SDL.
+ * Coordinates/width are logical pixels; the palette is supplied by each game.
+ */
+#ifndef POCKET_PIXEL_WIDGETS_H
+#define POCKET_PIXEL_WIDGETS_H
+#include "party_art.h"
+#include "pd_canvas.h"
+struct pocket_hp_palette {
+  uint32_t frame, inner, label, green, yellow, red;
+};
+static inline int pocket_hp_fill(int hp, int maxHp, int width) {
+  if (maxHp <= 0 || hp <= 0 || width < 2)
+    return 0;
+  if (hp > maxHp)
+    hp = maxHp;
+  int filled = (int)((int64_t)(width / 2) * hp / maxHp) * 2;
+  return filled < 2 ? 2 : filled;
+}
+/* x is the bar's left edge; the original HP label extends 22 pixels left. */
+static inline void pocket_hp_bar(struct pd_canvas *c, int x, int y, int width,
+                                 int hp, int maxHp,
+                                 const struct pocket_hp_palette *p) {
+  if (width < 10)
+    return;
+  pd_round_rect(c, x - 22, y, 24, 14, 2, p->frame);
+  for (int row = 0; row < 5; row++)
+    for (int col = 0; col < 9; col++)
+      if (partyHpLetters[row][col] == '1')
+        pd_fill(c, x - 20 + col * 2, y + 2 + row * 2, 2, 2, p->label);
+  pd_round_rect(c, x, y, width, 14, 4, p->frame);
+  pd_round_rect(c, x + 2, y + 2, width - 4, 10, 2, p->inner);
+  uint32_t color = maxHp <= 0 || (int64_t)hp * 2 > maxHp ? p->green
+                   : (int64_t)hp * 5 > maxHp             ? p->yellow
+                                                         : p->red;
+  pd_fill(c, x + 4, y + 4, pocket_hp_fill(hp, maxHp, width - 8), 6, color);
+}
+/* Original four 5x2 / 2x5 corners, 2 or 3 map pixels outside the region. */
+static inline void pocket_map_cursor(struct pd_canvas *c, int left, int top,
+                                     int right, int bottom, int scale, bool big,
+                                     uint32_t color) {
+  if (scale <= 0 || right <= left || bottom <= top)
+    return;
+  int out = (big ? 3 : 2) * scale;
+  int x0 = left - out, y0 = top - out;
+  int x1 = right + out, y1 = bottom + out;
+  for (int i = 0; i < 4; i++) {
+    int x = i & 1 ? x1 - 5 * scale : x0;
+    int y = i & 2 ? y1 - 5 * scale : y0;
+    pd_fill(c, x, i & 2 ? y1 - 2 * scale : y0, 5 * scale, 2 * scale, color);
+    pd_fill(c, i & 1 ? x1 - 2 * scale : x0, y, 2 * scale, 5 * scale, color);
+  }
+}
+#endif

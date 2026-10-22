@@ -254,7 +254,8 @@ static void wide_test_frame(struct mCore *c, bool companion, int frame) {
   }
 }
 static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
-                       struct pd_ui *u, struct pd_snapshot *s) {
+                       struct pd_ui *u, struct pd_snapshot *s,
+                       const struct pc_ui *pcUi) {
   if (wideTest) {
     wide_test_frame(c, companion, frame);
     return;
@@ -299,13 +300,34 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
       e.jbutton.button = 3;
       SDL_PushEvent(&e);
     }
-    if (frame == 130) {
+    if (getenv("POCKET_TEST_STATE")) {
+      if (frame >= 122 && frame < 122 + PC_MAP)
+        send_key(SDLK_e);
+      if (frame == 126) {
+        assert(companion && pcUi->section == PC_MAP);
+        assert(c->frameCounter(c) == pausedCounter);
+        assert(capture_frame("runtime-phase12-map-sdl.png", NULL));
+      }
+      if (frame >= 126 && frame < 126 + PC_MAP)
+        send_key(SDLK_q);
+      if (frame == 131) {
+        assert(companion && pcUi->section == PC_PARTY);
+        send_key(SDLK_z);
+      }
+      if (frame == 133) {
+        assert(companion && pcUi->summary);
+        assert(c->frameCounter(c) == pausedCounter);
+        assert(capture_frame("runtime-phase12-summary-sdl.png", NULL));
+        send_key(SDLK_x);
+      }
+    }
+    if (frame == 138) {
       assert(c->frameCounter(c) == pausedCounter);
       SDL_Event e = {.type = SDL_JOYBUTTONDOWN};
       e.jbutton.button = 0;
       SDL_PushEvent(&e);
     }
-    if (frame == 131) {
+    if (frame == 139) {
       assert(!companion);
       SDL_Event e = {.type = SDL_JOYBUTTONUP};
       e.jbutton.button = 0;

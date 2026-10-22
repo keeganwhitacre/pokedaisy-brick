@@ -2,13 +2,15 @@
  * ROM art is decoded only from the user's SHA-1 matched ROM. */
 #include "polished.h"
 #include "experience.h"
-#include "party_art.h"
 #include "pd_font.h"
+#include "pixel_widgets.h"
 #include "polished_guide_tables.h"
 #include "polished_tables.h"
 #include "rom_identity.h"
 #include <stdio.h>
 #include <string.h>
+static const struct pocket_hp_palette polishedHp = {
+    0x181818, 0xffffff, 0xffce10, 0x00bd00, 0xffbd00, 0xff0000};
 static struct pd_glyph romFont[129];
 static const unsigned char *fontRom;
 static size_t fontSize;
@@ -364,22 +366,7 @@ static void pc_party_draw(struct pd_canvas *c, const struct pd_snapshot *s,
                   : m->gender == PD_GENDER_MALE ? "♂"
                                                 : "",
                   0x181818, PD_NO_SHADOW);
-    pd_round_rect(c, x + 56, y + 52, 24, 14, 2, 0x181818);
-    for (int row = 0; row < 5; row++)
-      for (int col = 0; col < 9; col++)
-        if (partyHpLetters[row][col] == '1')
-          pd_fill(c, x + 58 + col * 2, y + 54 + row * 2, 2, 2, 0xffce10);
-    pd_round_rect(c, x + 78, y + 52, 154, 14, 4, 0x181818);
-    pd_round_rect(c, x + 80, y + 54, 150, 10, 2, 0xffffff);
-    int fill = m->maxHp ? (146 / 2 * m->hp / m->maxHp) * 2 : 0;
-    if (m->hp > 0 && fill < 2)
-      fill = 2;
-    if (fill > 146)
-      fill = 146;
-    pd_fill(c, x + 82, y + 56, fill, 6,
-            m->hp * 2 > m->maxHp   ? 0x00bd00
-            : m->hp * 5 > m->maxHp ? 0xffbd00
-                                   : 0xff0000);
+    pocket_hp_bar(c, x + 78, y + 52, 154, m->hp, m->maxHp, &polishedHp);
     snprintf(b, sizeof b, "%d/%d", m->hp, m->maxHp);
     pd_text_right(c, x + 232, y + 68, b, 0x181818, PD_NO_SHADOW);
     txt(c, x + 76, y + 68, m->hp ? pd_status_label(m->status) : "FNT");

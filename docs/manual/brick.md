@@ -20,7 +20,7 @@ from NextUI's Tools menu. Choose a game with the D-pad and A.
 
 Press X to open the companion. The game pauses while you use it. A confirms,
 B goes back, and X returns to the game. In the GBA companion, L and R change
-sections. In Polished Crystal, L and R cycle Party, Bag, Battle, Dex and Map. In the bag,
+sections. In Polished Crystal, L and R cycle Party, Bag, Battle, Dex, Map and Guide. In the bag,
 Left and Right change pocket, while Up and Down select items. The bag shows
 quantities and money; using an item is not available yet. Summaries include
 held items and EXP. A opens a selected item's description. The battle screen is read-only.
@@ -60,3 +60,15 @@ in the package for the exact tested paths and remaining limitations.
 ## Polished Guide
 
 L/R reaches GUIDE. Left/Right selects HERE: WILD, HERE: FINDS, NEXT BOSS, TIPS or WHERE IS. Y changes wild encounter method or Where Is category. Up/Down chooses an entry; A reveals a hint and then its answer. Up/Down scrolls an open answer, B closes it, and X returns to gameplay. Clock, badges, item/gift and boss marks come from actual memory; no game data is changed. Guide data comes from upstream and may contain mistakes.
+
+## Battle health and map cursor
+
+In the Polished Crystal companion, `INFO`, `SUGGESTIONS`, `FOE DETAILS` and revealed
+`FOE TEAM` rows show HP bars in the game's party colors. Green means more than
+half, amber means more than one fifth, and red means one fifth or less. Selecting
+an unseen foe still reveals its information explicitly; the app does not pretend
+the game has announced its next choice.
+
+On `MAP`, the four corners pulse around your selected place. The center stays
+clear so you can see your player marker. The game stays paused while you browse
+the map or open a summary. Press B to go back or X to resume playing.

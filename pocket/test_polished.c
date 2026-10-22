@@ -288,11 +288,46 @@ static void test_experience(void) {
   puts("PASS six upstream EXP curves at every level, boundaries/clamps/MAX, "
        "Polished rate mapping and egg exclusion");
 }
+static void test_pixel_widgets(void) {
+  // Unknown, fainted, tiny positive, full and corrupt/out-of-range health.
+  assert(!pocket_hp_fill(0, 100, 146));
+  assert(!pocket_hp_fill(10, 0, 146));
+  assert(!pocket_hp_fill(-1, 100, 146));
+  assert(pocket_hp_fill(1, 999, 146) == 2);
+  assert(pocket_hp_fill(50, 100, 146) == 72);
+  assert(pocket_hp_fill(999, 100, 146) == 146);
+  assert(pocket_hp_fill(INT32_MAX, INT32_MAX, 146) == 146);
+  uint32_t px[512 * 384];
+  struct pd_canvas c;
+  pd_canvas_init(&c, 512, 384, px);
+  const int hp[] = {100, 51, 50, 21, 20, 1, 0};
+  const uint32_t colors[] = {0x00bd00, 0x00bd00, 0xffbd00, 0xffbd00,
+                             0xff0000, 0xff0000, 0xffffff};
+  for (int i = 0; i < 7; i++) {
+    pd_fill(&c, 0, 0, 512, 384, 0x123456);
+    pocket_hp_bar(&c, 100, 60, 154, hp[i], 100, &polishedHp);
+    assert(px[64 * 512 + 104] == colors[i]);
+    assert(px[59 * 512 + 104] == 0x123456);
+    assert(px[74 * 512 + 104] == 0x123456);
+  }
+  // The cursor's center remains transparent; all corners pulse outward.
+  for (int big = 0; big < 2; big++) {
+    pd_fill(&c, 0, 0, 512, 384, 0x123456);
+    pocket_map_cursor(&c, 100, 100, 116, 116, 2, big, 0xffffff);
+    assert(px[108 * 512 + 108] == 0x123456);
+    int outside = big ? 94 : 96;
+    assert(px[outside * 512 + outside] == 0xffffff);
+    assert(px[(outside - 1) * 512 + outside] == 0x123456);
+  }
+  puts("PASS shared pixel widgets: HP boundaries/colors/saturation and map "
+       "pulse");
+}
 int main(int argc, char **argv) {
   assert(argc == 2 || argc == 3);
   test_battle_advice();
   test_phase9();
   test_experience();
+  test_pixel_widgets();
   unsigned char *cart = NULL;
   size_t romSize = 0;
   int build = 0;
@@ -431,6 +466,14 @@ int main(int argc, char **argv) {
         assert(pd_png_write(path, 512, 384, canvasPixels));
       }
     if (cart && i == 2) {
+      for (int page = 0; page < 4; page++) {
+        ui.battlePage = page;
+        pc_ui_draw(&ui, &testCanvas, &b, cart, romSize, build);
+        char path[96];
+        snprintf(path, sizeof path, "runtime-phase12-battle%d-fixture.png",
+                 page);
+        assert(pd_png_write(path, 512, 384, canvasPixels));
+      }
       ui.battlePage = 1;
       pc_ui_draw(&ui, &testCanvas, &b, cart, romSize, build);
       assert(pd_png_write("runtime-phase11-suggestions-fixture.png", 512, 384,
