@@ -48,9 +48,10 @@ static void pc_bag_pages(struct pc_ui *u, struct pd_canvas *c,
       pd_round_rect(c, 20, y + 19, 150, 4, 2, pcBagUnderline);
     txt(c, 20, y + 6, bag_labels[tabs[i] + 1]);
   }
-  pd_layered_box(c, 8, 254, 176, 32, 8, pcBagEdge, 3, 0xffffff);
-  snprintf(b, sizeof b, "Money %ld", s->money);
-  pd_text_fit(c, 16, 262, 160, b, 0x181818, PD_NO_SHADOW);
+  pd_layered_box(c, 8, 242, 176, 44, 8, pcBagEdge, 3, 0xffffff);
+  txt(c, 20, 248, "Money");
+  snprintf(b, sizeof b, "%ld", s->money);
+  pd_text_right(c, 170, 264, b, 0x181818, PD_NO_SHADOW);
   const char *sorts[] = {"Default", "Name", "Type", "Count"};
   pd_layered_box(c, 8, 294, 176, 40, 8, pcBagEdge, 3, 0xffffff);
   snprintf(b, sizeof b, "Y:%s", sorts[u->bagSort]);
