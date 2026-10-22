@@ -86,3 +86,9 @@ Upstream merged through `54d8f4867501feb32b7ee139a5616b7c6301f044` with both par
 - `pc_ui`/Guide: controller adaptation of upstream GuideUiState single-open-entry, hint, answer and close behavior. No emulator calls enter the companion renderer.
 
 New games should reuse host I/O, identity, controller events and emulator lifecycle. Add game-specific memory definitions behind snapshots and reuse the upstream game implementation/assets; do not add ROM-specific save/display branches to main.c.
+
+## Phase 11 reusable experience and animation
+
+`experience.c/.h` is a portable, game-independent adaptation of SnapshotView ExpProgress, with all six upstream ExpTables curves. `gen_experience.py --check` validates table shape and records source hashes. Each game maps its own growth-rate ids before calling this module; Polished's mapping and species rates come from upstream Gen2SpeciesPolishedCrystal/SnapshotView via gen_polished.py.
+
+`gen_party.py` extracts PartyScreen's HP lettering with source provenance. The native party layout follows SlotGeometry/drawSlotFrame/drawHpBar using the existing portable canvas rounded rectangles; Polished's transparent ball palette is respected. `pc_ui_tick` accepts a caller-supplied monotonic UI clock: companion animation never advances the emulator or depends on SDL in the renderer. `partyActive` is optional snapshot telemetry, initialized to -1 by readers; the Polished adapter fills it from upstream curBattleMon only in a validated battle. Generic host code contains no new Pokemon addresses.

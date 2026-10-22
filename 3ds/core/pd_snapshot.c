@@ -182,6 +182,7 @@ static bool read_u32(pd_read_fn read, void* ctx, uint32_t addr, uint32_t* out) {
 
 void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn read, void* ctx) {
     memset(s, 0, sizeof(*s));
+    s->partyActive = -1;
     s->money = -1;
     const struct pd_config* cfg = g->cfg;
     if (!cfg) return;

@@ -168,3 +168,7 @@ Reuse `app/src/main/cpp/pk_wide_gb.c`; native-only definitions leave Android gam
 ## Phase 10 integration audit
 
 Reviewed upstream 1.3.1 changes through 54d8f4867501feb32b7ee139a5616b7c6301f044. Merged the original source history. Reused pk_savevf.c unchanged, with Pocket's independent host wrapper retaining read/write-only save admission and making I/O errors visible. Did not enable Android MAKEOVER, DS or new GBA companions. Per-game display settings follow ROM SHA-1 and are atomic separate config files. The SHA-1 codec was moved unchanged from polished.c into rom_identity.h. GuideScreen bossPage and GuideUiState.tap now map to separate selected Pokemon entries rather than revealing a whole team. Single-entry reveals close on entry/page/progress changes.
+
+## Phase 11 source audit
+
+Inspected PartyScreen SlotGeometry, drawSlotFrame/drawHpBar, Polished palette and ten-frame bob; MonDetailScreen SummaryBar/ExpBlue; SnapshotView.expProgress; ExpTables; Gen2SpeciesPolishedCrystal growth rates; Gen2Reader.curBattleMon; SuggestionsScreen OUT behavior. Polished rates 0/1/2/3 map to upstream tables 0/3/4/5. Native OUT uses the upstream party index definition rather than species/level matching, avoiding ambiguity for duplicate party members. No ROM writes or invented offsets are added. PokedexScreen has no name search and Gen 2 PartySlot has no EXP bar; earlier checklist assumptions were corrected.

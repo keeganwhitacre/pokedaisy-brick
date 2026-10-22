@@ -1,7 +1,7 @@
-# Polished Crystal Android parity boundary — Phase 10
+# Polished Crystal Android parity boundary — Phase 11
 
 This compares the native port with the **Polished Crystal path** at upstream
-`a64c9172828bb2e3824d5211655091e27f7ff73c`, rather than with Android features
+`54d8f4867501feb32b7ee139a5616b7c6301f044`, rather than with Android features
 that only other games support. All displayed game art/font/text is read from the
 user's matching cart. Full visual and behavioral parity is still unfinished.
 
@@ -10,11 +10,11 @@ user's matching cart. Full visual and behavioral parity is still unfinished.
 | Gameplay | mGBA, integer scaling, audio, input, saves/states, fast-forward | Sustained hardware performance, RTC, suspend/power verification |
 | Identity | Upstream's 16 exact normal/faithful/debug build hashes | Import and test future builds |
 | Font | Original ROM font and Gen2Art mapping, crisp logical 2x glyphs | Remaining per-widget spacing/animations |
-| Party | Six slots, icons, gender, HP, status, held marker, egg handling | Icon bobbing, EXP bar and exact slot-frame details |
-| Summary | Left-info/right-moves hierarchy, held item, EXP, descriptions, type matchups, party cycling | Remaining styling/animation; Android's Polished decoder does not supply IV/EV stats or LEARN data |
+| Party | Six slots, rounded upstream frames, original HP lettering, larger ROM icons, selected-icon bobbing, gender/status/held markers and egg handling | Remaining icon-frame animation and fine layout details; upstream Gen 2 EXP bar is on Summary |
+| Summary | Left-info/right-moves hierarchy, held item, EXP progress/NEXT/MAX and HP bars, descriptions, type matchups, party cycling | Remaining styling/animation; Android's Polished decoder does not supply IV/EV stats or LEARN data |
 | Bag | All real quantities/pockets/money, matching-ROM descriptions | Further item-icon/layout parity; upstream FieldItems has no Polished USE/GIVE/TAKE implementation |
-| Battle | INFO effectiveness labels; upstream power/type/risk ranking; live foe item/stats/moves and type-matchup groups; browsable team with unseen slots; battle-scoped seen tracking | Remaining Android layout/HP-bar details, active-party marker and automatic next-foe selection; upstream GBA command controls are not Polished controls |
-| Dex | Real flags/order, four upstream filters, front sprites, descriptions, dimensions/base stats, species abilities | Search and remaining navigation/styling; upstream's Polished dex has no evolution table |
+| Battle | INFO effectiveness labels; upstream power/type/risk ranking; live foe item/stats/moves and type-matchup groups; browsable team with unseen slots; battle-scoped seen tracking and exact active-party OUT marker | Remaining Android layout/HP-bar details, automatic next-foe selection; upstream GBA command controls are not Polished controls |
+| Dex | Real flags/order, four upstream filters, front sprites, descriptions, dimensions/base stats, species abilities | Remaining navigation/styling; upstream PokedexScreen has no name-search feature; upstream's Polished dex has no evolution table |
 | Map | All three ROM maps, palettes/flips, live location/player, cursor, regions, Places | Cursor blink and precise location refinements; Polished Fly is not provided by upstream FieldItems |
 | Guide HERE | Live map/time encounter lists, all eight methods, badge-adjusted levels, caught marks; area finds and progress marks | More exact Android layout, per-entry icons and encounter-detail interactions |
 | Guide NEXT BOSS | Progress-dependent order, League/rematch rules, normal/faithful teams, type hints, individual Pokemon hint/answer entries, moves/held-item answers, own-best-level comparison | Exact Android panel styling |
@@ -39,11 +39,13 @@ Remaining expansion work: unspawned/connected-map NPC templates; broad outdoor, 
 ## Next Polished work, before GBA companion expansion
 
 1. Hardware validation and wider exploration of this renderer, including connected maps.
-2. Remaining battle layout/active-party indication and foe-selection refinements.
-3. Dex search and remaining Guide layout details.
-4. Party EXP bar/icon animation, item icons and exact widget styling.
+2. Remaining battle layout and foe-selection refinements.
+3. Remaining Dex/Guide layout details.
+4. Remaining icon-frame animation, item icons and exact widget styling.
 5. Multi-slot state browser and broader lifecycle/RTC/suspend verification.
 
-These are still open; Phase 10 does not claim full Android parity. GBA work is deferred.
+These are still open; Phase 11 does not claim full Android parity. GBA work is deferred.
 
-Phase 10 remembers display mode per ROM content identity and reuses upstream's save mapping fallback with native I/O failure reporting. A new shared host module owns those policies; Polished readers/renderers remain independent. Upstream 1.3.1 source history is merged, but Android feature breadth is not implied by that merge.
+Phase 11 remembers display mode per ROM content identity and reuses upstream's save mapping fallback with native I/O failure reporting. A new shared host module owns those policies; Polished readers/renderers remain independent. Upstream 1.3.1 source history is merged, but Android feature breadth is not implied by that merge.
+
+Phase 11 corrects two earlier checklist assumptions: upstream Gen 2 uses its EXP bar in Summary, and its Dex list has no name search. Those are not missing Party/Dex features to invent. The native summary now uses the exact upstream experience tables and Polished rate mapping. Shared experience progress remains independent of game memory and rendering.

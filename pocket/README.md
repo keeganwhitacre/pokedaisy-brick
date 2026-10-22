@@ -1,10 +1,10 @@
-# PokeDaisy Pocket: Phase 10
+# PokeDaisy Pocket: Phase 11
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 
 Native SDL2 and mGBA prototype for TrimUI Brick / NextUI. The user has confirmed
 Phase 1 gameplay and a live party with a ROM sprite on physical Brick hardware.
-Phase 10 merges upstream 1.3.1-era history, remembers display mode per ROM, reuses upstream's save-mapping fallback with native error reporting, and adds individual boss-Pokemon Guide hints/answers. It retains live Polished party, summaries, bag, battle advice, Dex filters, maps, Guide, expansion/zoom and the L3 quick menu. It contains a real mGBA emulator and companion integration, tested with the supplied normal 3.2.3 ROM.
+Phase 11 adapts the upstream Polished party-slot frames, HP lettering, larger ROM icons and selected-icon bobbing. Summary adds the original EXP progress/NEXT/MAX display and HP bar; battle Suggestions marks the actual active party slot OUT. Earlier live companion, expansion/zoom, quick-menu and shared save/display features remain included. Tested with the supplied normal 3.2.3 ROM; hardware verification of this pass remains open.
 It does not yet reproduce the full Android application.
 
 Gameplay preserves the working opaque RGB888 format. Game scaling now uses the
@@ -179,8 +179,14 @@ L3/R3 are discovered from SDL controller bindings or Linux joystick/evdev button
 
 Adds the four upstream Pokedex filters, live-foe type-matchup groups and Guide best-party/boss-ace level comparison. All Phase 8 expansion and quick-menu features remain included. No GBA feature development or game-memory writes are added. Full Android parity remains unfinished; see PARITY.md.
 
-## Phase 10 integration
+## Phase 11 integration
 
 Upstream history is merged through `54d8f4867501feb32b7ee139a5616b7c6301f044` (1.3.1-era source). The native build reuses upstream `pk_savevf.c` unchanged for memory-mapping fallback. `host_io.c` adds shared error handling around the underlying save file, and content-keyed atomic display preferences. A save must still open read/write. I/O failures stop emulation and are reported; the existing pre-launch `.bak` is retained when one was made. This is not power-loss protection. No battery-save migration is performed.
 
 Android-only 1.3.1 features remain available in the source for later adaptation; merging their source does not enable MAKEOVER, DS or new GBA companions on Brick. Polished's generated decoding/data remains isolated from the Linux host.
+
+## Phase 11 party and summary
+
+Party slots use the upstream PartyScreen geometry/palette and pixel HP label. The selected icon bobs at the upstream ten-frame cadence while the game remains paused. No extra Poke Ball art is introduced: the Polished palette makes it transparent. Summary uses the game's real total EXP, the upstream six experience tables and Polished's own growth rates. NEXT shows the remaining EXP; level 100 shows MAX. Eggs hide the EXP bar. Suggestions' OUT marker uses the game-specific generated current-party-index address and is omitted if the index cannot be read safely.
+
+The upstream Gen 2 party slots do not have an EXP bar, and its Dex list does not provide name search; earlier parity notes suggesting otherwise were corrected.

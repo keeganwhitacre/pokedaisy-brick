@@ -8,6 +8,7 @@ def array(file,name):
 out=['/* Generated from upstream Android tables by gen_polished.py. */']
 out+=['static const int variants[]={'+array('Gen2SpeciesPolishedCrystal.kt','polishedVariantForms')+'};']
 out+=['static const int genders[]={'+array('Gen2SpeciesPolishedCrystal.kt','gen2GenderRatiosPolishedCrystal')+'};']
+out+=['static const int polishedGrowthRates[]={'+array('Gen2SpeciesPolishedCrystal.kt','gen2GrowthRatesPolishedCrystal')+'};']
 s=(base/'SpeciesNamesPolishedCrystal.kt').read_text()
 pairs=re.findall(r'(0x[0-9A-Fa-f]+|\d+) to "([^"]+)"',s)
 out+=['static const char *names[512] = {'+','.join('['+k+']='+json.dumps(v) for k,v in pairs)+'};']
@@ -41,7 +42,7 @@ for field,bank,addr in re.findall(r'(\w+) = wramx\((\d+), (0x[0-9A-Fa-f]+)\)',re
  ram[field]=(int(bank)<<16)|int(addr,16)
 for field,addr in re.findall(r'(\w+) = (0x[0-9A-Fa-f]+)L',reader):
  ram[field]=int(addr,16)
-required='partyCount partyMons numItems numMedicine numBalls numBerries numKeyItems tmsHms money battleMode battleMon enemyMon dexCaught dexSeen otPartyCount otPartyMons curOTMon'.split()
+required='partyCount partyMons numItems numMedicine numBalls numBerries numKeyItems tmsHms money battleMode battleMon enemyMon dexCaught dexSeen otPartyCount otPartyMons curOTMon curBattleMon'.split()
 assert all(k in ram for k in required), 'Upstream RAM config changed; review Gen2Reader.kt'
 out+=['enum { '+','.join('PC_RAM_'+k+'='+hex(v) for k,v in sorted(ram.items()))+' };']
 out+=['static const int dexOrder[]={'+array('Gen2PolishedCrystalGen.kt','gen2DexOrderPolishedCrystal')+'};']

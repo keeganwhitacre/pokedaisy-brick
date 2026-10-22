@@ -258,10 +258,41 @@ static void test_phase9(void) {
       "PASS Dex four upstream filters, filtered navigation/empty guard; battle "
       "live-type groups/sorting/page wrap; Guide best level excludes eggs");
 }
+static void test_experience(void) {
+  struct pocket_exp xp;
+  const uint32_t caps[] = {1000000, 600000, 1640000, 1059860, 800000, 1250000};
+  for (int rate = 0; rate < 6; rate++) {
+    assert(pocket_exp_progress(rate, 100, 0, 214, &xp) &&
+           xp.start == caps[rate] && xp.next == caps[rate] && xp.filled == 214);
+    for (int lv = 1; lv < 100; lv++) {
+      assert(pocket_exp_progress(rate, lv, 0, 214, &xp) && xp.next > xp.start &&
+             xp.filled == 0);
+      uint32_t start = xp.start, next = xp.next;
+      assert(pocket_exp_progress(rate, lv, start, 214, &xp) && !xp.filled);
+      assert(pocket_exp_progress(rate, lv, next, 214, &xp) &&
+             xp.filled == 214 && !xp.toNext);
+      assert(pocket_exp_progress(rate, lv, UINT32_MAX, 214, &xp) &&
+             xp.filled == 214 && !xp.toNext);
+    }
+  }
+  struct pd_mon mon = {.species = 155, .level = 5, .experience = 135};
+  assert(pc_exp(&mon, 200, &xp) && xp.start == 135 && xp.next == 179 &&
+         xp.toNext == 44 && !xp.filled);
+  mon.experience = 157;
+  assert(pc_exp(&mon, 200, &xp) && xp.filled == 100 && xp.toNext == 22);
+  mon.species = 255;
+  assert(!pc_exp(&mon, 200, &xp));
+  assert(!pocket_exp_progress(-1, 1, 0, 20, &xp) &&
+         !pocket_exp_progress(0, 0, 0, 20, &xp) &&
+         !pocket_exp_progress(0, 101, 0, 20, &xp));
+  puts("PASS six upstream EXP curves at every level, boundaries/clamps/MAX, "
+       "Polished rate mapping and egg exclusion");
+}
 int main(int argc, char **argv) {
   assert(argc == 2 || argc == 3);
   test_battle_advice();
   test_phase9();
+  test_experience();
   unsigned char *cart = NULL;
   size_t romSize = 0;
   int build = 0;
@@ -347,6 +378,18 @@ int main(int argc, char **argv) {
     struct pd_snapshot b;
     assert(pc_read(&b, read_fixture, NULL));
     assert(b.inBattle);
+    unsigned addr = (PC_RAM_curBattleMon >> 16) * 4096 +
+                    (PC_RAM_curBattleMon & 65535) - 0xd000;
+    unsigned char old = ram[addr];
+    ram[addr] = b.partyCount - 1;
+    struct pd_snapshot selected;
+    assert(pc_read(&selected, read_fixture, NULL) &&
+           selected.partyActive == b.partyCount - 1);
+    ram[addr] = 255;
+    assert(pc_read(&selected, read_fixture, NULL) &&
+           selected.partyActive == -1);
+    ram[addr] = old;
+    assert(pc_read(&b, read_fixture, NULL));
     assert(b.battlers[0].species == 155 && b.battlers[0].level == 5);
     if (i == 0)
       assert(b.battlers[0].hp == 13 && b.battlers[1].species == 161 &&
@@ -387,6 +430,12 @@ int main(int argc, char **argv) {
                  group);
         assert(pd_png_write(path, 512, 384, canvasPixels));
       }
+    if (cart && i == 2) {
+      ui.battlePage = 1;
+      pc_ui_draw(&ui, &testCanvas, &b, cart, romSize, build);
+      assert(pd_png_write("runtime-phase11-suggestions-fixture.png", 512, 384,
+                          canvasPixels));
+    }
     pc_dex_draw(&testCanvas, &b, 288, false, NULL, 0, 0);
     pc_dex_draw(&testCanvas, &b, 154, true, NULL, 0, 0);
     pc_item_draw(&testCanvas, 25, NULL, 0, 0);

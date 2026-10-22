@@ -165,6 +165,13 @@ static void pc_summary_draw(struct pd_canvas *c, const struct pd_snapshot *s,
   txt(c, 68, 88, b);
   snprintf(b, sizeof b, "HP %d/%d", m->hp, m->maxHp);
   txt(c, 20, 124, b);
+  pd_fill(c, 20, 144, 218, 6, 0x181818);
+  pd_fill(c, 22, 146, 214, 2, 0xffffff);
+  if (m->maxHp > 0)
+    pd_fill(c, 22, 146, 214 * m->hp / m->maxHp, 2,
+            m->hp * 2 > m->maxHp   ? 0x00bd00
+            : m->hp * 5 > m->maxHp ? 0xffbd00
+                                   : 0xff0000);
   const int *types = mon_types(m->species, build);
   if (!page) {
     if (types[0]) {
@@ -175,9 +182,20 @@ static void pc_summary_draw(struct pd_canvas *c, const struct pd_snapshot *s,
     txt(c, 20, 208, "HELD ITEM");
     pd_text_fit(c, 20, 230, 218, item_name(m->heldItem, build), 0x181818,
                 PD_NO_SHADOW);
-    txt(c, 20, 270, "EXPERIENCE");
+    txt(c, 20, 250, "EXPERIENCE");
     snprintf(b, sizeof b, "%lu", (unsigned long)m->experience);
-    txt(c, 20, 292, b);
+    txt(c, 20, 272, b);
+    struct pocket_exp xp;
+    if (pc_exp(m, 214, &xp)) {
+      pd_fill(c, 20, 296, 218, 10, 0x181818);
+      pd_fill(c, 22, 298, 214, 6, 0xffffff);
+      pd_fill(c, 22, 298, xp.filled, 6, 0x40b8f8);
+      if (m->level == 100)
+        snprintf(b, sizeof b, "MAX");
+      else
+        snprintf(b, sizeof b, "NEXT %lu", (unsigned long)xp.toNext);
+      txt(c, 20, 314, b);
+    }
   } else {
     const char *labels[] = {"", "WEAK TO", "RESISTS", "IMMUNE TO"};
     txt(c, 20, 158, labels[page]);

@@ -241,7 +241,8 @@ static void pc_battle_pages(struct pc_ui *u, struct pd_canvas *c,
       int y = 96 + i * 76;
       pd_fill(c, 8, y, 496, 72, 0xececec);
       icon(c, 16, y + 8, m->species, rom, n, build);
-      snprintf(b, sizeof b, "%d. %s Lv%d", i + 1, names[m->species], m->level);
+      snprintf(b, sizeof b, "%d. %s Lv%d%s", i + 1, names[m->species], m->level,
+               p.slot == s->partyActive ? " OUT" : "");
       txt(c, 60, y + 4, b);
       const char *name;
       int t, power;

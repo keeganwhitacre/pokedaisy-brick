@@ -32,6 +32,7 @@ struct pc_ui {
       guideReveal, guideScroll, guideMon, guideBoss, battlePage, battleRow,
       battleFoe, battleType, dexFilter;
   unsigned battleSeen;
+  uint32_t animationMs;
   bool wasBattle;
   bool summary, detail, mapSet, placesOpen, moveOpen, guideBossOpen;
 };
@@ -47,6 +48,7 @@ enum pc_action {
   PC_ALTERNATE,
   PC_PLACES
 };
+void pc_ui_tick(struct pc_ui *, uint32_t);
 void pc_ui_observe(struct pc_ui *, const struct pd_snapshot *);
 bool pc_ui_input(struct pc_ui *, const struct pd_snapshot *, enum pc_action);
 void pc_ui_draw(struct pc_ui *, struct pd_canvas *, const struct pd_snapshot *,

@@ -19,6 +19,8 @@ jobs:
         run: |
           python3 pocket/gen_polished.py --check
           python3 pocket/gen_quick.py --check
+          python3 pocket/gen_experience.py --check
+          python3 pocket/gen_party.py --check
       - name: Build Linux frontend and tests
         run: |
           cmake -S pocket -B pocket/build-ci -DCMAKE_BUILD_TYPE=Release -DPOCKET_TESTS=ON -DBUILD_LTO=OFF

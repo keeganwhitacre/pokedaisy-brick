@@ -81,6 +81,7 @@ struct pd_snapshot {
     int foeCount;
     struct pd_mon foes[PD_PARTY_SIZE];
     int foeActive, foeNext;
+    int partyActive; // Optional player party index, -1 when unknown in native Gen 2.
     int mapsec;
     long money; // -1 = unknown
     // By PD_POCKET_*; bagOk = the pockets read (not just empty).

@@ -81,6 +81,10 @@ static void read_sections(struct pd_snapshot *s, pd_read_fn read, void *ctx) {
     return;
   s->inBattle = true;
   s->isTrainer = mode == 2;
+  unsigned char partyIndex;
+  if (read(ctx, PC_RAM_curBattleMon, &partyIndex, 1) &&
+      partyIndex < s->partyCount)
+    s->partyActive = partyIndex;
   if (read(ctx, PC_RAM_battleMon, raw, sizeof raw))
     battle_mon(&s->battlers[PD_POS_PLAYER_LEFT], raw);
   if (read(ctx, PC_RAM_enemyMon, raw, sizeof raw))
@@ -502,6 +506,8 @@ void pc_item_draw(struct pd_canvas *c, int item, const unsigned char *rom,
   txt(c, 12, 366, "B:Bag X:Play");
 }
 
+static void pc_party_draw(struct pd_canvas *, const struct pd_snapshot *, int,
+                          bool, const unsigned char *, size_t, int, int);
 static const int *mon_types(int, int);
 static int type_percent(int, int);
 #include "polished_battle.inc"
@@ -511,6 +517,7 @@ static int clamp_selection(int value, int count);
 static int clamp_selection(int value, int count) {
   return value < 0 || !count ? 0 : value >= count ? count - 1 : value;
 }
+void pc_ui_tick(struct pc_ui *u, uint32_t ms) { u->animationMs = ms; }
 bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
                  enum pc_action a) {
   if (a == PC_PREVIOUS || a == PC_NEXT) {
@@ -751,7 +758,8 @@ void pc_ui_draw(struct pc_ui *u, struct pd_canvas *c,
       pc_summary_draw(c, s, u->selected, u->move, u->summaryPage, u->typePage,
                       rom, n, build);
     else
-      pc_draw(c, s, u->selected, false, rom, n, build);
+      pc_party_draw(c, s, u->selected, false, rom, n, build,
+                    ((u->animationMs / 167) % 2) ? 10 : 2);
   } else if (u->section == PC_BAG) {
     if (u->detail && s->bag[u->pocket].count)
       pc_item_draw(c, s->bag[u->pocket].items[u->item].id, rom, n, build);

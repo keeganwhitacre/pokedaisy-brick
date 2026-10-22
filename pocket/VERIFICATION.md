@@ -1,4 +1,4 @@
-# Phase 10 verification
+# Phase 11 verification
 
 Phase 7 adds the L3 quick menu: original Android state/FF/companion pixel icons,
 D-pad ring navigation, genuine paused gameplay at its existing physical scale,
@@ -158,3 +158,11 @@ Native and ARM/QEMU diagnostic GB/GBA emulator tests pass both normally and with
 The private-ROM display test passes natively and on ARM/QEMU: exact PPU viewport preservation, display cycling, menu fallback, state cache invalidation, companion/wheel pause, and remembered display mode after actual emulator teardown/reopening. The ARM run also forces save-mapping failure. No physical Brick testing occurred. SD-card failure behavior, sustained hardware speed/audio, RTC and suspend/power remain unverified. No ROM, extracted commercial art or private save/state is distributed.
 
 CI includes pocket-host-test and forced-map-failure diagnostics in both native and ARM jobs. Check Actions separately for remote status. Shared sources are merged, but only features compiled into the native host are claimed.
+
+## Phase 11 results (2026-10-22)
+
+Linux and actual NextUI Cortex-A53/AArch64 builds compile. Generated experience tables, Polished growth rates, party art and prior adapters pass freshness checks. Tests check all six experience curves at every level, lower/upper clamping, level 100, invalid ids/levels, egg suppression and Polished Cyndaquil's medium-slow mapping (Lv5 starts at 135; next level 179; 44 remaining at the actual starter state). Active-party decoding is tested against captured battle WRAM with valid and invalid party indices, including one-member parties.
+
+The supplied normal 3.2.3 ROM passes the ordinary-input fresh-game route, produces actual 512x384 party/summary captures, and reads real Cyndaquil Lv5 HP19/19 EXP135. Paired UI-clock captures assert that only the selected sprite region changes. The empty EXP bar at this starter's level boundary is intentional, not placeholder data. Battle OUT captures are labeled upstream trainer-memory fixtures, not a live trainer playthrough.
+
+Native and ARM/QEMU runtime tests pass game/companion pause/resume, state round trips and quick-menu regressions. The supplied-ROM runtime also passes on both architectures without fixture injection. Physical Brick controls, sustained performance, RTC and suspend remain unverified for this pass. Full Android styling/feature parity remains open in PARITY.md. No commercial ROM or private save/state is shipped.

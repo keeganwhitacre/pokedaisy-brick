@@ -143,9 +143,31 @@ int main(int argc, char **argv) {
   struct pc_ui u = {0};
   pc_ui_draw(&u, &canvas, &s, rom, size, build);
   pd_png_write("runtime-live323-party.png", 512, 384, px);
+  static uint32_t still[512 * 384];
+  for (int frame = 0; frame < 2; frame++) {
+    pc_ui_tick(&u, frame * 167);
+    pc_ui_draw(&u, &canvas, &s, rom, size, build);
+    char path[80];
+    snprintf(path, sizeof path, "runtime-phase11-party%d.png", frame);
+    assert(pd_png_write(path, 512, 384, px));
+    if (!frame)
+      memcpy(still, px, sizeof still);
+    else {
+      int changed = 0;
+      for (int y = 0; y < 384; y++)
+        for (int x = 0; x < 512; x++)
+          if (still[y * 512 + x] != px[y * 512 + x]) {
+            changed++;
+            assert(x >= 8 && x < 72 && y >= 40 && y < 128);
+          }
+      assert(changed > 0);
+      puts("PASS selected icon animation changes only its sprite region");
+    }
+  }
   u.summary = true;
   pc_ui_draw(&u, &canvas, &s, rom, size, build);
   pd_png_write("runtime-live323-summary.png", 512, 384, px);
+  assert(pd_png_write("runtime-phase11-summary.png", 512, 384, px));
   u.summaryPage = 1;
   pc_ui_draw(&u, &canvas, &s, rom, size, build);
   pd_png_write("runtime-live323-matchups.png", 512, 384, px);

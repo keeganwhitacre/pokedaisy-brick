@@ -1,6 +1,8 @@
 /* GPL-3.0; adapted from PokeDaisy Gen2Reader.kt, Gen2Art.kt, Gen2Dex.kt.
  * ROM art is decoded only from the user's SHA-1 matched ROM. */
 #include "polished.h"
+#include "experience.h"
+#include "party_art.h"
 #include "pd_font.h"
 #include "polished_guide_tables.h"
 #include "polished_tables.h"
@@ -41,6 +43,16 @@ void pc_font(const unsigned char *rom, size_t n, int build) {
     fontBuild = build;
   }
   pd_font_set(romFont, 129);
+}
+static bool pc_exp(const struct pd_mon *m, int width, struct pocket_exp *xp) {
+  static const int rates[] = {0, 3, 4, 5};
+  if (m->species <= 0 || m->species == 255 ||
+      m->species >=
+          (int)(sizeof polishedGrowthRates / sizeof *polishedGrowthRates))
+    return false;
+  int rate = polishedGrowthRates[m->species];
+  return rate >= 0 && rate < 4 &&
+         pocket_exp_progress(rates[rate], m->level, m->experience, width, xp);
 }
 static int landmark(unsigned map);
 int pc_identify(const unsigned char *rom, size_t n) {
@@ -106,6 +118,7 @@ invalid:
 static void read_sections(struct pd_snapshot *, pd_read_fn, void *);
 bool pc_read(struct pd_snapshot *s, pd_read_fn read, void *ctx) {
   memset(s, 0, sizeof(*s));
+  s->partyActive = -1;
   unsigned char count, raw[288];
   if (!read(ctx, PC_RAM_partyCount, &count, 1) || count > 6 ||
       !read(ctx, PC_RAM_partyMons, raw, sizeof raw))
@@ -231,8 +244,9 @@ static uint32_t rgb(const unsigned char *p) {
   return (((r << 3) | (r >> 2)) << 16) | (((g << 3) | (g >> 2)) << 8) |
          (b << 3) | (b >> 2);
 }
-static void icon(struct pd_canvas *c, int x, int y, int id,
-                 const unsigned char *rom, size_t n, int build) {
+static void icon_scaled(struct pd_canvas *c, int x, int y, int id,
+                        const unsigned char *rom, size_t n, int build,
+                        int scale) {
   if (!rom || build < 0 || build >= (int)(sizeof builds / sizeof *builds) ||
       id < 1)
     return;
@@ -252,9 +266,13 @@ static void icon(struct pd_canvas *c, int x, int y, int id,
         int v = ((tiles[tile * 16 + yy * 2] >> (7 - xx)) & 1) |
                 (((tiles[tile * 16 + yy * 2 + 1] >> (7 - xx)) & 1) << 1);
         if (v)
-          pd_fill(c, x + (tile % 2 * 8 + xx) * 2, y + (tile / 2 * 8 + yy) * 2,
-                  2, 2, colors[v]);
+          pd_fill(c, x + (tile % 2 * 8 + xx) * scale,
+                  y + (tile / 2 * 8 + yy) * scale, scale, scale, colors[v]);
       }
+}
+static void icon(struct pd_canvas *c, int x, int y, int id,
+                 const unsigned char *rom, size_t n, int build) {
+  icon_scaled(c, x, y, id, rom, n, build, 2);
 }
 // Gen2Art.holdIcons: first tile is Mail, second tile is the item marker.
 static void held_icon(struct pd_canvas *c, int x, int y,
@@ -303,8 +321,9 @@ static void pc_summary_draw(struct pd_canvas *, const struct pd_snapshot *, int,
                             int, int, int, const unsigned char *, size_t, int);
 static void pc_move_draw(struct pd_canvas *, const struct pd_mon *, int,
                          const unsigned char *, size_t, int);
-void pc_draw(struct pd_canvas *c, const struct pd_snapshot *s, int selected,
-             bool summary, const unsigned char *rom, size_t n, int build) {
+static void pc_party_draw(struct pd_canvas *c, const struct pd_snapshot *s,
+                          int selected, bool summary, const unsigned char *rom,
+                          size_t n, int build, int iconBob) {
   if (summary && s->valid && selected >= 0 && selected < s->partyCount) {
     pc_summary_draw(c, s, selected, 0, 0, 0, rom, n, build);
     return;
@@ -314,54 +333,65 @@ void pc_draw(struct pd_canvas *c, const struct pd_snapshot *s, int selected,
     txt(c, 20, 70, "Party data is not ready.");
     return;
   }
+  /* PartyScreen.SlotGeometry, drawSlotFrame and drawHpBar at u=2,
+   * stretched to the existing two-column controller grid. Polished's ball
+   * palette is transparent, so no unrelated Pokeball artwork is added. */
   for (int i = 0; i < 6; i++) {
-    int x = 8 + (i % 2) * 250, y = 40 + (i / 2) * 100, w = 244;
+    int x = 8 + (i % 2) * 250, y = 40 + (i / 2) * 100;
     bool empty = i >= s->partyCount;
-    pd_fill(c, x, y, w, 92, empty ? 0xaaaaaa : 0x181818);
-    pd_fill(c, x + 2, y + 2, w - 4, 88,
-            empty           ? 0xf2f2f2
-            : i == selected ? 0xdcdcdc
-                            : 0xffffff);
+    unsigned paper = empty ? 0xf2f2f2 : i == selected ? 0xdcdcdc : 0xffffff;
+    pd_round_rect(c, x + 16, y + 12, 224, 76, 6, empty ? 0xaaaaaa : 0x181818);
+    pd_round_rect(c, x + 20, y + 16, 216, 68, 2, paper);
     if (empty)
       continue;
     const struct pd_mon *m = &s->party[i];
     char b[64];
-    icon(c, x + 7, y + 12, m->species, rom, n, build);
+    icon_scaled(c, x, y + 4 + (i == selected ? iconBob : 0), m->species, rom, n,
+                build, 4);
     if (m->heldItem)
-      held_icon(c, x + 23, y + 37, rom, n, build);
+      held_icon(c, x + 32, y + 56, rom, n, build);
     const char *name = m->species == 255  ? "Egg"
                        : m->species < 512 ? names[m->species]
                                           : NULL;
-    pd_text_fit(c, x + 44, y + 5, w - 50, name ? name : "Unknown", 0x181818,
+    pd_text_fit(c, x + 76, y + 20, 156, name ? name : "Unknown", 0x181818,
                 PD_NO_SHADOW);
     if (m->species == 255)
       continue;
     snprintf(b, sizeof b, "Lv%d", m->level);
-    txt(c, x + 44, y + 25, b);
-    pd_text_right(c, x + w - 8, y + 25,
+    txt(c, x + 88, y + 34, b);
+    pd_text_right(c, x + 220, y + 34,
                   m->gender == PD_GENDER_FEMALE ? "♀"
                   : m->gender == PD_GENDER_MALE ? "♂"
                                                 : "",
                   0x181818, PD_NO_SHADOW);
-    pd_fill(c, x + 44, y + 48, 32, 16, 0xffce10);
-    txt(c, x + 44, y + 48, "HP");
-    pd_fill(c, x + 80, y + 49, w - 90, 12, 0x181818);
-    pd_fill(c, x + 82, y + 51, w - 94, 8, 0xffffff);
-    if (m->maxHp)
-      pd_fill(c, x + 82, y + 51, (w - 94) * m->hp / m->maxHp, 8,
-              m->hp * 5 < m->maxHp   ? 0xff0000
-              : m->hp * 2 < m->maxHp ? 0xffbd00
-                                     : 0x00bd00);
+    pd_round_rect(c, x + 56, y + 52, 24, 14, 2, 0x181818);
+    for (int row = 0; row < 5; row++)
+      for (int col = 0; col < 9; col++)
+        if (partyHpLetters[row][col] == '1')
+          pd_fill(c, x + 58 + col * 2, y + 54 + row * 2, 2, 2, 0xffce10);
+    pd_round_rect(c, x + 78, y + 52, 154, 14, 4, 0x181818);
+    pd_round_rect(c, x + 80, y + 54, 150, 10, 2, 0xffffff);
+    int fill = m->maxHp ? (146 / 2 * m->hp / m->maxHp) * 2 : 0;
+    if (m->hp > 0 && fill < 2)
+      fill = 2;
+    if (fill > 146)
+      fill = 146;
+    pd_fill(c, x + 82, y + 56, fill, 6,
+            m->hp * 2 > m->maxHp   ? 0x00bd00
+            : m->hp * 5 > m->maxHp ? 0xffbd00
+                                   : 0xff0000);
     snprintf(b, sizeof b, "%d/%d", m->hp, m->maxHp);
-    txt(c, x + 44, y + 68, b);
-    pd_text_right(c, x + w - 8, y + 68,
-                  m->hp ? pd_status_label(m->status) : "FNT", 0x181818,
-                  PD_NO_SHADOW);
+    pd_text_right(c, x + 232, y + 68, b, 0x181818, PD_NO_SHADOW);
+    txt(c, x + 76, y + 68, m->hp ? pd_status_label(m->status) : "FNT");
   }
   txt(c, 12, 346, "D-pad:Choose A:Summary");
   txt(c, 12, 366, "L/R:Section B/X:Play");
 }
 
+void pc_draw(struct pd_canvas *c, const struct pd_snapshot *s, int selected,
+             bool summary, const unsigned char *rom, size_t n, int build) {
+  pc_party_draw(c, s, selected, summary, rom, n, build, 0);
+}
 void pc_bag_draw(struct pd_canvas *c, const struct pd_snapshot *s, int pocket,
                  int selected, int build) {
   header(c, 1);

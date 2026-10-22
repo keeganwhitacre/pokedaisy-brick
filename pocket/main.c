@@ -835,6 +835,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     if (pc >= 0) {
       pc_read(&snap, read_memory, c);
       pc_ui_observe(&pcUi, &snap);
+      pc_ui_tick(&pcUi, SDL_GetTicks());
     } else
       pd_snapshot_read(&snap, &game, read_memory, c);
     if (quickOpen) {
