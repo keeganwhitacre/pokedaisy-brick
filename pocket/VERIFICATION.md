@@ -234,3 +234,8 @@ comparison exposed solid native dividers; the final pass reuses upstream's
 6u/2u dash pattern and 2u stroke via a shared canvas helper. Remaining text
 metrics, wrapping and single-screen navigation differences stay documented
 in PARITY.md. The package includes labeled source/native comparisons.
+
+The comparison also caught initial row-follow scrolling hiding HERE's area
+heading. A newly opened page now starts at its section heading; entry-follow
+scrolling starts after controller navigation/reveal. Native/ARM fixture
+captures assert that initial page scroll is zero.

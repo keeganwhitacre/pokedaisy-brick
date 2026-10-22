@@ -479,6 +479,7 @@ static void guide_input(struct pc_ui *u, const struct pd_snapshot *s,
   }
   if (a == PC_RIGHT || (a == PC_CONFIRM && u->guidePagesFocused)) {
     u->guidePagesFocused = false;
+    u->guideFollowSelection = true;
     return;
   }
   if (a == PC_ALTERNATE ||
@@ -486,8 +487,11 @@ static void guide_input(struct pc_ui *u, const struct pd_snapshot *s,
     page = (page + 4 + (a == PC_UP ? -1 : 1)) % 4;
     u->guidePage = pages[page];
     u->guideRow = u->guideScroll = u->guideRowScroll = 0;
+    u->guideFollowSelection = false;
     return;
   }
+  if (a == PC_UP || a == PC_DOWN || a == PC_CONFIRM || a == PC_PLACES)
+    u->guideFollowSelection = true;
   struct guide_row rows[GUIDE_ROWS];
   int count;
   // Game build does not change the selected row in HERE/NEXT BOSS/TIPS.
@@ -630,7 +634,9 @@ static void pc_guide_draw(struct pc_ui *u, struct pd_canvas *c,
   u->guideRowScrollMax = maxRowScroll;
   if (u->guideRowScroll > maxRowScroll)
     u->guideRowScroll = maxRowScroll;
-  if (selectedH > visible)
+  if (!u->guideFollowSelection)
+    u->guideScroll = 0;
+  else if (selectedH > visible)
     u->guideScroll = selectedTop + u->guideRowScroll;
   else if (selectedTop < u->guideScroll)
     u->guideScroll = selectedTop;
@@ -648,7 +654,9 @@ static void pc_guide_draw(struct pc_ui *u, struct pd_canvas *c,
       guide_entry(&rows[i], s, build, &e);
       guide_row_draw(c, y, &rows[i], &e,
                      rows[i].key == u->guideOpenKey ? u->guideReveal : 0,
-                     i == u->guideRow && !u->guidePagesFocused, rom, n, build);
+                     i == u->guideRow && u->guideFollowSelection &&
+                         !u->guidePagesFocused,
+                     rom, n, build);
     }
     y += heights[i];
   }

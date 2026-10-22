@@ -560,6 +560,7 @@ int main(int argc, char **argv) {
         for (int page = 0; page < 4; page++) {
           struct pc_ui guide = {.section = PC_GUIDE, .guidePage = pages[page]};
           pc_ui_draw(&guide, &c, &s, cart, romSize, build);
+          assert(guide.guideScroll == 0); // Opening a page retains its heading.
           char path[128];
           snprintf(path, sizeof path, "runtime-phase14-guide-%s-fixture.png",
                    labels[page]);

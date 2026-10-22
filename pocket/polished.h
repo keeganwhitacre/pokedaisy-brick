@@ -34,7 +34,7 @@ struct pc_ui {
   unsigned battleSeen;
   uint64_t guideOpenKey;
   int guideRowScroll, guideRowScrollMax, guideBuild, guideOpenPage;
-  bool guidePagesFocused;
+  bool guidePagesFocused, guideFollowSelection;
   uint32_t animationMs;
   bool wasBattle, bagStarted, bagReselect;
   bool summary, detail, mapSet, placesOpen, moveOpen;
