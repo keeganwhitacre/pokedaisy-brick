@@ -23,7 +23,11 @@ static int quick_evdev_button(const unsigned char *bits, int target,
 static void quick_bindings(SDL_Joystick *js, SDL_GameController *pad) {
   l3Button = r3Button = -1;
   if (js) {
-    const char *path = SDL_JoystickPath(js);
+    // Optional since SDL 2.24: retain startup compatibility with older
+    // firmware.
+    typedef const char *(*path_fn)(SDL_Joystick *);
+    path_fn joystick_path = (path_fn)dlsym(RTLD_DEFAULT, "SDL_JoystickPath");
+    const char *path = joystick_path ? joystick_path(js) : NULL;
     int fd = path ? open(path, O_RDONLY | O_NONBLOCK) : -1;
     unsigned short buttons[KEY_MAX - BTN_MISC + 1] = {0};
     if (fd >= 0) {

@@ -1,3 +1,6 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 /* Native single-screen host for PokeDaisy. GPL-3.0, see ../NOTICE. */
 #include "../3ds/desktop/pd_png.h"
 #include "pd_font.h"
@@ -9,6 +12,7 @@
 #include "polished.h"
 #include <SDL.h>
 #include <dirent.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/joystick.h>
