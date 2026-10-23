@@ -1,8 +1,9 @@
 # Companion battle interactions — implementation checkpoint
 
 This continues Phase 16 on phase16-nextui-checkpoints. Main's previous baseline
-is retained. Native build passed once; pure-C captured-menu/model tests pass.
-Real-ROM execution, final native/ARM regressions and packaging are in progress.
+is retained. Native/ARM builds and captured-menu/model tests pass. A genuine
+normal-input Lyra battle verifies the second move's PP consumption and the real
+battle Bag. Final frontend/native/ARM checks and packaging are in progress.
 This checkpoint is not yet a verified hardware release.
 
 Source: checked-in Android BattleInputController.driveGbPickLocked,
@@ -37,3 +38,10 @@ pages, quick ring, save/recovery, expansion and filters remain in place.
 Known current differences: exact Android animations/processing-ball and
 held-frame switching are not yet translated; intermediate original party
 menus may be visible. No Polished field item use/give/take was added.
+
+The real ROM drops B during move-menu opening. Back therefore retries only
+while the same filled-cursor menu remains, bounded like other GB picks; it
+does not report acceptance merely because a B pulse was queued. Android's
+original Back queues one pulse. This is a reliability adaptation, not a new
+game action. A fresh Compose preview attempt was blocked at Gradle download;
+source-rendered Android screenshot comparison remains pending.

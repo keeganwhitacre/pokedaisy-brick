@@ -236,6 +236,11 @@ int main(int argc, char **argv) {
   *addr(0x1d113) = 1;
   assert(pocket_battle_read(read_mem, NULL, &m) && m.state == PB_BUSY);
   reset(PB_MOVE, false);
+  delay = 7;
+  assert(pocket_battle_begin(&a, sha, PB_BACK, 0, read_mem, NULL));
+  run(&a);
+  assert(a.result == PA_DONE && mode == PB_ACTION);
+  reset(PB_MOVE, false);
   *addr(0xc4a5 + 12) = 0;
   assert(!pocket_battle_begin(&a, sha, PB_CHOOSE_MOVE, 1, read_mem, NULL));
   reset(PB_PARTY, false);

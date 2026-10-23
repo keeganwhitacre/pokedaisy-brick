@@ -22,76 +22,125 @@ void pc_ui_observe(struct pc_ui *u, const struct pd_snapshot *s) {
 /* BattleControlsScreen.Gen1ActionButtons / Gen1MoveList / PartyPicker:
  * source labels, 2x2 action/move cells and existing party grid. Physical
  * controller focus replaces touch; original game remains authoritative. */
-static int battle_pct(int,int,int);
-static const char *battle_verdict(int,int);
-static void battle_move(int,int,const char **,int *,int *);
-static bool pc_battle_controls_input(struct pc_ui *u,const struct pd_snapshot *s,enum pc_action a) {
-  bool party=u->battleParty || u->battleMenu.state==PB_PARTY || u->battleMenu.state==PB_SUBMENU;
-  if(a==PC_BACK) {
-    if(party && u->battleMenu.state==PB_ACTION)u->battleParty=false;
-    else if(u->battleMenu.state==PB_MOVE || (party && !u->battleMenu.forced))u->battleRequest=PB_BACK;
-    else u->battleControls=false;
+static int battle_pct(int, int, int);
+static const char *battle_verdict(int, int);
+static void battle_move(int, int, const char **, int *, int *);
+static bool pc_battle_controls_input(struct pc_ui *u,
+                                     const struct pd_snapshot *s,
+                                     enum pc_action a) {
+  bool party = u->battleParty || u->battleMenu.state == PB_PARTY ||
+               u->battleMenu.state == PB_SUBMENU;
+  if (a == PC_BACK) {
+    if (party && u->battleMenu.state == PB_ACTION)
+      u->battleParty = false;
+    else if (u->battleMenu.state == PB_MOVE || (party && !u->battleMenu.forced))
+      u->battleRequest = PB_BACK;
+    else
+      u->battleControls = false;
     return true;
   }
-  if(a==PC_ALTERNATE){u->battleControls=false;return true;}
-  if(a==PC_LEFT)u->battleChoice &= ~1;
-  if(a==PC_RIGHT)u->battleChoice |= 1;
-  if(a==PC_UP)u->battleChoice=party?(u->battleChoice+4)%6:u->battleChoice & ~2;
-  if(a==PC_DOWN)u->battleChoice=party?(u->battleChoice+2)%6:u->battleChoice | 2;
-  if(a==PC_CONFIRM) {
-    if(party) {
-      int i=u->battleChoice;
-      if(i<s->partyCount && s->party[i].hp>0 && s->party[i].species!=255 && i!=s->partyActive) {
-        u->battleRequest=PB_SWITCH;u->battleValue=i;
+  if (a == PC_ALTERNATE) {
+    u->battleControls = false;
+    return true;
+  }
+  if (a == PC_LEFT)
+    u->battleChoice &= ~1;
+  if (a == PC_RIGHT)
+    if (!party || (u->battleChoice | 1) < s->partyCount)
+      u->battleChoice |= 1;
+  if (a == PC_UP)
+    u->battleChoice = party ? (u->battleChoice + 4) % 6 : u->battleChoice & ~2;
+  if (a == PC_DOWN)
+    u->battleChoice = party ? (u->battleChoice + 2) % 6 : u->battleChoice | 2;
+  if (party && u->battleChoice >= s->partyCount)
+    u->battleChoice = s->partyCount > 1 ? (u->battleChoice & 1) : 0;
+  if (a == PC_CONFIRM) {
+    if (party) {
+      int i = u->battleChoice;
+      if (i < s->partyCount && s->party[i].hp > 0 &&
+          s->party[i].species != 255 && i != s->partyActive) {
+        u->battleRequest = PB_SWITCH;
+        u->battleValue = i;
       }
-    } else if(u->battleMenu.state==PB_ACTION) {
-      if(u->battleChoice==1){u->battleParty=true;u->battleChoice=0;}
-      else {u->battleRequest=PB_CHOOSE_ACTION;u->battleValue=(int[]){0,2,1,3}[u->battleChoice];}
-    } else if(u->battleMenu.state==PB_MOVE) {
-      const struct pd_battle_mon *m=&s->battlers[0];int i=u->battleChoice;
-      if(m->moves[i] && m->pp[i]>0){u->battleRequest=PB_CHOOSE_MOVE;u->battleValue=i;}
+    } else if (u->battleMenu.state == PB_ACTION) {
+      if (u->battleChoice == 1) {
+        u->battleParty = true;
+        u->battleChoice = 0;
+      } else {
+        u->battleRequest = PB_CHOOSE_ACTION;
+        u->battleValue = (int[]){0, 2, 1, 3}[u->battleChoice];
+      }
+    } else if (u->battleMenu.state == PB_MOVE) {
+      const struct pd_battle_mon *m = &s->battlers[0];
+      int i = u->battleChoice;
+      if (m->moves[i] && m->pp[i] > 0) {
+        u->battleRequest = PB_CHOOSE_MOVE;
+        u->battleValue = i;
+      }
     }
   }
   return true;
 }
-static void pc_battle_controls_draw(struct pc_ui *u,struct pd_canvas *c,
-                                   const struct pd_snapshot *s,const unsigned char *rom,size_t n,int build) {
-  header(c,PC_BATTLE);
-  bool party=u->battleParty || u->battleMenu.state==PB_PARTY || u->battleMenu.state==PB_SUBMENU;
-  if(party) {
-    pc_party_draw(c,s,u->battleChoice,false,rom,n,build,((u->animationMs/167)%2)?10:2);
-    txt(c,12,346,"Choose a POKeMON. A:Send in");
-    txt(c,12,366,"B:Cancel Y:Info X:Game");
+static void pc_battle_controls_draw(struct pc_ui *u, struct pd_canvas *c,
+                                    const struct pd_snapshot *s,
+                                    const unsigned char *rom, size_t n,
+                                    int build) {
+  header(c, PC_BATTLE);
+  bool party = u->battleParty || u->battleMenu.state == PB_PARTY ||
+               u->battleMenu.state == PB_SUBMENU;
+  if (party) {
+    pc_party_draw(c, s, u->battleChoice, false, rom, n, build,
+                  ((u->animationMs / 167) % 2) ? 10 : 2);
+    pd_fill(c, 0, 338, 512, 46, 0xffffff);
+    if (s->partyActive >= 0 && s->partyActive < s->partyCount)
+      txt(c, 8 + (s->partyActive % 2) * 250 + 182,
+          50 + (s->partyActive / 2) * 100, "OUT");
+    txt(c, 12, 346, "Choose a POKeMON. A:Send in");
+    txt(c, 12, 366, "B:Cancel Y:Info X:Game");
     return;
   }
-  txt(c,12,38,"BATTLE CONTROLS  Y:Info");
-  if(u->battleMenu.state!=PB_ACTION && u->battleMenu.state!=PB_MOVE) {
-    wrapped(c,24,112,464,5,"Waiting for your turn... Return to the game to advance dialogue.");
-  } else for(int i=0;i<4;i++) {
-    int x=8+(i&1)*252,y=72+(i/2)*126;
-    pd_layered_box(c,x,y,244,118,6,pcOptionFrame,5,0xffffff);
-    bool enabled=true;
-    if(i==u->battleChoice)pd_fill(c,x+18,y+20,4,76,0x181818);
-    if(u->battleMenu.state==PB_ACTION) {
-      const char *labels[]={"Fight","PkMn","Bag","Run"};
-      txt(c,x+34,y+46,labels[i]);
-      if(!i)icon(c,x+170,y+36,s->battlers[0].species,rom,n,build);
-    } else {
-      const struct pd_battle_mon *m=&s->battlers[0];int id=m->moves[i],type,power;const char *name;
-      battle_move(id,build,&name,&type,&power);enabled=id && m->pp[i]>0;
-      pd_text_fit(c,x+28,y+20,196,name,enabled?0x181818:0x989898,PD_NO_SHADOW);
-      if(id) {
-        char b[80];snprintf(b,sizeof b,"%s  PP %d",typeNames[type],m->pp[i]);
-        pd_text_fit(c,x+28,y+48,196,b,0x181818,PD_NO_SHADOW);
-        int pct=battle_pct(type,s->battlers[1].type1,s->battlers[1].type2);
-        snprintf(b,sizeof b,"%s",battle_verdict(power,pct));
-        pd_text_fit(c,x+28,y+74,196,b,0x181818,PD_NO_SHADOW);
+  txt(c, 12, 38, "BATTLE CONTROLS  Y:Info");
+  if (u->battleMenu.state != PB_ACTION && u->battleMenu.state != PB_MOVE) {
+    wrapped(c, 24, 112, 464, 5,
+            "Waiting for your turn... Return to the game to advance dialogue.");
+  } else
+    for (int i = 0; i < 4; i++) {
+      int x = 8 + (i & 1) * 252, y = 72 + (i / 2) * 126;
+      pd_layered_box(c, x, y, 244, 118, 6, pcOptionFrame, 5, 0xffffff);
+      bool enabled = true;
+      if (i == u->battleChoice)
+        pd_fill(c, x + 18, y + 20, 4, 76, 0x181818);
+      if (u->battleMenu.state == PB_ACTION) {
+        const char *labels[] = {"Fight", "PkMn", "Bag", "Run"};
+        txt(c, x + 34, y + 46, labels[i]);
+        if (!i)
+          icon(c, x + 170, y + 36, s->battlers[0].species, rom, n, build);
+      } else {
+        const struct pd_battle_mon *m = &s->battlers[0];
+        int id = m->moves[i], type, power;
+        const char *name;
+        battle_move(id, build, &name, &type, &power);
+        enabled = id && m->pp[i] > 0;
+        pd_text_fit(c, x + 28, y + 20, 196, name, enabled ? 0x181818 : 0x989898,
+                    PD_NO_SHADOW);
+        if (id) {
+          char b[80];
+          snprintf(b, sizeof b, "%s", typeNames[type]);
+          pd_text_fit(c, x + 28, y + 48, 196, b, 0x181818, PD_NO_SHADOW);
+          int pct =
+              battle_pct(type, s->battlers[1].type1, s->battlers[1].type2);
+          if (power)
+            snprintf(b, sizeof b, "PP %d  %gx", m->pp[i], pct / 100.0);
+          else
+            snprintf(b, sizeof b, "PP %d", m->pp[i]);
+          pd_text_fit(c, x + 28, y + 74, 196, b, 0x181818, PD_NO_SHADOW);
+        }
       }
+      if (!enabled)
+        pocket_fade_rect(c, x + 12, y + 12, 220, 94, 0xffffff, 55);
     }
-    if(!enabled)pocket_fade_rect(c,x+12,y+12,220,94,0xffffff,55);
-  }
-  txt(c,12,346,"D-pad:Choose A:Confirm B:Back");
-  txt(c,12,366,"Start:Info X:Game");
+  txt(c, 12, 346, "D-pad:Pick A:Use B:Back");
+  txt(c, 12, 366, "Start:Info X:Game");
 }
 static int battle_pct(int type, int d1, int d2) {
   int pct = type_percent(type, d1);

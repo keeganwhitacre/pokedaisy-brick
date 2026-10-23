@@ -99,8 +99,9 @@ static int target_slot(struct pocket_battle_action *a, pocket_action_read r,
     uint8_t id[8];
     identity(p, id);
     if (requested >= 0 ? i == requested : !memcmp(id, a->identity, 8)) {
+      unsigned hp = (p[34] << 8) | p[35], maxHp = (p[36] << 8) | p[37];
       if (found >= 0 || !p[0] || p[0] == 255 || (p[21] & 64) || !p[31] ||
-          p[31] > 100 || !(p[34] | p[35]))
+          p[31] > 100 || !hp || hp > maxHp || maxHp > 999)
         return -1;
       found = i;
       if (requested >= 0)
@@ -148,6 +149,7 @@ bool pocket_battle_begin(struct pocket_battle_action *a, const char *sha,
     a->hold = 2;
     a->gap = 2;
     a->phase = 5;
+    a->menu = m.state;
   } else
     return false;
   a->result = PA_RUNNING;
@@ -184,8 +186,16 @@ unsigned pocket_battle_tick(struct pocket_battle_action *a,
   if (!pocket_battle_read(r, c, &m))
     return reject(a);
   if (a->phase == 5) {
-    a->result = PA_DONE;
-    return 0;
+    if (m.state != (enum pocket_battle_state)a->menu) {
+      a->result = PA_DONE;
+      return 0;
+    }
+    if (a->frames - a->lastA < 8)
+      return 0;
+    if (++a->presses > 12)
+      return reject(a);
+    a->lastA = a->frames;
+    return press(a, KEY_B, 2, 2);
   }
   if (a->phase == 4) { /* Android driveRunLocked: six bounded B presses. */
     if (m.state == PB_NONE || m.state == PB_ACTION || !a->presses) {
