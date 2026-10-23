@@ -203,11 +203,13 @@ int main(int argc, char **argv) {
     wide_tick(c, false);
     if (wideReady && pk_wide_gb_scene() == PK_WIDE_SCENE_TEXT)
       openFrames++;
-    if (wideReady && pk_wide_gb_scene() == PK_WIDE_SCENE_FIELD)
+    if (wideReady && pk_wide_gb_scene() == PK_WIDE_SCENE_FIELD) {
+      if (!fieldFrames)
+        screenshot("runtime-phase16-expanded-field.png");
       fieldFrames++;
+    }
   }
   assert(openFrames > 0 && fieldFrames > 0);
-  screenshot("runtime-phase16-expanded-field.png");
   printf("PASS expanded dialogue %d frames / field %d frames; original PPU "
          "centre asserted every expanded frame\n",
          openFrames, fieldFrames);

@@ -19,7 +19,8 @@ Native and ARM tests pass recovery roundtrip with exact frame counters;
 failed SRAM-sync preservation; corrupt/truncated/wrong-ROM rejection before
 core mutation; changed-battery rejection; manual-state separation; and actual
 frontend graceful exit/relaunch, AUTO RESUME OFF and --fresh bypass. The test
-also inspects the actual envelope payload to assert it contains no savedata.
+also passes actual frontend normal-boot fallback after truncating its recovery
+and inspects the actual envelope payload to assert it contains no savedata.
 See LIFECYCLE.md for content versus RTC-trailer checks and atomic-write limits.
 
 Synthetic power events verify immediate pause between frames, zero input,
@@ -50,7 +51,12 @@ Earlier sanitizer results below apply only to their documented earlier runs.
 
 Reproduce with POCKET_TESTS=ON and the commands in LIFECYCLE.md. The package
 includes phase16 test logs and screenshots, with no ROMs, player saves, states
-or recovery files. Source checkpoints are on phase16-nextui-checkpoints;
+or recovery files. The stripped packaged AArch64 executable also passes a
+120-frame real-ROM launch/capture under QEMU (800x720 original viewport,
+25,825 nonblack pixels). The direct-launch wrapper passes an isolated
+argument-forwarding check, including spaces and --fresh. Actual NextUI menu
+selection remains a hardware integration check.
+Source checkpoints are on phase16-nextui-checkpoints;
 main retains the previously tested Phase 15 baseline.
 
 ## Phase 15 verification (retained)
