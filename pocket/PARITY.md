@@ -35,7 +35,7 @@ retail companion support remain as before; this does not add Seaglass decoding.
 
 L3 opens the quick-menu ring. R3 cycles Original / Expand / Zoom, with a Menu > Display fallback. The existing `pk_wide_gb.c` renderer has a native-only adapter for normal Polished Crystal 3.2.3, using official release symbols and the game's actual decompressed metatile/attribute banks. Original pixels are preserved. Ready matched dialogue stays expanded unless AUTO ZOOM IN is ON; menus, battles and unmatched frames return to the original viewport. Other builds do not receive guessed addresses.
 
-Remaining expansion work: unspawned/connected-map NPC templates; broad outdoor, map-connection, weather/lighting and battle-transition verification; User confirms expansion/zoom and quick-menu operation on Brick; broader performance, lifecycle and new-UI retests remain. The initial real-ROM verification covers Elm's laboratory, normal starter dialogue, display cycling, paused companion/wheel and state reset.
+Phase 18 adds ordinary unspawned/connected-map NPC templates; see EXPANSION.md for supported objects and conservative omissions. Broad outdoor, weather/lighting and battle-transition verification remain. User confirms expansion/zoom and quick-menu operation on Brick; broader performance, lifecycle and new-UI retests remain. Real-ROM coverage now includes lab dialogue, New Bark Town and a normal Route29 connection crossing.
 
 ## Next Polished work, before GBA companion expansion
 
@@ -63,10 +63,10 @@ accepts ready MAP/TEXT frames from the unchanged shared renderer. Default OFF
 is an explicit user-requested difference from Android's ON. Android's timed
 camera tween is still absent; safe menu/battle fallback is retained.
 
-The Polished object audit verified the loaded 34-byte layout and sprite flag
-logic against actual release source. Unspawned/connected-map NPC templates
-remain unported and may pop in at expanded edges. No speculative data or
-unverified connected-map fix is claimed. Lab tests do not certify connections.
+The Phase 16 audit verified the loaded 34-byte object layout against actual
+release source. Phase 18 now adapts ordinary unspawned/connected-map objects,
+with a real New Bark/Route29 crossing test. Special objects, missing palettes
+and broader connected-map conditions remain limited; see EXPANSION.md.
 
 Recovery and power are Linux/NextUI adaptations, preserving the existing
 mGBA frontend. Recovery validates state and current battery content and never

@@ -1,4 +1,32 @@
-# Phase 17 verification
+# Phase 18 verification
+
+Native Linux and actual NextUI AArch64 release targets build. New object tests
+pass natively and under ARM/QEMU with the private normal 3.2.3 ROM. The game is
+walked normally from the aide-gift state through Elm's lab exit, New Bark Town
+and its west connection into Route29. Every frame compares every original
+160x144 PPU pixel. The real Route29 header checks the distinct Polished list
+sizes. Decoded standing player tiles equal the game's own VRAM bytes.
+
+Same-frame templates-on/off captures were inspected: 205 changed pixels add
+the connected New Bark NPC at the expanded right edge, with the original PPU
+unchanged. The templates-off image disables only the new layer in a copied
+snapshot, not an independently run historical binary. The test observes eight
+unspawned unmasked Route29 objects, of which two have supported standard
+graphics and an available palette. This does not establish all-map coverage.
+
+Model guards cover visibility masks, loaded associations, carryover identity,
+time restriction, invalid flags, unavailable palettes, unsupported special
+sprites/movements and cache reset. Model mutations touch copied snapshots,
+not live game memory. Existing native/ARM runtime, save, recovery, dialogue,
+quick menu, expansion and companion checks remain the regression boundary.
+
+Power packet tests cover short press, hold, autorepeat, wake debounce,
+discard-through-SYN_REPORT and failed-resync safety. Lifecycle tests substitute
+only the real suspend invocation. Physical Brick sleep/wake, audio restoration,
+elapsed RTC and sustained speed remain unverified. See LIFECYCLE.md for the
+short device test and launch-log diagnostics, EXPANSION.md for source/limits.
+
+## Phase 17 verification
 
 ## Bag favorites follow-up
 

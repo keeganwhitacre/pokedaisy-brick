@@ -1,5 +1,29 @@
 # Phase 16: handheld lifecycle and recovery
 
+Phase 18 follow-up: evdev queue overflow (SYN_DROPPED) now discards the
+incomplete packet through SYN_REPORT before querying key state. A lost release
+cannot be interpreted as a short press or a long-held shutdown. Failed resync
+requires a fresh press. Pure Linux packet tests cover press/repeat/release,
+hold, wake debounce and overflow without invoking host sleep. Launch logs now
+identify power presses, requested sleep/shutdown and helper return status.
+These changes improve the adapter; they do not certify hardware sleep.
+
+## Brick test after installing Phase 18
+
+1. Launch the ROM directly from its NextUI game-list entry. Confirm the
+   expected battery save or recovery session opens; try --fresh if needed.
+2. Save in-game, enable Expand or Zoom, open/close dialogue and companion.
+3. Tap power, wait, then wake. Check real device sleep, normal audio, released
+   buttons and no accelerated catch-up. Repeat several times.
+4. Close game normally, return to NextUI and reopen. Check position, game
+   progress, battery save compatibility and recovery behavior.
+5. After an in-game save, test long-press shutdown and the next startup.
+
+If power does nothing, retain Tools/tg5040/PokeDaisy.pak/launch.log. Its
+"NextUI power" lines distinguish missing event access, button detection,
+helper failure and return. Do not treat a frozen game/backlight alone as proof
+of sleep. Check RTC against real elapsed time on the device.
+
 Physical sleep/wake, audible audio, startup B and elapsed RTC behavior await
 Brick testing. Linux/QEMU tests substitute the suspend callback and never
 suspend or shut down their host. This keeps the existing SDL/mGBA backend.

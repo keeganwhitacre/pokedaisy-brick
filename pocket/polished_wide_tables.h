@@ -27,5 +27,7 @@ static const uint32_t pcWideConfig[GB_CONFIG] = {
     [PC_METATILES] = 0x3d000,
     [PC_ATTRIBUTES] = 0x4d000,
     [PC_SCRATCH] = 0x6d000,
+    [GB_MAP_OBJECTS] = 0x1d691,
+    [PC_LOADED_PALS] = 0x1db7e,
     [PC_MAP_ATTR_BANK] = 0x26,
 };

@@ -7,6 +7,7 @@ struct pocket_platform {
   bool active, powerDown, sleepRequested, shutdownRequested;
   uint32_t pressedAt, ignoreUntil;
   int fds[32], count;
+  bool dropped[32];
   char suspendHelper[1200];
 };
 void pocket_platform_init(struct pocket_platform *);

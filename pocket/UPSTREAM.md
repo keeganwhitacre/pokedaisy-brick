@@ -1,5 +1,22 @@
 # Maintaining the native port
 
+## Phase 18: object and power boundaries
+
+EXPANSION.md records the exact Polished release source, symbol checksum,
+14-byte map objects, event parsing, sprite decoding and dynamic palette rules.
+The shared renderer retains its algorithms, with small guarded hooks calling
+polished_wide_objects.inc only for normal 3.2.3 Linux. ROM graphics are cached
+without changing emulated VRAM. Review map object/layout constants, movement
+types, event counts, SpriteHeaders, GetUsedSprite, palette assignment and map
+connection reassociation together on game updates. Dynamic/special objects
+and connected callback behavior remain explicit follow-up work.
+
+platform_nextui remains the sole foreground power adapter. Its queue-overflow
+fix follows the evdev SYN_DROPPED/SYN_REPORT resynchronization contract; no
+daemon, fake sleep path or additional power-button owner was introduced.
+Tests exercise packet handling and substituted lifecycle calls. Device-level
+verification is separate and remains required.
+
 This is a branch of lidor30/pokedaisy with its original history, not an independent
 copy of the application. The current upstream base is recorded in the release's
 Verification/build.json. Keep the original LICENSE and NOTICE.

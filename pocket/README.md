@@ -1,10 +1,18 @@
-# PokeDaisy Pocket: Phase 17 — companion battle interactions
+# PokeDaisy Pocket: Phase 18 — expanded NPCs and handheld reliability
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 
 Native SDL2 and mGBA port for TrimUI Brick / NextUI. The user has confirmed
 gameplay, expanded/zoomed overworlds, companion menus, saves and the quick menu
 on physical hardware. Those working paths are retained.
+
+Phase 18 adds ordinary unspawned and connected-map NPCs to expanded Polished
+Crystal, using verified object data, original ROM graphics and applied
+palettes. A normal-input test crosses New Bark Town into Route29 and checks
+every original Game Boy pixel. Special objects and unavailable palettes remain
+conservative omissions; see EXPANSION.md. Power input also handles queue
+overflow safely and logs button/helper stages for device testing. Physical
+sleep/wake, audio, RTC and long-session speed still await Brick testing.
 
 Phase 17 ports Android's Polished battle controller for normal 3.2.3. During a
 battle open the companion, choose BATTLE and press Start for controls. D-pad/A

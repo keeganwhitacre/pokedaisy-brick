@@ -50,11 +50,14 @@ void pocket_platform_key(struct pocket_platform *p, bool down, uint32_t now) {
   if (down && !p->powerDown) {
     p->powerDown = true;
     p->pressedAt = now;
+    fprintf(stderr, "NextUI power: button pressed; gameplay pause requested\n");
   } else if (!down && p->powerDown) {
     if (now - p->pressedAt >= 1000)
       p->shutdownRequested = true;
     else
       p->sleepRequested = true;
+    fprintf(stderr, "NextUI power: %s requested\n",
+            p->shutdownRequested ? "shutdown" : "sleep");
     p->powerDown = false;
   }
 }
@@ -64,31 +67,52 @@ void pocket_platform_poll(struct pocket_platform *p, uint32_t now) {
   for (int i = 0; i < p->count; i++) {
     struct input_event e;
     while (read(p->fds[i], &e, sizeof e) == sizeof e) {
-      if (e.type == EV_KEY && e.code == KEY_POWER && e.value != 2)
-        pocket_platform_key(p, e.value != 0, now);
       if (e.type == EV_SYN && e.code == SYN_DROPPED) {
+        p->dropped[i] = true;
+        p->powerDown = false;
+        continue;
+      }
+      // Linux input protocol requires discarding the incomplete packet up
+      // to SYN_REPORT before querying current key state. Old KEY_POWER
+      // releases in that packet must not become a sleep request.
+      if (p->dropped[i]) {
+        if (e.type != EV_SYN || e.code != SYN_REPORT)
+          continue;
+        p->dropped[i] = false;
         unsigned char keys[(KEY_MAX + 8) / 8] = {0};
         if (ioctl(p->fds[i], EVIOCGKEY(sizeof keys), keys) >= 0)
           pocket_platform_key(
               p, (keys[KEY_POWER / 8] & (1u << (KEY_POWER % 8))) != 0, now);
+        else
+          p->powerDown =
+              false; // No trustworthy held key; never infer shutdown.
+        continue;
       }
+      if (e.type == EV_KEY && e.code == KEY_POWER && e.value != 2)
+        pocket_platform_key(p, e.value != 0, now);
     }
   }
-  if (p->powerDown && now - p->pressedAt >= 1000)
+  if (p->powerDown && !p->shutdownRequested && now - p->pressedAt >= 1000) {
     p->shutdownRequested = true;
+    fprintf(stderr, "NextUI power: held button; shutdown requested\n");
+  }
 }
 void pocket_platform_woke(struct pocket_platform *p, uint32_t now) {
   p->powerDown = p->sleepRequested = false;
   p->ignoreUntil = now + 1000;
+  fprintf(stderr, "NextUI power: suspend returned; input debounce active\n");
   for (int i = 0; i < p->count; i++) {
+    p->dropped[i] = false;
     struct input_event e;
     while (read(p->fds[i], &e, sizeof e) == sizeof e) {
     }
   }
 }
 bool pocket_platform_suspend(struct pocket_platform *p) {
-  if (!p->active || access(p->suspendHelper, X_OK))
+  if (!p->active || access(p->suspendHelper, X_OK)) {
+    fprintf(stderr, "NextUI power: real suspend helper unavailable\n");
     return false;
+  }
   pid_t child = fork();
   if (child < 0)
     return false;
@@ -100,7 +124,10 @@ bool pocket_platform_suspend(struct pocket_platform *p) {
   while (waitpid(child, &status, 0) < 0)
     if (errno != EINTR)
       return false;
-  return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+  bool ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
+  fprintf(stderr, "NextUI power: suspend helper %s (wait status %d)\n",
+          ok ? "completed" : "failed", status);
+  return ok;
 }
 bool pocket_platform_poweroff(struct pocket_platform *p) {
   if (!p->active || !p->shutdownRequested)
