@@ -1,10 +1,14 @@
-# Companion battle interactions — implementation checkpoint
+# Phase 17: companion battle interactions
 
 This continues Phase 16 on phase16-nextui-checkpoints. Main's previous baseline
-is retained. Native/ARM builds and captured-menu/model tests pass. A genuine
-normal-input Lyra battle verifies the second move's PP consumption and the real
-battle Bag. Final frontend/native/ARM checks and packaging are in progress.
-This checkpoint is not yet a verified hardware release.
+is retained. Native/actual NextUI ARM builds and captured-menu/model tests pass.
+A genuine normal-input Lyra battle verifies the second move's PP consumption,
+the real battle Bag, Back and trainer Run refusal. The actual frontend's
+Fight -> second move -> turn -> automatic return passes natively and on ARM/QEMU.
+The genuine one-member party verifies active-slot refusal and picker cancel.
+Optional/forced switching and game refusal are capture/model-tested, not yet
+executed in a genuine multi-member real-ROM party. Physical controls still
+require Brick testing. This is an incremental port, not full Android parity.
 
 Source: checked-in Android BattleInputController.driveGbPickLocked,
 driveGbSwitchLocked, readGen2BattleInput, readGen2PartyMenu, Gen2PartySwitch,
@@ -35,6 +39,12 @@ Dialogue may still need ordinary game buttons. B/X/Menu/L3 or power cancel an
 active sequence and release synthetic keys. Original read-only companion
 pages, quick ring, save/recovery, expansion and filters remain in place.
 
+Start+Select follows the same cancellation rule as Menu. A native/ARM frontend
+test pauses a queued action through that hotkey, loads a state and verifies
+that resuming cannot restart cancelled input. The isolated model/capture
+harness passes ASan/UBSan (leak detection disabled); this is not a whole-core
+sanitizer claim.
+
 Known current differences: exact Android animations/processing-ball and
 held-frame switching are not yet translated; intermediate original party
 menus may be visible. No Polished field item use/give/take was added.
@@ -45,3 +55,26 @@ does not report acceptance merely because a B pulse was queued. Android's
 original Back queues one pulse. This is a reliability adaptation, not a new
 game action. A fresh Compose preview attempt was blocked at Gradle download;
 source-rendered Android screenshot comparison remains pending.
+
+## Reproduce
+
+Build POCKET_TESTS=ON. From pocket:
+
+```
+pocket-battle-test ../app/src/test/resources/fixtures
+pocket-battle-runtime-test /private/normal-3.2.3.gbc /private/starter.ss
+```
+
+Generate the starter with the existing pocket-rom-test normal-input script.
+The runtime harness finishes Elm's conversation, walks to the source-verified
+scene-6 coordinate event at (4,6), then battles Lyra normally. Game coordinates
+are read from the existing official-symbol-generated expansion mapping; no
+RAM/fixture injection is used in these emulator tests. Separate pure-C model
+tests deliberately mutate their own byte arrays to exercise failures.
+
+The new module must be reviewed with Gen2Reader's menu geometry, cursor tile,
+party-menu action values and Polished struct offsets on upstream updates.
+BattleInputController SHA-256 at this port:
+ad07035d1db292b58071b96a336ee3650aaff85e2e2d83e5d476b457cd5f26d5.
+GbPartySwitch: bc5791a35ad51762f008b8c5dc5cce7a91ba2dd3fd195d29eb6362b157b49f63.
+Gen2Reader: 8ec656a7687c9c9375964e5b4df7186abf6f4da6eb2b0b57d416d47b6d6e798c.

@@ -1,4 +1,4 @@
-# Polished Crystal Android parity boundary — Phase 16
+# Polished Crystal Android parity boundary — Phase 17
 
 This compares the native port with the **Polished Crystal path** at upstream
 `54d8f4867501feb32b7ee139a5616b7c6301f044`, rather than with Android features
@@ -13,7 +13,7 @@ user's matching cart. Full visual and behavioral parity is still unfinished.
 | Party | Six slots, rounded upstream frames, original HP lettering, larger ROM icons, selected-icon bobbing, gender/status/held markers and egg handling | Remaining fine layout details; upstream Gen 2 EXP bar is on Summary |
 | Summary | Left-info/right-moves hierarchy, held item, EXP progress/NEXT/MAX and HP bars, descriptions, type matchups, party cycling | Remaining styling/animation; Android's Polished decoder does not supply IV/EV stats or LEARN data |
 | Bag | Upstream magenta stripes, folder tabs, All/occupied pockets, cursor, framed list and inline complete descriptions; all quantities/money and four read-only sorts with stack retention | Favorites and fine layout details; Gen 2 supplies no item icons; upstream FieldItems has no Polished USE/GIVE/TAKE implementation |
-| Battle | INFO effectiveness labels; upstream power/type/risk ranking; live foe item/stats/moves and type-matchup groups; browsable team with unseen slots; battle-scoped seen tracking and exact active-party OUT marker and original-style HP bars | Remaining Android panel layout; Gen 2 supplies no announced-next-foe index; Android Polished battle commands and party switching remain to be ported (Gen2Reader/GbPartySwitch/BattleInputController) |
+| Battle | Existing INFO/advice/team features plus source-derived action/move controls, original battle Bag/Run/Back and identity-checked switching on normal 3.2.3 | Multi-member real-ROM switch validation; other builds; remaining Android layout/animation, processing indicator and held-frame switching; Gen 2 supplies no announced-next-foe index |
 | Dex | Upstream counts/filter + icon-list layout, original caught/seen marks and muted unseen entries; real flags/order, four filters, front sprites, descriptions, dimensions/base stats, species abilities | Entry-page layout, held-button navigation/repeat and further styling; upstream PokedexScreen has no name-search feature; upstream's Polished dex has no evolution table |
 | Map | All three ROM maps, palettes/flips, live location/player, pulsing landmark cursor, regions, Places | Precise location refinements; Polished Fly is not provided by upstream FieldItems |
 | Guide HERE | Android left page selector and inline sections for every present encounter method, PEOPLE and ITEMS; caught counts/balls, owned-last area rows, time/badge levels, encounter icons and spoiler-safe reveals | First-use guide notice, small-text sizing and fine layout/scroll-animation differences |
@@ -48,6 +48,15 @@ Remaining expansion work: unspawned/connected-map NPC templates; broad outdoor, 
 These are still open; Phase 14 does not claim full Android parity. GBA work is deferred.
 
 ## Phase 16: native handheld integration
+
+Phase 17 adds the existing Android Polished battle interaction path; see
+INTERACTIONS.md for supported ROM identity, controls and validation limits.
+The read-only information pages remain available. Native and ARM/QEMU genuine
+Lyra-battle tests prove second-move PP consumption and companion return, Bag,
+Back and game-owned trainer Run refusal. Switching is implemented from the
+upstream state machine, but genuine multi-member/forced-switch runtime testing
+is still pending beyond captured observations and model tests. No Polished
+field-item use/give/take or healing-target extension was added.
 
 Android WideCamera/Prefs already supports disabling AUTO ZOOM IN. The host now
 accepts ready MAP/TEXT frames from the unchanged shared renderer. Default OFF

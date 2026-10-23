@@ -509,6 +509,7 @@ bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
       a != PC_NEXT)
     return pc_battle_controls_input(u, s, a);
   if (a == PC_PREVIOUS || a == PC_NEXT) {
+    u->battleRequest = 0;
     u->section =
         (u->section + PC_SECTIONS + (a == PC_NEXT ? 1 : -1)) % PC_SECTIONS;
     u->summary = u->detail = u->moveOpen = u->placesOpen = false;

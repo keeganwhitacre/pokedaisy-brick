@@ -201,3 +201,14 @@ NextUI power ownership/helper/launcher behavior was inspected at commit
 sprite initialization were inspected in release source. No new memory offsets
 or guessed connected-map objects were introduced. LIFECYCLE.md records source
 paths, defaults, suspend differences and recovery validation/durability rules.
+
+## Phase 17 battle interaction sources
+
+BattleInputController, Gen2Reader and GbPartySwitch are translated as recorded
+in INTERACTIONS.md. Normal 3.2.3's cfg supplies menu geometry CE7C, cursor CE84,
+tilemap C1A0, battle mode 1:D233, move-menu type 1:D239, party action 1:D113,
+active slot 1:D0DA, party count/structs 1:DCCE/1:DCD6 and battle struct C4A5.
+The actual game's ram/wram0.asm, ram/wramx.asm and engine/battle/core.asm confirm
+the field semantics and BattleMenu_PKMN behavior. Filled-arrow checks prevent
+stale menus from being treated as waiting; battle item-target menus are excluded.
+Only read callbacks and normal controller bits cross the adapter boundary.

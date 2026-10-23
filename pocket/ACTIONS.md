@@ -55,8 +55,8 @@ Never replace that with a RAM HP increment or inventory decrement. The current
 proof uses a genuine starter state, advances dialogue with normal buttons and
 opens the empty Bag; it proves neither item use nor item targeting.
 
-Android already has Polished battle command and switch support through
+Phase 17 ports Android's Polished battle command and switch support from
 `Gen2Reader.readGen2BattleInput`, `GbPartySwitch.Gen2PartySwitch` and
-`BattleInputController`. Port these adapters next, preserving their visible
-cursor-tile checks and distinguishing a battle switch menu from an item's
-party-target menu. Their existence corrects the earlier parity-table wording.
+`BattleInputController` into a separate read-only/controller-bit battle module.
+Visible cursor-tile checks and item-target exclusion remain essential.
+See INTERACTIONS.md for genuine-ROM versus capture/model verification limits.

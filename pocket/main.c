@@ -834,8 +834,11 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       continue;
     }
     repeat_directions();
+    bool menuRequested =
+        down(MENU) || ((down(START) || down(SELECT)) &&
+                       (held & (1u << START)) && (held & (1u << SELECT)));
     if ((battleAction.result == PA_RUNNING || battleReturn) &&
-        (down(B) || down(X) || down(MENU) || down(L3))) {
+        (down(B) || down(X) || menuRequested || down(L3))) {
       pocket_battle_cancel(&battleAction);
       battleReturn = false;
       c->setKeys(c, 0);
@@ -843,7 +846,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       notice(pocket_battle_message(&battleAction));
     }
     if (gameAction.result == PA_RUNNING &&
-        (down(B) || down(X) || down(MENU) || down(L3))) {
+        (down(B) || down(X) || menuRequested || down(L3))) {
       pocket_action_cancel(&gameAction);
       c->setKeys(c, 0);
       held &= ~1023u;
@@ -857,8 +860,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       if (audio)
         SDL_ClearQueuedAudio(audio);
     }
-    if (down(MENU) || ((down(START) || down(SELECT)) &&
-                       (held & (1u << START)) && (held & (1u << SELECT)))) {
+    if (menuRequested) {
       quickOpen = false;
       menuOpen = menuOpen ? 0 : 1;
       companion = true;

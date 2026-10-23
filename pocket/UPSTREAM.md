@@ -171,3 +171,19 @@ Android source, shared expansion implementation, save wrapper, ROM allowlist
 and game memory offsets are untouched. No portable renderer/schema rewrite
 is needed for these platform features. Polished's unspawned/connected objects
 remain an explicit game-adapter gap, rather than generic SDL policy.
+
+## Phase 17: original battle interactions
+
+`battle_action` translates the Android Gen 2 menu readers and closed-loop
+controller: read-only callbacks in, normal key bits out. It keeps game addresses
+and party identities out of SDL and never writes a cursor. The host owns input
+exclusion, cancellation (including power/system hotkeys), real-frame pacing and
+return to the single-screen companion. Existing game_action remains the
+independent Bag opener. INTERACTIONS.md records source hashes and retry rules.
+
+UI action/move cells adapt Gen1ActionButtons/Gen1MoveList (also used by Gen 2);
+the existing party grid adapts PartyPicker. Information pages remain intact.
+The Brick pauses while choosing and shows actual game execution between
+choices. Processing-ball/fades and held-frame switching remain differences.
+Follow-up should validate genuine multi-mon switches before widening the
+tested game/build scope.

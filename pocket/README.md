@@ -1,10 +1,20 @@
-# PokeDaisy Pocket: Phase 16
+# PokeDaisy Pocket: Phase 17 — companion battle interactions
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 
 Native SDL2 and mGBA port for TrimUI Brick / NextUI. The user has confirmed
 gameplay, expanded/zoomed overworlds, companion menus, saves and the quick menu
 on physical hardware. Those working paths are retained.
+
+Phase 17 ports Android's Polished battle controller for normal 3.2.3. During a
+battle open the companion, choose BATTLE and press Start for controls. D-pad/A
+select Fight, PkMn, Bag, Run or a move. PkMn opens the party picker; active,
+fainted and egg slots cannot be sent in. B backs out, Y shows INFO, X returns
+to the game. The companion pauses for your choice, shows the game executing it
+and returns at the next waiting menu. Advance turn dialogue with ordinary game
+A/B as needed; B also cancels automatic return. Bag opens the original game
+Bag. These controls never write game RAM. Other supported ROM builds retain
+read-only battle information. See INTERACTIONS.md for validation and limits.
 
 Phase 16 keeps safe expanded conversations at the selected scale. AUTO ZOOM
 IN restores upstream's dialogue pull-in; its Brick default is OFF. AUTO RESUME
@@ -84,7 +94,7 @@ follows the two-column grid and A opens a summary. Within a summary, Up/Down cha
 pocket and Up/Down scrolls through items. The Bag shows live quantities and
 money, including medicine grouped under Items, plus Balls, TMs/HMs, Berries and
 Key items. Press A for an item description read from the matching ROM. The Bag remains read-only; upstream does not provide Polished item-use actions.
-Battle uses Y to cycle INFO, SUGGESTIONS, FOE DETAILS, FOE TEAM and FOE TYPES. FOE TYPES uses Left/Right for weaknesses, resistances and immunities, with Up/Down for more rows. INFO rates damaging moves against the selected foe. Suggestions uses upstream’s power/type/defensive-risk heuristic, not a full damage calculation. Foe Details shows actual active-battler stats, held item and moves; reserve stats are omitted because the Polished party reader does not provide them. On Foe Team use D-pad and A to inspect a member. Unannounced slots remain unnamed until selected; Select follows the live foe again. B returns to INFO, then gameplay. No battle commands or memory writes are introduced.
+Battle INFO uses Y to cycle INFO, SUGGESTIONS, FOE DETAILS, FOE TEAM and FOE TYPES. FOE TYPES uses Left/Right for weaknesses, resistances and immunities, with Up/Down for more rows. INFO rates damaging moves against the selected foe. Suggestions uses upstream’s power/type/defensive-risk heuristic, not a full damage calculation. Foe Details shows actual active-battler stats, held item and moves; reserve stats are omitted because the Polished party reader does not provide them. On Foe Team use D-pad and A to inspect a member. Unannounced slots remain unnamed until selected; Select follows the live foe again. B returns to INFO, then gameplay. Start opens the supported battle controls described above; there are no game-memory writes.
 In the Dex list, Y cycles ALL, CAUGHT, SEEN ONLY (seen but not caught) and NOT SEEN. Filters are retained when returning from an entry or switching companion sections. Empty results cannot open an entry. Dex shows live seen/caught flags in Polished Crystal's 289-entry order. Up/Down chooses, Left/Right pages and A opens an entry. Up/Down browses entries and B returns to the list. Entry sprites, category, text, size and base stats read from the matching ROM. Y switches to the full-text/abilities page.
 Map displays Johto, Kanto and Orange with original ROM palettes, tile flips and player art. The D-pad moves its cursor; A changes region, Y recenters on the player, and Select opens Places. A on a place shows it on the map. Map is read-only; Fly is not implemented.
 The Guide uses Android's HERE, NEXT BOSS, TIPS and WHERE IS pages with inline

@@ -94,8 +94,8 @@ static void pc_battle_controls_draw(struct pc_ui *u, struct pd_canvas *c,
     pd_fill(c, 0, 338, 512, 46, 0xffffff);
     if (s->partyActive >= 0 && s->partyActive < s->partyCount)
       txt(c, 8 + (s->partyActive % 2) * 250 + 182,
-          50 + (s->partyActive / 2) * 100, "OUT");
-    txt(c, 12, 346, "Choose a POKeMON. A:Send in");
+          34 + (s->partyActive / 2) * 100, "OUT");
+    txt(c, 12, 346, "Choose a POKéMON. A:Send in");
     txt(c, 12, 366, "B:Cancel Y:Info X:Game");
     return;
   }

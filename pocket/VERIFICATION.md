@@ -1,4 +1,46 @@
-# Phase 16 verification
+# Phase 17 verification
+
+Native Linux and actual NextUI AArch64 builds pass. The new battle tests run
+natively and under QEMU using the actual SDK sysroot. Five upstream captured
+menus verify action/move/list/submenu/forced-pick recognition. Pure-C model
+tests verify delayed/dropped inputs, move selection, optional/forced switching,
+submenu recovery, fainted/egg/active refusal, changed identity, item-target
+exclusion, zero PP, unreadable memory, timeout and cancellation. Those models
+are explicitly not executed as game-memory modifications in mGBA.
+
+The supplied normal 3.2.3 ROM and a genuine starter reach Lyra's battle with
+normal dialogue/movement through the source-defined scene-6 event. Native and
+ARM/QEMU tests prove selection/use of move slot 1: its PP decreases once while
+slot 0's PP stays unchanged. The actual original battle Bag opens, Back returns
+to actions, and Run cannot escape the trainer battle. A full SDL controller
+test opens companion Battle, selects PkMn, refuses the active sole member,
+cancels, chooses Fight then slot 1, plays out the turn and returns automatically
+to companion controls. Turn dialogue is advanced through explicit ordinary
+gameplay button events. Captures of actions, moves, party and return were
+inspected, including readable remaining PP and OUT positioning.
+
+The current genuine party has one member. Actual multi-member/forced switching
+is not claimed beyond upstream captures and model tests. Real Brick controls,
+speed/audio and the prior power/RTC checks still require device testing.
+The Android Compose preview attempt failed at Gradle download (DNS failure);
+no fresh Android-rendered screenshot comparison is claimed.
+Native captures are genuine emulator output, using the actual ROM font/art.
+
+The final frontend test also starts an action, opens the reserved Start+Select
+system menu, verifies a paused core and released keys, loads the real battle
+state, then resumes. No cancelled input restarts. This passes on native/ARM.
+
+Native and ARM regressions pass host save faults/fallback, decoder/Guide,
+GB/GBA execution and 100 companion toggles, quick-ring state/confirmation,
+expanded display/cache/state/reopen and exact PPU-center checks, Phase 16
+recovery/corruption/bypass/lifecycle simulation, and existing filters/Bag opener.
+The final OUT-tag placement only changes drawing and receives the battle
+runtime/capture rerun. The isolated captured/model battle-action harness also
+passes ASan/UBSan with leak detection disabled. This is not a whole-core
+sanitizer or physical Brick validation claim.
+See INTERACTIONS.md for source hashes, explicit adaptations and reproduction.
+
+## Phase 16 verification (retained)
 
 Native Linux and actual NextUI Cortex-A53/AArch64 GCC 8.3 builds pass. ARM
 executables run against the actual TrimUI/NextUI SDK sysroot under

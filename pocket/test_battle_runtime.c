@@ -8,6 +8,8 @@
 #include <mgba/core/log.h>
 static const char *battleState = "/tmp/pd-real-battle.ss";
 static int stage, oldPP;
+static bool cancelTest, hotkeyPassed;
+static unsigned pauseCounter;
 static void send_key(int sym) {
   SDL_Event e = {.type = SDL_KEYDOWN};
   e.key.keysym.sym = sym;
@@ -20,6 +22,46 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
                        const struct pc_ui *p) {
   (void)pc;
   (void)u;
+  if (cancelTest) {
+    if (frame == 0)
+      assert(state(c, battleState, false));
+    if (frame == 1)
+      send_key(SDLK_TAB);
+    if (frame == 2 || frame == 3)
+      send_key(SDLK_e);
+    if (frame == 4)
+      send_key(SDLK_RETURN);
+    if (frame == 5)
+      send_key(SDLK_z);
+    if (frame == 6) {
+      SDL_Event e = {.type = SDL_KEYDOWN};
+      e.key.keysym.sym = SDLK_RETURN;
+      SDL_PushEvent(&e);
+      e.key.keysym.sym = SDLK_BACKSPACE;
+      SDL_PushEvent(&e);
+      pauseCounter = c->frameCounter(c);
+    }
+    if (frame == 7) {
+      assert(companion && testMenu == 1 && c->frameCounter(c) == pauseCounter);
+      assert(c->getKeys(c) == 0);
+      assert(state(c, battleState, false));
+      SDL_Event e = {.type = SDL_KEYUP};
+      e.key.keysym.sym = SDLK_RETURN;
+      SDL_PushEvent(&e);
+      e.key.keysym.sym = SDLK_BACKSPACE;
+      SDL_PushEvent(&e);
+    }
+    if (frame == 8)
+      send_key(SDLK_x);
+    if (frame == 25) {
+      struct pocket_battle_menu m;
+      assert(pocket_battle_read(read_memory, c, &m));
+      assert(!companion && m.state == PB_ACTION && c->getKeys(c) == 0);
+      hotkeyPassed = true;
+      running = 0;
+    }
+    return;
+  }
   if (frame == 0)
     assert(state(c, battleState, false));
   if (frame == 1)
@@ -230,5 +272,11 @@ int main(int argc, char **argv) {
   assert(pocket_app_main(6, args) == 0 && stage == 4);
   puts("PASS actual companion Fight -> second move -> game turn -> automatic "
        "return, with actual PP change");
+  cancelTest = true;
+  running = 1;
+  args[4] = "32";
+  assert(pocket_app_main(6, args) == 0 && hotkeyPassed);
+  puts("PASS Start+Select cancels battle action, pauses with released keys, "
+       "and state load/resume cannot restart stale input");
   return 0;
 }
