@@ -10,7 +10,7 @@ pak=out/'Tools/tg5040/PokeDaisy.pak';pak.mkdir(parents=True,exist_ok=True)
 shutil.copy2(binary,pak/'pokedaisy-pocket');(pak/'pokedaisy-pocket').chmod(0o755)
 shutil.copy2(repo/'pocket/launch.sh',pak/'launch.sh');(pak/'launch.sh').chmod(0o755)
 for name in ['roms','saves','states','lib']: (pak/name).mkdir(exist_ok=True)
-for name in ['README.md','SOURCE_AUDIT.md','VERIFICATION.md','UPSTREAM.md','PARITY.md']:
+for name in ['README.md','SOURCE_AUDIT.md','VERIFICATION.md','UPSTREAM.md','PARITY.md','ACTIONS.md','FUNCTIONAL_AUDIT.md']:
  shutil.copy2(repo/'pocket'/name,pak/name)
 for name in ['LICENSE','NOTICE']:shutil.copy2(repo/name,pak/name)
 licenses=pak/'licenses';licenses.mkdir(exist_ok=True)

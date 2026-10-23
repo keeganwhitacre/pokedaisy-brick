@@ -89,5 +89,5 @@ static void pc_bag_pages(struct pc_ui *u, struct pd_canvas *c,
   } else
     snprintf(b, sizeof b, "D-pad:Browse A:Info Y:Sort");
   pd_text_fit(c, 12, 346, 488, b, 0x181818, PD_NO_SHADOW);
-  txt(c, 12, 366, "L/R:Section B:Back X:Play");
+  txt(c, 12, 366, "Start:Game Bag L/R:Section B:Back");
 }

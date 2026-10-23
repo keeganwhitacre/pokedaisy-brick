@@ -1,4 +1,57 @@
-# Phase 13 verification
+# Phase 15 verification
+
+Phase 15 is an incremental functional milestone, not full Android parity.
+Native Linux and actual NextUI AArch64 builds pass the controller-only Bag
+opener, display reference/persistence checks and host/menu integration. The
+real normal 3.2.3 ROM advances Elm dialogue using ordinary buttons; the new
+adapter opens its real empty Bag in 61 emulated frames without game-memory
+writes. Unknown ROM, dialogue and already-open-menu requests reject; cancellation
+and a no-progress timeout return zero synthetic keys. No healing-item use,
+party target, held-item action or battle-command execution is claimed.
+
+Controller tests select Game > Settings, change FILTER/GRID/GBA COLORS, verify
+per-ROM persistence and refuse unsupported STRETCH+FILTER. Start from the
+companion Bag then opens the running game's Bag. LCD/SCANLINES masks use the
+source texel equations; color reference vectors test the GLSL matrix ordering.
+Malformed/truncated preference files fall back safely. The existing *.mode,
+INI, SRAM/backup and state locations remain unchanged.
+
+Native and ARM/QEMU host I/O, captured decoder/Guide, real GB/GBA execution,
+100 companion toggles, real state round-trips, quick ring/confirmations and
+expanded/zoomed original-centre/state-reset/reopen regressions pass. The
+new functional harness also passes with ASan/UBSan instrumentation on the host,
+dispatcher and display code; the linked mGBA and older companion objects are
+not instrumented in this run. Leak detection is disabled. This is not a
+whole-core sanitizer certification.
+
+`runtime-phase15-*.png` show actual emulator frames, the settings menu and
+companion-to-game Bag result. Captures were inspected. Native/ARM software SDL
+outputs agree exactly for unfiltered, GBA COLORS and STRETCH; LCD/SCANLINES
+blend outputs differ by at most one channel level between SDL versions. They
+are not Android GLES screenshots. Existing Phase 13/14 same-ROM/same-WRAM
+Compose comparisons remain preserved; the current Compose preview cannot
+capture EmulatorView's shader pipeline. See FUNCTIONAL_AUDIT.md.
+
+Warm-cache 180-frame render-only benchmarks are included in logs. Desktop and
+QEMU runs varied with shared-host load (roughly 3–13 ms/frame in recorded runs),
+so these are cost measurements, not a Brick FPS/audio guarantee. The mask is
+cached by dimensions/settings, no per-frame shader-math pass is allocated;
+color correction uses a precomputed 32K LUT. All effects are opt-in. Actual
+Brick backend blending, sustained speed, audible audio, RTC elapsed time and
+power/suspend handling require hardware testing. Prior user-confirmed gameplay,
+saves, expansion/zoom, companion and quick-menu results remain hardware facts,
+not validation of these new features.
+
+Reproduce the ROM-free display tests with `pocket-functional-test`. For the
+normal-input action proof pass the private normal 3.2.3 ROM and a starter state
+made by `pocket-rom-test ROM boot-polished-newgame.txt /private/starter.ss`:
+`pocket-functional-test ROM /private/starter.ss`. Tests use disposable data
+roots. Set SDL_VIDEODRIVER=offscreen, SDL_RENDER_DRIVER=software and
+SDL_AUDIODRIVER=dummy for headless integration. ARM tests use the actual NextUI
+sysroot under qemu-aarch64-static, not a desktop cross-architecture substitute.
+
+## Earlier verification retained
+
 
 Phase 7 adds the L3 quick menu: original Android state/FF/companion pixel icons,
 D-pad ring navigation, genuine paused gameplay at its existing physical scale,

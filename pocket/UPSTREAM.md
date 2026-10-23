@@ -127,3 +127,25 @@ incremental contribution boundary without replacing the working emulator host.
 User hardware confirmation now covers gameplay, expansion/zoom, companion,
 saves and quick menu. It does not imply the new Guide layout, sustained
 performance, RTC or power handling have been verified on the device.
+
+## Phase 15: portable action and display boundaries
+
+`game_action.c/.h` is a read-only observer/controller-bit state machine; SDL
+owns pacing, input exclusion, cancellation and reporting. Only the verified
+normal 3.2.3 observation adapter is enabled. This first Bag opener is downstream,
+while Polished battle controls/switching are existing Android functionality.
+See ACTIONS.md for official game source/symbol provenance; do not propagate
+its offsets into generic menus or widen the ROM allowlist without verification.
+
+`display_fx.c/.h` translates ScreenShaders LCD, SCANLINES and GBA_COLOR math.
+It has no emulator/SDL dependence. The host caches one alpha texture per output
+geometry/filter/grid and preserves the existing opaque source textures.
+GRID defaults to MEDIUM as in Prefs. Defaults remain filter NONE, colors OFF,
+original integer aspect. The new *.fx file does not replace *.mode or INI files.
+
+On an upstream update review ScreenShaders/EmulatorView/Prefs changes together,
+including prescale/smoothing/companion semantics. Do not claim unsupported
+passes through similar-looking software effects. The combined SCREEN / SHADERS
+host menu remains a documented controller adaptation. The existing Compose
+preview cannot validate EmulatorView's GL pipeline; native reference-equation
+checks are explicitly narrower than Android GL screenshot parity.

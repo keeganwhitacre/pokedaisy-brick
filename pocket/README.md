@@ -1,10 +1,16 @@
-# PokeDaisy Pocket: Phase 14
+# PokeDaisy Pocket: Phase 15
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 
 Native SDL2 and mGBA port for TrimUI Brick / NextUI. The user has confirmed
 gameplay, expanded/zoomed overworlds, companion menus, saves and the quick menu
 on physical hardware. Those working paths are retained.
+
+Phase 15 adds original LCD/SCANLINES effects, GRID strengths, GBA COLORS and
+unfiltered STRETCH in Menu > Settings. Choices persist per ROM. Start in the
+companion Bag opens the real game's Bag on normal Polished Crystal 3.2.3.
+This safe controller-only extension does not yet use or target companion items.
+See FUNCTIONAL_AUDIT.md and ACTIONS.md for supported features and restrictions.
 
 Phase 14 adapts Android's Guide page selector and inline rows, combining HERE's
 encounters, people and items. It preserves unseen/hidden entry names until you
@@ -30,7 +36,9 @@ The companion draws at 512 x 384 with crisp 2x scaling to 1024 x 768.
 Gameplay uses the largest whole-pixel scale that fits the physical display:
 Game Boy / Color is 5x (800 x 720), centered with small borders; GBA is 4x
 (960 x 640). This increases GB image width and height by 25% over Phase 1.
-The original aspect ratio is preserved, with no stretching, filtering or crop.
+By default, original aspect and unfiltered integer scaling are preserved.
+Optional effects and STRETCH are selected in Menu > Settings. FILTER requires
+ORIGINAL aspect; EXPAND/ZOOM still work with these effects.
 No Android runtime, touchscreen or mouse is used.
 
 When updating an existing installation, merge the updated files into the pak
@@ -42,7 +50,7 @@ and keep your `roms`, `saves`, `states` and `display` folders and `settings.ini`
 | --- | --- | --- |
 | D-pad | Game directions | Select a party member or move focus |
 | A / B | Game A / B | Confirm / back |
-| Start / Select | Game Start / Select | Normal menu navigation uses A/B |
+| Start / Select | Game Start / Select | Start on Bag: original game Bag (verified normal 3.2.3); Select retains screen action |
 | X | Open companion | Return to game |
 | L3 | Quick-menu ring | Open / close quick menu |
 | R3 | Cycle Original / Expand / Zoom | Display also available in game menu |

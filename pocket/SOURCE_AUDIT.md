@@ -172,3 +172,22 @@ Reviewed upstream 1.3.1 changes through 54d8f4867501feb32b7ee139a5616b7c6301f044
 ## Phase 11 source audit
 
 Inspected PartyScreen SlotGeometry, drawSlotFrame/drawHpBar, Polished palette and ten-frame bob; MonDetailScreen SummaryBar/ExpBlue; SnapshotView.expProgress; ExpTables; Gen2SpeciesPolishedCrystal growth rates; Gen2Reader.curBattleMon; SuggestionsScreen OUT behavior. Polished rates 0/1/2/3 map to upstream tables 0/3/4/5. Native OUT uses the upstream party index definition rather than species/level matching, avoiding ambiguity for duplicate party members. No ROM writes or invented offsets are added. PokedexScreen has no name search and Gen 2 PartySlot has no EXP bar; earlier checklist assumptions were corrected.
+
+## Phase 15 functional source review
+
+The functionality review uses the checked-in upstream revision documented in
+PARITY.md, including ItemsScreen/FavoriteItems, ItemUse/FieldItems/GbField,
+BattleInputController/Gen2Reader/GbPartySwitch, QuickMenu/QuickMenuSettings,
+CompanionSettingsScreen/Prefs, ScreenShaders/EmulatorView and SaveStates.
+FUNCTIONAL_AUDIT.md records applicability and outstanding work rather than
+assuming GBA field functions apply to Polished. Android Polished battle input
+and switching are supported upstream and remain native parity gaps.
+
+LCD/SCANLINES/GBA_COLOR are small portable translations; SDL texture caching
+and per-ROM files are host policy. The original shader file's SHA-256 is
+`7478ded57e6862491865f19709c7c1764a84e4c959ae7a3ca3cbc6917015e8b3`.
+Keep its presets, coefficients and pipeline ordering under review on updates.
+The Polished Bag opener is a separate downstream controller-only adapter with
+official game source/symbol provenance recorded in ACTIONS.md. Neither new
+module receives a game-memory write callback. Android source and shared native
+emulator/save/expanded-rendering implementations remain intact.

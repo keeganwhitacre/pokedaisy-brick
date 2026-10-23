@@ -1,4 +1,4 @@
-# Polished Crystal Android parity boundary — Phase 14
+# Polished Crystal Android parity boundary — Phase 15
 
 This compares the native port with the **Polished Crystal path** at upstream
 `54d8f4867501feb32b7ee139a5616b7c6301f044`, rather than with Android features
@@ -13,14 +13,14 @@ user's matching cart. Full visual and behavioral parity is still unfinished.
 | Party | Six slots, rounded upstream frames, original HP lettering, larger ROM icons, selected-icon bobbing, gender/status/held markers and egg handling | Remaining fine layout details; upstream Gen 2 EXP bar is on Summary |
 | Summary | Left-info/right-moves hierarchy, held item, EXP progress/NEXT/MAX and HP bars, descriptions, type matchups, party cycling | Remaining styling/animation; Android's Polished decoder does not supply IV/EV stats or LEARN data |
 | Bag | Upstream magenta stripes, folder tabs, All/occupied pockets, cursor, framed list and inline complete descriptions; all quantities/money and four read-only sorts with stack retention | Favorites and fine layout details; Gen 2 supplies no item icons; upstream FieldItems has no Polished USE/GIVE/TAKE implementation |
-| Battle | INFO effectiveness labels; upstream power/type/risk ranking; live foe item/stats/moves and type-matchup groups; browsable team with unseen slots; battle-scoped seen tracking and exact active-party OUT marker and original-style HP bars | Remaining Android panel layout; Gen 2 supplies no announced-next-foe index; upstream GBA command controls are not Polished controls |
+| Battle | INFO effectiveness labels; upstream power/type/risk ranking; live foe item/stats/moves and type-matchup groups; browsable team with unseen slots; battle-scoped seen tracking and exact active-party OUT marker and original-style HP bars | Remaining Android panel layout; Gen 2 supplies no announced-next-foe index; Android Polished battle commands and party switching remain to be ported (Gen2Reader/GbPartySwitch/BattleInputController) |
 | Dex | Upstream counts/filter + icon-list layout, original caught/seen marks and muted unseen entries; real flags/order, four filters, front sprites, descriptions, dimensions/base stats, species abilities | Entry-page layout, held-button navigation/repeat and further styling; upstream PokedexScreen has no name-search feature; upstream's Polished dex has no evolution table |
 | Map | All three ROM maps, palettes/flips, live location/player, pulsing landmark cursor, regions, Places | Precise location refinements; Polished Fly is not provided by upstream FieldItems |
 | Guide HERE | Android left page selector and inline sections for every present encounter method, PEOPLE and ITEMS; caught counts/balls, owned-last area rows, time/badge levels, encounter icons and spoiler-safe reveals | First-use guide notice, small-text sizing and fine layout/scroll-animation differences |
 | Guide NEXT BOSS | Progress-dependent order, League/rematch rules, normal/faithful teams, type hints, individual Pokemon hint/answer entries, moves/held-item answers, own-best-level comparison | Shared OPTION frames and inline per-Pokémon entries now adapted; fine text metrics and controller scrolling differences remain |
 | Guide TIPS / WHERE IS | All seven upstream tips, hints/answers; HM/key/gift-Pokemon lists with deduplication, locations and owned marks | Inline hint/answer rows with source page/category hierarchy now adapted; fine text metrics and first-use guide notice remain |
 | Quick menu | L3 ring; original Android icons; paused integer-scaled gameplay behind it; state confirmation, FF and companion | More actions only when their game-specific implementations are ported; User confirms quick menu on Brick; new UI changes still require hardware retesting |
-| States/options | Existing host menu/state/FF controls | Multi-slot screenshot browser, broader options and remaining lifecycle integration |
+| States/options | Existing host state/FF controls; new controller SCREEN / SHADERS subset with per-ROM LCD/SCANLINES/GRID/GBA COLORS and unfiltered STRETCH | Multi-slot screenshot browser, full Android hierarchy, remaining effects/mapping/FF options and lifecycle integration |
 
 Guide definitions are generated from `GuidePolishedCrystal*.kt`; the original
 Android guide marks itself unverified and may contain source-data mistakes.
@@ -93,3 +93,24 @@ row and page-selector dividers to GbaMenu's 6u/2u dash geometry. The full-sized
 ROM text makes some native details wrap below the title rather than sit on the
 same line as Android. That difference remains explicit, with comparisons in
 the package; this is not a pixel-identical claim.
+
+## Phase 15: functionality before further styling
+
+See FUNCTIONAL_AUDIT.md for categories 1/2/3 and ACTIONS.md for exact source,
+checks and limits. Start in the companion Bag now opens the real running
+game's Bag through normal controller input on verified normal 3.2.3. It does
+not select/use the companion item, heal a Pokémon, or change inventory RAM.
+Other companion builds reject the shortcut; their existing features remain.
+
+New display choices are adaptations of ScreenShaders, not unrelated filters.
+Game > Settings exposes the supported subset with persistent per-ROM choices.
+LCD PAPER, CRT, UNLIT, smoothing, companion shaders and the stretch/filter
+combination remain gaps. Settings use the existing host menu and source names;
+full Android menu composition is not claimed. Existing quick-menu appearance,
+state handling, save paths and expansion remain intact.
+
+Functional priorities now include Android Polished battle commands/switching,
+Bag favorites, broader original settings/quick controls and state previews.
+Healing-item targeting is a separately identified downstream extension that
+requires additional verified completion/context predicates. Physical Brick
+validation of Phase 15 remains outstanding.

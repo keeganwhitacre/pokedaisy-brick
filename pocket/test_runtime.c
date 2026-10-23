@@ -141,20 +141,23 @@ static void quick_test_frame(struct mCore *c, bool companion, int frame) {
   if (frame == 62) {
     assert(companion && testMenu == 1);
     send_key(SDLK_UP);
-    send_key(SDLK_z);
   }
   if (frame == 63) {
+    send_key(SDLK_UP);
+    send_key(SDLK_z);
+  }
+  if (frame == 64) {
     assert(testQuick);
     send_key(SDLK_x);
   }
-  if (frame == 64) {
+  if (frame == 65) {
     assert(!testQuick && testMenu == 1);
     send_key(SDLK_x);
   }
-  if (frame == 65) {
+  if (frame == 66) {
     assert(!companion);
   }
-  if (frame == 66)
+  if (frame == 67)
     puts("PASS quick menu: raw L3/keyboard, D-pad, disabled load, FF, "
          "save/load confirmation/cancel/round-trip, companion, pause/resume "
          "and repeated toggles");
@@ -253,9 +256,79 @@ static void wide_test_frame(struct mCore *c, bool companion, int frame) {
          "centre preservation");
   }
 }
+static void options_ui_frame(struct mCore *c, bool companion, int frame) {
+  if (frame == 0)
+    assert(state(c, getenv("POCKET_TEST_STATE"), false));
+  if (frame == 5)
+    send_key(SDLK_ESCAPE);
+  if (frame == 6) {
+    assert(companion && testMenu == 1);
+    send_key(SDLK_UP);
+  }
+  if (frame == 7)
+    send_key(SDLK_z);
+  if (frame == 8) {
+    assert(testMenu == 6);
+    send_key(SDLK_RIGHT);
+  }
+  if (frame == 9) {
+    assert(displayOptions.filter == 1);
+    send_key(SDLK_DOWN);
+  }
+  if (frame == 10)
+    send_key(SDLK_RIGHT);
+  if (frame == 11) {
+    assert(displayOptions.grid == 2);
+    send_key(SDLK_DOWN);
+  }
+  if (frame == 12)
+    send_key(SDLK_z);
+  if (frame == 13) {
+    assert(displayOptions.colors);
+    send_key(SDLK_DOWN);
+  }
+  if (frame == 14)
+    send_key(SDLK_z);
+  if (frame == 15) {
+    assert(
+        !displayOptions.stretch); // Preserve upstream filter integer geometry.
+    assert(capture_frame("runtime-phase15-settings.png", NULL));
+    send_key(SDLK_x);
+  }
+  if (frame == 16) {
+    assert(testMenu == 1);
+    send_key(SDLK_x);
+  }
+  if (frame == 18) {
+    assert(!companion);
+    struct pocket_display_options p;
+    assert(pocket_options_load(root, displayKey, &p));
+    assert(p.filter == 1 && p.grid == 2 && p.colors && !p.stretch);
+    assert(capture_frame("runtime-phase15-settings-applied.png", NULL));
+    send_key(SDLK_TAB);
+  }
+  if (frame == 19)
+    send_key(SDLK_e); // Party -> Bag, existing navigation.
+  if (frame == 20)
+    send_key(SDLK_RETURN);
+  if (frame == 21)
+    assert(!companion);
+  if (frame == 100) {
+    uint8_t ptr[2];
+    read_memory(c, 0xce61, ptr, 2);
+    assert((ptr[0] | (ptr[1] << 8)) == 0x4791);
+    assert(capture_frame("runtime-phase15-bag-shortcut.png", NULL));
+    puts("PASS controller settings/persistence/filter constraint and companion "
+         "START -> real game Bag");
+  }
+}
 static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
                        struct pd_ui *u, struct pd_snapshot *s,
                        const struct pc_ui *pcUi) {
+  if (getenv("POCKET_TEST_OPTIONS")) {
+    options_ui_frame(c, companion, frame);
+    return;
+  }
   if (wideTest) {
     wide_test_frame(c, companion, frame);
     return;
@@ -602,7 +675,7 @@ int main(void) {
       quickRom = "diagnostic.gb";
     char *args[] = {
         "pokedaisy-pocket",       "--data",         quickRoot, "--frames",
-        wideTest ? "1942" : "68", (char *)quickRom, NULL};
+        wideTest ? "1942" : "69", (char *)quickRom, NULL};
     int result = pocket_app_main(6, args);
     if (wideTest) {
       wideReopen = true;
@@ -614,9 +687,12 @@ int main(void) {
   const char *personal = getenv("POCKET_TEST_ROM");
   if (personal) {
     realRomTest = true;
+    if (getenv("POCKET_TEST_OPTIONS"))
+      assert(mkdtemp(quickRoot));
     char *args[] = {"pokedaisy-pocket",
                     "--data",
-                    "/tmp/pd-personal-rom-test",
+                    getenv("POCKET_TEST_OPTIONS") ? quickRoot
+                                                  : "/tmp/pd-personal-rom-test",
                     "--frames",
                     "160",
                     (char *)personal,

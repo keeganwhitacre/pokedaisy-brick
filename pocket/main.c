@@ -4,6 +4,8 @@
 /* Native single-screen host for PokeDaisy. GPL-3.0, see ../NOTICE. */
 #include "../3ds/desktop/pd_png.h"
 #include "../app/src/main/cpp/pk_wide.h"
+#include "display_fx.h"
+#include "game_action.h"
 #include "host_io.h"
 #include "pd_font.h"
 #include "pd_menu.h"
@@ -49,6 +51,64 @@ static void notice(const char *text);
 static const char *root = ".";
 static char displayKey[41];
 static bool wideSupported, wideReady;
+static struct pocket_display_options displayOptions;
+static uint32_t colorLut[32768];
+static SDL_Texture *effectTexture;
+static bool effectFailed;
+static int effectW, effectH, effectTW, effectTH, effectFilter = -1,
+                                                 effectGrid = -1;
+static void effect_invalidate(void) {
+  if (effectTexture)
+    SDL_DestroyTexture(effectTexture);
+  effectTexture = NULL;
+  effectFailed = false;
+  effectFilter = -1;
+}
+static void effect_draw(int tw, int th) {
+  if (!displayOptions.filter || effectFailed)
+    return;
+  int w = lastGameRect.w, h = lastGameRect.h;
+  if (!effectTexture || effectW != w || effectH != h || effectTW != tw ||
+      effectTH != th || effectFilter != displayOptions.filter ||
+      effectGrid != displayOptions.grid) {
+    effect_invalidate();
+    if (w <= 0 || h <= 0 || w > 4096 || h > 4096)
+      return;
+    uint32_t *mask = malloc((size_t)w * h * 4);
+    if (!mask) {
+      effectFailed = true;
+      notice("Filter allocation failed");
+      return;
+    }
+    for (int y = 0; y < h; y++)
+      for (int x = 0; x < w; x++)
+        mask[y * w + x] = pocket_filter_mask(
+            displayOptions.filter, displayOptions.grid, x, y, w, h, tw, th);
+    effectTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                                      SDL_TEXTUREACCESS_STATIC, w, h);
+    if (!effectTexture ||
+        SDL_UpdateTexture(effectTexture, NULL, mask, w * 4) < 0 ||
+        SDL_SetTextureBlendMode(effectTexture, SDL_BLENDMODE_BLEND) < 0) {
+      effect_invalidate();
+      effectFailed = true;
+      notice("Filter unavailable on this video backend");
+    }
+    free(mask);
+    effectW = w;
+    effectH = h;
+    effectTW = tw;
+    effectTH = th;
+    effectFilter = displayOptions.filter;
+    effectGrid = displayOptions.grid;
+  }
+  if (effectTexture &&
+      SDL_RenderCopy(renderer, effectTexture, NULL, &lastGameRect) < 0)
+    notice("Filter draw failed");
+}
+static void options_save(void) {
+  if (!pocket_options_save(root, displayKey, &displayOptions))
+    notice("Settings could not be saved");
+}
 static int wideMode; /* 0 original, 1 expand, 2 zoom. */
 static unsigned wideW, wideH;
 static uint32_t wideFrame[256 * 192], widePixels[256 * 192], gbFrame[160 * 144];
@@ -81,6 +141,10 @@ static void wide_tick(struct mCore *c, bool skip) {
 #endif
 }
 static void wide_cycle(void) {
+  if (displayOptions.stretch) {
+    displayOptions.stretch = false;
+    options_save();
+  }
   if (!wideSupported) {
     notice("Expansion unavailable for this ROM build");
     return;
@@ -315,7 +379,7 @@ static void render_game(unsigned gw, unsigned gh) {
       (SDL_Rect){(ow - (int)gw * scale) / 2, (oh - (int)gh * scale) / 2,
                  (int)gw * scale, (int)gh * scale};
   SDL_Texture *drawTexture = gameTexture;
-  if (wideReady) {
+  if (wideReady && !displayOptions.stretch) {
     gw = wideW;
     gh = wideH;
     drawTexture = wideTexture;
@@ -330,6 +394,8 @@ static void render_game(unsigned gw, unsigned gh) {
     for (unsigned i = 0; i < gw * gh; i++) {
       uint32_t n = wideFrame[i];
       widePixels[i] = ((n & 255) << 16) | (n & 0xff00) | ((n >> 16) & 255);
+      if (displayOptions.colors)
+        widePixels[i] = pocket_color_apply(colorLut, widePixels[i]);
     }
     if (SDL_UpdateTexture(wideTexture, &(SDL_Rect){0, 0, (int)gw, (int)gh},
                           widePixels, gw * 4) < 0) {
@@ -342,6 +408,9 @@ static void render_game(unsigned gw, unsigned gh) {
         uint32_t n = video[y * 256 + x];
         gamePixels[y * 256 + x] =
             ((n & 255) << 16) | (n & 0xff00) | ((n >> 16) & 255);
+        if (displayOptions.colors)
+          gamePixels[y * 256 + x] =
+              pocket_color_apply(colorLut, gamePixels[y * 256 + x]);
       }
     if (SDL_UpdateTexture(gameTexture, NULL, gamePixels, 256 * 4) < 0) {
       notice(SDL_GetError());
@@ -349,11 +418,14 @@ static void render_game(unsigned gw, unsigned gh) {
     }
   }
   SDL_RenderClear(renderer);
+  if (displayOptions.stretch)
+    lastGameRect = (SDL_Rect){0, 0, ow, oh};
   SDL_Rect src = {0, 0, (int)gw, (int)gh};
   if (SDL_RenderCopy(renderer, drawTexture, &src, &lastGameRect) < 0) {
     notice(SDL_GetError());
     return;
   }
+  effect_draw(gw, gh);
   /* The caller may draw a quick-menu overlay before presenting. */
 }
 static void present_game(unsigned gw, unsigned gh) {
@@ -586,6 +658,9 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     pd_romart_scan(&game);
   char config[1024];
   snprintf(config, sizeof config, "%s/settings.ini", root);
+  pocket_options_load(root, displayKey, &displayOptions);
+  pocket_color_lut(colorLut);
+  effect_invalidate();
   struct pd_settings settings;
   pd_settings_load(&settings, config);
   struct pd_ui ui;
@@ -601,22 +676,37 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                         "Quit to game list",
                         "About",
                         "Display: Original / Expand / Zoom",
-                        "Quick menu"};
+                        "Quick menu",
+                        "Settings"};
   const char *confirmOpts[] = {"Cancel", "Confirm"};
   struct pd_menu gameMenu, confirmMenu;
-  pd_menu_init(&gameMenu, "GAME", opts, 9);
+  pd_menu_init(&gameMenu, "GAME", opts, 10);
   pd_menu_init(&confirmMenu, "CONFIRM", confirmOpts, 2);
+  char optionText[5][80];
+  const char *optionLabels[5];
+  for (int i = 0; i < 5; i++)
+    optionLabels[i] = optionText[i];
+  struct pd_menu screenMenu;
+  pd_menu_init(&screenMenu, "SCREEN / SHADERS", optionLabels, 5);
   int menuOpen = 0;
   bool quickOpen = false;
   int quickSelected = 0;
   bool companion = false, ff = false, leave = false;
   int focus = 0, frames = 0;
   struct pc_ui pcUi = {0};
+  struct pocket_action gameAction = {0};
   uint64_t due = SDL_GetPerformanceCounter();
   double hz = (double)c->frequency(c) / c->frameCycles(c);
   while (running && !leave) {
     events();
     repeat_directions();
+    if (gameAction.result == PA_RUNNING &&
+        (down(B) || down(X) || down(MENU) || down(L3))) {
+      pocket_action_cancel(&gameAction);
+      c->setKeys(c, 0);
+      held &= ~1023u;
+      notice(pocket_action_message(&gameAction));
+    }
     if (down(X)) {
       quickOpen = false;
       menuOpen = 0;
@@ -691,7 +781,45 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
         held &= ~1023u;
     } else if (companion) {
       if (menuOpen) {
-        if (menuOpen == 4) {
+        if (menuOpen == 6) {
+          if (down(UP))
+            pd_menu_move(&screenMenu, -1);
+          if (down(DOWN))
+            pd_menu_move(&screenMenu, 1);
+          if (down(B))
+            menuOpen = 1;
+          else if (down(A) || down(RIGHT) || down(LEFT)) {
+            int delta = down(LEFT) ? -1 : 1;
+            switch (screenMenu.selected) {
+            case 0: {
+              int f = displayOptions.filter == 3 ? 2 : displayOptions.filter;
+              f = (f + delta + 3) % 3;
+              if (displayOptions.stretch && f)
+                notice("Select ORIGINAL aspect before FILTER");
+              else
+                displayOptions.filter = f == 2 ? 3 : f;
+              break;
+            }
+            case 1:
+              displayOptions.grid = (displayOptions.grid + delta + 3) % 3;
+              break;
+            case 2:
+              displayOptions.colors = !displayOptions.colors;
+              break;
+            case 3:
+              if (displayOptions.filter && !displayOptions.stretch)
+                notice("STRETCH with FILTER is not yet supported");
+              else
+                displayOptions.stretch = !displayOptions.stretch;
+              break;
+            case 4:
+              wide_cycle();
+              break;
+            }
+            effect_invalidate();
+            options_save();
+          }
+        } else if (menuOpen == 4) {
           if (down(B) || down(A))
             menuOpen = 1;
         } else {
@@ -744,6 +872,9 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
               case 7:
                 wide_cycle();
                 break;
+              case 9:
+                menuOpen = 6;
+                break;
               case 8:
                 menuOpen = 1;
                 quickOpen = true;
@@ -766,6 +897,13 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           }
         }
       } else if (pc >= 0) {
+        if (down(START) && pcUi.section == PC_BAG) {
+          if (pocket_action_begin(&gameAction, displayKey, read_memory, c)) {
+            companion = false;
+            held &= ~1023u;
+          }
+          notice(pocket_action_message(&gameAction));
+        }
         static const int buttons[] = {UP, DOWN, LEFT, RIGHT, A,
                                       B,  L,    R,    Y,     SELECT};
         for (unsigned action = 0; action < sizeof buttons / sizeof *buttons;
@@ -821,8 +959,18 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       }
     } else {
       muted = ff;
-      c->setKeys(c, held & 1023);
-      int count = ff ? settings.ffSpeed : 1;
+      bool dispatching = gameAction.result == PA_RUNNING;
+      unsigned keys = dispatching
+                          ? pocket_action_tick(&gameAction, read_memory, c)
+                          : held & 1023;
+      c->setKeys(c, keys);
+      if (dispatching && gameAction.result != PA_RUNNING) {
+        held &= ~1023u;
+        notice(pocket_action_message(&gameAction));
+        if (gameAction.result == PA_TIMEOUT || gameAction.result == PA_REJECTED)
+          companion = true;
+      }
+      int count = dispatching ? 1 : ff ? settings.ffSpeed : 1;
       for (int i = 0; i < count; i++) {
         c->runFrame(c);
         wide_tick(c, i < count - 1);
@@ -843,7 +991,23 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                     len, pc);
     } else if (companion) {
       if (menuOpen) {
-        if (menuOpen == 4) {
+        if (menuOpen == 6) {
+          static const char *filters[] = {"NONE", "LCD", "SCANLINES"};
+          static const char *grids[] = {"SOFT", "MEDIUM", "STRONG"};
+          snprintf(
+              optionText[0], 80, "FILTER: %s",
+              filters[displayOptions.filter == 3 ? 2 : displayOptions.filter]);
+          snprintf(optionText[1], 80, "GRID: %s", grids[displayOptions.grid]);
+          snprintf(optionText[2], 80, "GBA COLORS: %s",
+                   displayOptions.colors ? "ON" : "OFF");
+          snprintf(optionText[3], 80, "ASPECT: %s",
+                   displayOptions.stretch ? "STRETCH" : "ORIGINAL");
+          snprintf(optionText[4], 80, "EXPAND: %s",
+                   wideMode == 1   ? "ON"
+                   : wideMode == 2 ? "ZOOM OUT"
+                                   : "OFF");
+          pd_menu_draw(&screenMenu, &canvas);
+        } else if (menuOpen == 4) {
           pd_splash_draw(&canvas, "Based on PokeDaisy by Lidor Itzhari",
                          "https://github.com/lidor30/pokedaisy",
                          "GPL-3.0 | mGBA MPL-2.0 | B: Back");
@@ -892,6 +1056,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   if (audio)
     SDL_ClearQueuedAudio(audio);
 cleanup:
+  effect_invalidate();
   c->unloadROM(c);
   mCoreConfigDeinit(&c->config);
   c->deinit(c);
