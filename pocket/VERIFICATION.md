@@ -1,4 +1,27 @@
-# Phase 20 verification
+# Phase 21 verification
+
+Native Linux and actual NextUI AArch64 builds pass. The real-ROM efficiency
+harness compares cached/uncached paused work: 60 unchanged Bag polls go from
+60 redraws and snapshots to zero of each, with an identical source canvas.
+It verifies same-frame state-load invalidation, texture/expose repaint,
+notice expiry, unchanged paused frame counters, party bob timing, map pulse
+timing and idle quick-menu caching. Captures are inspected. Process CPU timings
+are recorded in the logs and explicitly do not establish battery endurance.
+SDL status assertions verify paused audio in companion/quick menus and active
+audio after resuming gameplay; actual sound still needs a physical test.
+
+Launcher tests use a mock NextUI helper: default Auto, explicit Powersave,
+inherit opt-out, quoted paths and helper-failure continuation. No real CPU,
+governor or power control is invoked by those tests. Actual NextUI source
+confirms standalone paks otherwise inherit Performance. ENERGY.md records
+the exact inspected commit and physical validation required.
+
+Native/ARM real-ROM usability, battle, preview states, recovery, expanded
+dialogue and display reopen tests remain the regression boundary. SDL software
+offscreen/dummy audio and ARM/QEMU cannot validate actual governor support,
+physical suspend, sound, frame pacing or six-to-eight-hour runtime.
+
+## Previous Phase 20 verification
 
 Native Linux and actual NextUI GCC 8.3 AArch64 release builds pass. The new
 `pocket-usability-test <ROM> <starter-state>` runs the real SDL frontend,

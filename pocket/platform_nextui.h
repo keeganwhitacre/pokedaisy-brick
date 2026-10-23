@@ -17,4 +17,6 @@ void pocket_platform_poll(struct pocket_platform *, uint32_t now);
 void pocket_platform_woke(struct pocket_platform *, uint32_t now);
 bool pocket_platform_suspend(struct pocket_platform *);
 bool pocket_platform_poweroff(struct pocket_platform *);
+/* Read-only start/exit diagnostics; no per-frame battery/sysfs polling. */
+void pocket_platform_log_energy(const struct pocket_platform *, const char *);
 #endif

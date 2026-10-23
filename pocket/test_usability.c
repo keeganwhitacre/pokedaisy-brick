@@ -41,9 +41,16 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
   if (frame == 38) { assert(displayOptions.companionShaders); press(SDLK_x); }
   if (frame == 39) press(SDLK_x);
   if (frame == 40) { assert(!companion); ffCounter = c->frameCounter(c); press(SDLK_f); }
-  if (frame == 41) { assert(testFf && c->frameCounter(c) == ffCounter + 4); press(SDLK_f); }
+  if (frame == 41) {
+    assert(testFf && c->frameCounter(c) == ffCounter + 4);
+    assert(SDL_GetAudioDeviceStatus(audio) == SDL_AUDIO_PLAYING);
+    press(SDLK_f);
+  }
   if (frame == 42) { assert(!testFf); press(SDLK_TAB); }
-  if (frame == 43) { assert(companion); press(SDLK_z); }
+  if (frame == 43) {
+    assert(companion && SDL_GetAudioDeviceStatus(audio) == SDL_AUDIO_PAUSED);
+    press(SDLK_z);
+  }
   if (frame == 44) {
     assert(p->summary);
     assert(capture_frame("runtime-phase20-summary.png", NULL));

@@ -1,4 +1,11 @@
-# Polished Crystal Android parity boundary — Phase 20
+# Polished Crystal Android parity boundary — Phase 21
+
+Phase 21 is a Linux efficiency adaptation. Paused snapshots and static frames
+are reused, with explicit state-load/texture/window/notice invalidation and the
+existing party/map animation phases. The launcher requests NextUI's own Auto
+policy when available; hardware clock/performance/battery behavior is unverified.
+No Android source, game data, gameplay timing or save format was changed.
+See ENERGY.md. Six-to-eight-hour runtime is not claimed.
 
 Phase 20 retains the existing controller mappings and clarifies the Summary
 and Bag prompts. Settings now expose per-ROM 2x/3x/4x fast-forward and Android's

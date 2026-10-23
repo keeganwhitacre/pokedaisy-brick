@@ -1,4 +1,11 @@
-# PokeDaisy Pocket: Phase 20 — display and play options
+# PokeDaisy Pocket: Phase 21 — less idle work and automatic CPU scaling
+
+The launcher now requests NextUI's existing Auto CPU policy instead of
+inheriting Performance when its helper is available. Paused Polished screens
+reuse game data and redraw on changes, retaining the original animation timing.
+Gameplay timing, audio, expansion and controls are preserved. ENERGY.md covers
+the measured software checks, troubleshooting overrides and hardware test.
+Six to eight hours is a battery-life target, not a verified claim.
 
 Menu > Settings now exposes FAST-FORWARD (2x/3x/4x), ON COMPANION and
 BATTLE BACKGROUND. Change values with A or Left/Right; choices persist per ROM.

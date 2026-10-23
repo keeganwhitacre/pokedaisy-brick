@@ -562,6 +562,7 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
         "../app/src/test/resources/fixtures/polished_crystal/wramx.bin", "rb");
     assert(f);
     assert(fread(gb->memory.wram, 1, 32768, f) == 32768);
+    observationEpoch++; /* Fixture replacement bypasses the production loader. */
     fclose(f);
     *pc = 0; /* Fixture-only harness: never part of the release executable. */
   }
@@ -636,6 +637,7 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
     FILE *f = fopen(path, "rb");
     assert(f);
     assert(fread(gb->memory.wram, 1, 32768, f) == 32768);
+    observationEpoch++;
     fclose(f);
     if (frame == 126)
       send_key(SDLK_TAB);
@@ -672,6 +674,7 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
         "../app/src/test/resources/fixtures/polished_crystal/wramx.bin", "rb");
     assert(f);
     assert(fread(gb->memory.wram, 1, 32768, f) == 32768);
+    observationEpoch++;
     fclose(f);
     send_key(SDLK_q);
   }

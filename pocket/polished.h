@@ -61,6 +61,8 @@ enum pc_action {
   PC_FAVORITE
 };
 void pc_ui_tick(struct pc_ui *, uint32_t);
+/* Changes only when an actually visible discrete animation changes frame. */
+unsigned pc_ui_animation_key(const struct pc_ui *);
 void pc_ui_observe(struct pc_ui *, const struct pd_snapshot *);
 bool pc_ui_input(struct pc_ui *, const struct pd_snapshot *, enum pc_action);
 void pc_ui_draw(struct pc_ui *, struct pd_canvas *, const struct pd_snapshot *,

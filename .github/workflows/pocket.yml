@@ -33,6 +33,7 @@ jobs:
           SDL_AUDIODRIVER: dummy
         run: |
           python3 make_diagnostic.py
+          python3 test_launch.py
           build-ci/pocket-host-test
           build-ci/pocket-functional-test
           build-ci/pocket-decoder-test ../app/src/test/resources/fixtures

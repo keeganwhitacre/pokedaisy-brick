@@ -503,6 +503,16 @@ static int clamp_selection(int value, int count) {
   return value < 0 || !count ? 0 : value >= count ? count - 1 : value;
 }
 void pc_ui_tick(struct pc_ui *u, uint32_t ms) { u->animationMs = ms; }
+unsigned pc_ui_animation_key(const struct pc_ui *u) {
+  if ((u->section == PC_PARTY && !u->summary) ||
+      (u->section == PC_BATTLE && u->battleControls &&
+       (u->battleParty || u->battleMenu.state == PB_PARTY ||
+        u->battleMenu.state == PB_SUBMENU)))
+    return (u->animationMs / 167) % 2;
+  if (u->section == PC_MAP && !u->placesOpen)
+    return (u->animationMs / 333) % 2;
+  return 0;
+}
 bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
                  enum pc_action a) {
   if (u->section == PC_BATTLE && u->battleControls && a != PC_PREVIOUS &&

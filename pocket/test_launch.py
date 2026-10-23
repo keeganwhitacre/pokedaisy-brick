@@ -21,4 +21,24 @@ with tempfile.TemporaryDirectory(prefix="pd launch ") as temp:
     assert all((pak / name).is_dir() for name in ("roms", "saves", "states"))
     subprocess.run(["sh", str(pak / "launch.sh"), "--library"], env=env, check=True)
     assert json.loads(capture.read_text()) == ["--data", str(pak), "--library"]
+    system = Path(temp) / "NextUI system"
+    (system / "bin").mkdir(parents=True)
+    governor = system / "bin/governor.sh"
+    governor.write_text('#!/bin/sh\nprintf "%s\\n" "$1" >> "$PD_POLICY_CAPTURE"\nexit "${PD_POLICY_FAIL:-0}"\n')
+    policy = Path(temp) / "policies.txt"
+    env.update(SYSTEM_PATH=str(system), PD_POLICY_CAPTURE=str(policy))
+    env.pop("POCKET_CPU_MODE", None)
+    subprocess.run(["sh", str(pak / "launch.sh"), "--fresh"], env=env, check=True)
+    assert policy.read_text() == "auto\n"
+    env["POCKET_CPU_MODE"] = "powersave"
+    subprocess.run(["sh", str(pak / "launch.sh")], env=env, check=True)
+    assert policy.read_text() == "auto\npowersave\n"
+    env["POCKET_CPU_MODE"] = "inherit"
+    subprocess.run(["sh", str(pak / "launch.sh")], env=env, check=True)
+    assert policy.read_text() == "auto\npowersave\n"
+    env.update(POCKET_CPU_MODE="auto", PD_POLICY_FAIL="1")
+    subprocess.run(["sh", str(pak / "launch.sh"), "--library"], env=env, check=True)
+    assert json.loads(capture.read_text()) == ["--data", str(pak), "--library"]
+    assert "CPU policy request failed" in (pak / "launch.log").read_text()
 print("PASS direct NextUI wrapper: quoted SD/ROM paths, literal arguments, shared data root, explicit library and bounded logs")
+print("PASS NextUI-owned Auto/Powersave requests, inherit opt-out and helper failure fallback; no CPU/power controls invoked")

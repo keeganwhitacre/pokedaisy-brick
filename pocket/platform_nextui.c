@@ -44,6 +44,30 @@ void pocket_platform_close(struct pocket_platform *p) {
   p->count = 0;
   p->active = false;
 }
+void pocket_platform_log_energy(const struct pocket_platform *p, const char *phase) {
+  if (!p->active)
+    return;
+  static const char *paths[] = {
+      "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
+      "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq",
+      "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq",
+      "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq",
+      "/sys/class/power_supply/axp2202-battery/capacity"};
+  static const char *labels[] = {"governor", "cpu-khz", "min-khz", "max-khz", "battery-percent"};
+  fprintf(stderr, "NextUI energy %s:", phase);
+  for (unsigned i = 0; i < sizeof paths / sizeof *paths; i++) {
+    FILE *f = fopen(paths[i], "r");
+    if (!f)
+      continue;
+    char value[80];
+    if (fgets(value, sizeof value, f)) {
+      value[strcspn(value, "\r\n")] = 0;
+      fprintf(stderr, " %s=%s", labels[i], value);
+    }
+    fclose(f);
+  }
+  fputc('\n', stderr);
+}
 void pocket_platform_key(struct pocket_platform *p, bool down, uint32_t now) {
   if (!p->active || (p->ignoreUntil && (int32_t)(now - p->ignoreUntil) < 0))
     return;

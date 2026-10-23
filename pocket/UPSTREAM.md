@@ -1,5 +1,21 @@
 # Maintaining the native port
 
+Phase 21: the host caches paused observations by core frame plus an epoch
+advanced on successful state load. Do not use frame count alone: different
+states can have the same count. Test-only WRAM fixture replacement explicitly
+invalidates observations. Actual game/ROM memory is never edited by this cache.
+Rendering invalidates on input, notices/expiry, window exposure/resize,
+texture restoration, settings, screen transitions and visible animation keys.
+`pc_ui_animation_key` must be reviewed with all future animated native widgets.
+Generic companion rendering remains continuous. Core frames, input polling and
+audio retain the existing schedule; no emulator rewrite or frame skipping.
+
+The launcher invokes the installed NextUI governor helper, which remains the
+OS's responsibility. ENERGY.md pins the inspected source and describes the
+inherit/performance fallback. Hardware must verify governor support, wake,
+audio and sustained frame pacing. Start/exit diagnostics are read-only and
+do not introduce a polling thread. Host CPU benchmarks are not power figures.
+
 Phase 20 keeps Android sources unchanged. ON COMPANION follows Prefs'
 `companion_shaders` default and CompanionSettingsScreen's explicit switch.
 The native renderer reuses the existing ScreenShaders-derived mask and color

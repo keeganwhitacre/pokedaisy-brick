@@ -57,6 +57,10 @@ static const char *root = ".";
 static char displayKey[41];
 static bool wideSupported, wideReady;
 static bool battleVisible;
+/* A state can change memory without changing the frame counter. Texture loss
+ * and exposed windows also require repainting an otherwise unchanged pause. */
+static uint64_t observationEpoch, repaintEpoch;
+static uint64_t snapshotReads, framePresents;
 static struct pocket_platform platform;
 static bool forceFresh, graphicsReset, lifecycleFailure;
 static struct pocket_display_options displayOptions;
@@ -177,6 +181,7 @@ static void wide_cycle(void) {
                          : "Original display");
 }
 static SDL_AudioDeviceID audio;
+static bool audioPaused;
 static volatile sig_atomic_t running = 1;
 static bool muted;
 static int appError;
@@ -220,6 +225,7 @@ static void stop(int sig) {
   running = 0;
 }
 static void notice(const char *s) {
+  repaintEpoch++;
   snprintf(message, sizeof message, "%s", s);
   messageUntil = SDL_GetTicks() + 2500;
   fprintf(stderr, "%s\n", s);
@@ -334,6 +340,11 @@ static void events(void) {
       running = 0;
     if (e.type == SDL_RENDER_TARGETS_RESET || e.type == SDL_RENDER_DEVICE_RESET)
       graphicsReset = true;
+    if (e.type == SDL_WINDOWEVENT &&
+        (e.window.event == SDL_WINDOWEVENT_EXPOSED ||
+         e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED ||
+         e.window.event == SDL_WINDOWEVENT_RESTORED))
+      repaintEpoch++;
     if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
       if (e.key.keysym.scancode == SDL_SCANCODE_POWER ||
           e.key.keysym.sym == SDLK_POWER) {
@@ -373,6 +384,7 @@ static void repeat_directions(void) {
 }
 static bool down(int k) { return (pressed & (1u << k)) != 0; }
 static void present_ui(bool companion) {
+  framePresents++;
   SDL_RenderSetLogicalSize(renderer, W, H);
   if (SDL_GetTicks() < messageUntil) {
     pd_fill(&canvas, 4, 334, 504, 24, 0x181818);
@@ -429,6 +441,7 @@ static uint32_t battle_background(unsigned gw, unsigned gh) {
 // Gameplay scales in physical panel pixels; the companion keeps its 512x384
 // grid.
 static void render_game(unsigned gw, unsigned gh) {
+  framePresents++;
   int ow, oh;
   if (SDL_GetRendererOutputSize(renderer, &ow, &oh) < 0 || ow <= 0 || oh <= 0)
     return;
@@ -554,6 +567,7 @@ static bool state(struct mCore *c, const char *path, bool save) {
     bool ok = save ? pocket_slot_save(c, path, displayKey)
                    : pocket_slot_load(c, path, displayKey);
     if (ok && !save) {
+      observationEpoch++;
       pk_wide_gb_reset();
       wideReady = false;
     }
@@ -569,6 +583,7 @@ static bool state(struct mCore *c, const char *path, bool save) {
                  : mCoreLoadStateNamed(c, f, SAVESTATE_RTC);
   f->close(f);
   if (ok && !save) {
+    observationEpoch++;
     pk_wide_gb_reset();
     wideReady = false;
   }
@@ -580,6 +595,14 @@ static bool state(struct mCore *c, const char *path, bool save) {
   }
   return ok;
 }
+static void audio_pause(bool pause) {
+  if (audio && pause != audioPaused) {
+    if (pause)
+      SDL_ClearQueuedAudio(audio);
+    SDL_PauseAudioDevice(audio, pause);
+    audioPaused = pause;
+  }
+}
 static void audio_open(void) {
   SDL_AudioSpec want = {0};
   want.freq = 32768;
@@ -587,12 +610,14 @@ static void audio_open(void) {
   want.channels = 2;
   want.samples = 512;
   audio = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
+  audioPaused = false;
   if (audio)
     SDL_PauseAudioDevice(audio, 0);
   else
     fprintf(stderr, "Audio unavailable: %s\n", SDL_GetError());
 }
 static bool textures_reset(void) {
+  repaintEpoch++;
   effect_invalidate();
   SDL_DestroyTexture(quickTexture);
   quickTexture = NULL;
@@ -630,7 +655,7 @@ static bool lifecycle(struct mCore *c, const char *battery,
   if (action)
     pocket_action_cancel(action);
   if (audio) {
-    SDL_PauseAudioDevice(audio, 1);
+    audio_pause(true);
     SDL_ClearQueuedAudio(audio);
   }
   if (platform.shutdownRequested) {
@@ -883,8 +908,20 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   struct pocket_action gameAction = {0};
   struct pocket_battle_action battleAction = {0};
   bool battleReturn = false;
+  const char *idleSetting = getenv("POCKET_IDLE_CACHE");
+  bool cacheIdle = !idleSetting || strcmp(idleSetting, "0");
+  bool snapshotValid = false, painted = false;
+  unsigned snapshotFrame = 0;
+  uint64_t snapshotEpoch = observationEpoch, paintedEpoch = 0;
+  bool paintedCompanion = false, paintedQuick = false, paintedNotice = false;
+  int paintedMenu = -1;
+  unsigned paintedAnimation = 0, paintedMessageUntil = 0, paintedDisplay = 0;
+  snapshotReads = framePresents = 0;
   uint64_t due = SDL_GetPerformanceCounter();
   double hz = (double)c->frequency(c) / c->frameCycles(c);
+  struct timespec cpuStart = {0}, wallStart = {0};
+  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpuStart);
+  clock_gettime(CLOCK_MONOTONIC, &wallStart);
 #ifndef POCKET_TEST
 play_loop:
 #endif
@@ -1334,11 +1371,24 @@ play_loop:
     }
     if (leave)
       break;
+    audio_pause(companion || quickOpen);
+    unsigned coreFrame = c->frameCounter(c);
+    bool freshSnapshot = !cacheIdle || !snapshotValid || snapshotFrame != coreFrame ||
+                         snapshotEpoch != observationEpoch;
+    if (freshSnapshot) {
+      snapshotReads++;
+      if (pc >= 0) {
+        pc_read(&snap, read_memory, c);
+        pc_ui_observe(&pcUi, &snap);
+      } else
+        pd_snapshot_read(&snap, &game, read_memory, c);
+      snapshotFrame = coreFrame;
+      snapshotEpoch = observationEpoch;
+      snapshotValid = true;
+    }
     if (pc >= 0) {
-      pc_read(&snap, read_memory, c);
-      pc_ui_observe(&pcUi, &snap);
       pc_ui_tick(&pcUi, SDL_GetTicks());
-      if (pcUi.battleSupported) {
+      if (pcUi.battleSupported && freshSnapshot) {
         if (!pocket_battle_read(read_memory, c, &pcUi.battleMenu))
           pcUi.battleMenu =
               (struct pocket_battle_menu){.state = PB_BUSY, .cursor = -1};
@@ -1362,13 +1412,25 @@ play_loop:
             SDL_ClearQueuedAudio(audio);
         }
       }
-    } else
-      pd_snapshot_read(&snap, &game, read_memory, c);
+    }
     battleVisible = pc >= 0 && snap.valid && snap.inBattle;
-    if (quickOpen) {
+    bool noticeVisible = SDL_GetTicks() < messageUntil;
+    unsigned animation = companion && !quickOpen && !menuOpen && pc >= 0
+                             ? pc_ui_animation_key(&pcUi) : 0;
+    unsigned displayStamp = displayOptions.filter | (displayOptions.grid << 3) |
+                            (displayOptions.colors << 5) |
+                            (displayOptions.companionShaders << 6);
+    bool redraw = !cacheIdle || !painted || (!companion && !quickOpen) || freshSnapshot ||
+                  pressed || paintedEpoch != repaintEpoch ||
+                  companion != paintedCompanion || quickOpen != paintedQuick ||
+                  menuOpen != paintedMenu || animation != paintedAnimation ||
+                  noticeVisible != paintedNotice ||
+                  paintedMessageUntil != messageUntil ||
+                  displayStamp != paintedDisplay || (companion && pc < 0);
+    if (redraw && quickOpen) {
       quick_present(gw, gh, quickSelected, ff, access(ss, F_OK) == 0, romdata,
                     len, pc);
-    } else if (companion) {
+    } else if (redraw && companion) {
       if (menuOpen) {
         opts[5] =
             displayOptions.autoResume ? "Save session & close" : "Close game";
@@ -1415,9 +1477,18 @@ play_loop:
         focus_draw(&ui, focus);
       }
       present_ui(!menuOpen);
-    } else {
+    } else if (redraw) {
       present_game(gw, gh);
     }
+    painted = true;
+    paintedEpoch = repaintEpoch;
+    paintedCompanion = companion;
+    paintedQuick = quickOpen;
+    paintedMenu = menuOpen;
+    paintedAnimation = animation;
+    paintedNotice = noticeVisible;
+    paintedMessageUntil = messageUntil;
+    paintedDisplay = displayStamp;
 #ifdef POCKET_TEST
     testQuick = quickOpen;
     testFf = ff;
@@ -1447,6 +1518,13 @@ play_loop:
   }
   if (audio)
     SDL_ClearQueuedAudio(audio);
+  struct timespec cpuEnd = {0}, wallEnd = {0};
+  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpuEnd);
+  clock_gettime(CLOCK_MONOTONIC, &wallEnd);
+  fprintf(stderr, "Session work: wall=%.3fs process-cpu=%.3fs loops=%d draws=%llu snapshots=%llu\n",
+          wallEnd.tv_sec - wallStart.tv_sec + (wallEnd.tv_nsec - wallStart.tv_nsec) / 1.e9,
+          cpuEnd.tv_sec - cpuStart.tv_sec + (cpuEnd.tv_nsec - cpuStart.tv_nsec) / 1.e9,
+          frames, (unsigned long long)framePresents, (unsigned long long)snapshotReads);
   bool recoveryOk = !displayOptions.autoResume || saveStatus.failed ||
                     pocket_recovery_save(c, root, displayKey, sav);
   if (!recoveryOk) {
@@ -1577,6 +1655,7 @@ int main(int argc, char **argv) {
   pd_canvas_init(&canvas, W, H, pixels);
   audio_open();
   pocket_platform_init(&platform);
+  pocket_platform_log_energy(&platform, "start");
   SDL_GameController *pad = SDL_NumJoysticks() && SDL_IsGameController(0)
                                 ? SDL_GameControllerOpen(0)
                                 : NULL;
@@ -1661,6 +1740,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "NextUI shutdown request failed\n");
     appError = 1;
   }
+  pocket_platform_log_energy(&platform, "exit");
   pocket_platform_close(&platform);
   return appError;
 }
