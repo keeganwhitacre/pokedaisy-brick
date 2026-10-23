@@ -359,8 +359,8 @@ static void test_item_lists(void) {
   assert(rows[0].pocket == 0 && rows[1].pocket == 0 && rows[2].pocket == 1);
   struct pd_snapshot s = {.bagOk = true};
   struct pc_ui u = {.section = PC_BAG};
-  int tabs[6];
-  assert(bag_tabs(&s, tabs) == 1 && tabs[0] == -1);
+  int tabs[7];
+  assert(bag_tabs(&s, &u.favorites, tabs) == 1 && tabs[0] == -1);
   assert(pc_ui_input(&u, &s, PC_CONFIRM) && !u.detail && u.pocket == -1);
   s.bag[0].count = 1;
   s.bag[1].count = 2;
@@ -369,26 +369,45 @@ static void test_item_lists(void) {
   s.bag[1].items[1] = (struct pd_item){1, 2};
   struct pd_snapshot before = s;
   struct pocket_item_ref all[640];
-  assert(bag_entries(&s, -1, 0, 0, all) == 3);
+  assert(bag_entries(&s, -1, 0, 0, &u.favorites, all) == 3);
   assert(all[0].id == 25 && all[1].slot == 0 && all[2].slot == 1);
-  assert(bag_entries(&s, -1, 3, 0, all) == 3 && all[0].quantity == 3);
-  assert(bag_tabs(&s, tabs) == 3 && tabs[1] == 0 && tabs[2] == 1);
+  assert(bag_entries(&s, -1, 3, 0, &u.favorites, all) == 3 && all[0].quantity == 3);
+  assert(bag_tabs(&s, &u.favorites, tabs) == 3 && tabs[1] == 0 && tabs[2] == 1);
   assert(pc_ui_input(&u, &s, PC_DOWN) && u.item == 1 && u.detail);
   assert(pc_ui_input(&u, &s, PC_BACK) && !u.detail);
   assert(pc_ui_input(&u, &s, PC_RIGHT) && u.pocket == 0 && !u.item);
   assert(pc_ui_input(&u, &s, PC_RIGHT) && u.pocket == 1);
   assert(pc_ui_input(&u, &s, PC_RIGHT) && u.pocket == -1);
   assert(!memcmp(&s, &before, sizeof s));
+  // Android DEFAULT stable favorites partition; both stacks of an id share
+  // the star, other sort modes keep their original comparator.
+  u.item = 1;
+  u.detail = true;
+  assert(pc_ui_input(&u, &s, PC_FAVORITE));
+  assert(u.favoritesDirty && pocket_favorite_has(&u.favorites, 1));
+  assert(bag_entries(&s, BAG_ALL, 0, 0, &u.favorites, all) == 3);
+  assert(all[0].id == 1 && all[0].slot == 0 && all[1].slot == 1 && all[2].id == 25);
+  assert(bag_tabs(&s, &u.favorites, tabs) == 4 && tabs[1] == BAG_FAVORITES);
+  assert(pc_ui_input(&u, &s, PC_RIGHT) && u.pocket == BAG_FAVORITES);
+  assert(bag_entries(&s, BAG_FAVORITES, 0, 0, &u.favorites, all) == 2);
+  assert(pc_ui_input(&u, &s, PC_CONFIRM) && u.detail);
+  assert(pc_ui_input(&u, &s, PC_FAVORITE));
+  assert(u.pocket == BAG_ALL && !pocket_favorite_has(&u.favorites, 1));
+  assert(bag_tabs(&s, &u.favorites, tabs) == 3);
+  // A favorite not currently held persists, but does not create a dead tab.
+  pocket_favorite_toggle(&u.favorites, 65535);
+  assert(bag_tabs(&s, &u.favorites, tabs) == 3);
+  assert(!memcmp(&s, &before, sizeof s));
   for (int p = 0; p < PD_POCKET_COUNT; p++) {
     s.bag[p].count = PD_POCKET_SLOTS;
     for (int i = 0; i < PD_POCKET_SLOTS; i++)
       s.bag[p].items[i] = (struct pd_item){1, i + 1};
   }
-  assert(bag_count(&s, -1) == 640);
-  assert(bag_entries(&s, -1, 3, 0, all) == 640);
+  assert(bag_count(&s, -1, &u.favorites) == 640);
+  assert(bag_entries(&s, -1, 3, 0, &u.favorites, all) == 640);
   assert(all[0].quantity == 128 && all[639].quantity == 1);
   s.bag[0].count++;
-  assert(bag_entries(&s, -1, 0, 0, all) == 512);
+  assert(bag_entries(&s, -1, 0, 0, &u.favorites, all) == 512);
   puts("PASS read-only item models: stable duplicate stacks, all/present "
        "pockets, "
        "name/type/count sorting, boundaries, capacity and nested controller "
@@ -555,6 +574,14 @@ int main(int argc, char **argv) {
         assert(bag.bagKeyPocket == keyPocket && bag.bagKeySlot == keySlot);
         assert(pd_png_write("runtime-phase13-bag-sorted-fixture.png", 512, 384,
                             px));
+        pc_ui_input(&bag, &s, PC_CONFIRM);
+        pc_ui_input(&bag, &s, PC_FAVORITE);
+        pc_ui_draw(&bag, &c, &s, cart, romSize, build);
+        assert(pd_png_write("runtime-phase17-bag-favorites.png", 512, 384, px));
+        pc_ui_input(&bag, &s, PC_RIGHT);
+        assert(bag.pocket == BAG_FAVORITES);
+        pc_ui_draw(&bag, &c, &s, cart, romSize, build);
+        assert(pd_png_write("runtime-phase17-bag-favorites-tab.png", 512, 384, px));
         const int pages[] = {0, 2, 3, 4};
         const char *labels[] = {"here", "boss", "tips", "where"};
         for (int page = 0; page < 4; page++) {

@@ -41,7 +41,7 @@ Remaining expansion work: unspawned/connected-map NPC templates; broad outdoor, 
 
 1. Hardware validation and wider exploration of this renderer, including connected maps.
 2. Remaining battle panel layout and foe-selection ergonomics.
-3. Remaining Dex entry layouts, Bag favorites, Guide notice and shared menu composition.
+3. Remaining Dex entry layouts, Guide notice and shared menu composition.
 4. Remaining exact widget styling and small-text metrics.
 5. Multi-slot state browser and physical lifecycle/RTC/suspend verification.
 
@@ -138,7 +138,32 @@ full Android menu composition is not claimed. Existing quick-menu appearance,
 state handling, save paths and expansion remain intact.
 
 Functional priorities now include Android Polished battle commands/switching,
-Bag favorites, broader original settings/quick controls and state previews.
+Broader original settings/quick controls and state previews.
+
+## Phase 17 follow-up: Bag favorites
+
+Translated the existing Polished Crystal functionality in `FavoriteItems.kt`,
+`Prefs.favoriteItemsFor/setFavoriteItemsFor`, and `ItemsScreen.kt` (category and
+sort rules, description-bar favorite action). X in an open Bag description
+stars/unstars its item id. Duplicate stacks share the star. Default order is a
+stable favorites-first partition; Name, Type and Count retain their comparators.
+Favorites appears after All only while a starred item is held. Removing the
+last one returns to All; temporarily absent item ids remain stored.
+
+Linux preferences live separately in `favorites/<ROM-SHA1>.txt`, with bounded
+parsing and atomic replacement. Android uses CRC32-keyed SharedPreferences;
+Linux uses the existing SHA-1 identity and reports storage failure. No SRAM,
+emulator state, original Bag order, or game-memory changes. The displayed star
+is the original `PixelIcons.star`, using `OptionColors.favorite` light color.
+The physical X shortcut adapts Android's description-bar star button. Outside
+an open Bag description, X retains its game/companion toggle.
+
+Native decoder/controller tests and preference tests pass, including duplicate
+stacks, tab removal, missing/corrupt files and the complete 16-bit item-id range.
+Native captures were inspected using upstream RAM snapshots and ROM font.
+ARM/live frontend validation and physical Brick validation are pending at this
+checkpoint. This does not add Polished Crystal item Use/Give/Take, which the
+upstream Android item-action backend does not implement.
 Healing-item targeting is a separately identified downstream extension that
 requires additional verified completion/context predicates. Physical Brick
 validation of Phase 15 remains outstanding.

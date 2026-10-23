@@ -812,6 +812,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   bool companion = false, ff = false, leave = false;
   int focus = 0, frames = 0;
   struct pc_ui pcUi = {.battleSupported = pocket_battle_supported(displayKey)};
+  pocket_favorites_load(root, displayKey, &pcUi.favorites);
   struct pocket_action gameAction = {0};
   struct pocket_battle_action battleAction = {0};
   bool battleReturn = false;
@@ -852,7 +853,9 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       held &= ~1023u;
       notice(pocket_action_message(&gameAction));
     }
-    if (down(X)) {
+    bool favoriteRequested = down(X) && companion && !menuOpen && !quickOpen &&
+                             pc >= 0 && pcUi.section == PC_BAG && pcUi.detail;
+    if (down(X) && !favoriteRequested) {
       quickOpen = false;
       menuOpen = 0;
       companion = !companion;
@@ -1071,6 +1074,12 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           if (down(buttons[action]) &&
               !pc_ui_input(&pcUi, &snap, (enum pc_action)action))
             companion = false;
+        if (favoriteRequested) pc_ui_input(&pcUi, &snap, PC_FAVORITE);
+        if (pcUi.favoritesDirty) {
+          if (!pocket_favorites_save(root, displayKey, &pcUi.favorites))
+            notice("Favorites could not be saved");
+          pcUi.favoritesDirty = false;
+        }
         if (pcUi.battleRequest) {
           if (gameAction.result != PA_RUNNING &&
               pocket_battle_begin(
