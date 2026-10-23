@@ -656,6 +656,7 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
   }
 }
 int main(void) {
+  forceFresh = true; /* Baseline tests provide their own state. */
   if (getenv("POCKET_TEST_QUICK") || getenv("POCKET_TEST_WIDE")) {
     wideTest = getenv("POCKET_TEST_WIDE") != NULL;
     quickTest = true;

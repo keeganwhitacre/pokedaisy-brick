@@ -20,7 +20,7 @@ static bool valid(const struct pocket_display_options *o) {
 }
 bool pocket_options_load(const char *root, const char *sha,
                          struct pocket_display_options *out) {
-  *out = (struct pocket_display_options){.grid = 1};
+  *out = (struct pocket_display_options){.grid = 1, .autoResume = true};
   char path[1200];
   if (!option_path(root, sha, path))
     return false;
@@ -33,14 +33,16 @@ bool pocket_options_load(const char *root, const char *sha,
   if (fclose(f))
     ok = false;
   data[n] = 0;
-  static const char *keys[] = {"filter=", "grid=", "colors=", "stretch="};
-  int values[4] = {0};
+  static const char *keys[] = {
+      "filter=", "grid=", "colors=", "stretch=", "auto-zoom=", "auto-resume="};
+  int values[6] = {0, 0, 0, 0, 0, 1};
   char *p = data;
-  if (strncmp(p, "pocket-fx=1\n", 12))
+  bool legacy = !strncmp(p, "pocket-fx=1\n", 12);
+  if (!legacy && strncmp(p, "pocket-fx=2\n", 12))
     ok = false;
   else
     p += 12;
-  for (int i = 0; ok && i < 4; i++) {
+  for (int i = 0; ok && i < (legacy ? 4 : 6); i++) {
     size_t k = strlen(keys[i]);
     if (strncmp(p, keys[i], k)) {
       ok = false;
@@ -57,9 +59,11 @@ bool pocket_options_load(const char *root, const char *sha,
     values[i] = (int)v;
     p = end + 1;
   }
-  struct pocket_display_options o = {values[0], values[1], values[2] == 1,
-                                     values[3] == 1};
-  ok = ok && !*p && values[2] <= 1 && values[3] <= 1 && valid(&o);
+  struct pocket_display_options o = {values[0],      values[1],
+                                     values[2] == 1, values[3] == 1,
+                                     values[4] == 1, values[5] == 1};
+  ok = ok && !*p && values[2] <= 1 && values[3] <= 1 && values[4] <= 1 &&
+       values[5] <= 1 && valid(&o);
   if (ok)
     *out = o;
   return ok;
@@ -76,9 +80,11 @@ bool pocket_options_save(const char *root, const char *sha,
   FILE *f = fopen(temp, "w");
   if (!f)
     return false;
-  bool ok =
-      fprintf(f, "pocket-fx=1\nfilter=%d\ngrid=%d\ncolors=%d\nstretch=%d\n",
-              o->filter, o->grid, o->colors, o->stretch) > 0;
+  bool ok = fprintf(f,
+                    "pocket-fx=2\nfilter=%d\ngrid=%d\ncolors=%d\nstretch=%"
+                    "d\nauto-zoom=%d\nauto-resume=%d\n",
+                    o->filter, o->grid, o->colors, o->stretch, o->autoZoom,
+                    o->autoResume) > 0;
   if (fflush(f) || fsync(fileno(f)))
     ok = false;
   if (fclose(f))

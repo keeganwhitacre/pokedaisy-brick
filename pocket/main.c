@@ -13,7 +13,9 @@
 #include "pd_settings.h"
 #include "pd_ui.h"
 #include "pd_ui_internal.h"
+#include "platform_nextui.h"
 #include "polished.h"
+#include "recovery.h"
 #include "rom_identity.h"
 #include <SDL.h>
 #include <dirent.h>
@@ -51,6 +53,8 @@ static void notice(const char *text);
 static const char *root = ".";
 static char displayKey[41];
 static bool wideSupported, wideReady;
+static struct pocket_platform platform;
+static bool forceFresh, graphicsReset, lifecycleFailure;
 static struct pocket_display_options displayOptions;
 static uint32_t colorLut[32768];
 static SDL_Texture *effectTexture;
@@ -128,8 +132,10 @@ static void wide_tick(struct mCore *c, bool skip) {
     return;
   }
   int mix = pk_wide_gb_view(c, gbFrame, wideFrame, v, NULL);
+  int scene = pk_wide_gb_scene();
   wideReady = mix == 256 && pk_wide_gb_last_mode() == PK_WIDE_MODE_MAP &&
-              !pk_wide_gb_wants_close();
+              (scene == PK_WIDE_SCENE_FIELD ||
+               (!displayOptions.autoZoom && scene == PK_WIDE_SCENE_TEXT));
 #ifdef POCKET_TEST
   /* Pixels in the actual PPU viewport must survive expansion unchanged. */
   if (wideReady)
@@ -315,7 +321,15 @@ static void events(void) {
   while (SDL_PollEvent(&e)) {
     if (e.type == SDL_QUIT)
       running = 0;
+    if (e.type == SDL_RENDER_TARGETS_RESET || e.type == SDL_RENDER_DEVICE_RESET)
+      graphicsReset = true;
     if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
+      if (e.key.keysym.scancode == SDL_SCANCODE_POWER ||
+          e.key.keysym.sym == SDLK_POWER) {
+        if (!e.key.repeat && !platform.count)
+          pocket_platform_key(&platform, e.type == SDL_KEYDOWN, SDL_GetTicks());
+        continue;
+      }
       if (!e.key.repeat)
         key(keyboard(e.key.keysym.sym), e.type == SDL_KEYDOWN);
     }
@@ -337,6 +351,7 @@ static void events(void) {
         e.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
       held = 0;
   }
+  pocket_platform_poll(&platform, SDL_GetTicks());
 }
 static void repeat_directions(void) {
   for (int k = RIGHT; k <= DOWN; k++)
@@ -505,6 +520,99 @@ static bool state(struct mCore *c, const char *path, bool save) {
   }
   return ok;
 }
+static void audio_open(void) {
+  SDL_AudioSpec want = {0};
+  want.freq = 32768;
+  want.format = AUDIO_S16SYS;
+  want.channels = 2;
+  want.samples = 512;
+  audio = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
+  if (audio)
+    SDL_PauseAudioDevice(audio, 0);
+  else
+    fprintf(stderr, "Audio unavailable: %s\n", SDL_GetError());
+}
+static bool textures_reset(void) {
+  effect_invalidate();
+  SDL_DestroyTexture(quickTexture);
+  quickTexture = NULL;
+  SDL_DestroyTexture(texture);
+  SDL_DestroyTexture(gameTexture);
+  SDL_DestroyTexture(wideTexture);
+  texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888,
+                              SDL_TEXTUREACCESS_STREAMING, W, H);
+  gameTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888,
+                                  SDL_TEXTUREACCESS_STREAMING, 256, 256);
+  wideTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888,
+                                  SDL_TEXTUREACCESS_STREAMING, 256, 192);
+  graphicsReset = false;
+  return texture && gameTexture && wideTexture;
+}
+#ifdef POCKET_TEST
+static bool (*test_suspend)(void);
+#endif
+/* Foreground thread only, between emulated frames. The suspend helper owns
+ * the real hardware transition; the core and CPU expansion cache stay still. */
+static bool lifecycle(struct mCore *c, const char *battery,
+                      struct pocket_action *action, uint64_t *due) {
+  if (graphicsReset && !textures_reset()) {
+    notice("Video reset failed");
+    running = 0;
+    return true;
+  }
+  if (!platform.powerDown && !platform.sleepRequested &&
+      !platform.shutdownRequested)
+    return false;
+  held = pressed = 0;
+  memset(repeatAt, 0, sizeof repeatAt);
+  if (c)
+    c->setKeys(c, 0);
+  if (action)
+    pocket_action_cancel(action);
+  if (audio) {
+    SDL_PauseAudioDevice(audio, 1);
+    SDL_ClearQueuedAudio(audio);
+  }
+  if (platform.shutdownRequested) {
+    running = 0;
+    return true;
+  }
+  if (platform.powerDown) {
+    SDL_Delay(16);
+    return true;
+  }
+  if (c && displayOptions.autoResume &&
+      !pocket_recovery_save(c, root, displayKey, battery))
+    notice("Recovery could not be saved before sleep");
+  if (audio) {
+    SDL_CloseAudioDevice(audio);
+    audio = 0;
+  }
+  bool ok;
+#ifdef POCKET_TEST
+  if (test_suspend)
+    ok = test_suspend();
+  else
+#endif
+    ok = pocket_platform_suspend(&platform);
+  pocket_platform_woke(&platform, SDL_GetTicks());
+  SDL_FlushEvents(SDL_KEYDOWN, SDL_KEYUP);
+  SDL_FlushEvents(SDL_JOYAXISMOTION, SDL_JOYBUTTONUP);
+  SDL_FlushEvents(SDL_CONTROLLERAXISMOTION, SDL_CONTROLLERBUTTONUP);
+  SDL_JoystickUpdate();
+  if (!textures_reset()) {
+    notice("Video restore failed");
+    running = 0;
+  }
+  audio_open();
+  if (due)
+    *due = SDL_GetPerformanceCounter();
+  if (!ok) {
+    notice("Suspend failed or unsupported; gameplay restored");
+    lifecycleFailure = true;
+  }
+  return true;
+}
 static void focus_move(struct pd_ui *u, int *focus, int direction) {
   if (!u->hitCount) {
     *focus = -1;
@@ -659,6 +767,16 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   char config[1024];
   snprintf(config, sizeof config, "%s/settings.ini", root);
   pocket_options_load(root, displayKey, &displayOptions);
+  if (displayOptions.autoResume && !forceFresh) {
+    enum pocket_recovery_result result =
+        pocket_recovery_load(c, root, displayKey, sav);
+    if (result == RECOVERY_LOADED)
+      notice("Session restored");
+    else if (result == RECOVERY_INVALID)
+      notice("Invalid recovery ignored; starting normally");
+    else if (result == RECOVERY_STALE)
+      notice("Battery save changed; recovery ignored");
+  }
   pocket_color_lut(colorLut);
   effect_invalidate();
   struct pd_settings settings;
@@ -673,7 +791,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                         "Save state",
                         "Load state",
                         "Toggle fast-forward",
-                        "Quit to game list",
+                        "Close game",
                         "About",
                         "Display: Original / Expand / Zoom",
                         "Quick menu",
@@ -682,12 +800,12 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   struct pd_menu gameMenu, confirmMenu;
   pd_menu_init(&gameMenu, "GAME", opts, 10);
   pd_menu_init(&confirmMenu, "CONFIRM", confirmOpts, 2);
-  char optionText[5][80];
-  const char *optionLabels[5];
-  for (int i = 0; i < 5; i++)
+  char optionText[7][80];
+  const char *optionLabels[7];
+  for (int i = 0; i < 7; i++)
     optionLabels[i] = optionText[i];
   struct pd_menu screenMenu;
-  pd_menu_init(&screenMenu, "SCREEN / SHADERS", optionLabels, 5);
+  pd_menu_init(&screenMenu, "SCREEN / SESSION", optionLabels, 7);
   int menuOpen = 0;
   bool quickOpen = false;
   int quickSelected = 0;
@@ -699,6 +817,15 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   double hz = (double)c->frequency(c) / c->frameCycles(c);
   while (running && !leave) {
     events();
+    if (lifecycle(c, sav, &gameAction, &due)) {
+      if (lifecycleFailure) {
+        lifecycleFailure = false;
+        companion = true;
+        menuOpen = 1;
+        quickOpen = false;
+      }
+      continue;
+    }
     repeat_directions();
     if (gameAction.result == PA_RUNNING &&
         (down(B) || down(X) || down(MENU) || down(L3))) {
@@ -815,6 +942,12 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
             case 4:
               wide_cycle();
               break;
+            case 5:
+              displayOptions.autoZoom = !displayOptions.autoZoom;
+              break;
+            case 6:
+              displayOptions.autoResume = !displayOptions.autoResume;
+              break;
             }
             effect_invalidate();
             options_save();
@@ -863,7 +996,9 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                 break;
               case 5:
                 menuOpen = 3;
-                confirmMenu.title = "Quit? Save in-game first.";
+                confirmMenu.title = displayOptions.autoResume
+                                        ? "Close game? Auto resume ON"
+                                        : "Close? Save in-game first";
                 confirmMenu.selected = 0;
                 break;
               case 6:
@@ -1006,6 +1141,10 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                    wideMode == 1   ? "ON"
                    : wideMode == 2 ? "ZOOM OUT"
                                    : "OFF");
+          snprintf(optionText[5], 80, "AUTO ZOOM IN: %s",
+                   displayOptions.autoZoom ? "ON" : "OFF");
+          snprintf(optionText[6], 80, "AUTO RESUME: %s",
+                   displayOptions.autoResume ? "ON" : "OFF");
           pd_menu_draw(&screenMenu, &canvas);
         } else if (menuOpen == 4) {
           pd_splash_draw(&canvas, "Based on PokeDaisy by Lidor Itzhari",
@@ -1055,6 +1194,9 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   }
   if (audio)
     SDL_ClearQueuedAudio(audio);
+  if (displayOptions.autoResume && !saveStatus.failed &&
+      !pocket_recovery_save(c, root, displayKey, sav))
+    notice("Recovery save failed; check storage");
 cleanup:
   effect_invalidate();
   c->unloadROM(c);
@@ -1099,6 +1241,8 @@ int main(int argc, char **argv) {
       frames = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--shot") && i + 1 < argc)
       shot = argv[++i];
+    else if (!strcmp(argv[i], "--fresh"))
+      forceFresh = true;
     else
       rom = argv[i];
   }
@@ -1148,16 +1292,8 @@ int main(int argc, char **argv) {
   SDL_SetTextureBlendMode(wideTexture, SDL_BLENDMODE_NONE);
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
   pd_canvas_init(&canvas, W, H, pixels);
-  SDL_AudioSpec want = {0};
-  want.freq = 32768;
-  want.format = AUDIO_S16SYS;
-  want.channels = 2;
-  want.samples = 512;
-  audio = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
-  if (audio)
-    SDL_PauseAudioDevice(audio, 0);
-  else
-    fprintf(stderr, "Audio unavailable: %s\n", SDL_GetError());
+  audio_open();
+  pocket_platform_init(&platform);
   SDL_GameController *pad = SDL_NumJoysticks() && SDL_IsGameController(0)
                                 ? SDL_GameControllerOpen(0)
                                 : NULL;
@@ -1165,6 +1301,11 @@ int main(int argc, char **argv) {
                      : SDL_NumJoysticks() ? SDL_JoystickOpen(0)
                                           : NULL;
   quick_bindings(js, pad);
+  SDL_PumpEvents();
+  SDL_JoystickUpdate();
+  if ((js && SDL_JoystickGetButton(js, 0)) ||
+      SDL_GetKeyboardState(NULL)[SDL_SCANCODE_X])
+    forceFresh = true;
   if (rom)
     run_game(rom, frames, shot);
   else {
@@ -1187,6 +1328,8 @@ int main(int argc, char **argv) {
     int ticks = 0;
     while (running) {
       events();
+      if (lifecycle(NULL, NULL, NULL, NULL))
+        continue;
       repeat_directions();
       if (down(B) || down(MENU))
         break;
@@ -1224,5 +1367,10 @@ int main(int argc, char **argv) {
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
   SDL_Quit();
+  if (!pocket_platform_poweroff(&platform)) {
+    fprintf(stderr, "NextUI shutdown request failed\n");
+    appError = 1;
+  }
+  pocket_platform_close(&platform);
   return appError;
 }

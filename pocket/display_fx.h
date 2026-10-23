@@ -8,6 +8,7 @@
 struct pocket_display_options {
   int filter, grid;
   bool colors, stretch;
+  bool autoZoom, autoResume;
 };
 enum {
   POCKET_FILTER_NONE = 0,
