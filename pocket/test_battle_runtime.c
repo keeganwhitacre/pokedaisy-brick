@@ -64,6 +64,25 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
   }
   if (frame == 0)
     assert(state(c, battleState, false));
+  if (frame == 1) {
+    assert(battleVisible);
+    assert(battle_background(160, 144));
+    present_game(160, 144);
+    assert(capture_frame("runtime-phase20-battle-background.png", NULL));
+    int w, h;
+    assert(SDL_GetRendererOutputSize(renderer, &w, &h) == 0);
+    uint32_t *shot = malloc((size_t)w * h * 4);
+    assert(shot && SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_RGB888,
+                                      shot, w * 4) == 0);
+    assert((shot[0] & 0xffffff) == battle_background(160, 144));
+    int scale = lastGameRect.w / 160;
+    for (int y = 0; y < 144; y++)
+      for (int x = 0; x < 160; x++)
+        assert((shot[(lastGameRect.y + y * scale) * w + lastGameRect.x + x * scale] &
+                0xffffff) == gamePixels[y * 256 + x]);
+    free(shot);
+    puts("PASS real battle background fills margins; every original PPU pixel remains exact");
+  }
   if (frame == 1)
     send_key(SDLK_TAB);
   if (frame == 2 || frame == 3)

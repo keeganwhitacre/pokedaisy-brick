@@ -16,11 +16,13 @@ static bool option_path(const char *root, const char *sha, char path[1200]) {
 }
 static bool valid(const struct pocket_display_options *o) {
   return (o->filter == 0 || o->filter == 1 || o->filter == 3) && o->grid >= 0 &&
-         o->grid < 3 && !(o->stretch && o->filter);
+         o->grid < 3 && !(o->stretch && o->filter) &&
+         o->ffSpeed >= 2 && o->ffSpeed <= 4;
 }
 bool pocket_options_load(const char *root, const char *sha,
                          struct pocket_display_options *out) {
-  *out = (struct pocket_display_options){.grid = 1, .autoResume = true};
+  *out = (struct pocket_display_options){.grid = 1, .autoResume = true,
+      .companionShaders = true, .battleBackground = true, .ffSpeed = 2};
   char path[1200];
   if (!option_path(root, sha, path))
     return false;
@@ -34,15 +36,17 @@ bool pocket_options_load(const char *root, const char *sha,
     ok = false;
   data[n] = 0;
   static const char *keys[] = {
-      "filter=", "grid=", "colors=", "stretch=", "auto-zoom=", "auto-resume="};
-  int values[6] = {0, 0, 0, 0, 0, 1};
+      "filter=", "grid=", "colors=", "stretch=", "auto-zoom=", "auto-resume=",
+      "companion-shaders=", "battle-background=", "ff-speed="};
+  int values[9] = {0, 0, 0, 0, 0, 1, 1, 1, 2};
   char *p = data;
   bool legacy = !strncmp(p, "pocket-fx=1\n", 12);
-  if (!legacy && strncmp(p, "pocket-fx=2\n", 12))
+  bool version2 = !strncmp(p, "pocket-fx=2\n", 12);
+  if (!legacy && !version2 && strncmp(p, "pocket-fx=3\n", 12))
     ok = false;
   else
     p += 12;
-  for (int i = 0; ok && i < (legacy ? 4 : 6); i++) {
+  for (int i = 0; ok && i < (legacy ? 4 : version2 ? 6 : 9); i++) {
     size_t k = strlen(keys[i]);
     if (strncmp(p, keys[i], k)) {
       ok = false;
@@ -52,7 +56,7 @@ bool pocket_options_load(const char *root, const char *sha,
     char *end;
     errno = 0;
     long v = strtol(p, &end, 10);
-    if (errno || end == p || *end != '\n' || v < 0 || v > 3) {
+    if (errno || end == p || *end != '\n' || v < 0 || v > 4) {
       ok = false;
       break;
     }
@@ -61,9 +65,10 @@ bool pocket_options_load(const char *root, const char *sha,
   }
   struct pocket_display_options o = {values[0],      values[1],
                                      values[2] == 1, values[3] == 1,
-                                     values[4] == 1, values[5] == 1};
+                                     values[4] == 1, values[5] == 1,
+                                     values[6] == 1, values[7] == 1, values[8]};
   ok = ok && !*p && values[2] <= 1 && values[3] <= 1 && values[4] <= 1 &&
-       values[5] <= 1 && valid(&o);
+       values[5] <= 1 && values[6] <= 1 && values[7] <= 1 && valid(&o);
   if (ok)
     *out = o;
   return ok;
@@ -81,10 +86,12 @@ bool pocket_options_save(const char *root, const char *sha,
   if (!f)
     return false;
   bool ok = fprintf(f,
-                    "pocket-fx=2\nfilter=%d\ngrid=%d\ncolors=%d\nstretch=%"
-                    "d\nauto-zoom=%d\nauto-resume=%d\n",
+                    "pocket-fx=3\nfilter=%d\ngrid=%d\ncolors=%d\nstretch=%"
+                    "d\nauto-zoom=%d\nauto-resume=%d\ncompanion-shaders=%d\n"
+                    "battle-background=%d\nff-speed=%d\n",
                     o->filter, o->grid, o->colors, o->stretch, o->autoZoom,
-                    o->autoResume) > 0;
+                    o->autoResume, o->companionShaders, o->battleBackground,
+                    o->ffSpeed) > 0;
   if (fflush(f) || fsync(fileno(f)))
     ok = false;
   if (fclose(f))

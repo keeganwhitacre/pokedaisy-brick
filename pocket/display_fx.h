@@ -9,6 +9,8 @@ struct pocket_display_options {
   int filter, grid;
   bool colors, stretch;
   bool autoZoom, autoResume;
+  bool companionShaders, battleBackground;
+  int ffSpeed;
 };
 enum {
   POCKET_FILTER_NONE = 0,

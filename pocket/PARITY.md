@@ -1,4 +1,13 @@
-# Polished Crystal Android parity boundary — Phase 19
+# Polished Crystal Android parity boundary — Phase 20
+
+Phase 20 retains the existing controller mappings and clarifies the Summary
+and Bag prompts. Settings now expose per-ROM 2x/3x/4x fast-forward and Android's
+ON COMPANION choice for the currently supported LCD/SCANLINES/color effects.
+The battle background extension is a downstream option, not additional PPU
+rendering. It samples matching light corners/border of the current battle frame,
+fills only outside the original game image, and safely falls back to black.
+Fly remains unavailable; see FLY_INVESTIGATION.md for verified game rules and
+the controller-driven implementation path. Fast-forward music is out of scope.
 
 Phase 19 adapts SaveStates.kt and StatesScreen/SlotCard: ten numbered slots,
 timestamps, thumbnails and separate resume storage. Brick uses two columns,
@@ -33,7 +42,7 @@ user's matching cart. Full visual and behavioral parity is still unfinished.
 | Guide NEXT BOSS | Progress-dependent order, League/rematch rules, normal/faithful teams, type hints, individual Pokemon hint/answer entries, moves/held-item answers, own-best-level comparison | Shared OPTION frames and inline per-Pokémon entries now adapted; fine text metrics and controller scrolling differences remain |
 | Guide TIPS / WHERE IS | All seven upstream tips, hints/answers; HM/key/gift-Pokemon lists with deduplication, locations and owned marks | Inline hint/answer rows with source page/category hierarchy now adapted; fine text metrics and first-use guide notice remain |
 | Quick menu | L3 ring; original Android icons; paused integer-scaled gameplay behind it; state confirmation, FF and companion | More actions only when their game-specific implementations are ported; User confirms quick menu on Brick; new UI changes still require hardware retesting |
-| States/options | Existing state/FF controls; per-ROM LCD/SCANLINES/GRID/GBA COLORS, unfiltered STRETCH, AUTO ZOOM IN and AUTO RESUME | Multi-slot screenshot browser, full Android hierarchy, remaining effects/mapping/FF options |
+| States/options | Ten preview slots; per-ROM 2x/3x/4x FF, ON COMPANION, LCD/SCANLINES/GRID/GBA COLORS, unfiltered STRETCH, AUTO ZOOM IN, AUTO RESUME and battle background | Full Android hierarchy, remaining effects/mapping/scene-speed options and Undo state actions |
 | NextUI lifecycle | Foreground power adapter, real suspend helper, pause/audio/input restoration, separate atomic recovery and direct-launch pak | Physical sleep/wake/shutdown/RTC/audio testing; firmware monitor/LED/haptic differences |
 
 Guide definitions are generated from `GuidePolishedCrystal*.kt`; the original
@@ -145,7 +154,7 @@ Other companion builds reject the shortcut; their existing features remain.
 
 New display choices are adaptations of ScreenShaders, not unrelated filters.
 Game > Settings exposes the supported subset with persistent per-ROM choices.
-LCD PAPER, CRT, UNLIT, smoothing, companion shaders and the stretch/filter
+LCD PAPER, CRT, UNLIT, smoothing and the stretch/filter
 combination remain gaps. Settings use the existing host menu and source names;
 full Android menu composition is not claimed. Existing quick-menu appearance,
 state handling, save paths and expansion remain intact.

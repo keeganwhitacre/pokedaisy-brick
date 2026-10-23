@@ -103,7 +103,8 @@ static void pc_bag_pages(struct pc_ui *u, struct pd_canvas *c,
                                                                   : "Favorite",
              u->bagDescPage + 1, pages);
   } else
-    snprintf(b, sizeof b, "D-pad:Browse A:Info Y:Sort");
+    snprintf(b, sizeof b, "Up/Down:Item Left/Right:Pocket");
   pd_text_fit(c, 12, 346, 488, b, 0x181818, PD_NO_SHADOW);
-  txt(c, 12, 366, "Start:Game Bag L/R:Section B:Back");
+  pd_text_fit(c, 12, 366, 488, "A:Info Y:Sort Start:Bag B:Back",
+              0x181818, PD_NO_SHADOW);
 }

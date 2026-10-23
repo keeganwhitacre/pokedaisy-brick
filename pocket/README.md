@@ -1,4 +1,19 @@
-# PokeDaisy Pocket: Phase 19 — save previews and direct play
+# PokeDaisy Pocket: Phase 20 — display and play options
+
+Menu > Settings now exposes FAST-FORWARD (2x/3x/4x), ON COMPANION and
+BATTLE BACKGROUND. Change values with A or Left/Right; choices persist per ROM.
+ON COMPANION applies the selected LCD/SCANLINES and color correction to the
+companion, with a separate OFF choice for crisp text. App settings and save
+previews remain unfiltered. Defaults: 2x, ON COMPANION on, battle background on.
+Old display files migrate without changing their existing display/session choices.
+
+Battle background extends the current light background into the unused panel
+space without stretching or changing the original game pixels. Transitions or
+mixed/dark borders fall back to black. It is a downstream presentation option,
+not expanded battle terrain. Existing physical controls are unchanged:
+Summary Up/Down changes Pokémon and Left/Right selects moves. The Summary and
+Bag prompts now fit the screen. Fly is still unavailable from the companion;
+see FLY_INVESTIGATION.md. Fast-forward music is not included.
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 

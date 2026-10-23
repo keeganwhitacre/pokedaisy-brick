@@ -12,10 +12,12 @@ static void options_test(void) {
   char dir[] = "/tmp/pd-options-XXXXXX";
   assert(mkdtemp(dir));
   const char *sha = "6930b48af5844d373e3c9130f26d6dd1084cf4ed";
-  struct pocket_display_options o = {3, 2, true, false}, p;
+  struct pocket_display_options o = {.filter = 3, .grid = 2, .colors = true,
+      .ffSpeed = 3, .companionShaders = true, .battleBackground = true}, p;
   assert(pocket_options_save(dir, sha, &o));
   assert(pocket_options_load(dir, sha, &p));
   assert(p.filter == 3 && p.grid == 2 && p.colors && !p.stretch);
+  assert(p.ffSpeed == 3 && p.companionShaders && p.battleBackground);
   o.stretch = true;
   assert(!pocket_options_save(dir, sha, &o));
   assert(!pocket_options_save(dir, "../../bad", &o));
@@ -28,6 +30,23 @@ static void options_test(void) {
   assert(pocket_options_load(dir, sha, &p));
   assert(p.filter == 3 && p.grid == 2 && p.colors && !p.stretch &&
          !p.autoZoom && p.autoResume);
+  assert(p.ffSpeed == 2 && p.companionShaders && p.battleBackground);
+  f = fopen(path, "w");
+  assert(f);
+  fputs("pocket-fx=2\nfilter=1\ngrid=1\ncolors=0\nstretch=0\nauto-zoom=1\nauto-resume=0\n", f);
+  fclose(f);
+  assert(pocket_options_load(dir, sha, &p));
+  assert(p.filter == 1 && p.autoZoom && !p.autoResume && p.ffSpeed == 2 &&
+         p.companionShaders && p.battleBackground);
+  p.ffSpeed = 1;
+  assert(!pocket_options_save(dir, sha, &p));
+  p.ffSpeed = 5;
+  assert(!pocket_options_save(dir, sha, &p));
+  p.ffSpeed = 4;
+  p.companionShaders = p.battleBackground = false;
+  assert(pocket_options_save(dir, sha, &p));
+  assert(pocket_options_load(dir, sha, &p) && p.ffSpeed == 4 &&
+         !p.companionShaders && !p.battleBackground);
   p.autoZoom = true;
   p.autoResume = false;
   assert(pocket_options_save(dir, sha, &p));

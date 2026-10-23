@@ -158,7 +158,7 @@ static void pc_summary_draw(struct pd_canvas *c, const struct pd_snapshot *s,
   icon(c, 20, 80, m->species, rom, n, build);
   if (m->species == 255) {
     txt(c, 20, 138, "It hasn't hatched yet.");
-    txt(c, 12, 346, "Up/Down:Party B:Party");
+    txt(c, 12, 346, "Up/Down:Mon B:Party");
     txt(c, 12, 366, "X:Play");
     return;
   }
@@ -251,9 +251,11 @@ static void pc_summary_draw(struct pd_canvas *c, const struct pd_snapshot *s,
     snprintf(b, sizeof b, "Power %d", power);
     txt(c, 266, y + 46, b);
   }
-  txt(c, 12, 346, "D-pad:Party/Move A:Info");
-  txt(c, 12, 366,
-      page ? "Y:Types Select:More B:Party" : "Y:Info/Types B:Party");
+  pd_text_fit(c, 12, 346, 488, "Up/Down:Mon Left/Right:Move",
+              0x181818, PD_NO_SHADOW);
+  pd_text_fit(c, 12, 366, 488,
+      page ? "A:Info Y:Page Select:More B:Back" : "A:Info Y:Page B:Party",
+      0x181818, PD_NO_SHADOW);
 }
 static void pc_move_draw(struct pd_canvas *c, const struct pd_mon *m, int slot,
                          const unsigned char *rom, size_t n, int build) {

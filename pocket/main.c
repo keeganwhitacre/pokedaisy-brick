@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/joystick.h>
+#include <math.h>
 #include <mgba-util/vfs.h>
 #include <mgba/core/blip_buf.h>
 #include <mgba/core/core.h>
@@ -41,6 +42,7 @@
 #define W 512
 #define H 384
 static uint32_t pixels[W * H];
+static uint32_t companionPixels[W * H];
 static color_t video[256 * 256];
 static struct pd_canvas canvas;
 static SDL_Window *window;
@@ -54,6 +56,7 @@ static void notice(const char *text);
 static const char *root = ".";
 static char displayKey[41];
 static bool wideSupported, wideReady;
+static bool battleVisible;
 static struct pocket_platform platform;
 static bool forceFresh, graphicsReset, lifecycleFailure;
 static struct pocket_display_options displayOptions;
@@ -73,6 +76,13 @@ static void effect_draw(int tw, int th) {
   if (!displayOptions.filter || effectFailed)
     return;
   int w = lastGameRect.w, h = lastGameRect.h;
+  int lw, lh, ow, oh;
+  SDL_RenderGetLogicalSize(renderer, &lw, &lh);
+  if (lw > 0 && lh > 0 && SDL_GetRendererOutputSize(renderer, &ow, &oh) == 0) {
+    double scale = fmin((double)ow / lw, (double)oh / lh);
+    w = (int)lround(w * scale);
+    h = (int)lround(h * scale);
+  }
   if (!effectTexture || effectW != w || effectH != h || effectTW != tw ||
       effectTH != th || effectFilter != displayOptions.filter ||
       effectGrid != displayOptions.grid) {
@@ -362,22 +372,59 @@ static void repeat_directions(void) {
     }
 }
 static bool down(int k) { return (pressed & (1u << k)) != 0; }
-static void present(void) {
+static void present_ui(bool companion) {
   SDL_RenderSetLogicalSize(renderer, W, H);
   if (SDL_GetTicks() < messageUntil) {
     pd_fill(&canvas, 4, 334, 504, 24, 0x181818);
     pd_text_fit(&canvas, 10, 338, 492, message, 0xffffff, PD_NO_SHADOW);
   }
-  if (SDL_UpdateTexture(texture, NULL, pixels, W * 4) < 0) {
+  const uint32_t *upload = pixels;
+  bool effects = companion && displayOptions.companionShaders;
+  if (effects && displayOptions.colors) {
+    for (int i = 0; i < W * H; i++)
+      companionPixels[i] = pocket_color_apply(colorLut, pixels[i]);
+    upload = companionPixels;
+  }
+  if (SDL_UpdateTexture(texture, NULL, upload, W * 4) < 0) {
     notice(SDL_GetError());
     return;
   }
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
   SDL_RenderClear(renderer);
   if (SDL_RenderCopy(renderer, texture, NULL, NULL) < 0) {
     notice(SDL_GetError());
     return;
   }
+  if (effects) {
+    SDL_Rect saved = lastGameRect;
+    lastGameRect = (SDL_Rect){0, 0, W, H};
+    effect_draw(W, H);
+    lastGameRect = saved;
+  }
   SDL_RenderPresent(renderer);
+}
+static void present(void) { present_ui(false); }
+/* Fill only the space outside the original PPU image. Matching light corners
+ * and a mostly uniform top border reject dark transitions/menus/animations.
+ * Use this frame's actual palette, never a guessed white or cached terrain. */
+static uint32_t battle_background(unsigned gw, unsigned gh) {
+  if (!battleVisible || !displayOptions.battleBackground || gw != 160 ||
+      gh != 144 || wideReady)
+    return 0;
+  uint32_t color = video[0] & 0xffffff;
+  if ((color & 255) < 128 || ((color >> 8) & 255) < 128 ||
+      ((color >> 16) & 255) < 128 ||
+      (video[159] & 0xffffff) != color ||
+      (video[143 * 256] & 0xffffff) != color ||
+      (video[143 * 256 + 159] & 0xffffff) != color)
+    return 0;
+  int matching = 0;
+  for (int x = 0; x < 160; x++)
+    matching += (video[x] & 0xffffff) == color;
+  if (matching < 120)
+    return 0;
+  uint32_t rgb = ((color & 255) << 16) | (color & 0xff00) | (color >> 16);
+  return displayOptions.colors ? pocket_color_apply(colorLut, rgb) : rgb;
 }
 // Gameplay scales in physical panel pixels; the companion keeps its 512x384
 // grid.
@@ -433,6 +480,9 @@ static void render_game(unsigned gw, unsigned gh) {
       return;
     }
   }
+  uint32_t background = battle_background(gw, gh);
+  SDL_SetRenderDrawColor(renderer, background >> 16, background >> 8,
+                         background, 255);
   SDL_RenderClear(renderer);
   if (displayOptions.stretch)
     lastGameRect = (SDL_Rect){0, 0, ow, oh};
@@ -792,6 +842,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   effect_invalidate();
   struct pd_settings settings;
   pd_settings_load(&settings, config);
+  settings.ffSpeed = displayOptions.ffSpeed;
+  battleVisible = false;
   struct pd_ui ui;
   pd_ui_init(&ui, &settings);
   struct pd_snapshot snap = {0};
@@ -811,12 +863,12 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   struct pd_menu gameMenu, confirmMenu;
   pd_menu_init(&gameMenu, "GAME", opts, 10);
   pd_menu_init(&confirmMenu, "CONFIRM", confirmOpts, 2);
-  char optionText[7][80];
-  const char *optionLabels[7];
-  for (int i = 0; i < 7; i++)
+  char optionText[10][80];
+  const char *optionLabels[10];
+  for (int i = 0; i < 10; i++)
     optionLabels[i] = optionText[i];
   struct pd_menu screenMenu;
-  pd_menu_init(&screenMenu, "SCREEN / SESSION", optionLabels, 7);
+  pd_menu_init(&screenMenu, "SCREEN / SESSION", optionLabels, 10);
   int menuOpen = 0;
   int slotIndex = 0;
   bool slotSave = true, slotConfirm = false;
@@ -1051,6 +1103,16 @@ play_loop:
             case 6:
               displayOptions.autoResume = !displayOptions.autoResume;
               break;
+            case 7:
+              displayOptions.ffSpeed = 2 + (displayOptions.ffSpeed - 2 + delta + 3) % 3;
+              settings.ffSpeed = displayOptions.ffSpeed;
+              break;
+            case 8:
+              displayOptions.companionShaders = !displayOptions.companionShaders;
+              break;
+            case 9:
+              displayOptions.battleBackground = !displayOptions.battleBackground;
+              break;
             }
             effect_invalidate();
             options_save();
@@ -1219,6 +1281,8 @@ play_loop:
           break;
         case PD_ACTION_SETTINGS_CHANGED:
           pd_settings_save(&settings, config);
+          displayOptions.ffSpeed = settings.ffSpeed;
+          options_save();
           break;
         default:
           break;
@@ -1300,6 +1364,7 @@ play_loop:
       }
     } else
       pd_snapshot_read(&snap, &game, read_memory, c);
+    battleVisible = pc >= 0 && snap.valid && snap.inBattle;
     if (quickOpen) {
       quick_present(gw, gh, quickSelected, ff, access(ss, F_OK) == 0, romdata,
                     len, pc);
@@ -1328,6 +1393,11 @@ play_loop:
                    displayOptions.autoZoom ? "ON" : "OFF");
           snprintf(optionText[6], 80, "AUTO RESUME: %s",
                    displayOptions.autoResume ? "ON" : "OFF");
+          snprintf(optionText[7], 80, "FAST-FORWARD: %dx", displayOptions.ffSpeed);
+          snprintf(optionText[8], 80, "ON COMPANION: %s",
+                   displayOptions.companionShaders ? "ON" : "OFF");
+          snprintf(optionText[9], 80, "BATTLE BACKGROUND: %s",
+                   displayOptions.battleBackground ? "ON" : "OFF");
           pd_menu_draw(&screenMenu, &canvas);
         } else if (menuOpen == 4) {
           pd_splash_draw(&canvas, "Based on PokeDaisy by Lidor Itzhari",
@@ -1344,7 +1414,7 @@ play_loop:
         pd_ui_draw(&ui, &canvas, &game, &snap, &host);
         focus_draw(&ui, focus);
       }
-      present();
+      present_ui(!menuOpen);
     } else {
       present_game(gw, gh);
     }

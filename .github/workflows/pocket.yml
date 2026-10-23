@@ -34,6 +34,7 @@ jobs:
         run: |
           python3 make_diagnostic.py
           build-ci/pocket-host-test
+          build-ci/pocket-functional-test
           build-ci/pocket-decoder-test ../app/src/test/resources/fixtures
           build-ci/pocket-runtime-test
           POCKET_TEST_NO_MMAP=1 build-ci/pocket-runtime-test
@@ -63,6 +64,7 @@ jobs:
         run: |
           python3 make_diagnostic.py
           qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-host-test
+          qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-functional-test
           qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-decoder-test ../app/src/test/resources/fixtures
           qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-runtime-test
           POCKET_TEST_NO_MMAP=1 qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-runtime-test

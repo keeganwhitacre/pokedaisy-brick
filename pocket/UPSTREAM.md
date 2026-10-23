@@ -1,5 +1,25 @@
 # Maintaining the native port
 
+Phase 20 keeps Android sources unchanged. ON COMPANION follows Prefs'
+`companion_shaders` default and CompanionSettingsScreen's explicit switch.
+The native renderer reuses the existing ScreenShaders-derived mask and color
+LUT. Masks are cached at physical output resolution even when the companion
+uses its 512x384 logical grid; the source canvas and game PPU buffer are not
+modified. Host settings/save-browser screens remain unfiltered. LCD PAPER,
+CRT, UNLIT and smoothing remain unported.
+
+The host exposes the existing 2–4 frame fast-forward range per ROM. Android's
+broader speed modes/scene speeds are not claimed. Display preferences v3 read
+v1/v2 files, retain old fields and default new fields. The generic companion's
+FF setting also writes the per-ROM value. No input mappings were changed.
+
+Battle background is an isolated downstream host presentation option: current
+frame corner/top-border checks determine a light fill outside the untouched
+PPU image. It does not relocate HUD/text or expand battle simulation. Review
+the guard and transition captures when changing scaling or filters.
+FLY_INVESTIGATION.md records the exact Polished v3.2.3 game routines for a
+future controller-driven Fly adapter; no guessed symbols or warp writes.
+
 Phase 19: manual_states.c reuses mGBA's unchanged extended-state API for the
 state, RTC, metadata and screenshot. No PNG dependency or alternate emulator
 format is introduced. State/preview hashes and ROM identity are stored in

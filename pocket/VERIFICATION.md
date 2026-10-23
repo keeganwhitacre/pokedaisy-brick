@@ -1,4 +1,31 @@
-# Phase 19 verification
+# Phase 20 verification
+
+Native Linux and actual NextUI GCC 8.3 AArch64 release builds pass. The new
+`pocket-usability-test <ROM> <starter-state>` runs the real SDL frontend,
+changes FF 2x/3x/4x through controller events, verifies exact four-frame core
+advancement, toggles both new display options and checks per-ROM persistence.
+It verifies the retained Summary controls, a cached physical 1024x768 LCD
+mask, visible LCD/color changes, the OFF bypass, and an unchanged source canvas.
+Settings, Summary, LCD Summary and Bag captures are visually inspected.
+
+`pocket-battle-runtime-test` reaches Lyra through original game inputs and
+captures the actual battle with extended background. It checks every original
+PPU pixel in the SDL output and the outside background color. Synthetic guard
+tests cover disabled/nonbattle/other-dimension/expanded/mixed-border fallbacks;
+these are not presented as actual game screenshots. Old v1/v2 preferences
+migrate; invalid FF values and malformed settings reject safely.
+
+Both new workflows run natively and on the actual ARM executable under QEMU.
+Existing recovery/expanded-dialogue/lifecycle, ten preview slots, quick-menu,
+emulator/save and decoder regressions are retained. Offscreen/software video
+and dummy audio do not establish physical performance, actual audio or
+sleep/wake/RTC correctness. New 3x/4x values are requested rates, subject to
+device performance. No physical Brick testing is claimed for this update.
+
+Fly findings are source-verified against v3.2.3, not a successful flight test.
+The early-game test state has no Storm Badge/HM02, so Fly remains disabled.
+
+## Previous Phase 19 verification
 
 Native Linux and actual NextUI AArch64 release builds pass. The real-ROM
 states harness runs natively and under ARM/QEMU: slots 0–9 save/load exact
