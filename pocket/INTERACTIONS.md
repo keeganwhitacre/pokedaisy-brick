@@ -1,5 +1,14 @@
 # Phase 17: companion battle interactions
 
+Bag follow-up: Android favorites are also ported, including per-ROM storage,
+duplicate stacks, Default sorting and the conditional Favorites tab. This is
+existing upstream Polished functionality, distinct from the downstream Bag
+opener and from unimplemented item Use/Give/Take. X stars/unstars only while a
+Bag description is open; its original companion toggle remains elsewhere.
+The frontend test uses an inventory earned by normal Lyra battle completion
+and the aide Potion gift at ElmsLab scene 5 coordinate (4,8), verified against
+the actual v3.2.3 map source. No inventory is injected into game memory.
+
 This continues Phase 16 on phase16-nextui-checkpoints. Main's previous baseline
 is retained. Native/actual NextUI ARM builds and captured-menu/model tests pass.
 A genuine normal-input Lyra battle verifies the second move's PP consumption,

@@ -260,6 +260,35 @@ int main(int argc, char **argv) {
   assert(pc_read(&s, read_memory, c) && s.inBattle && s.isTrainer);
   puts("PASS original move BACK and trainer RUN refusal; battle rules "
        "preserved");
+  if (getenv("POCKET_TEST_ITEMS_STATE")) {
+    // Obtain an actual item through the game's normal progression. Elm's
+    // source has scene 5's aide gift at (4,8), after the can-lose Lyra battle.
+    assert(state(c, battleState, false));
+    bool field = false;
+    struct pocket_action probe = {0};
+    for (int i = 0; i < 1500 && !field; i++) {
+      frames(c, 1, 3); frames(c, 0, 57);
+      field = pocket_action_begin(&probe, sha, read_memory, c);
+      pocket_action_cancel(&probe);
+    }
+    assert(field && pc_read(&s, read_memory, c) && !s.inBattle);
+    for (int i = 0; i < 30; i++) {
+      assert(read_memory(c, 0x1dcae, xy, 2));
+      if (xy[0] >= 8) break;
+      frames(c, 128, 1); frames(c, 0, 17);
+    }
+    bool obtained = false;
+    for (int i = 0; i < 150 && !obtained; i++) {
+      frames(c, 1, 3); frames(c, 0, 57);
+      assert(pc_read(&s, read_memory, c));
+      obtained = s.bagOk && s.bag[PD_POCKET_ITEMS].count > 0 &&
+                 pocket_action_begin(&probe, sha, read_memory, c);
+      pocket_action_cancel(&probe);
+    }
+    assert(obtained && s.bag[PD_POCKET_ITEMS].items[0].id == 25);
+    assert(state(c, getenv("POCKET_TEST_ITEMS_STATE"), true));
+    puts("PASS normal Lyra battle completion and original aide Potion gift; real inventory state exported for favorites frontend test");
+  }
   c->unloadROM(c);
   mCoreConfigDeinit(&c->config);
   c->deinit(c);

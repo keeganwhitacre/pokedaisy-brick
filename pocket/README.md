@@ -16,6 +16,12 @@ A/B as needed; B also cancels automatic return. Bag opens the original game
 Bag. These controls never write game RAM. Other supported ROM builds retain
 read-only battle information. See INTERACTIONS.md for validation and limits.
 
+Bag favorites now follow Android's original rules. With an item description
+open, press X to favorite/unfavorite it. Stars are saved per ROM; Default sort
+puts starred items first, and Favorites appears beside All while any are held.
+Close the description with A/B before using X to return to gameplay. Start
+still opens the actual game Bag. This adds no unsupported item-use actions.
+
 Phase 16 keeps safe expanded conversations at the selected scale. AUTO ZOOM
 IN restores upstream's dialogue pull-in; its Brick default is OFF. AUTO RESUME
 defaults ON and restores a separate validated recovery session after graceful

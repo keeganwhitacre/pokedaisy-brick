@@ -30,12 +30,18 @@ int main(void) {
   assert(pocket_favorites_load(root, a, &loaded));
   assert(!memcmp(&f, &loaded, sizeof f));
   snprintf(path, sizeof path, "%s/favorites/%s.txt", root, a);
-  const char *bad[] = {"", "PD-FAVORITES-2\n25\n", "PD-FAVORITES-1\n25",
-    "PD-FAVORITES-1\n65536\n", "PD-FAVORITES-1\n1,,2\n",
-    "PD-FAVORITES-1\n1,\n", "PD-FAVORITES-1\n0\n",
-    "PD-FAVORITES-1\n-1\n", "PD-FAVORITES-1\n25\ntrailing"};
+  const char *bad[] = {"",
+                       "PD-FAVORITES-2\n25\n",
+                       "PD-FAVORITES-1\n25",
+                       "PD-FAVORITES-1\n65536\n",
+                       "PD-FAVORITES-1\n1,,2\n",
+                       "PD-FAVORITES-1\n1,\n",
+                       "PD-FAVORITES-1\n0\n",
+                       "PD-FAVORITES-1\n-1\n",
+                       "PD-FAVORITES-1\n25\ntrailing"};
   for (unsigned i = 0; i < sizeof bad / sizeof *bad; i++) {
-    FILE *out = fopen(path, "w"); assert(out);
+    FILE *out = fopen(path, "w");
+    assert(out);
     assert(fputs(bad[i], out) >= 0 && !fclose(out));
     assert(!pocket_favorites_load(root, a, &loaded));
     struct pocket_favorites empty = {0};
@@ -46,11 +52,15 @@ int main(void) {
   assert(pocket_favorites_save(root, a, &f));
   assert(pocket_favorites_load(root, a, &loaded));
   // Full representable id range is bounded and round-trips.
-  memset(f.bits, 255, sizeof f.bits); f.bits[0] &= ~1u;
+  memset(f.bits, 255, sizeof f.bits);
+  f.bits[0] &= ~1u;
   assert(pocket_favorites_save(root, a, &f));
   assert(pocket_favorites_load(root, a, &loaded));
   assert(!memcmp(&f, &loaded, sizeof f));
   unlink(path);
-  snprintf(dir, sizeof dir, "%s/favorites", root); rmdir(dir); rmdir(root);
-  puts("PASS favorites: per-ROM isolation, atomic persistence, complete id range, invalid/truncated files and empty set");
+  snprintf(dir, sizeof dir, "%s/favorites", root);
+  rmdir(dir);
+  rmdir(root);
+  puts("PASS favorites: per-ROM isolation, atomic persistence, complete id "
+       "range, invalid/truncated files and empty set");
 }

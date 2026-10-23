@@ -187,3 +187,26 @@ The Brick pauses while choosing and shows actual game execution between
 choices. Processing-ball/fades and held-frame switching remain differences.
 Follow-up should validate genuine multi-mon switches before widening the
 tested game/build scope.
+
+## Bag favorites
+
+`favorites.h` is the portable item-id set translated from `FavoriteItems.kt`;
+`favorites.c` is only the Linux per-ROM preference adapter. The SDL host loads
+and saves that set. Bag filtering, stable partition, duplicate-stack semantics,
+conditional tab and last-unstar fallback follow `ItemsScreen.kt`; game memory
+is read-only throughout. The original Android implementation remains intact.
+X in an open description adapts its favorite button. Linux keys preferences by
+the existing SHA-1 ROM identity rather than Android's CRC32 preference key.
+
+On upstream changes review FavoriteItems, Prefs.favoriteItemsFor, ItemsScreen's
+DEFAULT comparator, category rules and favorite action, PixelIcons.star, and
+OptionColors.favorite together. Current source SHA-256:
+
+- FavoriteItems.kt: 5e2ac930993a673ffbeb96f94e8d27491619c412b220178dc225bc5889a9072c
+- ItemsScreen.kt: 9f60e7cb5a8c1c3c1cc507e8210a4459afb8ff3e11b9f39e0e13d80838856dd3
+- Prefs.kt: d131875f480e704361159396af3091159cdd9cd982a73afd3a118e6ccf6fd358
+
+Preview-only Gen 2 shots exercise the same source favorite action as existing
+DS shots; they do not create a replacement Compose UI. Fresh preview execution
+is currently blocked by Gradle distribution DNS failure, documented separately
+from native/ARM rendered captures.

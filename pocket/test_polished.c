@@ -574,6 +574,9 @@ int main(int argc, char **argv) {
         assert(bag.bagKeyPocket == keyPocket && bag.bagKeySlot == keySlot);
         assert(pd_png_write("runtime-phase13-bag-sorted-fixture.png", 512, 384,
                             px));
+        bag.bagSort = 0;
+        bag.bagReselect = true;
+        pc_ui_draw(&bag, &c, &s, cart, romSize, build);
         pc_ui_input(&bag, &s, PC_CONFIRM);
         pc_ui_input(&bag, &s, PC_FAVORITE);
         pc_ui_draw(&bag, &c, &s, cart, romSize, build);

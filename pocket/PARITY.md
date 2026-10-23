@@ -161,8 +161,15 @@ an open Bag description, X retains its game/companion toggle.
 Native decoder/controller tests and preference tests pass, including duplicate
 stacks, tab removal, missing/corrupt files and the complete 16-bit item-id range.
 Native captures were inspected using upstream RAM snapshots and ROM font.
-ARM/live frontend validation and physical Brick validation are pending at this
-checkpoint. This does not add Polished Crystal item Use/Give/Take, which the
+The actual NextUI ARM build, ARM/QEMU decoder/preference tests, and native plus
+ARM/QEMU live frontend tests also pass. The live test earns the Potion through
+the original Lyra battle and aide gift, then stars, relaunches and unstars it
+without unpausing the companion. Physical Brick validation remains pending.
+The Compose preview was retried, but Gradle download fails with DNS
+`UnknownHostException: services.gradle.org`; no fresh Android comparison is
+claimed. Matching Gen 2 favorite/tab preview shots are now defined for an
+environment with the preview dependencies available.
+This does not add Polished Crystal item Use/Give/Take, which the
 upstream Android item-action backend does not implement.
 Healing-item targeting is a separately identified downstream extension that
 requires additional verified completion/context predicates. Physical Brick

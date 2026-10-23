@@ -1219,6 +1219,18 @@ fun main(args: Array<String>) {
         Shot("$g-real-items-desc", bw, bh, bd, companion("ITEMS", snap = ::gen2Snapshot)) {
             onNodeWithText("Potion").performClick()
         },
+        Shot("$g-real-items-favorite", bw, bh, bd, companion("ITEMS", snap = ::gen2Snapshot)) {
+            onNodeWithText("Potion").performClick()
+            repeat(10) { mainClock.advanceTimeByFrame() }
+            onNodeWithContentDescription("FAVORITE").performClick()
+        },
+        Shot("$g-real-items-favorites-tab", bw, bh, bd, companion("ITEMS", snap = ::gen2Snapshot)) {
+            onNodeWithText("Potion").performClick()
+            repeat(10) { mainClock.advanceTimeByFrame() }
+            onNodeWithContentDescription("FAVORITE").performClick()
+            repeat(10) { mainClock.advanceTimeByFrame() }
+            onNodeWithText("Favorites").performClick()
+        },
         Shot("$g-real-party", bw, bh, bd, companion("PARTY", snap = ::gen2Snapshot)),
         Shot("$g-real-dex", bw, bh, bd, companion("DEX", snap = ::gen2Snapshot)),
         Shot("$g-real-guide-here", bw, bh, bd, companion("GUIDE", snap = ::gen2Snapshot)),

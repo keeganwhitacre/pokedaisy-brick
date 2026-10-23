@@ -1,5 +1,48 @@
 # Phase 17 verification
 
+## Bag favorites follow-up
+
+Native and actual NextUI GCC 8.3 AArch64 builds pass. The favorites preference
+test passes natively, under ARM/QEMU and with ASan/UBSan (leak detection off).
+It covers absent/corrupt/truncated files, empty sets, the complete 16-bit id
+range, per-ROM isolation and invalid identity/path rejection. Captured-memory
+decoder tests verify stable favorites-first Default order, duplicate stacks,
+conditional Favorites, last-unstar fallback and absent items retaining stars.
+The original snapshot is compared byte-for-byte after interaction.
+
+A genuine normal-input game test finishes Lyra's can-lose battle, walks to the
+source-defined aide gift at (4,8), and receives the original Potion. Native and
+ARM/QEMU SDL tests load that disposable game state, star the actual inventory
+item, verify the core stays paused, relaunch and verify persistence, unstar,
+close the description and verify X resumes normal gameplay. No ROM, save or
+state is distributed. Real multi-member party switching remains unverified.
+
+The existing native/ARM checks retain battle turn execution/PP, system-hotkey
+cancellation, GB/GBA gameplay, repeated companion use, quick menu/state
+round-trip, recovery/corruption/bypass and simulated lifecycle behavior.
+Native favorite-list/tab and full-resolution relaunch captures were inspected.
+This is not physical Brick validation or sustained performance/audio testing.
+
+Fresh Compose preview rendering was attempted with the same ROM and upstream
+Polished RAM fixture. Gradle fails with `UnknownHostException` for
+`services.gradle.org`. No new source-rendered Android comparison is claimed.
+The Gen 2 preview now defines favorite and Favorites-tab captures using the
+existing Compose action, ready to run when its dependencies are accessible.
+
+From `pocket`, after generating `/private/starter.ss` with the existing
+normal-input new-game harness:
+
+```sh
+build-native/pocket-favorites-test
+POCKET_TEST_ITEMS_STATE=/private/items.ss build-native/pocket-battle-runtime-test /private/game.gbc /private/starter.ss
+SDL_VIDEODRIVER=offscreen SDL_RENDER_DRIVER=software SDL_AUDIODRIVER=dummy POCKET_FULLSCREEN=1 build-native/pocket-favorites-runtime-test /private/game.gbc /private/items.ss
+```
+
+Use the documented offscreen/dummy SDL environment for the battle harness too.
+Run the ARM targets with `qemu-aarch64-static -L <NextUI sysroot>`.
+
+## Battle interaction milestone
+
 Native Linux and actual NextUI AArch64 builds pass. The new battle tests run
 natively and under QEMU using the actual SDK sysroot. Five upstream captured
 menus verify action/move/list/submenu/forced-pick recognition. Pure-C model
