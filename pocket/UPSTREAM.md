@@ -1,5 +1,14 @@
 # Maintaining the native port
 
+Phase 19: manual_states.c reuses mGBA's unchanged extended-state API for the
+state, RTC, metadata and screenshot. No PNG dependency or alternate emulator
+format is introduced. State/preview hashes and ROM identity are stored in
+creator metadata; existing raw slot 0 remains loadable. Embedded battery
+savedata is rejected. state_browser.inc adapts Android StatesScreen/SlotCard
+and SaveStates.kt's slots 0–9, using the existing OPTION canvas. Undo actions
+remain unported. SAVE_STATES.md records the controller/storage differences.
+On upstream updates review slot counts, preview/undo and serialization rules.
+
 ## Phase 18: object and power boundaries
 
 EXPANSION.md records the exact Polished release source, symbol checksum,

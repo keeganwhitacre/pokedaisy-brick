@@ -1,4 +1,17 @@
-# Polished Crystal Android parity boundary — Phase 17
+# Polished Crystal Android parity boundary — Phase 19
+
+Phase 19 adapts SaveStates.kt and StatesScreen/SlotCard: ten numbered slots,
+timestamps, thumbnails and separate resume storage. Brick uses two columns,
+D-pad selection and Save/Load mode with confirmation, retaining OPTION styling.
+Unlike Android's separate thumbnail file, the mGBA extended state contains
+its own image and identity/integrity metadata, replaced atomically. Existing
+slot-0 files remain compatible. Undo Save/Undo Load are still missing. These
+are explicit differences, not a claim of complete StatesScreen parity.
+
+Linux usability additions: a sole Tools ROM launches directly; --library keeps
+the picker. AUTO RESUME ON closes with one action, with retry/keep-playing on
+recovery write failure. The existing game-list wrapper, backup/save paths,
+power adapter and separate recovery validation remain. See SAVE_STATES.md.
 
 This compares the native port with the **Polished Crystal path** at upstream
 `54d8f4867501feb32b7ee139a5616b7c6301f044`, rather than with Android features

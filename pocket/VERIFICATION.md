@@ -1,4 +1,35 @@
-# Phase 18 verification
+# Phase 19 verification
+
+Native Linux and actual NextUI AArch64 release builds pass. The real-ROM
+states harness runs natively and under ARM/QEMU: slots 0–9 save/load exact
+frame counters, previews match the original frame with explicit BGR-to-RGB
+conversion, wrong-ROM/hash damage/truncation fail, old raw states load, and
+embedded battery savedata is rejected. The actual SDL frontend launches its
+sole Tools ROM directly, saves two slots, displays their images/timestamps,
+cancels then confirms load, resumes gameplay, closes with one action and
+restores the recovery session on relaunch. Browser/confirmation captures were
+inspected. No-ROM/multi-ROM selection remains available; --library forces it.
+
+Shell launcher tests pass quoted SD-card/ROM paths, literal arguments, the
+shared Tools data root, explicit library launch and 1-MiB log rotation.
+Native and ARM tests use offscreen software SDL/dummy audio. They do not
+establish physical controls, audible audio, power or RTC behavior.
+
+New manual files remain mGBA extended states, atomically combining state,
+screenshot and metadata. No savedata is serialized/restored. Failed loads
+restore the prior core state. Existing quick/L2/R2 slot-0 paths remain.
+The production recovery-write failure prompt offers retry or keep playing;
+that interactive storage-failure prompt is source-reviewed, not a claimed
+hardware or injected-SDL test. Undo Save/Load remain unimplemented.
+
+Reproduce from pocket with the actual ROM and genuine aide-gift state:
+
+```sh
+SDL_VIDEODRIVER=offscreen SDL_RENDER_DRIVER=software SDL_AUDIODRIVER=dummy POCKET_FULLSCREEN=1 build-native/pocket-states-test /private/game.gbc /private/items.ss
+python3 test_launch.py
+```
+
+## Phase 18 verification
 
 Capture correction: the new raw wide-object harness initially wrote mGBA's
 BBGGRR words directly to an RGB PNG writer, swapping red/blue in those images.

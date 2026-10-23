@@ -7,6 +7,7 @@
 #include "display_fx.h"
 #include "game_action.h"
 #include "host_io.h"
+#include "manual_states.h"
 #include "pd_font.h"
 #include "pd_menu.h"
 #include "pd_romart.h"
@@ -499,6 +500,15 @@ static bool copy_backup(const char *path) {
   return ok;
 }
 static bool state(struct mCore *c, const char *path, bool save) {
+  if (strlen(displayKey) == 40) {
+    bool ok = save ? pocket_slot_save(c, path, displayKey)
+                   : pocket_slot_load(c, path, displayKey);
+    if (ok && !save) {
+      pk_wide_gb_reset();
+      wideReady = false;
+    }
+    return ok;
+  }
   char tmp[1200];
   snprintf(tmp, sizeof tmp, "%s.tmp", path);
   struct VFile *f = VFileOpen(save ? tmp : path,
@@ -666,6 +676,7 @@ static void focus_draw(struct pd_ui *u, int focus) {
   pd_fill(&canvas, h->x, h->y, 2, h->h, 0xff7331);
   pd_fill(&canvas, h->x + h->w - 2, h->y, 2, h->h, 0xff7331);
 }
+#include "state_browser.inc"
 #ifdef POCKET_TEST
 static void test_frame(struct mCore *, int *, bool, int, struct pd_ui *,
                        struct pd_snapshot *, const struct pc_ui *);
@@ -807,6 +818,10 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   struct pd_menu screenMenu;
   pd_menu_init(&screenMenu, "SCREEN / SESSION", optionLabels, 7);
   int menuOpen = 0;
+  int slotIndex = 0;
+  bool slotSave = true, slotConfirm = false;
+  struct pocket_slot *slots = NULL;
+  char slotPath[1200];
   bool quickOpen = false;
   int quickSelected = 0;
   bool companion = false, ff = false, leave = false;
@@ -818,8 +833,13 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   bool battleReturn = false;
   uint64_t due = SDL_GetPerformanceCounter();
   double hz = (double)c->frequency(c) / c->frameCycles(c);
+#ifndef POCKET_TEST
+play_loop:
+#endif
   while (running && !leave) {
     events();
+    if (!running)
+      break;
     if (platform.powerDown || platform.sleepRequested ||
         platform.shutdownRequested) {
       pocket_battle_cancel(&battleAction);
@@ -928,7 +948,70 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
         held &= ~1023u;
     } else if (companion) {
       if (menuOpen) {
-        if (menuOpen == 6) {
+        if (menuOpen == 7) {
+          if (!slots) {
+            slots = calloc(10, sizeof *slots);
+            if (slots)
+              slots_refresh(c, ss, slots);
+          }
+          int previousSlot = slotIndex;
+          if (down(LEFT) && slotIndex % 2)
+            slotIndex--;
+          if (down(RIGHT) && !(slotIndex % 2))
+            slotIndex++;
+          if (down(UP) && slotIndex >= 2)
+            slotIndex -= 2;
+          if (down(DOWN) && slotIndex < 8)
+            slotIndex += 2;
+          if (previousSlot != slotIndex)
+            slotConfirm = false;
+          if (down(Y)) {
+            slotSave = !slotSave;
+            slotConfirm = false;
+          }
+          if (down(B)) {
+            if (slotConfirm)
+              slotConfirm = false;
+            else {
+              menuOpen = 0;
+              companion = false;
+            }
+          } else if (down(A) && slots) {
+            pocket_slot_path(ss, slotIndex, slotPath);
+            bool occupied = slots[slotIndex].status != SLOT_EMPTY;
+            if (!slotSave && (slots[slotIndex].status == SLOT_EMPTY ||
+                              slots[slotIndex].status == SLOT_INVALID))
+              notice(occupied ? "State unavailable or damaged"
+                              : "This slot is empty");
+            else if ((slotSave && occupied) || !slotSave) {
+              if (!slotConfirm) {
+                slotConfirm = true;
+                messageUntil = 0;
+              } else if (state(c, slotPath, slotSave)) {
+                notice(slotSave ? "State saved" : "State loaded");
+                menuOpen = 0;
+                companion = false;
+                slotConfirm = false;
+                slots_refresh(c, ss, slots);
+                due = SDL_GetPerformanceCounter();
+                if (audio)
+                  SDL_ClearQueuedAudio(audio);
+              } else {
+                slotConfirm = false;
+                notice("State operation failed; game retained");
+                slots_refresh(c, ss, slots);
+              }
+            } else if (state(c, slotPath, true)) {
+              notice("State saved");
+              menuOpen = 0;
+              companion = false;
+              slots_refresh(c, ss, slots);
+              due = SDL_GetPerformanceCounter();
+            } else
+              notice("State save failed; check storage");
+          }
+          held &= ~1023u;
+        } else if (menuOpen == 6) {
           if (down(UP))
             pd_menu_move(&screenMenu, -1);
           if (down(DOWN))
@@ -1001,20 +1084,30 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                 pcUi.summary = pcUi.detail = false;
                 break;
               case 2:
-                menuOpen = 5;
-                confirmMenu.title = "Overwrite save state?";
-                confirmMenu.selected = 0;
+                messageUntil = 0;
+                menuOpen = 7;
+                slotSave = true;
+                slotConfirm = false;
+                if (slots)
+                  slots_refresh(c, ss, slots);
                 break;
               case 3:
-                menuOpen = 2;
-                confirmMenu.title = "Load state? Current progress will rewind.";
-                confirmMenu.selected = 0;
+                messageUntil = 0;
+                menuOpen = 7;
+                slotSave = false;
+                slotConfirm = false;
+                if (slots)
+                  slots_refresh(c, ss, slots);
                 break;
               case 4:
                 ff = !ff;
                 notice(ff ? "Fast-forward on" : "Fast-forward off");
                 break;
               case 5:
+                if (displayOptions.autoResume) {
+                  leave = true;
+                  break;
+                }
                 menuOpen = 3;
                 confirmMenu.title = displayOptions.autoResume
                                         ? "Close game? Auto resume ON"
@@ -1074,7 +1167,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           if (down(buttons[action]) &&
               !pc_ui_input(&pcUi, &snap, (enum pc_action)action))
             companion = false;
-        if (favoriteRequested) pc_ui_input(&pcUi, &snap, PC_FAVORITE);
+        if (favoriteRequested)
+          pc_ui_input(&pcUi, &snap, PC_FAVORITE);
         if (pcUi.favoritesDirty) {
           if (!pocket_favorites_save(root, displayKey, &pcUi.favorites))
             notice("Favorites could not be saved");
@@ -1174,6 +1268,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       if (saveStatus.failed)
         break;
     }
+    if (leave)
+      break;
     if (pc >= 0) {
       pc_read(&snap, read_memory, c);
       pc_ui_observe(&pcUi, &snap);
@@ -1209,7 +1305,11 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                     len, pc);
     } else if (companion) {
       if (menuOpen) {
-        if (menuOpen == 6) {
+        opts[5] =
+            displayOptions.autoResume ? "Save session & close" : "Close game";
+        if (menuOpen == 7) {
+          slots_draw(&canvas, slots, slotIndex, slotSave, slotConfirm);
+        } else if (menuOpen == 6) {
           static const char *filters[] = {"NONE", "LCD", "SCANLINES"};
           static const char *grids[] = {"SOFT", "MEDIUM", "STRONG"};
           snprintf(
@@ -1277,9 +1377,36 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   }
   if (audio)
     SDL_ClearQueuedAudio(audio);
-  if (displayOptions.autoResume && !saveStatus.failed &&
-      !pocket_recovery_save(c, root, displayKey, sav))
+  bool recoveryOk = !displayOptions.autoResume || saveStatus.failed ||
+                    pocket_recovery_save(c, root, displayKey, sav);
+  if (!recoveryOk) {
     notice("Recovery save failed; check storage");
+#ifndef POCKET_TEST
+    while (running && !maxFrames && !recoveryOk) {
+      pd_font_set(NULL, 0);
+      pd_splash_draw(&canvas, "COULD NOT SAVE SESSION",
+                     "Check SD card space and permissions.",
+                     "A:Retry  B:Keep playing");
+      present();
+      events();
+      if (down(A))
+        recoveryOk = pocket_recovery_save(c, root, displayKey, sav);
+      if (down(B)) {
+        leave = false;
+        companion = false;
+        menuOpen = 0;
+        quickOpen = false;
+        held = pressed = 0;
+        due = SDL_GetPerformanceCounter();
+        goto play_loop;
+      }
+      SDL_Delay(16);
+    }
+#endif
+    if (!recoveryOk)
+      appError = 1;
+  }
+  free(slots);
 cleanup:
   effect_invalidate();
   c->unloadROM(c);
@@ -1316,6 +1443,7 @@ static int cmp(const void *a, const void *b) {
 }
 int main(int argc, char **argv) {
   const char *rom = NULL, *shot = NULL;
+  bool showLibrary = false;
   int frames = 0;
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--data") && i + 1 < argc)
@@ -1326,6 +1454,8 @@ int main(int argc, char **argv) {
       shot = argv[++i];
     else if (!strcmp(argv[i], "--fresh"))
       forceFresh = true;
+    else if (!strcmp(argv[i], "--library"))
+      showLibrary = true;
     else
       rom = argv[i];
   }
@@ -1406,35 +1536,42 @@ int main(int argc, char **argv) {
     if (d)
       closedir(d);
     qsort(names, count, sizeof(*names), cmp);
-    struct pd_menu menu;
-    pd_menu_init(&menu, "PokeDaisy Pocket", (const char *const *)names, count);
-    int ticks = 0;
-    while (running) {
-      events();
-      if (lifecycle(NULL, NULL, NULL, NULL))
-        continue;
-      repeat_directions();
-      if (down(B) || down(MENU))
-        break;
-      if (down(UP))
-        pd_menu_move(&menu, -1);
-      if (down(DOWN))
-        pd_menu_move(&menu, 1);
-      if (down(A) && count) {
-        snprintf(path, sizeof path, "%s/roms/%s", root, names[menu.selected]);
-        run_game(path, 0, NULL);
+    if (count == 1 && !showLibrary) {
+      snprintf(path, sizeof path, "%s/roms/%s", root, names[0]);
+      run_game(path, frames, shot);
+      free(names[0]);
+    } else {
+      struct pd_menu menu;
+      pd_menu_init(&menu, "PokeDaisy Pocket", (const char *const *)names,
+                   count);
+      int ticks = 0;
+      while (running) {
+        events();
+        if (lifecycle(NULL, NULL, NULL, NULL))
+          continue;
+        repeat_directions();
+        if (down(B) || down(MENU))
+          break;
+        if (down(UP))
+          pd_menu_move(&menu, -1);
+        if (down(DOWN))
+          pd_menu_move(&menu, 1);
+        if (down(A) && count) {
+          snprintf(path, sizeof path, "%s/roms/%s", root, names[menu.selected]);
+          run_game(path, 0, NULL);
+        }
+        pd_menu_draw(&menu, &canvas);
+        present();
+        if (frames && ++ticks >= frames) {
+          if (shot)
+            capture_frame(shot, NULL);
+          break;
+        }
+        SDL_Delay(16);
       }
-      pd_menu_draw(&menu, &canvas);
-      present();
-      if (frames && ++ticks >= frames) {
-        if (shot)
-          capture_frame(shot, NULL);
-        break;
-      }
-      SDL_Delay(16);
+      for (int i = 0; i < count; i++)
+        free(names[i]);
     }
-    for (int i = 0; i < count; i++)
-      free(names[i]);
   }
   if (pad)
     SDL_GameControllerClose(pad);

@@ -1,10 +1,21 @@
-# PokeDaisy Pocket: Phase 18 — expanded NPCs and handheld reliability
+# PokeDaisy Pocket: Phase 19 — save previews and direct play
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 
 Native SDL2 and mGBA port for TrimUI Brick / NextUI. The user has confirmed
 gameplay, expanded/zoomed overworlds, companion menus, saves and the quick menu
 on physical hardware. Those working paths are retained.
+
+Phase 19 adds ten manual slots with screenshots/timestamps in Menu > Save
+state / Load state. D-pad selects, A acts, Y changes Save/Load mode, B returns
+to play. Overwrites/loads confirm; successful operations resume gameplay.
+Quick-ring and L2/R2 controls retain slot 0 and the old state path.
+
+Tools opens a sole ROM directly and exits cleanly after closing it. Use
+--library for the picker, or the existing NextUI game-list launcher to open a
+selected game directly. AUTO RESUME ON makes "Save session & close" one step;
+startup restores the validated recovery session. B held at startup / --fresh
+bypasses it. SAVE_STATES.md explains compatibility and remaining differences.
 
 Phase 18 adds ordinary unspawned and connected-map NPCs to expanded Polished
 Crystal, using verified object data, original ROM graphics and applied
