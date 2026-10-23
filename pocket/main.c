@@ -811,12 +811,19 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   int quickSelected = 0;
   bool companion = false, ff = false, leave = false;
   int focus = 0, frames = 0;
-  struct pc_ui pcUi = {0};
+  struct pc_ui pcUi = {.battleSupported = pocket_battle_supported(displayKey)};
   struct pocket_action gameAction = {0};
+  struct pocket_battle_action battleAction = {0};
+  bool battleReturn = false;
   uint64_t due = SDL_GetPerformanceCounter();
   double hz = (double)c->frequency(c) / c->frameCycles(c);
   while (running && !leave) {
     events();
+    if (platform.powerDown || platform.sleepRequested ||
+        platform.shutdownRequested) {
+      pocket_battle_cancel(&battleAction);
+      battleReturn = false;
+    }
     if (lifecycle(c, sav, &gameAction, &due)) {
       if (lifecycleFailure) {
         lifecycleFailure = false;
@@ -827,6 +834,14 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       continue;
     }
     repeat_directions();
+    if ((battleAction.result == PA_RUNNING || battleReturn) &&
+        (down(B) || down(X) || down(MENU) || down(L3))) {
+      pocket_battle_cancel(&battleAction);
+      battleReturn = false;
+      c->setKeys(c, 0);
+      held &= ~1023u;
+      notice(pocket_battle_message(&battleAction));
+    }
     if (gameAction.result == PA_RUNNING &&
         (down(B) || down(X) || down(MENU) || down(L3))) {
       pocket_action_cancel(&gameAction);
@@ -1032,6 +1047,14 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           }
         }
       } else if (pc >= 0) {
+        if (down(START) && pcUi.section == PC_BATTLE) {
+          if (pcUi.battleSupported && snap.inBattle) {
+            pcUi.battleControls = !pcUi.battleControls;
+            pcUi.battleParty = false;
+            pcUi.battleChoice = 0;
+          } else
+            notice("Battle controls need normal Polished Crystal 3.2.3 battle");
+        }
         if (down(START) && pcUi.section == PC_BAG) {
           if (pocket_action_begin(&gameAction, displayKey, read_memory, c)) {
             companion = false;
@@ -1046,6 +1069,20 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           if (down(buttons[action]) &&
               !pc_ui_input(&pcUi, &snap, (enum pc_action)action))
             companion = false;
+        if (pcUi.battleRequest) {
+          if (gameAction.result != PA_RUNNING &&
+              pocket_battle_begin(
+                  &battleAction, displayKey,
+                  (enum pocket_battle_command)pcUi.battleRequest,
+                  pcUi.battleValue, read_memory, c)) {
+            companion = false;
+            battleReturn = !(pcUi.battleRequest == PB_CHOOSE_ACTION &&
+                             pcUi.battleValue == 1);
+            held = pressed = 0;
+          }
+          pcUi.battleRequest = 0;
+          notice(pocket_battle_message(&battleAction));
+        }
       } else {
         if (down(B) && !pd_ui_back(&ui))
           companion = false;
@@ -1094,12 +1131,23 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       }
     } else {
       muted = ff;
-      bool dispatching = gameAction.result == PA_RUNNING;
-      unsigned keys = dispatching
+      bool battleDispatch = battleAction.result == PA_RUNNING;
+      bool dispatching = gameAction.result == PA_RUNNING || battleDispatch;
+      unsigned keys = battleDispatch
+                          ? pocket_battle_tick(&battleAction, read_memory, c)
+                      : gameAction.result == PA_RUNNING
                           ? pocket_action_tick(&gameAction, read_memory, c)
                           : held & 1023;
       c->setKeys(c, keys);
-      if (dispatching && gameAction.result != PA_RUNNING) {
+      if (battleDispatch && battleAction.result != PA_RUNNING) {
+        held &= ~1023u;
+        notice(pocket_battle_message(&battleAction));
+        if (battleAction.result != PA_DONE) {
+          companion = true;
+          battleReturn = false;
+        }
+      }
+      if (dispatching && !battleDispatch && gameAction.result != PA_RUNNING) {
         held &= ~1023u;
         notice(pocket_action_message(&gameAction));
         if (gameAction.result == PA_TIMEOUT || gameAction.result == PA_REJECTED)
@@ -1119,6 +1167,30 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       pc_read(&snap, read_memory, c);
       pc_ui_observe(&pcUi, &snap);
       pc_ui_tick(&pcUi, SDL_GetTicks());
+      if (pcUi.battleSupported) {
+        if (!pocket_battle_read(read_memory, c, &pcUi.battleMenu))
+          pcUi.battleMenu =
+              (struct pocket_battle_menu){.state = PB_BUSY, .cursor = -1};
+        if (pcUi.battleMenu.state == PB_NONE)
+          battleReturn = false;
+        if (battleReturn && battleAction.result != PA_RUNNING &&
+            (pcUi.battleMenu.state == PB_ACTION ||
+             pcUi.battleMenu.state == PB_MOVE ||
+             pcUi.battleMenu.state == PB_PARTY)) {
+          companion = true;
+          battleReturn = false;
+          pcUi.battleControls = true;
+          pcUi.battleParty = false;
+          pcUi.battleChoice =
+              pcUi.battleMenu.cursor >= 0 && pcUi.battleMenu.cursor < 6
+                  ? pcUi.battleMenu.cursor
+                  : 0;
+          held = pressed = 0;
+          c->setKeys(c, 0);
+          if (audio)
+            SDL_ClearQueuedAudio(audio);
+        }
+      }
     } else
       pd_snapshot_read(&snap, &game, read_memory, c);
     if (quickOpen) {

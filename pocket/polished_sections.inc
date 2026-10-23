@@ -505,6 +505,8 @@ static int clamp_selection(int value, int count) {
 void pc_ui_tick(struct pc_ui *u, uint32_t ms) { u->animationMs = ms; }
 bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
                  enum pc_action a) {
+  if(u->section==PC_BATTLE && u->battleControls && a!=PC_PREVIOUS && a!=PC_NEXT)
+    return pc_battle_controls_input(u,s,a);
   if (a == PC_PREVIOUS || a == PC_NEXT) {
     u->section =
         (u->section + PC_SECTIONS + (a == PC_NEXT ? 1 : -1)) % PC_SECTIONS;
@@ -683,8 +685,11 @@ void pc_ui_draw(struct pc_ui *u, struct pd_canvas *c,
                     ((u->animationMs / 167) % 2) ? 10 : 2);
   } else if (u->section == PC_BAG) {
     pc_bag_pages(u, c, s, rom, n, build);
-  } else if (u->section == PC_BATTLE)
-    pc_battle_pages(u, c, s, rom, n, build);
+  } else if (u->section == PC_BATTLE) {
+    if(u->battleControls && u->battleSupported && s->inBattle)
+      pc_battle_controls_draw(u,c,s,rom,n,build);
+    else pc_battle_pages(u, c, s, rom, n, build);
+  }
   else if (u->section == PC_DEX) {
     int ids[512], count = dex_entries(s, u->dexFilter, ids);
     if (count)

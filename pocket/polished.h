@@ -1,5 +1,6 @@
 #ifndef POCKET_POLISHED_H
 #define POCKET_POLISHED_H
+#include "battle_action.h"
 #include "pd_canvas.h"
 #include "pd_snapshot.h"
 void pc_font(const unsigned char *, size_t, int);
@@ -38,6 +39,9 @@ struct pc_ui {
   uint32_t animationMs;
   bool wasBattle, bagStarted, bagReselect;
   bool summary, detail, mapSet, placesOpen, moveOpen;
+  bool battleControls, battleParty, battleSupported;
+  int battleChoice, battleRequest, battleValue;
+  struct pocket_battle_menu battleMenu;
 };
 enum pc_action {
   PC_UP,
