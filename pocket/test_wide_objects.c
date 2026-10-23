@@ -10,6 +10,16 @@
 #include <stdlib.h>
 static uint32_t video[256 * 256], frame[160 * 144], out[256 * 192];
 static struct PkWideView view = {-48, -24, 256, 192};
+static bool screenshot(const char *path, const uint32_t *raw) {
+  // mGBA is 0x00BBGGRR; pd_png_write expects 0x00RRGGBB, just like the
+  // frontend's RGB888 texture. Keep raw buffers intact for PPU assertions.
+  uint32_t rgb[256 * 192];
+  for (int i = 0; i < 256 * 192; i++) {
+    uint32_t n = raw[i];
+    rgb[i] = ((n & 255) << 16) | (n & 0xff00) | ((n >> 16) & 255);
+  }
+  return pd_png_write(path, 256, 192, rgb);
+}
 static void tick(struct mCore *core, unsigned keys, int count) {
   core->setKeys(core, keys);
   for (int i = 0; i < count; i++) {
@@ -49,7 +59,7 @@ int main(int argc, char **argv) {
     assert(outside);
     tick(core, 0, 120);
     assert(pk_wide_gb_last_score() >= GB_MIN_SCORE);
-    assert(pd_png_write("runtime-phase18-new-bark.png", 256, 192, out));
+    assert(screenshot("runtime-phase18-new-bark.png", out));
     // Walk west along y=8, avoiding the teacher at (6,8), then cross into
     // Route29. The connection and NPCs are observed through real movement.
     for (int i = 0; i < 30 && gbRam(gbCfg[GB_YCOORD]) < 7; i++) {
@@ -76,12 +86,11 @@ int main(int argc, char **argv) {
       route = current.w == 30 && current.h == 9;
     }
     if (!route)
-      pd_png_write("runtime-phase18-west-blocked.png", 256, 192, out);
+      screenshot("runtime-phase18-west-blocked.png", out);
     assert(route);
     tick(core, 0, 120);
     assert(pk_wide_gb_last_score() >= GB_MIN_SCORE);
-    assert(
-        pd_png_write("runtime-phase18-route29-connection.png", 256, 192, out));
+    assert(screenshot("runtime-phase18-route29-connection.png", out));
     // Same live frame with only the previous loaded-object path, to expose
     // exactly what the new template layer contributes outside the PPU.
     struct GbSnap baseline = gbGood;
@@ -101,13 +110,12 @@ int main(int argc, char **argv) {
       changed += before[i] != out[i];
     fprintf(stderr, "template-layer visible pixel changes: %u\n", changed);
     assert(changed);
-    assert(pd_png_write("runtime-phase18-route29-templates-off.png", 256, 192,
-                        before));
+    assert(screenshot("runtime-phase18-route29-templates-off.png", before));
     puts("PASS actual lab exit, NewBarkTown and west connection into Route29; "
          "original PPU preserved throughout");
   }
   assert(pk_wide_gb_last_score() >= GB_MIN_SCORE);
-  assert(pd_png_write("runtime-phase18-wide-npcs.png", 256, 192, out));
+  assert(screenshot("runtime-phase18-wide-npcs.png", out));
   struct GbSnap snap;
   gbTake(&snap);
   assert(snap.ok);

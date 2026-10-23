@@ -1,5 +1,11 @@
 # Phase 18 verification
 
+Capture correction: the new raw wide-object harness initially wrote mGBA's
+BBGGRR words directly to an RGB PNG writer, swapping red/blue in those images.
+It now performs the same conversion as the existing frontend. Raw PPU tests
+remain byte-exact; the production executable already converted correctly.
+This correction affects screenshots/tests only, not the Brick rendering path.
+
 Native Linux and actual NextUI AArch64 release targets build. New object tests
 pass natively and under ARM/QEMU with the private normal 3.2.3 ROM. The game is
 walked normally from the aide-gift state through Elm's lab exit, New Bark Town
