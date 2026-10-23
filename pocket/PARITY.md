@@ -1,4 +1,4 @@
-# Polished Crystal Android parity boundary — Phase 15
+# Polished Crystal Android parity boundary — Phase 16
 
 This compares the native port with the **Polished Crystal path** at upstream
 `54d8f4867501feb32b7ee139a5616b7c6301f044`, rather than with Android features
@@ -20,7 +20,8 @@ user's matching cart. Full visual and behavioral parity is still unfinished.
 | Guide NEXT BOSS | Progress-dependent order, League/rematch rules, normal/faithful teams, type hints, individual Pokemon hint/answer entries, moves/held-item answers, own-best-level comparison | Shared OPTION frames and inline per-Pokémon entries now adapted; fine text metrics and controller scrolling differences remain |
 | Guide TIPS / WHERE IS | All seven upstream tips, hints/answers; HM/key/gift-Pokemon lists with deduplication, locations and owned marks | Inline hint/answer rows with source page/category hierarchy now adapted; fine text metrics and first-use guide notice remain |
 | Quick menu | L3 ring; original Android icons; paused integer-scaled gameplay behind it; state confirmation, FF and companion | More actions only when their game-specific implementations are ported; User confirms quick menu on Brick; new UI changes still require hardware retesting |
-| States/options | Existing host state/FF controls; new controller SCREEN / SHADERS subset with per-ROM LCD/SCANLINES/GRID/GBA COLORS and unfiltered STRETCH | Multi-slot screenshot browser, full Android hierarchy, remaining effects/mapping/FF options and lifecycle integration |
+| States/options | Existing state/FF controls; per-ROM LCD/SCANLINES/GRID/GBA COLORS, unfiltered STRETCH, AUTO ZOOM IN and AUTO RESUME | Multi-slot screenshot browser, full Android hierarchy, remaining effects/mapping/FF options |
+| NextUI lifecycle | Foreground power adapter, real suspend helper, pause/audio/input restoration, separate atomic recovery and direct-launch pak | Physical sleep/wake/shutdown/RTC/audio testing; firmware monitor/LED/haptic differences |
 
 Guide definitions are generated from `GuidePolishedCrystal*.kt`; the original
 Android guide marks itself unverified and may contain source-data mistakes.
@@ -32,7 +33,7 @@ retail companion support remain as before; this does not add Seaglass decoding.
 
 ## Expansion and shortcuts
 
-L3 opens the quick-menu ring. R3 cycles Original / Expand / Zoom, with a Menu > Display fallback. The existing `pk_wide_gb.c` renderer now has a native-only adapter for normal Polished Crystal 3.2.3, using official release symbols and the game's actual decompressed metatile/attribute banks. Original pixels are preserved. Menus/dialogue/battles return to the normal viewport. Other builds do not receive guessed addresses.
+L3 opens the quick-menu ring. R3 cycles Original / Expand / Zoom, with a Menu > Display fallback. The existing `pk_wide_gb.c` renderer has a native-only adapter for normal Polished Crystal 3.2.3, using official release symbols and the game's actual decompressed metatile/attribute banks. Original pixels are preserved. Ready matched dialogue stays expanded unless AUTO ZOOM IN is ON; menus, battles and unmatched frames return to the original viewport. Other builds do not receive guessed addresses.
 
 Remaining expansion work: unspawned/connected-map NPC templates; broad outdoor, map-connection, weather/lighting and battle-transition verification; User confirms expansion/zoom and quick-menu operation on Brick; broader performance, lifecycle and new-UI retests remain. The initial real-ROM verification covers Elm's laboratory, normal starter dialogue, display cycling, paused companion/wheel and state reset.
 
@@ -42,9 +43,27 @@ Remaining expansion work: unspawned/connected-map NPC templates; broad outdoor, 
 2. Remaining battle panel layout and foe-selection ergonomics.
 3. Remaining Dex entry layouts, Bag favorites, Guide notice and shared menu composition.
 4. Remaining exact widget styling and small-text metrics.
-5. Multi-slot state browser and broader lifecycle/RTC/suspend verification.
+5. Multi-slot state browser and physical lifecycle/RTC/suspend verification.
 
 These are still open; Phase 14 does not claim full Android parity. GBA work is deferred.
+
+## Phase 16: native handheld integration
+
+Android WideCamera/Prefs already supports disabling AUTO ZOOM IN. The host now
+accepts ready MAP/TEXT frames from the unchanged shared renderer. Default OFF
+is an explicit user-requested difference from Android's ON. Android's timed
+camera tween is still absent; safe menu/battle fallback is retained.
+
+The Polished object audit verified the loaded 34-byte layout and sprite flag
+logic against actual release source. Unspawned/connected-map NPC templates
+remain unported and may pop in at expanded edges. No speculative data or
+unverified connected-map fix is claimed. Lab tests do not certify connections.
+
+Recovery and power are Linux/NextUI adaptations, preserving the existing
+mGBA frontend. Recovery validates state and current battery content and never
+contains SRAM; manual states and battery-save backups remain separate. See
+LIFECYCLE.md for provenance, bypasses and precise firmware differences. All
+physical sleep/wake and elapsed RTC conclusions still await Brick testing.
 
 Phase 11 remembers display mode per ROM content identity and reuses upstream's save mapping fallback with native I/O failure reporting. A new shared host module owns those policies; Polished readers/renderers remain independent. Upstream 1.3.1 source history is merged, but Android feature breadth is not implied by that merge.
 

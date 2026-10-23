@@ -4,13 +4,12 @@ This branch preserves recovered work in progress after automated workspace
 maintenance removed the previous local checkout and uncommitted Phase 16 work.
 The published Phase 15 baseline remains unchanged on main.
 
-The second checkpoint wires the reconstructed recovery-session and NextUI
-power backends into the frontend and build, restores the expanded dialogue
-option, and adds a real-ROM session/lifecycle harness and direct-launch wrapper.
-Builds/tests are in progress. This remains a checkpoint, not a verified release.
-Earlier native/ARM results and screenshots cannot certify these reconstructed
-files; those local logs and captures were removed with the workspace.
+The integrated checkpoint wires recovery and NextUI power backends into the
+existing frontend, adds safe expanded dialogue and AUTO ZOOM IN, per-ROM AUTO
+RESUME, a real-ROM session/lifecycle harness and optional direct-launch wrapper.
 
-Next: finish native and actual NextUI ARM
-builds and ROM regressions, inspect captures, and publish further checkpoints.
-Physical sleep/wake and power behavior require testing on a TrimUI Brick.
+Rebuilt native and actual NextUI ARM/QEMU checks pass; VERIFICATION.md records
+their scope. Captures and results have been regenerated after reconstruction.
+The extra frontend corruption-fallback regression and final packaging are
+being finished. This branch remains separate from the tested Phase 15 main.
+Physical sleep/wake, audible audio and RTC require testing on a TrimUI Brick.

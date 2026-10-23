@@ -1,4 +1,59 @@
-# Phase 15 verification
+# Phase 16 verification
+
+Native Linux and actual NextUI Cortex-A53/AArch64 GCC 8.3 builds pass. ARM
+executables run against the actual TrimUI/NextUI SDK sysroot under
+qemu-aarch64-static with software/offscreen SDL and dummy audio. Neither this
+nor the simulated suspend callback is physical Brick validation.
+
+The private normal Polished Crystal 3.2.3 ROM matches upstream SHA-1
+6930b48af5844d373e3c9130f26d6dd1084cf4ed. The normal-input new-game harness
+creates a genuine starter; tests never open the player's battery files. The
+session harness observes 1,972 expanded TEXT frames and 428 expanded FIELD
+frames through 2,400 normal-input frames of the starter conversation. Every
+original PPU center pixel is asserted unchanged on every expanded frame.
+AUTO ZOOM IN ON pulls in; state load resets then restores safe expansion.
+The dialogue, auto-zoom, state and field PNGs were inspected. These are actual
+native software SDL captures from that game, not new Android GL comparisons.
+
+Native and ARM tests pass recovery roundtrip with exact frame counters;
+failed SRAM-sync preservation; corrupt/truncated/wrong-ROM rejection before
+core mutation; changed-battery rejection; manual-state separation; and actual
+frontend graceful exit/relaunch, AUTO RESUME OFF and --fresh bypass. The test
+also inspects the actual envelope payload to assert it contains no savedata.
+See LIFECYCLE.md for content versus RTC-trailer checks and atomic-write limits.
+
+Synthetic power events verify immediate pause between frames, zero input,
+action cancellation, closed audio during the substituted suspend callback,
+no sleeping frame advancement, queued-input removal, reopened audio, failure
+recovery, wake debounce and one-second long-hold detection. No test invokes
+the real suspend helper or writes the shutdown marker. Physical short/long
+power, display restoration, audible quality, real control timing and elapsed
+RTC remain awaiting Brick testing. NextUI helper/launcher source inspection
+does not certify firmware behavior.
+
+Existing host save I/O faults/fallback, decoder/captured Guide, GB/GBA execution,
+100 companion toggles, quick-ring confirmation/cancel/state roundtrip,
+expanded Original/Expand/Zoom cycling, paused companion/ring, PPU preservation,
+state-load cache reset and display persistence across reopen pass on native
+and ARM/QEMU. Controller tests cover the original filter settings plus both
+new toggles, per-ROM persistence and companion START -> the actual game Bag.
+The options harness now advances a fresh starter out of dialogue using normal
+buttons before testing the context-restricted Bag opener. The production
+context guard is unchanged. Phase 15 preference migration preserves filters.
+
+The loaded-object layout and sprite flags were checked against Polished's
+actual release source. No connected-map NPC fix or real-ROM connection-travel
+validation is claimed: that remains a gap requiring suitable exploration/test
+states. No objects, terrain, game actions or memory addresses were invented.
+The new lifecycle code has not received a fresh sanitizer certification.
+Earlier sanitizer results below apply only to their documented earlier runs.
+
+Reproduce with POCKET_TESTS=ON and the commands in LIFECYCLE.md. The package
+includes phase16 test logs and screenshots, with no ROMs, player saves, states
+or recovery files. Source checkpoints are on phase16-nextui-checkpoints;
+main retains the previously tested Phase 15 baseline.
+
+## Phase 15 verification (retained)
 
 Phase 15 is an incremental functional milestone, not full Android parity.
 Native Linux and actual NextUI AArch64 builds pass the controller-only Bag

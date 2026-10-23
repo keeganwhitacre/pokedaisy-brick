@@ -23,6 +23,17 @@ static void options_test(void) {
   snprintf(path, sizeof path, "%s/display/%s.fx", dir, sha);
   FILE *f = fopen(path, "w");
   assert(f);
+  fputs("pocket-fx=1\nfilter=3\ngrid=2\ncolors=1\nstretch=0\n", f);
+  fclose(f);
+  assert(pocket_options_load(dir, sha, &p));
+  assert(p.filter == 3 && p.grid == 2 && p.colors && !p.stretch &&
+         !p.autoZoom && p.autoResume);
+  p.autoZoom = true;
+  p.autoResume = false;
+  assert(pocket_options_save(dir, sha, &p));
+  assert(pocket_options_load(dir, sha, &p) && p.autoZoom && !p.autoResume);
+  f = fopen(path, "w");
+  assert(f);
   fputs("pocket-fx=1\nfilter=3\n", f);
   fclose(f);
   assert(!pocket_options_load(dir, sha, &p) && p.filter == 0 && !p.colors);

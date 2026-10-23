@@ -24,7 +24,7 @@ static void test_frame(struct mCore *c, int *pc, bool companion, int frame,
     savedFrame = c->frameCounter(c);
   if (pass == 2 && frame == 0)
     assert(c->frameCounter(c) == savedFrame + 1);
-  if ((pass == 3 || pass == 4) && frame == 0)
+  if ((pass == 3 || pass == 4 || pass == 5) && frame == 0)
     assert(c->frameCounter(c) == 1);
 }
 static bool simulated_suspend(void) {
@@ -88,6 +88,24 @@ int main(int argc, char **argv) {
   assert(pocket_recovery_load(c, data, displayKey, battery) ==
          RECOVERY_MISSING);
   assert(pocket_recovery_save(c, data, displayKey, battery));
+  /* Check the actual payload, not just the flags passed to mGBA. A future
+   * serializer change must not silently reintroduce savedata restoration. */
+  f = fopen(session, "rb");
+  assert(f && fseek(f, 0, SEEK_END) == 0);
+  long recoverySize = ftell(f) - 144;
+  assert(recoverySize > 0 && fseek(f, 144, SEEK_SET) == 0);
+  bytes = malloc((size_t)recoverySize);
+  assert(bytes && fread(bytes, 1, recoverySize, f) == (size_t)recoverySize);
+  fclose(f);
+  struct VFile *payload = VFileFromConstMemory(bytes, (size_t)recoverySize);
+  struct mStateExtdata ext;
+  mStateExtdataInit(&ext);
+  assert(payload && mCoreExtractExtdata(c, payload, &ext));
+  struct mStateExtdataItem savedata;
+  assert(mStateExtdataGet(&ext, EXTDATA_SAVEDATA, &savedata) && !savedata.data);
+  mStateExtdataDeinit(&ext);
+  payload->close(payload);
+  free(bytes);
   unsigned at = c->frameCounter(c);
   c->runFrame(c);
   assert(pocket_recovery_load(c, data, displayKey, battery) == RECOVERY_LOADED);
@@ -269,5 +287,11 @@ int main(int argc, char **argv) {
                    "--fresh",          argv[1],  NULL};
   assert(pocket_app_main(7, fresh) == 0);
   puts("PASS AUTO RESUME OFF and --fresh bypass recovery in actual frontend");
+  assert(truncate(session, 20) == 0);
+  forceFresh = false;
+  pass = 5;
+  running = 1;
+  assert(pocket_app_main(6, args) == 0);
+  puts("PASS corrupt recovery -> normal boot fallback in actual frontend");
   return 0;
 }

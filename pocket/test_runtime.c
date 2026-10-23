@@ -163,6 +163,7 @@ static void quick_test_frame(struct mCore *c, bool companion, int frame) {
          "and repeated toggles");
 }
 static void wide_test_frame(struct mCore *c, bool companion, int frame) {
+  displayOptions.autoZoom = true; /* Retain upstream pull-in regression. */
   if (wideReopen) {
     assert(wideMode == 1);
     if (!frame)
@@ -257,8 +258,24 @@ static void wide_test_frame(struct mCore *c, bool companion, int frame) {
   }
 }
 static void options_ui_frame(struct mCore *c, bool companion, int frame) {
-  if (frame == 0)
+  if (frame == 0) {
     assert(state(c, getenv("POCKET_TEST_STATE"), false));
+    /* A freshly generated starter is still in dialogue. Reach the real free
+     * field before testing the Bag action; never weaken its context guard. */
+    struct pocket_action probe = {0};
+    bool freeField = false;
+    for (int i = 0; i < 100 && !freeField; i++) {
+      c->setKeys(c, 1);
+      for (int j = 0; j < 8; j++)
+        c->runFrame(c);
+      c->setKeys(c, 0);
+      for (int j = 0; j < 60; j++)
+        c->runFrame(c);
+      freeField = pocket_action_begin(&probe, displayKey, read_memory, c);
+      pocket_action_cancel(&probe);
+    }
+    assert(freeField);
+  }
   if (frame == 5)
     send_key(SDLK_ESCAPE);
   if (frame == 6) {
@@ -293,25 +310,42 @@ static void options_ui_frame(struct mCore *c, bool companion, int frame) {
     assert(
         !displayOptions.stretch); // Preserve upstream filter integer geometry.
     assert(capture_frame("runtime-phase15-settings.png", NULL));
-    send_key(SDLK_x);
+    send_key(SDLK_DOWN); // EXPAND
   }
-  if (frame == 16) {
-    assert(testMenu == 1);
-    send_key(SDLK_x);
-  }
+  if (frame == 16)
+    send_key(SDLK_DOWN); // AUTO ZOOM IN
+  if (frame == 17)
+    send_key(SDLK_z);
   if (frame == 18) {
+    assert(displayOptions.autoZoom);
+    send_key(SDLK_DOWN); // AUTO RESUME
+  }
+  if (frame == 19)
+    send_key(SDLK_z);
+  if (frame == 20) {
+    assert(!displayOptions.autoResume);
+    send_key(SDLK_z);
+  }
+  if (frame == 21) {
+    assert(displayOptions.autoResume);
+    send_key(SDLK_x);
+  }
+  if (frame == 22)
+    send_key(SDLK_x);
+  if (frame == 24) {
     assert(!companion);
     struct pocket_display_options p;
     assert(pocket_options_load(root, displayKey, &p));
-    assert(p.filter == 1 && p.grid == 2 && p.colors && !p.stretch);
+    assert(p.filter == 1 && p.grid == 2 && p.colors && !p.stretch &&
+           p.autoZoom && p.autoResume);
     assert(capture_frame("runtime-phase15-settings-applied.png", NULL));
     send_key(SDLK_TAB);
   }
-  if (frame == 19)
+  if (frame == 25)
     send_key(SDLK_e); // Party -> Bag, existing navigation.
-  if (frame == 20)
+  if (frame == 26)
     send_key(SDLK_RETURN);
-  if (frame == 21)
+  if (frame == 27)
     assert(!companion);
   if (frame == 100) {
     uint8_t ptr[2];

@@ -1,10 +1,18 @@
-# PokeDaisy Pocket: Phase 15
+# PokeDaisy Pocket: Phase 16
 
 Based on PokeDaisy by Lidor Itzhari - https://github.com/lidor30/pokedaisy
 
 Native SDL2 and mGBA port for TrimUI Brick / NextUI. The user has confirmed
 gameplay, expanded/zoomed overworlds, companion menus, saves and the quick menu
 on physical hardware. Those working paths are retained.
+
+Phase 16 keeps safe expanded conversations at the selected scale. AUTO ZOOM
+IN restores upstream's dialogue pull-in; its Brick default is OFF. AUTO RESUME
+defaults ON and restores a separate validated recovery session after graceful
+close. An optional NextUI game-list launcher shares this pak's data root.
+Power handling uses NextUI's real suspend helper, with pause/audio/input
+restoration. Physical power, wake, audible audio and RTC still await Brick
+testing. See LIFECYCLE.md for setup, source provenance and limitations.
 
 Phase 15 adds original LCD/SCANLINES effects, GRID strengths, GBA COLORS and
 unfiltered STRETCH in Menu > Settings. Choices persist per ROM. Start in the
@@ -42,7 +50,11 @@ ORIGINAL aspect; EXPAND/ZOOM still work with these effects.
 No Android runtime, touchscreen or mouse is used.
 
 When updating an existing installation, merge the updated files into the pak
-and keep your `roms`, `saves`, `states` and `display` folders and `settings.ini`.
+and keep your `roms`, `saves`, `states`, `recovery` and `display` folders and `settings.ini`.
+
+For direct game-list launching, also install `Emus/tg5040/POKEDAISY.pak` and
+put your game in a folder such as `Roms/Polished Crystal (POKEDAISY)/`.
+Keep the Tools pak installed; the optional wrapper calls the same executable.
 
 ## Controls
 
@@ -59,10 +71,14 @@ and keep your `roms`, `saves`, `states` and `display` folders and `settings.ini`
 | Menu | Open game menu | Open / close game menu |
 | Select + Start held together | Open game menu | Open / close game menu |
 | L2 / R2, while paused | No action during gameplay | Confirm save / load state |
+| Power (NextUI; hardware verification pending) | Short release: real suspend; 1s hold: graceful shutdown request | Same behavior |
 
 The game menu also offers resume, party, state saving/loading, fast-forward,
-quit and About. Loading a state and quitting require confirmation. Save inside
-the game before choosing Quit; quitting does not perform the game's save action.
+Close game and About. Loading a state and closing require confirmation. AUTO
+RESUME saves a recovery session on graceful close; continue saving in-game too.
+Hold B at startup or launch with `--fresh` to bypass loading a suspect recovery.
+AUTO RESUME OFF disables automatic loading and writing without deleting files.
+Sudden power loss, a crash or forced termination cannot trigger a final save.
 In Polished Crystal, L/R cycles Party, Bag, Battle, Dex, Map and Guide. In Party, the D-pad
 follows the two-column grid and A opens a summary. Within a summary, Up/Down changes Pokemon, Left/Right selects a move, A opens its ROM description, Y cycles Info/Weaknesses/Resistances/Immunities, and Select pages long matchup lists. B returns one level. Eggs conceal their moves. In Bag, Left/Right changes
 pocket and Up/Down scrolls through items. The Bag shows live quantities and
@@ -111,6 +127,7 @@ Data stays inside the pak:
 - `saves/<complete ROM filename>.sav` for in-game saves, for example
   `saves/MyGame.gbc.sav`.
 - `states/<complete ROM filename>.ss` for one save-state slot.
+- `recovery/<ROM SHA-1>.session` for automatic recovery, separate from both above.
 - `settings.ini` for GBA companion settings.
 - `launch.log` for errors.
 

@@ -191,3 +191,13 @@ The Polished Bag opener is a separate downstream controller-only adapter with
 official game source/symbol provenance recorded in ACTIONS.md. Neither new
 module receives a game-memory write callback. Android source and shared native
 emulator/save/expanded-rendering implementations remain intact.
+
+## Phase 16 additions
+
+Dialogue policy was checked against Android WideCamera.frame and
+Prefs.expandZoomOnText, with composition retained in pk_wide_gb.c.
+NextUI power ownership/helper/launcher behavior was inspected at commit
+5291344b3aceae5fa197437a70824afb41e2d338. Polished 3.2.3 object constants and
+sprite initialization were inspected in release source. No new memory offsets
+or guessed connected-map objects were introduced. LIFECYCLE.md records source
+paths, defaults, suspend differences and recovery validation/durability rules.

@@ -149,3 +149,25 @@ passes through similar-looking software effects. The combined SCREEN / SHADERS
 host menu remains a documented controller adaptation. The existing Compose
 preview cannot validate EmulatorView's GL pipeline; native reference-equation
 checks are explicitly narrower than Android GL screenshot parity.
+
+## Phase 16: lifecycle and session boundaries
+
+WideCamera.frame / Prefs.expandZoomOnText supply the dialogue policy. The shared
+renderer remains unchanged; only ready FIELD and opted-in TEXT frames expand.
+AUTO ZOOM IN defaults OFF by request here, versus ON on Android. Do not widen
+the readiness predicate to conceal unsupported menus, fades or map matches.
+Exact Android camera timing remains separate unfinished work.
+
+`platform_nextui` owns foreground Linux power events, helper execution and the
+launcher shutdown marker. `recovery` owns the bounded serialization envelope,
+SRAM-content check and atomic replacement independently of SDL/game decoding.
+The existing frontend coordinates core/audio/input/textures between frames.
+LIFECYCLE.md records the actual NextUI source commit and audited functions.
+On updates recheck power ownership, suspend helper/launcher contracts, mGBA
+state compatibility, GB/GBA SRAM access and absence of savedata in recovery.
+
+The optional Emus wrapper reuses the existing Tools executable/data root.
+Android source, shared expansion implementation, save wrapper, ROM allowlist
+and game memory offsets are untouched. No portable renderer/schema rewrite
+is needed for these platform features. Polished's unspawned/connected objects
+remain an explicit game-adapter gap, rather than generic SDL policy.
