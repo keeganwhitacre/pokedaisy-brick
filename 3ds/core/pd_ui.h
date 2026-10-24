@@ -62,6 +62,7 @@ enum pd_action {
 // What the host tells the companion about itself.
 #define PD_UI_HOST_LINES 2
 struct pd_host_info {
+    bool hideScreenMode; // Host supplies its own display controls; default false.
     const char* labels[PD_UI_HOST_LINES]; // extra SETTINGS info rows (FILE, SPEED ...)
     char values[PD_UI_HOST_LINES][40];
     int count;

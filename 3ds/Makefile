@@ -15,7 +15,7 @@ CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror
 CORE_SRC := $(wildcard core/*.c)
 DEVKITARM_IMAGE := devkitpro/devkitarm:latest
 
-.PHONY: preview test-font 3ds decomps fixture-roms azahar-test azahar-battle-test tables clean
+.PHONY: preview test-host test-font 3ds decomps fixture-roms azahar-test azahar-battle-test tables clean
 
 $(BUILD)/pd_font_test: core/pd_canvas.c core/pd_canvas.h core/pd_font.h core/pd_font_gen.c test/font_test.c
 	@mkdir -p $(BUILD)
@@ -23,6 +23,13 @@ $(BUILD)/pd_font_test: core/pd_canvas.c core/pd_canvas.h core/pd_font.h core/pd_
 
 test-font: $(BUILD)/pd_font_test
 	$(BUILD)/pd_font_test
+
+$(BUILD)/pd_host_test: $(CORE_SRC) $(wildcard core/*.h) test/host_test.c
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(CORE_SRC) test/host_test.c -lm
+
+test-host: $(BUILD)/pd_host_test
+	$(BUILD)/pd_host_test
 
 $(BUILD)/pd_preview: $(CORE_SRC) $(wildcard core/*.h) desktop/pd_preview.c desktop/pd_png.c desktop/pd_png.h
 	@mkdir -p $(BUILD)

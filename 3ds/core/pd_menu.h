@@ -15,6 +15,8 @@ struct pd_menu {
     int scroll;
     bool touching;
     int pressed; // row the stylus went down on, -1 = none
+    const char* emptyHint; // Optional host text; NULL retains the 3DS default.
+    const char* emptyPath;
 };
 
 void pd_menu_init(struct pd_menu* m, const char* title, const char* const* items, int count);
