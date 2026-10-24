@@ -195,6 +195,7 @@ static bool save_key(const struct pd_config* cfg, pd_read_fn read, void* ctx, ui
 
 void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn read, void* ctx) {
     memset(s, 0, sizeof(*s));
+    s->partyActive = -1;
     s->money = -1;
     const struct pd_config* cfg = g->cfg;
     if (!cfg) return;
