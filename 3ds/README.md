@@ -215,3 +215,20 @@ not used; nor is render-to-texture.
   party icons' two-frame animation.
 - More state slots with thumbnails, and resuming where the player left off (with
   the app's `pkStateMatchesSave` check first).
+
+## Portable font overrides
+
+The shared C canvas defaults to Pixel Operator. A host that decodes a font from
+its loaded ROM can call `pd_font_set(glyphs, count)` from `core/pd_font.h`.
+The array remains caller-owned and must stay alive until reset. Codepoints
+missing from that array still use Pixel Operator, then the question mark.
+Drawing and text measurement use the same glyph advances.
+
+The override is process-wide. Set and reset it on the render thread, and call
+`pd_font_set(NULL, 0)` before releasing the array or switching games. Existing
+hosts need no changes and retain their current font and appearance.
+
+Run `make -C 3ds test-font` from the repository root to check override pixels,
+UTF-8 lookup, fallback, measurement, clipping and reset behavior. This target
+needs only a C compiler and make; it does not need a ROM, SDL or a console SDK.
+

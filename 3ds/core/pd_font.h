@@ -16,7 +16,15 @@ struct pd_glyph {
 extern const struct pd_glyph pd_font_glyphs[];
 extern const int pd_font_glyph_count;
 
+// Optional caller-owned glyph overrides, for example decoded from a loaded ROM.
+// Keep the array alive until replaced or reset. NULL or count <= 0 resets it.
+// Missing codepoints fall back to Pixel Operator, then '?'. This is process-wide:
+// set/reset on the render thread, including when unloading or changing ROMs.
+// With no overrides, existing callers retain the original font and metrics.
+void pd_font_set(const struct pd_glyph* glyphs, int count);
+
 // The glyph for a codepoint ('?' when the font lacks it).
 const struct pd_glyph* pd_font_glyph(uint32_t codepoint);
 
 #endif
+

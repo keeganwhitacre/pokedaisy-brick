@@ -17,6 +17,14 @@ permissions:
   contents: read
 
 jobs:
+  native-font:
+    name: Portable canvas font
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - run: make -C 3ds test-font
+
   app:
     name: Unit tests + debug build
     runs-on: ubuntu-latest
@@ -111,3 +119,4 @@ jobs:
       - run: npm ci
       - run: node --test test/docs.test.js test/docsearch.test.js
       - run: npm run build
+
