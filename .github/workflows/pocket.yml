@@ -1,0 +1,85 @@
+name: Pocket native
+on:
+  push:
+    branches: ['main', 'handheld/**', 'upstream/linux-*']
+  pull_request:
+    paths: ['app/src/main/cpp/pk_wide*', 'app/src/main/cpp/pk_savevf*', 'pocket/**', '3ds/**', 'app/src/main/kotlin/com/pokedaisy/app/companion/data/**', 'app/src/main/kotlin/com/pokedaisy/app/companion/ui/**', 'app/src/test/resources/fixtures/**', '.github/workflows/pocket.yml', 'third_party/mgba']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # upstream pin, v5.1.0
+      - run: git submodule update --init third_party/mgba
+      - run: sudo apt-get update && sudo apt-get install -y cmake libsdl2-dev
+      - name: Check generated upstream definitions
+        run: |
+          python3 pocket/scripts/check_integration.py
+          python3 pocket/gen_polished.py --check
+          python3 pocket/gen_quick.py --check
+          python3 pocket/gen_experience.py --check
+          python3 pocket/gen_party.py --check
+          python3 pocket/gen_style.py --check
+      - name: Shared C host compatibility
+        run: make -C 3ds test-host test-font preview
+      - name: Build Linux frontend and tests
+        run: |
+          cmake -S pocket -B pocket/build-ci -DCMAKE_BUILD_TYPE=Release -DPOCKET_TESTS=ON -DBUILD_LTO=OFF
+          cmake --build pocket/build-ci -j2
+      - name: Captured-memory and emulator tests
+        working-directory: pocket
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          python3 make_diagnostic.py
+          python3 test_launch.py
+          build-ci/pocket-host-test
+          build-ci/pocket-wide-profile-test
+          build-ci/pocket-platform-test
+          build-ci/pocket-favorites-test
+          build-ci/pocket-battle-test ../app/src/test/resources/fixtures
+          build-ci/pocket-functional-test
+          build-ci/pocket-decoder-test ../app/src/test/resources/fixtures
+          build-ci/pocket-runtime-test
+          POCKET_TEST_NO_MMAP=1 build-ci/pocket-runtime-test
+          POCKET_TEST_QUICK=1 build-ci/pocket-runtime-test
+  brick:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - run: git submodule update --init third_party/mgba
+      - run: sudo apt-get update && sudo apt-get install -y cmake qemu-user-static
+      - name: Prepare verified NextUI toolchain and TrimUI SDK
+        run: |
+          python3 pocket/scripts/setup_brick_sdk.py "$RUNNER_TEMP/brick-sdk"
+          echo "NEXTUI_TOOLCHAIN=$RUNNER_TEMP/brick-sdk/cross/x86_64-aarch64-nextui-linux-gnu" >> "$GITHUB_ENV"
+      - name: Build AArch64 frontend and tests
+        run: |
+          cmake -S pocket -B pocket/build-brick-ci -DCMAKE_TOOLCHAIN_FILE=nextui-toolchain.cmake -DCMAKE_BUILD_TYPE=Release -DPOCKET_TESTS=ON -DBUILD_LTO=OFF
+          cmake --build pocket/build-brick-ci -j2
+      - name: ARM decoder and emulator tests
+        working-directory: pocket
+        env:
+          SDL_VIDEODRIVER: offscreen
+          SDL_RENDER_DRIVER: software
+          SDL_AUDIODRIVER: dummy
+          POCKET_FULLSCREEN: '1'
+        run: |
+          python3 make_diagnostic.py
+          qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-host-test
+          qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-wide-profile-test
+          qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-platform-test
+          qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-favorites-test
+          qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-battle-test ../app/src/test/resources/fixtures
+          qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-functional-test
+          qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-decoder-test ../app/src/test/resources/fixtures
+          qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-runtime-test
+          POCKET_TEST_NO_MMAP=1 qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-runtime-test
+          POCKET_TEST_QUICK=1 qemu-aarch64-static -L "$NEXTUI_TOOLCHAIN/aarch64-nextui-linux-gnu/libc" build-brick-ci/pocket-runtime-test
+      - name: Verify install package
+        run: python3 pocket/package.py pocket/build-brick-ci/pokedaisy-pocket "$RUNNER_TEMP/PokeDaisy"
