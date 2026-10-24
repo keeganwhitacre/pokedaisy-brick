@@ -1,4 +1,16 @@
-# Phase 21 verification
+# Phase 22 verification
+
+Native and NextUI AArch64 builds plus a new real-ROM rendering harness cover
+512x384 and 1024x768 outputs. For LCD and SCANLINES, compare every filtered
+game-centre output pixel against the original clipped pass, verify patterned
+battle margins and substantial companion coverage, and inspect screenshots.
+The harness reaches Lyra through original controller inputs, captures the
+surrounding-world fade and checks every original PPU pixel during it. These
+are Linux and ARM/QEMU checks; physical Brick validation remains pending.
+See RENDER_FIXES.md for the distinction between this handoff and a full-width
+reimplementation of the game's swirl.
+
+## Previous Phase 21 verification
 
 Native Linux and actual NextUI AArch64 builds pass. The real-ROM efficiency
 harness compares cached/uncached paused work: 60 unchanged Bag polls go from

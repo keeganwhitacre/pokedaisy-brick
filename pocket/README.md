@@ -1,4 +1,13 @@
-# PokeDaisy Pocket: Phase 21 — less idle work and automatic CPU scaling
+# PokeDaisy Pocket: Phase 22 — consistent filters and battle handoff
+
+Companion LCD/SCANLINES now follow the original art pixel scale on both
+512x384 and 1024x768 render targets. Battle background margins use the same
+filter spacing and phase as the original game image. With expansion enabled,
+the last visible verified world around the viewport fades to black over ten
+presented game frames as the original battle transition runs unchanged.
+State loads, new games and display-mode changes clear the retained image.
+See RENDER_FIXES.md for validation and limitations. Phase 21 efficiency,
+save, recovery and controller behavior are retained.
 
 The launcher now requests NextUI's existing Auto CPU policy instead of
 inheriting Performance when its helper is available. Paused Polished screens

@@ -1,5 +1,15 @@
 # Maintaining the native port
 
+Phase 22: effect_cover separates the filter destination from its source-pixel
+reference rectangle. pocket_filter_extended repeats the source grid outside
+that rectangle, retaining its phase and original centre samples. Companion
+reference dimensions are W/2 by H/2, matching the native art's 2 logical pixels.
+Future temporal shaders must revisit retained-frame caching. The battle fade
+uses pk_wide_gb_scene BATTLE_START and only pixels previously presented by the
+verified wide renderer. It changes host composition, never game RAM or PPU
+buffers. Review new scene classifications against this trigger. Retained
+images reset on state loads, new cores and display-mode changes.
+
 Phase 21: the host caches paused observations by core frame plus an epoch
 advanced on successful state load. Do not use frame count alone: different
 states can have the same count. Test-only WRAM fixture replacement explicitly

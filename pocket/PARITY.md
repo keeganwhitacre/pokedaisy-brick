@@ -1,4 +1,10 @@
-# Polished Crystal Android parity boundary — Phase 21
+# Polished Crystal Android parity boundary — Phase 22
+
+Phase 22 corrects the companion filter's texel scale and extends the battle
+filter continuously into the host background without changing the filtered
+game centre. A downstream handoff fades only retained, previously displayed
+world surroundings during the shared renderer's BATTLE_START signal. It does
+not reconstruct or stretch the original swirl. See RENDER_FIXES.md.
 
 Phase 21 is a Linux efficiency adaptation. Paused snapshots and static frames
 are reused, with explicit state-load/texture/window/notice invalidation and the

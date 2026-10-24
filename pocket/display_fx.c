@@ -122,6 +122,13 @@ uint32_t pocket_filter_mask(int filter, int grid, int x, int y, int w, int h,
   }
   return (uint32_t)alpha << 24; // black, with straight alpha for SDL blend
 }
+uint32_t pocket_filter_extended(int filter, int grid, int x, int y,
+                                int ox, int oy, int w, int h, int tw, int th) {
+  if (w <= 0 || h <= 0) return 0;
+  x = ((x - ox) % w + w) % w;
+  y = ((y - oy) % h + h) % h;
+  return pocket_filter_mask(filter, grid, x, y, w, h, tw, th);
+}
 void pocket_color_lut(uint32_t table[32768]) {
   // ScreenShaders.GBA_COLOR: GLSL's mat3 is column-major. Preserve defaults.
   for (int b = 0; b < 32; b++)

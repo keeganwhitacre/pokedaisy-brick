@@ -23,6 +23,10 @@ bool pocket_options_save(const char *root, const char *sha,
                          const struct pocket_display_options *);
 uint32_t pocket_filter_mask(int filter, int grid, int x, int y, int w, int h,
                             int texw, int texh);
+/* Repeat the same texel grid outside the source rectangle, retaining phase. */
+uint32_t pocket_filter_extended(int filter, int grid, int x, int y,
+                                int originX, int originY, int w, int h,
+                                int texw, int texh);
 void pocket_color_lut(uint32_t table[32768]);
 static inline uint32_t pocket_color_apply(const uint32_t table[32768],
                                           uint32_t rgb) {

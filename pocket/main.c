@@ -69,6 +69,7 @@ static SDL_Texture *effectTexture;
 static bool effectFailed;
 static int effectW, effectH, effectTW, effectTH, effectFilter = -1,
                                                  effectGrid = -1;
+static int effectRW, effectRH, effectOX, effectOY;
 static void effect_invalidate(void) {
   if (effectTexture)
     SDL_DestroyTexture(effectTexture);
@@ -76,20 +77,25 @@ static void effect_invalidate(void) {
   effectFailed = false;
   effectFilter = -1;
 }
-static void effect_draw(int tw, int th) {
+static void effect_cover(int tw, int th, SDL_Rect area, SDL_Rect reference) {
   if (!displayOptions.filter || effectFailed)
     return;
-  int w = lastGameRect.w, h = lastGameRect.h;
+  int w = area.w, h = area.h;
+  double scale = 1.;
   int lw, lh, ow, oh;
   SDL_RenderGetLogicalSize(renderer, &lw, &lh);
   if (lw > 0 && lh > 0 && SDL_GetRendererOutputSize(renderer, &ow, &oh) == 0) {
-    double scale = fmin((double)ow / lw, (double)oh / lh);
+    scale = fmin((double)ow / lw, (double)oh / lh);
     w = (int)lround(w * scale);
     h = (int)lround(h * scale);
   }
+  int rw = (int)lround(reference.w * scale), rh = (int)lround(reference.h * scale);
+  int ox = (int)lround((reference.x - area.x) * scale);
+  int oy = (int)lround((reference.y - area.y) * scale);
   if (!effectTexture || effectW != w || effectH != h || effectTW != tw ||
       effectTH != th || effectFilter != displayOptions.filter ||
-      effectGrid != displayOptions.grid) {
+      effectGrid != displayOptions.grid || effectRW != rw || effectRH != rh ||
+      effectOX != ox || effectOY != oy) {
     effect_invalidate();
     if (w <= 0 || h <= 0 || w > 4096 || h > 4096)
       return;
@@ -101,8 +107,8 @@ static void effect_draw(int tw, int th) {
     }
     for (int y = 0; y < h; y++)
       for (int x = 0; x < w; x++)
-        mask[y * w + x] = pocket_filter_mask(
-            displayOptions.filter, displayOptions.grid, x, y, w, h, tw, th);
+        mask[y * w + x] = pocket_filter_extended(
+            displayOptions.filter, displayOptions.grid, x, y, ox, oy, rw, rh, tw, th);
     effectTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                                       SDL_TEXTUREACCESS_STATIC, w, h);
     if (!effectTexture ||
@@ -119,10 +125,14 @@ static void effect_draw(int tw, int th) {
     effectTH = th;
     effectFilter = displayOptions.filter;
     effectGrid = displayOptions.grid;
+    effectRW = rw; effectRH = rh; effectOX = ox; effectOY = oy;
   }
   if (effectTexture &&
-      SDL_RenderCopy(renderer, effectTexture, NULL, &lastGameRect) < 0)
+      SDL_RenderCopy(renderer, effectTexture, NULL, &area) < 0)
     notice("Filter draw failed");
+}
+static void effect_draw(int tw, int th) {
+  effect_cover(tw, th, lastGameRect, lastGameRect);
 }
 static void options_save(void) {
   if (!pocket_options_save(root, displayKey, &displayOptions))
@@ -131,6 +141,13 @@ static void options_save(void) {
 static int wideMode; /* 0 original, 1 expand, 2 zoom. */
 static unsigned wideW, wideH;
 static uint32_t wideFrame[256 * 192], widePixels[256 * 192], gbFrame[160 * 144];
+static uint32_t fadeWorld[256 * 192];
+static unsigned fadeW, fadeH, fadeStep;
+static bool fadeArmed, fadeActive, fadeHaveWorld;
+static void fade_reset(void) {
+  fadeArmed = fadeActive = fadeHaveWorld = false; fadeStep = 0;
+  memset(fadeWorld, 0, sizeof fadeWorld);
+}
 static void wide_tick(struct mCore *c, bool skip) {
   if (!wideSupported)
     return;
@@ -151,6 +168,14 @@ static void wide_tick(struct mCore *c, bool skip) {
   wideReady = mix == 256 && pk_wide_gb_last_mode() == PK_WIDE_MODE_MAP &&
               (scene == PK_WIDE_SCENE_FIELD ||
                (!displayOptions.autoZoom && scene == PK_WIDE_SCENE_TEXT));
+  if (wideReady) {
+    fadeW = wideW; fadeH = wideH;
+    fadeArmed = true; fadeActive = false; fadeStep = 0;
+  } else if (!fadeActive && fadeArmed && fadeHaveWorld && scene == PK_WIDE_SCENE_BATTLE_START) {
+    fadeActive = true; fadeArmed = false; fadeStep = 1;
+  } else if (fadeActive && ++fadeStep >= 10) {
+    fadeActive = false;
+  }
 #ifdef POCKET_TEST
   /* Pixels in the actual PPU viewport must survive expansion unchanged. */
   if (wideReady)
@@ -162,6 +187,7 @@ static void wide_tick(struct mCore *c, bool skip) {
 #endif
 }
 static void wide_cycle(void) {
+  fade_reset();
   if (displayOptions.stretch) {
     displayOptions.stretch = false;
     options_save();
@@ -410,7 +436,8 @@ static void present_ui(bool companion) {
   if (effects) {
     SDL_Rect saved = lastGameRect;
     lastGameRect = (SDL_Rect){0, 0, W, H};
-    effect_draw(W, H);
+    /* ROM art uses two logical canvas pixels per original art pixel. */
+    effect_draw(W / 2, H / 2);
     lastGameRect = saved;
   }
   SDL_RenderPresent(renderer);
@@ -473,6 +500,26 @@ static void render_game(unsigned gw, unsigned gh) {
       if (displayOptions.colors)
         widePixels[i] = pocket_color_apply(colorLut, widePixels[i]);
     }
+    /* Keep the last visible world through the game's black transition frames.
+     * No guessed terrain: these are pixels already shown by this renderer. */
+    unsigned brightness = 0, visible = 0, distinct = 0, firstMatches = 0;
+    uint32_t colors[3] = {0};
+    for (unsigned k = 0; k < 32; k++) {
+      uint32_t p = gbFrame[k * 160 * 144 / 32];
+      p &= 0xffffff;
+      bool found = false;
+      for (unsigned j = 0; j < distinct; j++) found |= colors[j] == p;
+      if (!found && distinct < 3) colors[distinct++] = p;
+      firstMatches += p == colors[0];
+      unsigned light = (p & 255) + ((p >> 8) & 255) + ((p >> 16) & 255);
+      brightness += light;
+      visible += light > 96;
+    }
+    if (pk_wide_gb_scene() == PK_WIDE_SCENE_FIELD && distinct == 3 &&
+        firstMatches <= 24 && visible >= 16 && brightness > 32 * 3 * 16) {
+      memcpy(fadeWorld, widePixels, gw * gh * sizeof *fadeWorld);
+      fadeHaveWorld = true;
+    }
     if (SDL_UpdateTexture(wideTexture, &(SDL_Rect){0, 0, (int)gw, (int)gh},
                           widePixels, gw * 4) < 0) {
       notice(SDL_GetError());
@@ -500,11 +547,29 @@ static void render_game(unsigned gw, unsigned gh) {
   if (displayOptions.stretch)
     lastGameRect = (SDL_Rect){0, 0, ow, oh};
   SDL_Rect src = {0, 0, (int)gw, (int)gh};
+  if (fadeActive && !wideReady && !displayOptions.stretch && fadeW && fadeH) {
+    SDL_Rect fs = {0, 0, (int)fadeW, (int)fadeH};
+    int z = ow / (int)fadeW;
+    if (oh / (int)fadeH < z) z = oh / (int)fadeH;
+    if (z < 1) z = 1;
+    SDL_Rect fd = {(ow - (int)fadeW * z) / 2, (oh - (int)fadeH * z) / 2,
+                   (int)fadeW * z, (int)fadeH * z};
+    if (!SDL_UpdateTexture(wideTexture, &fs, fadeWorld, fadeW * 4)) {
+      SDL_RenderCopy(renderer, wideTexture, &fs, &fd);
+      SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+      SDL_SetRenderDrawColor(renderer, 0, 0, 0, (Uint8)(fadeStep * 255 / 10));
+      SDL_RenderFillRect(renderer, NULL);
+      SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    }
+  }
   if (SDL_RenderCopy(renderer, drawTexture, &src, &lastGameRect) < 0) {
     notice(SDL_GetError());
     return;
   }
-  effect_draw(gw, gh);
+  if ((background || fadeActive) && !displayOptions.stretch)
+    effect_cover(gw, gh, (SDL_Rect){0, 0, ow, oh}, lastGameRect);
+  else
+    effect_draw(gw, gh);
   /* The caller may draw a quick-menu overlay before presenting. */
 }
 static void present_game(unsigned gw, unsigned gh) {
@@ -567,6 +632,7 @@ static bool state(struct mCore *c, const char *path, bool save) {
     bool ok = save ? pocket_slot_save(c, path, displayKey)
                    : pocket_slot_load(c, path, displayKey);
     if (ok && !save) {
+      fade_reset();
       observationEpoch++;
       pk_wide_gb_reset();
       wideReady = false;
@@ -583,6 +649,7 @@ static bool state(struct mCore *c, const char *path, bool save) {
                  : mCoreLoadStateNamed(c, f, SAVESTATE_RTC);
   f->close(f);
   if (ok && !save) {
+    fade_reset();
     observationEpoch++;
     pk_wide_gb_reset();
     wideReady = false;
@@ -869,6 +936,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   pd_settings_load(&settings, config);
   settings.ffSpeed = displayOptions.ffSpeed;
   battleVisible = false;
+  fade_reset();
   struct pd_ui ui;
   pd_ui_init(&ui, &settings);
   struct pd_snapshot snap = {0};
