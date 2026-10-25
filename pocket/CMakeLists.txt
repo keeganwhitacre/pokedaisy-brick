@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 project(pokedaisy-pocket C)
 set(CMAKE_C_STANDARD 11)
+add_compile_definitions(_GNU_SOURCE)
 option(POCKET_BUNDLED_MGBA "Build pinned upstream mGBA" ON)
 if(POCKET_BUNDLED_MGBA)
   set(BUILD_QT OFF CACHE BOOL "" FORCE)

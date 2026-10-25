@@ -156,8 +156,8 @@ static void wide_tick(struct mCore *c, bool skip) {
   if (wideGba) {
     for (int y = 0; y < 160; y++)
       memcpy(gbFrame + y * 240, video + y * 256, 240 * sizeof *gbFrame);
-    wideW = wideMode == 2 ? 320 : 240;
-    wideH = wideMode == 2 ? 240 : 180;
+    wideW = wideMode == 2 ? 320 : 256;
+    wideH = wideMode == 2 ? 240 : 192;
     struct PkWideView v = {(240 - (int)wideW) / 2,
                           (160 - (int)wideH) / 2, (int)wideW, (int)wideH};
     if (skip || !wideMode) {

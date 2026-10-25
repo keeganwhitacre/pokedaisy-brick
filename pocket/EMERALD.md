@@ -6,8 +6,8 @@ ROM recognition uses upstream's generated pk_wide_games.h CRC table.
 Unknown ROMs retain the original viewport.
 
 The host packs mGBA's 256-stride frame into the renderer's expected 240x160
-input. EXPAND requests 240x180, keeping the original horizontal field and
-adding vertical world for the Brick's 4:3 shape. ZOOM requests 320x240.
+input. EXPAND requests 256x192, filling the Brick at integer 4x with 8 more
+world pixels on each side and 16 above/below. ZOOM requests 320x240.
 The original source pixels remain at their native aspect with integer scaling.
 Menus, battles, faults and unmatched scenes use the original image.
 AUTO ZOOM IN gates text scenes through the existing scene classifier.
