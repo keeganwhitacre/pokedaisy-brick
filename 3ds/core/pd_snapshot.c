@@ -147,6 +147,10 @@ bool pd_decode_party_mon(const uint8_t* raw, struct pd_mon* m) {
     }
     m->stats.nature = personality % 25;
     m->stats.valid = true;
+    m->stats.hasIvs = m->stats.hasEvs = m->stats.hasNature = true;
+    m->stats.hasHiddenPower = true;
+    m->stats.hiddenPowerType = pd_hidden_power_type(&m->stats);
+    m->stats.hiddenPowerPower = pd_hidden_power_power(&m->stats);
     for (int i = 0; i < PD_NUM_MOVES; i++) {
         m->moves[i] = u16(block + off[1] + i * 2);
         m->pp[i] = block[off[1] + 8 + i];
