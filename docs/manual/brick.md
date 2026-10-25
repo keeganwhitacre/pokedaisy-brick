@@ -36,6 +36,11 @@ state and quitting ask you to confirm. Save in the game before you quit.
 
 ## Game size
 
+The experimental GBA expansion build uses the shared renderer's recognized
+games. Expand adds surrounding world for a 4:3 view; Zoom shows a larger area.
+Unknown games and unsupported scenes keep the original viewport. These paths
+still need real-game verification before replacing a stable build.
+
 The companion keeps its crisp doubled UI. Gameplay uses the physical display
 independently: Game Boy and Color use a centered 800 by 720 image, and GBA uses
 960 by 640. Both use whole pixels without stretching or cropping.

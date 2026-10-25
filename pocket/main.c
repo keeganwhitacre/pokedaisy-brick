@@ -141,8 +141,9 @@ static void options_save(void) {
 }
 static int wideMode; /* 0 original, 1 expand, 2 zoom. */
 static unsigned wideW, wideH;
-static uint32_t wideFrame[256 * 192], widePixels[256 * 192], gbFrame[160 * 144];
-static uint32_t fadeWorld[256 * 192];
+static bool wideGba;
+static uint32_t wideFrame[320 * 240], widePixels[320 * 240], gbFrame[240 * 160];
+static uint32_t fadeWorld[320 * 240];
 static unsigned fadeW, fadeH, fadeStep;
 static bool fadeArmed, fadeActive, fadeHaveWorld;
 static void fade_reset(void) {
@@ -152,6 +153,33 @@ static void fade_reset(void) {
 static void wide_tick(struct mCore *c, bool skip) {
   if (!wideSupported)
     return;
+  if (wideGba) {
+    for (int y = 0; y < 160; y++)
+      memcpy(gbFrame + y * 240, video + y * 256, 240 * sizeof *gbFrame);
+    wideW = wideMode == 2 ? 320 : 240;
+    wideH = wideMode == 2 ? 240 : 180;
+    struct PkWideView v = {(240 - (int)wideW) / 2,
+                          (160 - (int)wideH) / 2, (int)wideW, (int)wideH};
+    if (skip || !wideMode) {
+      pk_wide_skip(c, gbFrame);
+      wideReady = false;
+      return;
+    }
+    int mix = pk_wide_view(c, gbFrame, wideFrame, v, NULL);
+    int scene = pk_wide_scene();
+    wideReady = mix == 256 && pk_wide_last_mode() == PK_WIDE_MODE_MAP &&
+                !pk_wide_fault() && (scene == PK_WIDE_SCENE_FIELD ||
+                (!displayOptions.autoZoom && scene == PK_WIDE_SCENE_TEXT));
+    fadeActive = fadeArmed = fadeHaveWorld = false;
+#ifdef POCKET_TEST
+    if (wideReady)
+      for (int y = 0; y < 160; y++)
+        for (int x = 0; x < 240; x++)
+          if (wideFrame[(y - v.y) * wideW + x - v.x] != gbFrame[y * 240 + x])
+            abort();
+#endif
+    return;
+  }
   for (int y = 0; y < 144; y++)
     for (int x = 0; x < 160; x++)
       gbFrame[y * 160 + x] = video[y * 256 + x];
@@ -516,7 +544,7 @@ static void render_game(unsigned gw, unsigned gh) {
       brightness += light;
       visible += light > 96;
     }
-    if (pk_wide_gb_scene() == PK_WIDE_SCENE_FIELD && distinct == 3 &&
+    if (!wideGba && pk_wide_gb_scene() == PK_WIDE_SCENE_FIELD && distinct == 3 &&
         firstMatches <= 24 && visible >= 16 && brightness > 32 * 3 * 16) {
       memcpy(fadeWorld, widePixels, gw * gh * sizeof *fadeWorld);
       fadeHaveWorld = true;
@@ -635,7 +663,7 @@ static bool state(struct mCore *c, const char *path, bool save) {
     if (ok && !save) {
       fade_reset();
       observationEpoch++;
-      pk_wide_gb_reset();
+      pk_wide_reset();
       wideReady = false;
     }
     return ok;
@@ -652,7 +680,7 @@ static bool state(struct mCore *c, const char *path, bool save) {
   if (ok && !save) {
     fade_reset();
     observationEpoch++;
-    pk_wide_gb_reset();
+    pk_wide_reset();
     wideReady = false;
   }
   if (save) {
@@ -697,7 +725,7 @@ static bool textures_reset(void) {
   gameTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888,
                                   SDL_TEXTUREACCESS_STREAMING, 256, 256);
   wideTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888,
-                                  SDL_TEXTUREACCESS_STREAMING, 256, 192);
+                                  SDL_TEXTUREACCESS_STREAMING, 320, 240);
   graphicsReset = false;
   return texture && gameTexture && wideTexture;
 }
@@ -902,9 +930,10 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     blip_set_rates(c->getAudioChannel(c, i), c->frequency(c), 32768);
   c->reset(c);
   uint32_t wideCrc = 0;
-  if (c->platform(c) == mPLATFORM_GB)
-    c->checksum(c, &wideCrc, mCHECKSUM_CRC32);
-  wideSupported = pocket_wide_configure(wideCrc);
+  wideGba = c->platform(c) == mPLATFORM_GBA;
+  c->checksum(c, &wideCrc, mCHECKSUM_CRC32);
+  wideSupported = wideGba ? pk_wide_configure(wideCrc)
+                          : pocket_wide_configure(wideCrc);
   wideReady = false;
   pocket_rom_sha1(romdata, (size_t)len, displayKey);
   wideMode = wideSupported ? pocket_display_load(root, displayKey) : 0;
@@ -1712,7 +1741,7 @@ int main(int argc, char **argv) {
   gameTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888,
                                   SDL_TEXTUREACCESS_STREAMING, 256, 256);
   wideTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888,
-                                  SDL_TEXTUREACCESS_STREAMING, 256, 192);
+                                  SDL_TEXTUREACCESS_STREAMING, 320, 240);
   if (!texture || !gameTexture || !wideTexture) {
     fprintf(stderr, "Texture: %s\n", SDL_GetError());
     return 1;
