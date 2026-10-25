@@ -11,6 +11,9 @@ world pixels on each side and 16 above/below. ZOOM requests 320x240.
 The original source pixels remain at their native aspect with integer scaling.
 Menus, battles, faults and unmatched scenes use the original image.
 AUTO ZOOM IN gates text scenes through the existing scene classifier.
+New GBA preferences default AUTO ZOOM IN to ON, matching Android. Existing
+saved preferences and GB defaults are retained. Upstream classifies the START
+overlay as TEXT, so disabling auto zoom intentionally keeps that overlay wide.
 Original viewport equality is asserted by POCKET_TEST builds.
 
 The prior battle-surroundings fade remains GB-only. GBA camera tweening,
@@ -26,4 +29,16 @@ Emerald terrain. The inspected companion capture is explicitly a fixture.
 Before a release, a matching retail Emerald ROM must verify outdoors, connected
 maps, dialogue, menus, battle transitions, state loads and original-pixel
 equality. No actual Emerald ROM or matching runtime state was supplied for
-this implementation run. Device performance and appearance require testing.
+the initial implementation run. Device performance and appearance require testing.
+
+## Private-ROM verification
+
+The subsequently supplied retail English ROM matches SHA1
+f3ae088181bf583e55daf962a92bb46f4f1d07b7. An isolated copy of the supplied
+128 KiB save boots on Route 117 with a three-member party. The runtime harness
+uses ordinary inputs, checks every original viewport pixel on matched frames,
+captures original/expanded/zoom views and walking, and checks a state roundtrip.
+It tests START fallback with AUTO ZOOM IN ON and captures real Party, Summary,
+Bag descriptions, Map, Dex and Settings. Uploaded ROM/save files are unchanged;
+they and the captures are never committed. The downloaded save's filename is
+not evidence that its contents were earned through ordinary gameplay.

@@ -40,6 +40,8 @@ The experimental GBA expansion build uses the shared renderer's recognized
 games. Expand adds surrounding world for a 4:3 view; Zoom shows a larger area.
 Unknown games and unsupported scenes keep the original viewport. These paths
 still need real-game verification before replacing a stable build.
+For a newly configured GBA game, `AUTO ZOOM IN` starts on. Text overlays return
+to the original view while it is on. Your previously saved choices are kept.
 
 The companion keeps its crisp doubled UI. Gameplay uses the physical display
 independently: Game Boy and Color use a centered 800 by 720 image, and GBA uses

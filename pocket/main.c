@@ -949,7 +949,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     pd_romart_scan(&game);
   char config[1024];
   snprintf(config, sizeof config, "%s/settings.ini", root);
-  pocket_options_load(root, displayKey, &displayOptions);
+  if (!pocket_options_load(root, displayKey, &displayOptions) && wideGba)
+    displayOptions.autoZoom = true; // Android default; preserve existing ROM prefs.
   if (displayOptions.autoResume && !forceFresh) {
     enum pocket_recovery_result result =
         pocket_recovery_load(c, root, displayKey, sav);
