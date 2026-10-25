@@ -19,6 +19,14 @@ static void shot(const char *name) {
   char path[1200]; snprintf(path,sizeof path,"%s/%s.png",outDir,name);
   assert(capture_frame(path,NULL));
 }
+static void activate(struct pd_ui* ui, int id) {
+  for(int i=0;i<ui->hitCount;i++)if(ui->hits[i].id==id) {
+    struct pd_hit h=ui->hits[i];
+    pd_ui_touch(ui,h.x+h.w/2,h.y+h.h/2,true);
+    pd_ui_touch(ui,h.x+h.w/2,h.y+h.h/2,false);return;
+  }
+  assert(!"Missing real Summary hit target");
+}
 static void test_frame(struct mCore *c,int *pc,bool companion,int frame,
                        struct pd_ui *ui,struct pd_snapshot *s,const struct pc_ui *p) {
   (void)pc;(void)companion;(void)p; assert(frame==0 && wideGba && wideSupported);
@@ -67,6 +75,37 @@ static void test_frame(struct mCore *c,int *pc,bool companion,int frame,
   assert(statsHit && ui->summaryStats);
   pd_ui_draw(ui,&canvas,&game,s,&host);present_ui(true);shot("emerald-stats");
   ui->summaryStats=false;
+  // Only actual party data. No memory injection or substitute display values.
+  for(int i=0;i<s->partyCount;i++) {
+    const struct pd_mon* mon=&s->party[i];
+    assert(mon->hasExperience && mon->hasHeldItem);
+    fprintf(stderr,"LIVE party %d species=%d Lv%d EXP=%lu held=%d\n",i,mon->species,mon->level,(unsigned long)mon->experience,mon->heldItem);
+    ui->summarySlot=i;ui->summaryTypes=ui->summaryItem=false;
+    pd_ui_draw(ui,&canvas,&game,s,&host);
+    if(mon->level==100) { present_ui(true);shot("emerald-summary-max"); }
+    activate(ui,HIT_SUMMARY_TYPES);assert(ui->summaryTypes);
+    pd_ui_draw(ui,&canvas,&game,s,&host);present_ui(true);
+    if(i==0)shot("emerald-summary-types");
+    activate(ui,HIT_SUMMARY_TYPES);assert(!ui->summaryTypes);
+    pd_ui_draw(ui,&canvas,&game,s,&host);
+    if(mon->heldItem) {
+      activate(ui,HIT_SUMMARY_ITEM);assert(ui->summaryItem);
+      pd_ui_draw(ui,&canvas,&game,s,&host);present_ui(true);shot("emerald-held-item");
+      activate(ui,HIT_SUMMARY_STATS);assert(ui->summaryStats && !ui->summaryItem);
+      pd_ui_draw(ui,&canvas,&game,s,&host);
+      activate(ui,HIT_SUMMARY_ITEM);assert(ui->summaryItem);
+      assert(pd_ui_back(ui) && !ui->summaryItem && ui->summarySlot==i);
+      ui->summaryStats=false;
+    }
+    if(s->partyCount>1) {
+      pd_ui_draw(ui,&canvas,&game,s,&host);
+      activate(ui,HIT_SLOT+(i+1)%s->partyCount);
+      assert(ui->summarySlot==(i+1)%s->partyCount && !ui->summaryStats && !ui->summaryTypes && !ui->summaryItem);
+    }
+  }
+  ui->summarySlot=0;
+  pd_ui_draw(ui,&canvas,&game,s,&host);present_ui(true);shot("emerald-summary-exp");
+  assert(pd_ui_back(ui) && ui->summarySlot==-1);
   ui->summarySlot=-1;ui->tab=PD_TAB_BAG;ui->bagSelected=0;
   pd_ui_draw(ui,&canvas,&game,s,&host);present_ui(true);shot("emerald-item-description");
   free(rom);running=0;

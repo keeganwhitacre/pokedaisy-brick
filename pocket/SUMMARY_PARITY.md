@@ -12,7 +12,7 @@ egg summary layouts retain their previous path. The Linux menu composition is
 not changed. The actual supplied Emerald save is used for runtime captures.
 
 Remaining Android fidelity: colored type chips/stripes, multiplier labels,
-EXP/NEXT, held-item details, Learn pages, party-strip controls, detail
+Learn pages, party-strip styling, move-detail
 interactions and exact frame/typography metrics. Matchup groups are bounded by
 the available height; this initial layout is not a scrolling implementation.
 Do not describe this as full Summary parity. No original Android screen is
@@ -26,8 +26,8 @@ HP/Attack/Defense/Sp.Atk/Sp.Def/Speed, IVs and EVs with totals, nature effects,
 and retail Gen 3 Hidden Power type/power. Values are decoded from the original
 100-byte encrypted Pokemon struct using Gen3Mon.kt's verified retail offsets.
 The game owns the computed stats: this does not recompute them from newer EVs.
-It also fills the existing experience and heldItem fields, but does not yet
-claim an EXP progress bar or held-item actions. No writes to game memory occur.
+It also fills the existing experience and heldItem fields, and now supplies EXP progress and held-item presentation as described below.
+Held-item actions remain unsupported. No writes to game memory occur.
 
 Nature names and Hidden Power's type order are generated from Android's own
 MonStats.kt / TypeChartUtil.kt by `python3 3ds/tools/gen_stats.py`; `--check`
@@ -80,3 +80,26 @@ Future DS work can populate the same optional presentation data, but needs
 its own verified decoder, type-table mapping and emulator/platform backend.
 This is an extensibility boundary, not implemented DS emulation or a guarantee
 of DS performance on the Brick. No DS addresses or hypothetical APIs are added.
+
+
+## EXP and held-item information increment
+
+See ../3ds/SUMMARY_INFO.md for the shared feature and controls. Linux retains
+its existing D-pad/A focus navigation and B back handling. Previous/next party
+buttons avoid returning to the grid for each Pokemon. No Linux policy was
+added to 3ds/core or pk_wide. No changes to emulation, game memory, saves,
+filters, power handling or the Polished presentation are part of this feature.
+
+The Polished EXP wrapper now delegates to the same shared calculator, retaining
+its existing game-specific growth mapping. The former pocket-only copy of the
+six curves is removed; the compatibility generator calls the shared generator.
+The existing Polished curve/decoder regression tests pass on native and ARM.
+
+Actual supplied Emerald ROM/save runtime tests pass natively and under NextUI
+AArch64/QEMU, including EXP values, INFO/TYPES, party wraparound, MAX at level
+100, state reload, expansion/zoom and original PPU equality on 470 matched
+frames. The party contains Lv50, Lv38 and Lv100 Pokemon, all holding no item.
+Therefore held-item descriptions are tested on captured Emerald/FireRed RAM,
+not claimed as exercised by that live save. Private ROM/save data is unchanged
+and excluded from git and install packages. New controls and performance await
+physical Brick testing; Smart Pro firmware compatibility remains unverified.
