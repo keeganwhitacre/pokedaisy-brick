@@ -17,8 +17,13 @@ The prior battle-surroundings fade remains GB-only. GBA camera tweening,
 HUD/minimap, item actions, other missing Android features and menu artwork
 are separate follow-up work. This is not a completed Android parity claim.
 
-Before a release: native/NextUI ARM builds and diagnostic regressions must
-pass, then a matching retail Emerald ROM must verify outdoors, connected
+Native Linux and actual NextUI ARM Release builds pass. The host functional
+checks, shared profile checks and diagnostic GB/GBA runtimes pass natively and
+under ARM/QEMU. The diagnostic runtime covers gameplay, save/state round trips,
+companion navigation and original GBA scaling; it does not validate expanded
+Emerald terrain. The inspected companion capture is explicitly a fixture.
+
+Before a release, a matching retail Emerald ROM must verify outdoors, connected
 maps, dialogue, menus, battle transitions, state loads and original-pixel
 equality. No actual Emerald ROM or matching runtime state was supplied for
 this implementation run. Device performance and appearance require testing.
