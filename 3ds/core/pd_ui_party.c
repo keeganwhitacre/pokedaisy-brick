@@ -83,9 +83,10 @@ static void summary_stats(struct pd_canvas* c, const struct pd_mon_stats* s,
     int statX = x + w * 46 / 100, ivX = x + w * 83 / 100;
     char buf[48];
     pd_text_right(c,statX,y,"STAT",PD_MUTED,PD_MUTED_SHADOW);
-    pd_text_right(c,ivX,y,"IV",PD_MUTED,PD_MUTED_SHADOW);
-    pd_text_right(c,x+w,y,"EV",PD_MUTED,PD_MUTED_SHADOW);
-    int up=pd_nature_raises(s->nature), down=pd_nature_lowers(s->nature);
+    if(s->hasIvs)pd_text_right(c,ivX,y,"IV",PD_MUTED,PD_MUTED_SHADOW);
+    if(s->hasEvs)pd_text_right(c,x+w,y,"EV",PD_MUTED,PD_MUTED_SHADOW);
+    int up=s->hasNature?pd_nature_raises(s->nature):-1;
+    int down=s->hasNature?pd_nature_lowers(s->nature):-1;
     int ivTotal=0,evTotal=0;
     for(int r=0;r<6;r++) {
         int i=order[r], ry=y+(r+1)*row;
@@ -94,31 +95,35 @@ static void summary_stats(struct pd_canvas* c, const struct pd_mon_stats* s,
         pd_text_fit(c,x,ry,w*32/100,buf,color,PD_LABEL_SHADOW);
         snprintf(buf,sizeof buf,"%d",s->values[i]);
         pd_text_right(c,statX,ry,buf,PD_LABEL,PD_LABEL_SHADOW);
-        if(w>=220) {
+        if(s->hasIvs && w>=220) {
             int bx=statX+8,bw=ivX-bx-23;
             pd_fill(c,bx,ry+4,bw,6,0x506858);
             uint32_t fill=s->ivs[i]==31?0xE8B830:s->ivs[i]*2>31?0x60D048:s->ivs[i]*5>31?0xF8C838:0xF04838;
             pd_fill(c,bx+1,ry+5,(bw-2)*s->ivs[i]/31,4,fill);
         }
         snprintf(buf,sizeof buf,"%d",s->ivs[i]);
-        pd_text_right(c,ivX,ry,buf,PD_VALUE,PD_VALUE_SHADOW);
+        if(s->hasIvs)pd_text_right(c,ivX,ry,buf,PD_VALUE,PD_VALUE_SHADOW);
         snprintf(buf,sizeof buf,"%d",s->evs[i]);
-        pd_text_right(c,x+w,ry,buf,PD_VALUE,PD_VALUE_SHADOW);
+        if(s->hasEvs)pd_text_right(c,x+w,ry,buf,PD_VALUE,PD_VALUE_SHADOW);
         ivTotal+=s->ivs[i];evTotal+=s->evs[i];
     }
     int ry=y+7*row;
     pd_text(c,x,ry,"TOTAL",PD_LABEL,PD_LABEL_SHADOW);
     snprintf(buf,sizeof buf,"%d",ivTotal);
-    pd_text_right(c,ivX,ry,buf,PD_VALUE,PD_VALUE_SHADOW);
+    if(s->hasIvs)pd_text_right(c,ivX,ry,buf,PD_VALUE,PD_VALUE_SHADOW);
     snprintf(buf,sizeof buf,"%d",evTotal);
-    pd_text_right(c,x+w,ry,buf,PD_VALUE,PD_VALUE_SHADOW);
+    if(s->hasEvs)pd_text_right(c,x+w,ry,buf,PD_VALUE,PD_VALUE_SHADOW);
     pd_fill(c,x,ry+row-3,w,1,PD_DIVIDER);
-    pd_text(c,x,ry+row,"NATURE",PD_MUTED,PD_MUTED_SHADOW);
+    if(s->hasNature)pd_text(c,x,ry+row,"NATURE",PD_MUTED,PD_MUTED_SHADOW);
     const char* nature=s->nature>=0&&s->nature<pd_nature_names_count?pd_nature_names[s->nature]:"?";
-    pd_text_right(c,x+w,ry+row,nature,PD_VALUE,PD_VALUE_SHADOW);
-    pd_text(c,x,ry+2*row,"HIDDEN POWER",PD_MUTED,PD_MUTED_SHADOW);
-    snprintf(buf,sizeof buf,"%s  PWR %d",pd_type_name(pd_hidden_power_type(s)),pd_hidden_power_power(s));
-    pd_text_fit(c,x,ry+3*row,w,buf,PD_LABEL,PD_LABEL_SHADOW);
+    if(s->hasNature)pd_text_right(c,x+w,ry+row,nature,PD_VALUE,PD_VALUE_SHADOW);
+    if(s->hasHiddenPower) {
+        pd_text(c,x,ry+2*row,"HIDDEN POWER",PD_MUTED,PD_MUTED_SHADOW);
+        if(s->hiddenPowerPower>0)
+            snprintf(buf,sizeof buf,"%s  PWR %d",pd_type_name(s->hiddenPowerType),s->hiddenPowerPower);
+        else snprintf(buf,sizeof buf,"%s",pd_type_name(s->hiddenPowerType));
+        pd_text_fit(c,x,ry+3*row,w,buf,PD_LABEL,PD_LABEL_SHADOW);
+    }
 }
 
 // MonDetailScreen: equal information/move columns and four equal move rows.

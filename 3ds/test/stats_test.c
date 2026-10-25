@@ -37,6 +37,9 @@ static void check_mon(const int* order, int permutation) {
     assert(mon.species==25 && mon.moves[0]==33 && mon.pp[0]==35);
     assert(mon.experience==123456 && mon.heldItem==13 && mon.hp==77);
     assert(mon.stats.valid && mon.stats.nature==(int)(pid%25));
+    assert(mon.stats.hasIvs && mon.stats.hasEvs && mon.stats.hasNature && mon.stats.hasHiddenPower);
+    assert(mon.stats.hiddenPowerType==pd_hidden_power_type(&mon.stats));
+    assert(mon.stats.hiddenPowerPower==pd_hidden_power_power(&mon.stats));
     for(int i=0;i<6;i++) {
         assert(mon.stats.ivs[i]==31-i && mon.stats.evs[i]==i*17);
         assert(mon.stats.values[i]==100+i*11);
@@ -109,6 +112,20 @@ int main(int argc,char** argv) {
             assert(ui.summaryStats);pd_ui_draw(&ui,&canvas,&game,&snap,&host);
             char path[1024];snprintf(path,sizeof path,"%s/%s-stats-%dx%d.png",argv[3],argv[2],w,h);
             assert(pd_png_write(path,w,h,pixels));
+            // A computed-stats-only adapter must never leak unsupported mechanics,
+            // even when those unused fields contain old/nonzero values.
+            struct pd_mon_stats saved=snap.party[0].stats;
+            struct pd_mon_stats* optional=&snap.party[0].stats;
+            optional->hasIvs=optional->hasEvs=optional->hasNature=optional->hasHiddenPower=false;
+            pd_ui_draw(&ui,&canvas,&game,&snap,&host);
+            uint32_t* expected=malloc((size_t)w*h*sizeof *expected);assert(expected);
+            memcpy(expected,pixels,(size_t)w*h*sizeof *expected);
+            memset(optional->ivs,31,sizeof optional->ivs);
+            memset(optional->evs,255,sizeof optional->evs);
+            optional->nature=3;optional->hiddenPowerType=10;optional->hiddenPowerPower=60;
+            pd_ui_draw(&ui,&canvas,&game,&snap,&host);
+            assert(!memcmp(expected,pixels,(size_t)w*h*sizeof *expected));free(expected);
+            snap.party[0].stats=saved;
             tap(&ui,HIT_SUMMARY_STATS);assert(!ui.summaryStats);
             snap.party[0].stats.valid=false;
             pd_ui_draw(&ui,&canvas,&game,&snap,&host);assert(!has(&ui,HIT_SUMMARY_STATS));

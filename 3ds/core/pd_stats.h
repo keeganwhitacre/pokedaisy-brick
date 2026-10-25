@@ -1,4 +1,4 @@
-// Read-only Gen 3 summary data; order matches Android MonStats.kt.
+// Read-only summary data; game adapters declare optional mechanics explicitly.
 #ifndef PD_STATS_H
 #define PD_STATS_H
 
@@ -7,6 +7,9 @@
 
 struct pd_mon_stats {
     bool valid;
+    bool hasIvs, hasEvs, hasNature, hasHiddenPower;
+    // Resolved by the game adapter: later generations need not use Gen 3 power.
+    int hiddenPowerType, hiddenPowerPower; // power 0 = unknown/not applicable
     uint8_t ivs[6], evs[6]; // HP, Attack, Defense, Speed, Sp.Atk, Sp.Def
     int values[6], nature;
 };

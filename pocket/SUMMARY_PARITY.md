@@ -59,3 +59,24 @@ supplied Emerald ROM/save runtime test opens STATS through the real hit target
 and captures the result alongside its expansion/zoom/menu/state checks. This
 is Linux/QEMU verification; the new STATS interaction awaits physical Brick
 testing. The user's ROM and save remain private and are never committed.
+
+## Cross-generation boundary
+
+The stats snapshot now declares IV, EV, nature and Hidden Power availability
+individually. The renderer consumes the adapter's resolved Hidden Power type
+and optional power instead of applying Gen 3 formulas to every game. Only the
+verified retail decoder enables those fields and computes its Gen 3 result.
+Computed-stat-only snapshots suppress unsupported columns and mechanics even
+if their unused fields contain nonzero data (covered by captured-RAM tests).
+
+Polished Crystal already has held-item and EXP/NEXT presentation in its
+existing Summary. Its Android Gen2Reader.decodePolishedPartyMon currently
+does not expose MonStats. This change does not infer party IVs/EVs/natures
+from battle offsets or silently enable Gen 3 rules for GBC. Translating common
+UI should converge incrementally; game-specific palettes, data tables and
+mechanics remain adapters. GBC is still a first-class regression target.
+
+Future DS work can populate the same optional presentation data, but needs
+its own verified decoder, type-table mapping and emulator/platform backend.
+This is an extensibility boundary, not implemented DS emulation or a guarantee
+of DS performance on the Brick. No DS addresses or hypothetical APIs are added.
