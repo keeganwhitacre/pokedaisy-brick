@@ -104,3 +104,13 @@ A opens the entry. The native entry pages still have their earlier layout.
 
 The shoulder tabs use the Game Boy window style and stay at the top on Brick.
 The complete Android settings and state-browser layouts are not available yet.
+
+## Emerald and FireRed Summary stats
+
+Open a party member's Summary, use the D-pad to focus STATS and press A.
+The right column shows the game's computed stats, IVs, EVs, nature effects
+and Hidden Power. Select MOVES to return; B closes Summary. Red + and blue -
+mark the nature's raised and lowered stats. Stats remain the game's values,
+which may not reflect newly gained EVs until the game recalculates them.
+This page is read-only and is available for verified retail Gen 3 party data.
+Crystal keeps its existing Summary and controls.

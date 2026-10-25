@@ -4,6 +4,7 @@
 #include "main.c"
 #undef main
 #include <assert.h>
+#include "../3ds/core/pd_ui_internal.h"
 static unsigned framesMatched;
 static const char *outDir;
 static void drive(struct mCore *c, unsigned keys, unsigned n) {
@@ -56,6 +57,16 @@ static void test_frame(struct mCore *c,int *pc,bool companion,int frame,
   for(unsigned i=0;i<5;i++){ui->tab=tabs[i];pd_ui_update(ui,s);pd_ui_draw(ui,&canvas,&game,s,&host);present_ui(true);shot(names[i]);}
   ui->tab=PD_TAB_PARTY;ui->summarySlot=0;
   pd_ui_draw(ui,&canvas,&game,s,&host);present_ui(true);shot("emerald-summary");
+  assert(s->party[0].stats.valid);
+  bool statsHit=false;
+  for(int i=0;i<ui->hitCount;i++)if(ui->hits[i].id==HIT_SUMMARY_STATS) {
+    struct pd_hit h=ui->hits[i];
+    pd_ui_touch(ui,h.x+h.w/2,h.y+h.h/2,true);
+    pd_ui_touch(ui,h.x+h.w/2,h.y+h.h/2,false);statsHit=true;break;
+  }
+  assert(statsHit && ui->summaryStats);
+  pd_ui_draw(ui,&canvas,&game,s,&host);present_ui(true);shot("emerald-stats");
+  ui->summaryStats=false;
   ui->summarySlot=-1;ui->tab=PD_TAB_BAG;ui->bagSelected=0;
   pd_ui_draw(ui,&canvas,&game,s,&host);present_ui(true);shot("emerald-item-description");
   free(rom);running=0;

@@ -1,5 +1,10 @@
 # Polished Crystal Android parity boundary — Phase 22
 
+Retail Emerald/FireRed work is tracked separately in SUMMARY_PARITY.md:
+large-canvas Summary now includes the Android-derived read-only STATS/MOVES
+toggle, computed stats, IVs/EVs, nature effects and Hidden Power. This does not
+add Gen 3 features to the Polished Crystal companion or imply full UI parity.
+
 Integration candidate: see INTEGRATION.md for the 1.3.2 base, shared-code
 extraction and current verification. This is not complete visual/functional
 parity. The older phase todo lists below are historical: favorites and ten
