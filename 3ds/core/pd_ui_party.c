@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "pd_icon.h"
+#include "pd_experience.h"
 #include "pd_tables.h"
 #include "pd_ui_internal.h"
 
@@ -129,7 +130,7 @@ static void summary_stats(struct pd_canvas* c, const struct pd_mon_stats* s,
 // MonDetailScreen: equal information/move columns and four equal move rows.
 // Large canvases can retain this hierarchy without changing the 3DS layout.
 static void wide_summary(struct pd_ui* ui, struct pd_canvas* c,
-                         const struct pd_game* g, const struct pd_mon* m) {
+                         const struct pd_game* g, const struct pd_mon* m, int partyCount) {
     int x=MARGIN+12, y=CONTENT_Y+12, left=(c->w-40)/2;
     int split=c->w/2, right=split+12, rw=c->w-right-16;
     int bottom=c->h-46;
@@ -141,6 +142,9 @@ static void wide_summary(struct pd_ui* ui, struct pd_canvas* c,
     pd_draw_mon_icon(c,g,m->species,x,y+22,false);
     snprintf(buf,sizeof buf,"Lv%d",m->level);
     pd_text(c,x+42,y+30,buf,PD_LABEL,PD_LABEL_SHADOW);
+    const char* species=pd_species_name(m->species,buf,sizeof buf);
+    if(m->nickname[0] && strcmp(m->nickname,species))
+        pd_text_fit(c,x+42,y+46,left-42,species,PD_MUTED,PD_MUTED_SHADOW);
     ui_status_badge(c,x+90,y+31,m->status);
     int t1,t2;pd_species_type_pair(m->species,&t1,&t2);
     snprintf(buf,sizeof buf,"%s%s%s",pd_type_name(t1),t1!=t2?" / ":"",t1!=t2?pd_type_name(t2):"");
@@ -148,23 +152,54 @@ static void wide_summary(struct pd_ui* ui, struct pd_canvas* c,
     ui_hp_bar(c,x,y+90,left-75,m->hp,m->maxHp);
     snprintf(buf,sizeof buf,"%d/%d",m->hp,m->maxHp);
     pd_text_right(c,x+left,y+84,buf,PD_LABEL,PD_LABEL_SHADOW);
-    int rowY=y+118;
-    const char* headings[]={"WEAK TO","RESISTS","IMMUNE TO"};
-    for(int group=0;group<3;group++) {
-        buf[0]=0;
-        for(int t=0;t<pd_type_names_count;t++) {
-            int pct=pd_type_multiplier_pct(t,t1,t2);
-            if(!((group==0&&pct>100)||(group==1&&pct>0&&pct<100)||(group==2&&pct==0)))continue;
-            size_t n=strlen(buf);
-            snprintf(buf+n,sizeof buf-n,"%s%s",n?", ":"",pd_type_name(t));
+    if (!ui->summaryTypes) {
+        struct pd_exp xp;
+        if (m->hasExperience && (g->kind==PD_GAME_EMERALD || g->kind==PD_GAME_FIRERED) &&
+            pd_retail_exp_progress(m->species,m->level,m->experience,left-2,&xp)) {
+            pd_text(c,x,y+108,"EXP",PD_MUTED,PD_MUTED_SHADOW);
+            snprintf(buf,sizeof buf,"%lu",(unsigned long)m->experience);
+            pd_text_right(c,x+left,y+126,buf,PD_VALUE,PD_VALUE_SHADOW);
+            pd_fill(c,x,y+148,left,9,PD_DIVIDER);
+            pd_fill(c,x+1,y+149,left-2,7,0x506858);
+            pd_fill(c,x+1,y+149,xp.filled,7,0x40B8F8);
+            if(m->level==100)snprintf(buf,sizeof buf,"MAX");
+            else snprintf(buf,sizeof buf,"NEXT %lu",(unsigned long)xp.toNext);
+            pd_text_right(c,x+left,y+164,buf,PD_VALUE,PD_VALUE_SHADOW);
         }
-        if(!buf[0]||rowY+38>bottom)continue;
-        pd_text(c,x,rowY,headings[group],PD_MUTED,PD_MUTED_SHADOW);
-        int lines=pd_text_wrap(c,x,rowY+16,left,16,2,buf,PD_LABEL,PD_LABEL_SHADOW);
-        rowY+=20+lines*16;
+        if(m->hasHeldItem) {
+            pd_text(c,x,y+188,"HELD ITEM",PD_MUTED,PD_MUTED_SHADOW);
+            const char* item=m->heldItem?pd_item_name(g,m->heldItem):"NONE";
+            if(!item[0])item="UNKNOWN ITEM";
+            pd_text_wrap(c,x,y+206,left,16,2,item,PD_LABEL,PD_LABEL_SHADOW);
+        }
+    } else {
+        int rowY=y+118;
+        const char* headings[]={"WEAK TO","RESISTS","IMMUNE TO"};
+        for(int group=0;group<3;group++) {
+            buf[0]=0;
+            for(int t=0;t<pd_type_names_count;t++) {
+                int pct=pd_type_multiplier_pct(t,t1,t2);
+                if(!((group==0&&pct>100)||(group==1&&pct>0&&pct<100)||(group==2&&pct==0)))continue;
+                size_t n=strlen(buf);
+                snprintf(buf+n,sizeof buf-n,"%s%s",n?", ":"",pd_type_name(t));
+            }
+            if(!buf[0]||rowY+38>bottom)continue;
+            pd_text(c,x,rowY,headings[group],PD_MUTED,PD_MUTED_SHADOW);
+            int lines=pd_text_wrap(c,x,rowY+16,left,16,2,buf,PD_LABEL,PD_LABEL_SHADOW);
+            rowY+=20+lines*16;
+        }
     }
     int rh=(bottom-y)/4;
-    if(ui->summaryStats && m->stats.valid) {
+    if(ui->summaryItem && m->hasHeldItem && m->heldItem) {
+        pd_text(c,right,y,"HELD ITEM",PD_MUTED,PD_MUTED_SHADOW);
+        const char* item=pd_item_name(g,m->heldItem);
+        int lines=pd_text_wrap(c,right,y+26,rw,18,3,item[0]?item:"UNKNOWN ITEM",PD_LABEL,PD_LABEL_SHADOW);
+        int descY=y+32+lines*18;
+        pd_fill(c,right,descY-4,rw,1,PD_DIVIDER);
+        const char* desc=pd_item_description(g,m->heldItem);
+        pd_text_wrap(c,right,descY+8,rw,18,(bottom-descY-8)/18,
+                     desc[0]?desc:"No description available.",PD_VALUE,PD_VALUE_SHADOW);
+    } else if(ui->summaryStats && m->stats.valid) {
         summary_stats(c,&m->stats,right,y,rw,bottom-y);
     } else for(int i=0;i<4;i++) {
         int my=y+i*rh,move=m->moves[i];
@@ -178,14 +213,26 @@ static void wide_summary(struct pd_ui* ui, struct pd_canvas* c,
             snprintf(buf,sizeof buf,"PWR - PP %d",m->pp[i]);
         pd_text_fit(c,right,my+45,rw,buf,PD_VALUE,PD_VALUE_SHADOW);
     }
+    // Reuse party hit targets: each selection starts with MOVES and INFO.
+    int bx=16, by=c->h-34;
+    if(partyCount>1) {
+        ui_button(ui,c,bx,by,26,22,"<",HIT_SLOT+(ui->summarySlot+partyCount-1)%partyCount);
+        ui_button(ui,c,bx+30,by,26,22,">",HIT_SLOT+(ui->summarySlot+1)%partyCount);
+        bx+=60;
+    }
+    ui_button(ui,c,bx,by,62,22,ui->summaryTypes?"INFO":"TYPES",HIT_SUMMARY_TYPES);
+    if(m->hasHeldItem && m->heldItem)
+        ui_button(ui,c,bx+66,by,58,22,ui->summaryItem?"CLOSE":"ITEM",HIT_SUMMARY_ITEM);
+    snprintf(buf,sizeof buf,"%d/%d",ui->summarySlot+1,partyCount);
+    pd_text(c,bx+132,by+4,buf,PD_MUTED,PD_MUTED_SHADOW);
     if(m->stats.valid)
-        ui_button(ui,c,c->w-166,c->h-34,74,22,ui->summaryStats?"MOVES":"STATS",HIT_SUMMARY_STATS);
+        ui_button(ui,c,c->w-166,c->h-34,74,22,ui->summaryStats && !ui->summaryItem?"MOVES":"STATS",HIT_SUMMARY_STATS);
     ui_button(ui,c,c->w-86,c->h-34,70,22,"BACK",HIT_BACK);
 }
 
-static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_mon* m) {
+static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_mon* m, int partyCount) {
     if(c->w>=480 && c->h>=320 && m->species!=PD_SPECIES_EGG) {
-        wide_summary(ui,c,g,m);return;
+        wide_summary(ui,c,g,m,partyCount);return;
     }
     char buf[40], buf2[40];
     int x = MARGIN, y = CONTENT_Y, w = c->w - 2 * MARGIN, h = c->h - CONTENT_Y - MARGIN;
@@ -239,7 +286,7 @@ static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game*
 
 void ui_party_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s) {
     if (ui->summarySlot >= 0) {
-        summary(ui, c, g, &s->party[ui->summarySlot]);
+        summary(ui, c, g, &s->party[ui->summarySlot], s->partyCount);
         return;
     }
     int gap = 4;

@@ -1,6 +1,7 @@
 // Decoder permutations, Android MonStats rules, and real captured-RAM UI.
 #include "../core/pd_ui_internal.h"
 #include "../core/pd_tables.h"
+#include "../core/pd_experience.h"
 #include "../desktop/pd_png.h"
 #include <assert.h>
 #include <stdio.h>
@@ -36,6 +37,7 @@ static void check_mon(const int* order, int permutation) {
     assert(pd_decode_party_mon(raw,&mon));
     assert(mon.species==25 && mon.moves[0]==33 && mon.pp[0]==35);
     assert(mon.experience==123456 && mon.heldItem==13 && mon.hp==77);
+    assert(mon.hasExperience && mon.hasHeldItem);
     assert(mon.stats.valid && mon.stats.nature==(int)(pid%25));
     assert(mon.stats.hasIvs && mon.stats.hasEvs && mon.stats.hasNature && mon.stats.hasHiddenPower);
     assert(mon.stats.hiddenPowerType==pd_hidden_power_type(&mon.stats));
@@ -75,7 +77,32 @@ static void tap(struct pd_ui* ui,int id) {
     }
     assert(!"Missing control");
 }
+static void check_experience(void) {
+    struct pd_exp xp;
+    for(int rate=0;rate<6;rate++) {
+        for(int lv=1;lv<100;lv++) {
+            uint32_t start=pd_experience_tables[rate][lv], next=pd_experience_tables[rate][lv+1];
+            assert(next>start);
+            assert(pd_exp_progress(rate,lv,start,214,&xp) && xp.filled==0 && xp.toNext==next-start);
+            assert(pd_exp_progress(rate,lv,start+(next-start)/2,214,&xp));
+            assert(xp.filled==(int)((uint64_t)((next-start)/2)*214/(next-start)));
+            assert(pd_exp_progress(rate,lv,next,214,&xp) && xp.filled==214 && xp.toNext==0);
+            assert(pd_exp_progress(rate,lv,UINT32_MAX,214,&xp) && xp.filled==214 && xp.toNext==0);
+        }
+        assert(pd_exp_progress(rate,100,pd_experience_tables[rate][100],214,&xp));
+        assert(xp.filled==214 && xp.toNext==0 && xp.next==xp.start);
+    }
+    assert(pd_retail_exp_progress(1,5,135,214,&xp) && xp.start==135 && xp.next==179); // Bulbasaur, medium slow
+    assert(pd_retail_exp_progress(25,5,125,214,&xp) && xp.start==125 && xp.next==216); // Pikachu, medium fast
+    assert(!pd_retail_exp_progress(0,5,0,214,&xp));
+    assert(!pd_retail_exp_progress(PD_SPECIES_EGG,5,0,214,&xp));
+    assert(!pd_exp_progress(-1,1,0,20,&xp) && !pd_exp_progress(6,1,0,20,&xp));
+    assert(!pd_exp_progress(0,0,0,20,&xp) && !pd_exp_progress(0,101,0,20,&xp));
+    assert(!pd_exp_progress(0,1,0,-1,&xp) && !pd_exp_progress(0,1,0,20,NULL));
+    puts("PASS six Android EXP curves, retail growth mapping, NEXT/MAX and bounds");
+}
 int main(int argc,char** argv) {
+    check_experience();
     int permutation=0;
     for(int a=0;a<4;a++)for(int b=0;b<4;b++)for(int c=0;c<4;c++)for(int d=0;d<4;d++) {
         if(a==b||a==c||a==d||b==c||b==d||c==d)continue;
@@ -108,6 +135,25 @@ int main(int argc,char** argv) {
             ui.tab=PD_TAB_PARTY;ui.summarySlot=0;ui.summaryStats=false;
             pd_ui_draw(&ui,&canvas,&game,&snap,&host);
             if(w==320){assert(!has(&ui,HIT_SUMMARY_STATS));continue;}
+            // Real captured party, with read-only summary hit targets.
+            assert(has(&ui,HIT_SUMMARY_TYPES));
+            tap(&ui,HIT_SUMMARY_TYPES);assert(ui.summaryTypes);
+            pd_ui_draw(&ui,&canvas,&game,&snap,&host);
+            tap(&ui,HIT_SUMMARY_TYPES);assert(!ui.summaryTypes);
+            if(snap.party[0].hasHeldItem && snap.party[0].heldItem) {
+                assert(has(&ui,HIT_SUMMARY_ITEM));tap(&ui,HIT_SUMMARY_ITEM);
+                assert(ui.summaryItem);
+                pd_ui_draw(&ui,&canvas,&game,&snap,&host);
+                char itemPath[1024];snprintf(itemPath,sizeof itemPath,"%s/%s-held-item-fixture-%dx%d.png",argv[3],argv[2],w,h);
+                assert(pd_png_write(itemPath,w,h,pixels));
+                assert(pd_ui_back(&ui));
+                assert(!ui.summaryItem && ui.summarySlot==0);
+                ui.summaryStats=true;
+                pd_ui_draw(&ui,&canvas,&game,&snap,&host);tap(&ui,HIT_SUMMARY_ITEM);
+                pd_ui_draw(&ui,&canvas,&game,&snap,&host);tap(&ui,HIT_SUMMARY_STATS);
+                assert(ui.summaryStats && !ui.summaryItem);
+                ui.summaryStats=false;
+            } else assert(!has(&ui,HIT_SUMMARY_ITEM));
             assert(has(&ui,HIT_SUMMARY_STATS));tap(&ui,HIT_SUMMARY_STATS);
             assert(ui.summaryStats);pd_ui_draw(&ui,&canvas,&game,&snap,&host);
             char path[1024];snprintf(path,sizeof path,"%s/%s-stats-%dx%d.png",argv[3],argv[2],w,h);
@@ -133,6 +179,25 @@ int main(int argc,char** argv) {
             int species=snap.party[0].species;snap.party[0].species=PD_SPECIES_EGG;
             pd_ui_draw(&ui,&canvas,&game,&snap,&host);assert(!has(&ui,HIT_SUMMARY_STATS));
             snap.party[0].species=species;
+            // Missing fields must not display plausible zero values.
+            struct pd_mon savedMon=snap.party[0];
+            snap.party[0].hasExperience=snap.party[0].hasHeldItem=false;
+            ui.summaryStats=ui.summaryTypes=ui.summaryItem=false;
+            pd_ui_draw(&ui,&canvas,&game,&snap,&host);
+            uint32_t* hidden=malloc((size_t)w*h*sizeof *hidden);assert(hidden);
+            memcpy(hidden,pixels,(size_t)w*h*sizeof *hidden);
+            snap.party[0].experience=UINT32_MAX;snap.party[0].heldItem=13;
+            pd_ui_draw(&ui,&canvas,&game,&snap,&host);
+            assert(!memcmp(hidden,pixels,(size_t)w*h*sizeof *hidden));free(hidden);
+            snap.party[0]=savedMon;
+            // Party arrows reset panes and wrap without leaving Summary.
+            if(snap.partyCount>1) {
+                pd_ui_draw(&ui,&canvas,&game,&snap,&host);
+                tap(&ui,HIT_SLOT+snap.partyCount-1);
+                assert(ui.summarySlot==snap.partyCount-1 && !ui.summaryStats && !ui.summaryTypes && !ui.summaryItem);
+                pd_ui_draw(&ui,&canvas,&game,&snap,&host);
+                tap(&ui,HIT_SLOT);assert(ui.summarySlot==0);
+            }
         }
         puts("PASS captured RAM, STATS/MOVES controls, compact/unknown/egg concealment");
     }

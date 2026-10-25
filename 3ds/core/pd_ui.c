@@ -207,9 +207,14 @@ static void act(struct pd_ui* ui, int id) {
         ui->action = PD_ACTION_TOGGLE_FF;
     } else if (id >= HIT_SLOT && id < HIT_SLOT + PD_PARTY_SIZE) {
         ui->summarySlot = id - HIT_SLOT;
-        ui->summaryStats = false;
+        ui->summaryStats = ui->summaryTypes = ui->summaryItem = false;
     } else if (id == HIT_SUMMARY_STATS) {
-        ui->summaryStats = !ui->summaryStats;
+        ui->summaryStats = ui->summaryItem || !ui->summaryStats;
+        ui->summaryItem = false;
+    } else if (id == HIT_SUMMARY_TYPES) {
+        ui->summaryTypes = !ui->summaryTypes;
+    } else if (id == HIT_SUMMARY_ITEM) {
+        ui->summaryItem = !ui->summaryItem;
     } else if (id == HIT_BACK) {
         pd_ui_back(ui);
     } else if (id == HIT_POCKET_PREV || id == HIT_POCKET_NEXT) {
@@ -298,6 +303,10 @@ bool pd_ui_back(struct pd_ui* ui) {
     if (ui->overlay == PD_OVERLAY_GUIDE_NOTICE) return ui_guide_act(ui, HIT_NOTICE_BACK);
     if (ui->overlay != PD_OVERLAY_NONE) {
         ui->overlay = PD_OVERLAY_NONE;
+        return true;
+    }
+    if (ui->summarySlot >= 0 && ui->summaryItem) {
+        ui->summaryItem = false;
         return true;
     }
     if (ui->summarySlot >= 0) {
