@@ -73,6 +73,54 @@ static void party_slot(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
     ui_add_hit(ui, x, y, w, h, HIT_SLOT + slot);
 }
 
+// MonStatsSection.kt: struct order differs from the summary's display order.
+static void summary_stats(struct pd_canvas* c, const struct pd_mon_stats* s,
+                          int x, int y, int w, int h) {
+    static const int order[] = {0, 1, 2, 4, 5, 3};
+    static const char* labels[] = {"HP", "ATTACK", "DEFENSE", "SPEED", "SP. ATK", "SP. DEF"};
+    int row = h / 12;
+    if (row > 25) row = 25;
+    int statX = x + w * 46 / 100, ivX = x + w * 83 / 100;
+    char buf[48];
+    pd_text_right(c,statX,y,"STAT",PD_MUTED,PD_MUTED_SHADOW);
+    pd_text_right(c,ivX,y,"IV",PD_MUTED,PD_MUTED_SHADOW);
+    pd_text_right(c,x+w,y,"EV",PD_MUTED,PD_MUTED_SHADOW);
+    int up=pd_nature_raises(s->nature), down=pd_nature_lowers(s->nature);
+    int ivTotal=0,evTotal=0;
+    for(int r=0;r<6;r++) {
+        int i=order[r], ry=y+(r+1)*row;
+        uint32_t color=i==up?0xE04040:i==down?0x3984F7:PD_LABEL;
+        snprintf(buf,sizeof buf,"%s%s",labels[i],i==up?" +":i==down?" -":"");
+        pd_text_fit(c,x,ry,w*32/100,buf,color,PD_LABEL_SHADOW);
+        snprintf(buf,sizeof buf,"%d",s->values[i]);
+        pd_text_right(c,statX,ry,buf,PD_LABEL,PD_LABEL_SHADOW);
+        if(w>=220) {
+            int bx=statX+8,bw=ivX-bx-23;
+            pd_fill(c,bx,ry+4,bw,6,0x506858);
+            uint32_t fill=s->ivs[i]==31?0xE8B830:s->ivs[i]*2>31?0x60D048:s->ivs[i]*5>31?0xF8C838:0xF04838;
+            pd_fill(c,bx+1,ry+5,(bw-2)*s->ivs[i]/31,4,fill);
+        }
+        snprintf(buf,sizeof buf,"%d",s->ivs[i]);
+        pd_text_right(c,ivX,ry,buf,PD_VALUE,PD_VALUE_SHADOW);
+        snprintf(buf,sizeof buf,"%d",s->evs[i]);
+        pd_text_right(c,x+w,ry,buf,PD_VALUE,PD_VALUE_SHADOW);
+        ivTotal+=s->ivs[i];evTotal+=s->evs[i];
+    }
+    int ry=y+7*row;
+    pd_text(c,x,ry,"TOTAL",PD_LABEL,PD_LABEL_SHADOW);
+    snprintf(buf,sizeof buf,"%d",ivTotal);
+    pd_text_right(c,ivX,ry,buf,PD_VALUE,PD_VALUE_SHADOW);
+    snprintf(buf,sizeof buf,"%d",evTotal);
+    pd_text_right(c,x+w,ry,buf,PD_VALUE,PD_VALUE_SHADOW);
+    pd_fill(c,x,ry+row-3,w,1,PD_DIVIDER);
+    pd_text(c,x,ry+row,"NATURE",PD_MUTED,PD_MUTED_SHADOW);
+    const char* nature=s->nature>=0&&s->nature<pd_nature_names_count?pd_nature_names[s->nature]:"?";
+    pd_text_right(c,x+w,ry+row,nature,PD_VALUE,PD_VALUE_SHADOW);
+    pd_text(c,x,ry+2*row,"HIDDEN POWER",PD_MUTED,PD_MUTED_SHADOW);
+    snprintf(buf,sizeof buf,"%s  PWR %d",pd_type_name(pd_hidden_power_type(s)),pd_hidden_power_power(s));
+    pd_text_fit(c,x,ry+3*row,w,buf,PD_LABEL,PD_LABEL_SHADOW);
+}
+
 // MonDetailScreen: equal information/move columns and four equal move rows.
 // Large canvases can retain this hierarchy without changing the 3DS layout.
 static void wide_summary(struct pd_ui* ui, struct pd_canvas* c,
@@ -111,7 +159,9 @@ static void wide_summary(struct pd_ui* ui, struct pd_canvas* c,
         rowY+=20+lines*16;
     }
     int rh=(bottom-y)/4;
-    for(int i=0;i<4;i++) {
+    if(ui->summaryStats && m->stats.valid) {
+        summary_stats(c,&m->stats,right,y,rw,bottom-y);
+    } else for(int i=0;i<4;i++) {
         int my=y+i*rh,move=m->moves[i];
         if(i)pd_fill(c,right,my-3,rw,1,PD_DIVIDER);
         if(!move){pd_text(c,right,my+8,"-",PD_MUTED,PD_MUTED_SHADOW);continue;}
@@ -123,6 +173,8 @@ static void wide_summary(struct pd_ui* ui, struct pd_canvas* c,
             snprintf(buf,sizeof buf,"PWR - PP %d",m->pp[i]);
         pd_text_fit(c,right,my+45,rw,buf,PD_VALUE,PD_VALUE_SHADOW);
     }
+    if(m->stats.valid)
+        ui_button(ui,c,c->w-166,c->h-34,74,22,ui->summaryStats?"MOVES":"STATS",HIT_SUMMARY_STATS);
     ui_button(ui,c,c->w-86,c->h-34,70,22,"BACK",HIT_BACK);
 }
 

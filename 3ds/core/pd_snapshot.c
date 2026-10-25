@@ -136,6 +136,17 @@ bool pd_decode_party_mon(const uint8_t* raw, struct pd_mon* m) {
     for (int slot = 0; slot < 4; slot++) off[SUBSTRUCT_ORDER[personality % 24][slot]] = slot * 12;
     m->species = u16(block + off[0]);
     if (m->species == 0) return false;
+    // Android Gen3Mon.kt decryptGen3Substructs / monStats, retail layout.
+    m->heldItem = u16(block + off[0] + 2);
+    m->experience = u32(block + off[0] + 4);
+    uint32_t ivWord = u32(block + off[3] + 4);
+    for (int i = 0; i < 6; i++) {
+        m->stats.ivs[i] = (ivWord >> (5 * i)) & 31;
+        m->stats.evs[i] = block[off[2] + i];
+        m->stats.values[i] = u16(raw + 0x58 + 2 * i);
+    }
+    m->stats.nature = personality % 25;
+    m->stats.valid = true;
     for (int i = 0; i < PD_NUM_MOVES; i++) {
         m->moves[i] = u16(block + off[1] + i * 2);
         m->pp[i] = block[off[1] + 8 + i];

@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "pd_game.h"
+#include "pd_stats.h"
 
 // Reads len bytes of the GBA bus at addr into out; false if it can't.
 typedef bool (*pd_read_fn)(void* ctx, uint32_t addr, void* out, size_t len);
@@ -31,9 +32,10 @@ struct pd_mon {
     int moves[PD_NUM_MOVES];
     int pp[PD_NUM_MOVES];
     uint32_t personality;
-    // Optional live fields used by the native Gen 2 companion.
+    // Optional live fields used by the native companions.
     uint32_t experience;
     int heldItem;
+    struct pd_mon_stats stats; // optional: valid only for verified decoders
 };
 
 struct pd_battle_mon {

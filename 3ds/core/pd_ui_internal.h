@@ -18,6 +18,7 @@ enum {
     HIT_FF = 110,
     HIT_SLOT = 200,        // + party slot
     HIT_BACK = 300,
+    HIT_SUMMARY_STATS = 301,
     HIT_POCKET_PREV = 400,
     HIT_POCKET_NEXT = 401,
     HIT_BAG_LIST = 410,
