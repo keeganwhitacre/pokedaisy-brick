@@ -18,6 +18,11 @@ from NextUI's Tools menu. Choose a game with the D-pad and A.
 
 ## Play and open the companion
 
+On a large companion canvas, a non-egg summary shows information and defensive
+types on the left, with move types, power and PP on the right. Smaller screens
+keep the compact summary. This is an experimental layout with more detail
+pages still to come.
+
 Press X to open the companion. The game pauses while you use it. A confirms,
 B goes back, and X returns to the game. Settings selections work independently
 of the bag's item-list capacity. In the GBA companion, L and R change

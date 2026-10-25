@@ -73,7 +73,63 @@ static void party_slot(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
     ui_add_hit(ui, x, y, w, h, HIT_SLOT + slot);
 }
 
+// MonDetailScreen: equal information/move columns and four equal move rows.
+// Large canvases can retain this hierarchy without changing the 3DS layout.
+static void wide_summary(struct pd_ui* ui, struct pd_canvas* c,
+                         const struct pd_game* g, const struct pd_mon* m) {
+    int x=MARGIN+12, y=CONTENT_Y+12, left=(c->w-40)/2;
+    int split=c->w/2, right=split+12, rw=c->w-right-16;
+    int bottom=c->h-46;
+    pd_title_box(c,MARGIN,CONTENT_Y,c->w-2*MARGIN,c->h-CONTENT_Y-MARGIN,PD_TITLE_FILL);
+    pd_fill(c,split,y,1,bottom-y,PD_DIVIDER);
+    char buf[160],name[40];
+    int nameW=pd_text_fit(c,x,y,left-18,mon_display_name(m,name,sizeof name),PD_LABEL,PD_LABEL_SHADOW);
+    gender_mark(c,x+nameW+3,y,m->gender);
+    pd_draw_mon_icon(c,g,m->species,x,y+22,false);
+    snprintf(buf,sizeof buf,"Lv%d",m->level);
+    pd_text(c,x+42,y+30,buf,PD_LABEL,PD_LABEL_SHADOW);
+    ui_status_badge(c,x+90,y+31,m->status);
+    int t1,t2;pd_species_type_pair(m->species,&t1,&t2);
+    snprintf(buf,sizeof buf,"%s%s%s",pd_type_name(t1),t1!=t2?" / ":"",t1!=t2?pd_type_name(t2):"");
+    pd_text_fit(c,x,y+62,left,buf,PD_LABEL,PD_LABEL_SHADOW);
+    ui_hp_bar(c,x,y+90,left-75,m->hp,m->maxHp);
+    snprintf(buf,sizeof buf,"%d/%d",m->hp,m->maxHp);
+    pd_text_right(c,x+left,y+84,buf,PD_LABEL,PD_LABEL_SHADOW);
+    int rowY=y+118;
+    const char* headings[]={"WEAK TO","RESISTS","IMMUNE TO"};
+    for(int group=0;group<3;group++) {
+        buf[0]=0;
+        for(int t=0;t<pd_type_names_count;t++) {
+            int pct=pd_type_multiplier_pct(t,t1,t2);
+            if(!((group==0&&pct>100)||(group==1&&pct>0&&pct<100)||(group==2&&pct==0)))continue;
+            size_t n=strlen(buf);
+            snprintf(buf+n,sizeof buf-n,"%s%s",n?", ":"",pd_type_name(t));
+        }
+        if(!buf[0]||rowY+38>bottom)continue;
+        pd_text(c,x,rowY,headings[group],PD_MUTED,PD_MUTED_SHADOW);
+        int lines=pd_text_wrap(c,x,rowY+16,left,16,2,buf,PD_LABEL,PD_LABEL_SHADOW);
+        rowY+=20+lines*16;
+    }
+    int rh=(bottom-y)/4;
+    for(int i=0;i<4;i++) {
+        int my=y+i*rh,move=m->moves[i];
+        if(i)pd_fill(c,right,my-3,rw,1,PD_DIVIDER);
+        if(!move){pd_text(c,right,my+8,"-",PD_MUTED,PD_MUTED_SHADOW);continue;}
+        pd_text_fit(c,right,my+4,rw,pd_move_name(move,name,sizeof name),PD_LABEL,PD_LABEL_SHADOW);
+        pd_text_fit(c,right,my+26,rw/2,pd_type_name(pd_move_type(move)),PD_MUTED,PD_MUTED_SHADOW);
+        if(pd_move_power(move)>0)
+            snprintf(buf,sizeof buf,"PWR %d PP %d",pd_move_power(move),m->pp[i]);
+        else
+            snprintf(buf,sizeof buf,"PWR - PP %d",m->pp[i]);
+        pd_text_fit(c,right,my+45,rw,buf,PD_VALUE,PD_VALUE_SHADOW);
+    }
+    ui_button(ui,c,c->w-86,c->h-34,70,22,"BACK",HIT_BACK);
+}
+
 static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_mon* m) {
+    if(c->w>=480 && c->h>=320 && m->species!=PD_SPECIES_EGG) {
+        wide_summary(ui,c,g,m);return;
+    }
     char buf[40], buf2[40];
     int x = MARGIN, y = CONTENT_Y, w = c->w - 2 * MARGIN, h = c->h - CONTENT_Y - MARGIN;
     int f = pd_title_box(c, x, y, w, h, PD_TITLE_FILL);
