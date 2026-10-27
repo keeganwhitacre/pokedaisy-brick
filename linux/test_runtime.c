@@ -333,6 +333,15 @@ static void test_frame(struct mCore* c,bool companion,int frame,struct pd_ui* ui
     for(int k=0;k<40;k++)focus_move(ui,LEFT);
     for(int k=0;k<40;k++)focus_move(ui,UP);
     assert(mapCursor.tx==mapCursor.minX && mapCursor.ty==mapCursor.minY && focusId==HIT_MAP);
+    // ME must also reset an empty selection: both old/new section IDs are -1.
+    assert(ui->mapSel==-1 && ui->mapDungeon==-1);
+    pd_ui_draw(ui,&canvas,&game,snap,&host);
+    assert(map_cursor_back(ui));
+    int emptyMe=focus_index(ui,HIT_MAP_ME);assert(emptyMe>=0);
+    focusId=HIT_MAP_ME;focusAt=ui->hits[emptyMe];focus_activate(ui);
+    pd_ui_draw(ui,&canvas,&game,snap,&host);map_cursor_sync(ui,&game,snap);
+    assert(mapCursor.tx==playerX && mapCursor.ty==playerY);
+    focusId=HIT_MAP;focus_resolve(ui);
     while(mapCursor.tx<playerX)focus_move(ui,RIGHT);
     while(mapCursor.ty<playerY)focus_move(ui,DOWN);
     focus_activate(ui);pd_ui_draw(ui,&canvas,&game,snap,&host);

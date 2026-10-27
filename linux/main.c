@@ -714,7 +714,7 @@ static int focus_index(const struct pd_ui *u, int id) {
 static struct {
   bool ready;
   unsigned rom;
-  int page, tx, ty, sel, dungeon;
+  int page, requestedPage, tx, ty, sel, dungeon;
   int minX, minY, maxX, maxY;
 } mapCursor;
 static void map_cursor_sync(const struct pd_ui *u, const struct pd_game *g,
@@ -747,6 +747,7 @@ static void map_cursor_sync(const struct pd_ui *u, const struct pd_game *g,
   mapCursor.maxX = layout->offX + layout->w - 1;
   mapCursor.maxY = layout->offY + layout->h - 1;
   if (mapCursor.ready && mapCursor.rom == g->loadId && mapCursor.page == shown &&
+      mapCursor.requestedPage == u->mapPage &&
       mapCursor.sel == u->mapSel && mapCursor.dungeon == u->mapDungeon)
     return;
   if (!player || page != shown) {
@@ -766,6 +767,7 @@ static void map_cursor_sync(const struct pd_ui *u, const struct pd_game *g,
   mapCursor.ready = true;
   mapCursor.rom = g->loadId;
   mapCursor.page = shown;
+  mapCursor.requestedPage = u->mapPage;
   mapCursor.tx = tx < mapCursor.minX ? mapCursor.minX : tx > mapCursor.maxX ? mapCursor.maxX : tx;
   mapCursor.ty = ty < mapCursor.minY ? mapCursor.minY : ty > mapCursor.maxY ? mapCursor.maxY : ty;
   mapCursor.sel = u->mapSel;
@@ -797,6 +799,7 @@ static void focus_activate(struct pd_ui *u) {
     ui_map_act(u, HIT_MAP);
     mapCursor.sel = u->mapSel;
     mapCursor.dungeon = u->mapDungeon;
+    mapCursor.requestedPage = u->mapPage;
   } else {
     pd_ui_touch(u, h->x + h->w / 2, h->y + h->h / 2, true);
     pd_ui_touch(u, h->x + h->w / 2, h->y + h->h / 2, false);
