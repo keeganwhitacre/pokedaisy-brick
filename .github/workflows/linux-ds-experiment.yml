@@ -1,5 +1,17 @@
 name: Linux DS experiment
 on:
+  pull_request:
+    paths:
+      - 'linux/**'
+      - '3ds/core/**'
+      - 'app/src/main/cpp/nds/pk_nds_field.*'
+      - 'app/src/main/kotlin/com/pokedaisy/app/companion/data/**'
+      - 'app/src/main/kotlin/com/pokedaisy/app/GameTitles.kt'
+      - 'third_party/dsperate'
+      - 'third_party/patches/dsperate-pokedaisy.patch'
+      - '.gitmodules'
+      - 'NOTICE'
+      - '.github/workflows/linux-ds-experiment.yml'
   push:
     branches: [experiment/dsperate-linux, experiment/ds-one-screen-battles]
   workflow_dispatch:
