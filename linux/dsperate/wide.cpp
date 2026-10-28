@@ -1,6 +1,7 @@
 // GPL-3.0. Genuine auxiliary geometry renders; the centre is the real screen.
 #include "wide.h"
 #include <algorithm>
+#include "core/gpu/kernels.h"
 
 DsWide::DsWide(ds::NDS& nds):nds_(nds) {}
 DsWide::~DsWide(){enable(false);}
@@ -33,6 +34,22 @@ bool DsWide::compose(const uint32_t* top,std::vector<uint32_t>& out) {
   nds_.gpu.quiesce();nds_.gpu3d.sync_raster();
   std::array<ds::gpu::Renderer3D::FrameRef,9> frames;
   for(int i=0;i<9;i++)if(views_[i]){views_[i]->poke_render(nds_.gpu3d);frames[i]=views_[i]->frame_ref(false);}
+  // Use the emulator's real RGB666 output stage, including BG0 fades and
+  // master brightness. Scaling six-bit channels by 255/63 rounded differently
+  // from the hardware path and made a rectangular colour boundary.
+  std::array<std::vector<uint32_t>,9> converted;
+  alignas(16) uint32_t row[256];
+  std::array<uint8_t,256> ids,win;ids.fill(1);win.fill(0x20);
+  auto& engine=nds_.gpu.engine[0];
+  for(int i=0;i<9;i++)if(views_[i]){
+    converted[i].resize(256*192);
+    for(int y=0;y<192;y++){
+      auto raw=views_[i]->line(frames[i],y);
+      int effect=(engine.bldcnt()>>6)&3;
+      if(effect>=2){ds::gpu::kern::active::composite_line_fade(engine.bldcnt(),engine.evy(),raw,ids.data(),win.data(),row);raw=row;}
+      ds::gpu::kern::active::output_line(raw,engine.master_bright(),converted[i].data()+y*256);
+    }
+  }
   out.assign(width_*height_,0xff000000);int mx=(width_-256)/2,my=(height_-192)/2;
   for(int y=0;y<height_;y++)for(int x=0;x<width_;x++) {
     int gx=x-mx,gy=y-my;
@@ -41,8 +58,7 @@ bool DsWide::compose(const uint32_t* top,std::vector<uint32_t>& out) {
     if(!views_[i])continue;
     int vx=gx-dx*252,vy=gy-dy*188;
     if(vx<0 || vx>=256 || vy<0 || vy>=192)continue;
-    uint32_t p=views_[i]->line(frames[i],vy)[vx];
-    out[y*width_+x]=0xff000000u | ((p&63)*255/63)<<16 | (((p>>8)&63)*255/63)<<8 | (((p>>16)&63)*255/63);
+    out[y*width_+x]=converted[i][vy*256+vx];
   }
   return true;
 }

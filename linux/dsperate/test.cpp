@@ -44,6 +44,12 @@ int main(int argc,char** argv){
   int mx=(wide.width()-256)/2,my=(wide.height()-192)/2;
   for(int y=0;y<192;y++)for(int x=0;x<256;x++)assert(out[(y+my)*wide.width()+x+mx]==original[y*256+x]);
   assert(out[(96+my)*wide.width()+270+mx]==0xffff0000u);
+  nds->bus.dma_write16(ds::Cpu::ARM9,0x0400006c,0x8008);
+  nds->sched.run_until(nds->sched.now()+ds::CYCLES_PER_FRAME*2);
+  nds->gpu.quiesce();
+  assert(wide.compose(nds->gpu.framebuffer(0),out));
+  assert(out[(96+my)*wide.width()+270+mx]==0xff7d0000u);
+  std::puts("PASS auxiliary view uses the DS master-brightness output stage");
   std::puts("PASS DSperate memory/input and real offscreen polygon rendering; centre unchanged");
   auto boot=std::make_unique<ds::NDS>();std::string error;
   assert(boot->load_bios("","","",{},&error));assert(boot->load_rom(argv[2]));
