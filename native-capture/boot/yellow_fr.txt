@@ -1,0 +1,32 @@
+# The English Yellow save (Nelson, Vermilion City's Pokemon Center) booted in the Version Jaune - Edition Speciale Pikachu (France) cart: title, CONTINUE,
+# the save's summary, then the field (fixtures yellow_fr*).
+# The save holds English's wCurMapDataPtr / TextPtr / ScriptPtr for map 0x59, which this cart keeps
+# elsewhere (its text moved): with the save loaded and its summary on screen, the cart's own 10-byte map header
+# (MapHeaderPointers[0x59]) goes to wCurMapTileset (0xD36B) .. wCurMapConnections first, or the map hangs.
+wait 400
+press START
+wait 200
+press START
+wait 120
+press A
+wait 90
+press A
+wait 90
+press A
+wait 90
+press A
+wait 300
+poke8 54123 0x06
+poke8 54124 0x04
+poke8 54125 0x07
+poke8 54126 0x64
+poke8 54127 0x40
+poke8 54128 0x6e
+poke8 54129 0x48
+poke8 54130 0x68
+poke8 54131 0x48
+poke8 54132 0x00
+press A
+wait 200
+press A
+wait 300

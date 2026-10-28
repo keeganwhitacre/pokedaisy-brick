@@ -1,0 +1,11 @@
+# Pokémon GS Chronicles v2.7.6: its intro (the "fan Romhack" / Ruki Studios splash, GAME FREAK, the
+# opening) runs ~19 s before the title screen takes A; A at the title, A on CONTINUE (its menu
+# fades in slowly), then the field. Checked headless 2026-10-13: the field in NEW BARK TOWN by
+# frame ~2200. One A press per screen only - more would talk to whoever stands in front.
+wait 1180
+press A
+wait 400
+press A
+wait 300
+press A
+wait 300

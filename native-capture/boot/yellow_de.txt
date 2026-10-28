@@ -1,0 +1,19 @@
+# The English Yellow save (Nelson, Vermilion City's Pokemon Center) booted in the Gelbe Edition - Special Pikachu Edition (Germany) cart: title, CONTINUE,
+# the save's summary, then the field (fixtures yellow_de*).
+wait 400
+press START
+wait 200
+press START
+wait 120
+press A
+wait 90
+press A
+wait 90
+press A
+wait 90
+press A
+wait 300
+press A
+wait 200
+press A
+wait 300

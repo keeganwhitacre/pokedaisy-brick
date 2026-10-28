@@ -1,0 +1,12 @@
+# Pokémon Prism v0.95 build 254 from a save: the intro, the title, CONTINUE and the save summary, then on the field
+# (capture_fixture_headless.sh prism --script native-capture/boot/prism.txt). Its title takes longer than Crystal's,
+# and A is held 6 frames.
+wait 900
+hold START 6
+wait 200
+hold A 6
+wait 200
+hold A 6
+wait 200
+hold A 6
+wait 300

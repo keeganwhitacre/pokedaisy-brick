@@ -1,0 +1,14 @@
+# Pokémon Recharged Emerald (every build) on the user's retail Emerald save, rewritten by
+# scripts/convert_save_recharged_emerald.py: Jaizu's warning and credits run ~11 s before the
+# title takes START, then CONTINUE, past the continue screen's recap, B to close the map name.
+wait 700
+press START
+wait 90
+press A
+wait 120
+press A
+wait 200
+press A
+wait 200
+press B
+wait 120

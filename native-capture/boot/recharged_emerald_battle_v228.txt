@@ -1,0 +1,19 @@
+# Recharged Emerald (v228): a scripted wild ZIGZAGOON Lv5 (setwildbattle 0x120 5 0 / dowildbattle / end, poked
+# into free EWRAM) run through this build's ScriptContext_SetupScript (0x081B09D5); dumped at the action menu.
+wait 700
+press START
+wait 90
+press A
+wait 120
+press A
+wait 200
+press A
+wait 200
+press B
+wait 120
+poke32 0x0203F800 0x050120B6
+poke32 0x0203F804 0x02B70000
+call 0x081B09D5 0x0203F800
+wait 700
+press A
+wait 300

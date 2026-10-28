@@ -1,0 +1,14 @@
+# Pokémon Crystal (any English release) from a save: the intro, the title, CONTINUE and the save
+# summary, then on the field (capture_fixture_headless.sh crystal --script native-capture/boot/crystal.txt).
+# Gen 2 can miss a one-frame press outside its menus: A is held 3 frames.
+wait 600
+press START
+wait 200
+hold A 3
+wait 120
+hold A 3
+wait 120
+hold A 3
+wait 120
+hold A 3
+wait 200
