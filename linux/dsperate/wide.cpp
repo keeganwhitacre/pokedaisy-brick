@@ -21,7 +21,7 @@ void DsWide::enable(bool on,int w,int h) {
 }
 void DsWide::polygon(void* p,const ds::gpu::Gpu3D& source,const ds::gpu::Vertex* const* vertices,int n) {
   auto& self=*static_cast<DsWide*>(p);
-  for(int i=0;i<9;i++)if(self.views_[i])self.views_[i]->poke_polygon(source,vertices,n,(i%3-1)*252,(i/3-1)*188);
+  for(int i=0;i<9;i++)if(self.views_[i])self.views_[i]->poke_polygon(source,vertices,n,(i%3-1)*((self.width_-256+1)/2),(i/3-1)*((self.height_-192+1)/2));
   self.polygons_++;
 }
 void DsWide::swap(void* p,const ds::gpu::Gpu3D& source) {
@@ -50,14 +50,29 @@ bool DsWide::compose(const uint32_t* top,std::vector<uint32_t>& out) {
       ds::gpu::kern::active::output_line(raw,engine.master_bright(),converted[i].data()+y*256);
     }
   }
+  // Edge marking uses clear pixels beyond the 256x192 viewport. In EXPAND
+  // those neighbours are real geometry, so the original one-pixel perimeter
+  // carries an artificial outline. Re-render that perimeter from an overlapping
+  // view, while retaining any pixel changed by the game's 2D compositor.
+  std::vector<uint32_t> source3d(256*192);auto sourceFrame=nds_.gpu3d.frame_ref(false);
+  for(int y=0;y<192;y++){
+    auto raw=nds_.gpu3d.line(sourceFrame,y);int effect=(engine.bldcnt()>>6)&3;
+    if(effect>=2){ds::gpu::kern::active::composite_line_fade(engine.bldcnt(),engine.evy(),raw,ids.data(),win.data(),row);raw=row;}
+    ds::gpu::kern::active::output_line(raw,engine.master_bright(),source3d.data()+y*256);
+  }
   out.assign(width_*height_,0xff000000);int mx=(width_-256)/2,my=(height_-192)/2;
   for(int y=0;y<height_;y++)for(int x=0;x<width_;x++) {
     int gx=x-mx,gy=y-my;
-    if(gx>=0 && gx<256 && gy>=0 && gy<192){out[y*width_+x]=top[gy*256+gx];continue;}
-    int dx=gx<0?-1:gx>=256?1:0,dy=gy<0?-1:gy>=192?1:0,i=(dy+1)*3+dx+1;
+    bool centre=gx>=0 && gx<256 && gy>=0 && gy<192;
+    if(centre){
+      out[y*width_+x]=top[gy*256+gx];
+      if((gx>0 && gx<255 && gy>0 && gy<191) || top[gy*256+gx]!=source3d[gy*256+gx])continue;
+    }
+    int dx=gx<=0?-1:gx>=255?1:0,dy=gy<=0?-1:gy>=191?1:0,i=(dy+1)*3+dx+1;
     if(!views_[i])continue;
-    int vx=gx-dx*252,vy=gy-dy*188;
+    int vx=gx-dx*((width_-256+1)/2),vy=gy-dy*((height_-192+1)/2);
     if(vx<0 || vx>=256 || vy<0 || vy>=192)continue;
+    if(centre && !(views_[i]->line(frames[i],vy)[vx]>>24))continue;
     out[y*width_+x]=converted[i][vy*256+vx];
   }
   return true;

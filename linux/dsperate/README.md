@@ -21,11 +21,14 @@ No Pokémon ROM, save, proprietary BIOS or game art is bundled.
   sprites, battle UI replacement, auto-resume or persistent DS settings yet.
 - Experimental 340×256 overworld view: optional DSperate hooks capture geometry
   before clipping and render eight auxiliary views. The original 256×192 center
-  is copied from the real screen, not stretched. Upstream's Platinum RAM field
+  interior is copied from the real screen, not stretched. The one-pixel
+  viewport perimeter is reconstructed from overlapping geometry where the
+  original 3D output matches the displayed pixel, preserving 2D overlays. Upstream's Platinum RAM field
   state gates expansion off during battles, menus and locked field tasks.
   Margins use DSperate's RGB conversion, master brightness and BG0 brightness
   fades. Alpha blending against other 2D layers, scanline-specific effects,
-  text overlays, transitions and remaining geometric seams need further work.
+  text overlays and transitions need further testing. Auxiliary views overlap
+  the original viewport so their raster borders are outside the joins.
   Auxiliary rendering may be too expensive on a Brick; it is OFF initially.
 
 The native tests use a captured upstream Platinum RAM fixture, an original

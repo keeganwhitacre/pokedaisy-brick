@@ -51,6 +51,24 @@ int main(int argc,char** argv){
   assert(out[(96+my)*wide.width()+270+mx]==0xff7d0000u);
   std::puts("PASS auxiliary view uses the DS master-brightness output stage");
   std::puts("PASS DSperate memory/input and real offscreen polygon rendering; centre unchanged");
+  // A world polygon across the whole viewport: hardware edge marking makes
+  // an artificial outline at the old viewport perimeter. The overlapping
+  // views must supply the continuous world there, without touching overlays.
+  w32(0x04000000,0x00010108); // Display engine A BG0 as 3D.
+  nds->bus.dma_write16(ds::Cpu::ARM9,0x0400006c,0);
+  nds->bus.dma_write16(ds::Cpu::ARM9,0x04000060,1u<<5);
+  nds->bus.dma_write16(ds::Cpu::ARM9,0x04000330,0x1084);
+  cmd(0x29,0x011f00c0);cmd(0x40,1);cmd(0x20,0x001f);
+  v(-0x1800,-0x1800);v(0x1800,-0x1800);v(0x1800,0x1800);v(-0x1800,0x1800);cmd(0x41,0);cmd(0x50,0);
+  nds->sched.run_until(nds->sched.now()+ds::CYCLES_PER_FRAME*2);nds->gpu.quiesce();
+  original=nds->gpu.framebuffer(0);assert(wide.compose(original,out));
+  assert(original[96*256]!=0xffff0000u); // Reproduce the unwanted viewport edge.
+  assert(out[(96+my)*wide.width()+mx]==0xffff0000u);
+  assert(out[my*wide.width()+128+mx]==0xffff0000u);
+  auto overlay=std::vector<uint32_t>(original,original+256*192);
+  overlay[96*256]=0xff123456u;assert(wide.compose(overlay.data(),out));
+  assert(out[(96+my)*wide.width()+mx]==0xff123456u);
+  std::puts("PASS viewport outline removed with real overlapping geometry; 2D overlay retained");
   auto boot=std::make_unique<ds::NDS>();std::string error;
   assert(boot->load_bios("","","",{},&error));assert(boot->load_rom(argv[2]));
   boot->setup_direct_boot();boot->run_frame();boot->run_frame();boot->gpu.quiesce();

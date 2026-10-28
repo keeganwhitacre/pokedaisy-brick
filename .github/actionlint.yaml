@@ -1,4 +1,0 @@
-self-hosted-runner:
-  # The release workflow's ROM runner (docs/RELEASING.md).
-  labels:
-    - pokedaisy-roms

@@ -1,7 +1,0 @@
-node_modules/
-dist/
-.astro/
-.firebase/
-*-debug.log
-# docs/manual's screenshots and art, copied in by scripts/sync-docs.mjs before dev / build
-public/docs/
