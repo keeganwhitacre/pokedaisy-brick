@@ -63,6 +63,11 @@ asset_members=[int(n) for n in re.findall(r'narc.member\((\d+)\)',map_art_sectio
 assert asset_members==[0,2,19,16,17,10,11]
 screens=[int(n) for n in re.search(r'for \(screen in intArrayOf\(([^)]*)\)',map_art_section)[1].split(',')]
 map_path=re.search(r'file\(f, header, "([^"]*tmap_gra.narc)"\)',art)[1]
+icon_path = re.search(r'val iconPath = if \(platinum\) "([^"]+)"', art)[1]
+icon_base = int(re.search(r'icon\(narc.member\((\d+) \+ species\)', art)[1])
+icon_egg = int(re.search(r'private const val EGG = (\d+)', art)[1])
+icon_palettes = [int(n) for n in re.findall(r'\d+', re.search(r'val iconPalettesPlatinum: ByteArray = byteArrayOf\((.*?)\n\)', tables, re.S)[1])]
+assert len(icon_palettes) > icon_egg and max(icon_palettes) < 3
 stats = (data / 'MonStats.kt').read_text()
 natures = re.findall(r'"([^"\n]+)"', re.search(r'private val natureNames = listOf\((.*?)\n\)', stats, re.S)[1])
 assert len(natures) == 25
@@ -82,6 +87,9 @@ out += ['inline constexpr int pockets[] = {'+', '.join(map(str, pockets))+'};',
         'inline constexpr char orders[][5] = {'+', '.join(json.dumps(x) for x in orders)+'};']
 for name, entries in maps.items():
     out += [f'inline constexpr const char* {name}[] = {{'+', '.join(json.dumps(entries.get(i, ''), ensure_ascii=True) for i in range(max(entries)+1))+'};']
+out += ['inline constexpr char iconPath[] = '+json.dumps(icon_path)+';',
+        f'inline constexpr int iconBase = {icon_base}, iconEgg = {icon_egg};',
+        'inline constexpr uint8_t iconPalettes[] = {'+', '.join(map(str,icon_palettes))+'};']
 out += ['inline constexpr char mapPath[] = '+json.dumps(map_path)+';',
         'inline constexpr int mapAssets[] = {'+', '.join(map(str,asset_members))+'};',
         'inline constexpr int mapScreens[] = {'+', '.join(map(str,screens))+'};',

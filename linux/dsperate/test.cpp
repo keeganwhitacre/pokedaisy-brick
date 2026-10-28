@@ -71,8 +71,15 @@ int main(int argc,char** argv){
   assert(std::strcmp(ds_map_name(1),"Twinleaf Town")==0);
   assert(ds_map_section(0,0)==-1 && ds_map_section(-1,0)==-1 && ds_map_section(30,0)==-1);
   assert(ds_map_art({}).background.empty());
+  assert(ds_party_icons({}).empty());
   if(argc==4){
     std::ifstream cart(argv[3],std::ios::binary);std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(cart),{}};
+    auto icons=ds_party_icons(bytes);assert(icons.size()==495);
+    for(int species: {1,387,412,493,494}){
+      assert(icons[species].size()==1024);bool clear=false,opaque=false;
+      for(auto p:icons[species]){clear|=p==0;opaque|=(p>>24)==255;}assert(clear && opaque);
+    }
+    std::puts("PASS real ROM party icons including Gen 4 species, Burmy and egg");
     auto art=ds_map_art(bytes);assert(art.width==216 && art.height==168);
     assert(art.background.size()==216*168 && art.blocks.size()==21 && art.heads.size()==2);
     bool varied=false;for(auto px:art.background)varied|=px!=art.background[0];assert(varied);

@@ -78,3 +78,20 @@ DsMapArt ds_map_art(const std::vector<uint8_t>& rom){
 }
 int ds_map_section(int x,int y){if(x<0 || x>=30 || y<0 || y>=30)return -1;int s=pd_ds_data::mapGrid[y*30+x];return s==65535?-1:s;}
 const char* ds_map_name(int s){return s>=0 && size_t(s)<std::size(pd_ds_data::mapSections)?pd_ds_data::mapSections[s]:"";}
+
+std::vector<std::vector<uint32_t>> ds_party_icons(const std::vector<uint8_t>& rom){
+  using namespace pd_ds_data;
+  try{
+    auto narc=file(rom,iconPath);auto pal=palette(member(narc,0));
+    std::vector<std::vector<uint32_t>> icons(iconEgg+1);
+    for(int species=1;species<=iconEgg;species++){
+      auto tile=tiles(member(narc,iconBase+species));auto& icon=icons[species];icon.resize(32*32,0);
+      int bank=iconPalettes[species];
+      for(int y=0;y<32;y++)for(int x=0;x<32;x++){
+        int v=pixel(tile,(y/8)*4+x/8,x%8,y%8);
+        if(v)icon[y*32+x]=pal.at(bank*16+v);
+      }
+    }
+    return icons;
+  }catch(const std::exception& e){std::fprintf(stderr,"DS party art: %s\n",e.what());return {};}
+}

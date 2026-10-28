@@ -256,8 +256,9 @@ consumed by the host, with held buttons blocked until released.
 
 A party HUD reuses linux/hud.c's level, HP, lead highlight and status drawing.
 The DS reader supplies the party data and an asset callback instead of using
-GBA ROM tables. Species names are a temporary text fallback; native DS icons,
-minimap and ball HUD integration remain incomplete. SET -> HUD toggles it,
+GBA ROM tables. Party icons are decoded from the cart using the app-owned palette declarations;
+species names remain a fallback if art cannot be decoded. Minimap and ball HUD
+integration remain incomplete. SET -> HUD toggles it,
 persisted in ds-settings.ini. It is hidden during battles and locked/menu scenes.
 
 This step does not implement projection/camera expansion or custom battle
@@ -269,3 +270,15 @@ Tests drive the actual host input path through POCKET_DS_HOST_KEYS and verify
 companion access, disabled loading, manual save/load, leave game and pause.
 The shared HUD callback is exercised with captured Platinum party RAM.
 These automated checks do not validate the new overlay on a physical Brick.
+
+### ROM-backed HUD icons
+
+The shared party HUD's asset callback uses the first 32x32 icon frame from
+Platinum's icon archive, decoded with the same NCGR/NCLR rules as NdsArt.kt.
+Archive path, member base, egg index and species palettes are generated from
+Android declarations by gen_data.py, not maintained as another registry.
+The draw-only snapshot leaves non-egg GBA species IDs unset; national DS
+species IDs stay in the DS model, preventing Burmy (412) colliding with the
+shared GBA egg marker. Real ROM native and ARM/QEMU checks decode Gen 4
+species, Burmy and egg art. Actual captures use Platinum USA rev1 at 1024x768
+with expansion disabled; they do not establish physical Brick performance.

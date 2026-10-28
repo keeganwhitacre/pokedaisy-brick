@@ -154,6 +154,7 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
   uint8_t digest[20];ds::crypto::sha1(bytes.data(),bytes.size(),digest);char hex[41];for(int i=0;i<20;i++)std::sprintf(hex+2*i,"%02x",digest[i]);
   bool supported=!std::strcmp(hex,pd_ds_data::sha1);char code[5]={};std::memcpy(code,bytes.data()+12,4);int revision=bytes[30];
   DsMapArt mapArt=supported?ds_map_art(bytes):DsMapArt{};
+  auto partyArt=supported?ds_party_icons(bytes):std::vector<std::vector<uint32_t>>{};
   bytes.clear();bytes.shrink_to_fit();
   std::fprintf(stderr,"DSperate %s rev %d SHA1 %s, companion %s\n",code,revision,hex,supported?"Platinum":"unsupported");
   auto nds=std::make_unique<ds::NDS>();active=nds.get();
@@ -350,12 +351,23 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
         pd_snapshot hs{};hs.valid=true;hs.partyCount=std::min(6,int(snap.party.size()));
         for(int i=0;i<hs.partyCount;i++){
           auto& m=snap.party[i];auto& h=hs.party[i];
-          h.species=m.egg?PD_SPECIES_EGG:m.species;h.hp=m.hp;h.maxHp=m.maxHp;h.level=m.level;h.status=m.status;
+          // This is a draw-only GBA HUD adapter. Do not put national DS IDs in
+          // its internal GBA species field (Burmy 412 collides with its egg).
+          h.species=m.egg?PD_SPECIES_EGG:0;h.hp=m.hp;h.maxHp=m.maxHp;h.level=m.level;h.status=m.status;
           std::snprintf(h.nickname,sizeof h.nickname,"%s",m.egg?"EGG":ds_species(m.species));
         }
-        // Text fallback until the DS ROM's party icons have a shared asset provider.
-        hud_party_draw(&canvas,&hs,nullptr,[](pd_canvas* c,void*,const pd_mon* m,int x,int y,bool faded){
-          pd_text_fit(c,x,y+10,32,m->nickname,faded?0xa8b0c0:0xf8f8f8,0x303840);
+        struct HudArt {const DsCompanion* snap;const pd_snapshot* view;const std::vector<std::vector<uint32_t>>* art;} context{&snap,&hs,&partyArt};
+        hud_party_draw(&canvas,&hs,&context,[](pd_canvas* c,void* data,const pd_mon* m,int x,int y,bool faded){
+          auto& ctx=*static_cast<HudArt*>(data);auto& mon=ctx.snap->party[m-ctx.view->party];
+          int species=mon.egg?pd_ds_data::iconEgg:mon.species;
+          if(species>0 && size_t(species)<ctx.art->size() && (*ctx.art)[species].size()==1024){
+            auto& icon=(*ctx.art)[species];
+            for(int yy=0;yy<32;yy++)for(int xx=0;xx<32;xx++){
+              uint32_t p=icon[yy*32+xx];if(!(p>>24))continue;
+              if(faded)p=((p&0xfefefe)>>1)&0xffffff;
+              pd_fill(c,x+xx,y+yy,1,1,p&0xffffff);
+            }
+          }else pd_text_fit(c,x,y+10,32,m->nickname,faded?0xa8b0c0:0xf8f8f8,0x303840);
         });
       }
       quick_finish(&canvas);blit(renderer,overlay.p,uiPixels.data(),341,256,ow,oh);
