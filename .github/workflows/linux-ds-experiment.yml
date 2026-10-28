@@ -1,7 +1,7 @@
 name: Linux DS experiment
 on:
   push:
-    branches: [experiment/dsperate-linux]
+    branches: [experiment/dsperate-linux, experiment/ds-one-screen-battles]
   workflow_dispatch:
 permissions:
   contents: read

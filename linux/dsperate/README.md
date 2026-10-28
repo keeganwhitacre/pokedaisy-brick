@@ -202,3 +202,28 @@ used, matching upstream's Town Map reader. Visited colouring follows the same
 range remain limited by the upstream telemetry. Fly selection, island unlock
 extensions and route previews are not implemented. Only Platinum USA Rev 1
 is enabled, and physical Brick navigation still needs validation.
+
+## One-screen battle experiment
+
+The separate `experiment/ds-one-screen-battles` branch adds SET → BATTLES:
+OFF retains manual screen selection; AUTO shows the native bottom screen
+while the controller waits for player input and the top screen otherwise;
+PANEL puts the complete native command screen over the battle scene at native
+pixel size. This is a prototype layout, not a redesigned battle menu. It covers
+part of the battlefield while choosing, preserving all native command UI.
+
+R2 cycles PANEL → bottom → top → PANEL during a command phase; AUTO can be
+manually overridden to top with R2. Overrides reset when the battle phase
+changes. The virtual stylus uses Select + D-pad and Select + A in either the
+bottom screen or panel. Existing DS button inputs go directly to the emulator.
+The option defaults OFF and is stored independently of normal screen preference.
+`POCKET_DS_BATTLE=1` or `2` overrides its initial value for testing.
+
+Detection reuses upstream pk_nds_field's battle controller reads. The separate
+metadata prerequisite fills Platinum's existing table entry, whose context and
+command offsets were unset. No second game-address table is introduced.
+Doubles, target selection, battle bag/party submenus and physical Brick controls
+need explicit validation before this could be proposed upstream. There is no
+custom action injection, forced move selection or synthetic menu artwork.
+`POCKET_DS_STOP_ON_BATTLE_INPUT=1` ends a diagnostic run on the command phase,
+allowing its real screen to be captured with --shot. This is not normal play.

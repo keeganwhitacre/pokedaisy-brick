@@ -3,12 +3,23 @@
 #include "core/state/state.h"
 #include "companion.h"
 #include "wide.h"
+#include "battle_view.h"
 #include "map_art.h"
 #include <cassert>
 #include <fstream>
 #include <cstdio>
 #include <cstring>
 int main(int argc,char** argv){
+  assert(!ds_battle_view(0,true,true,false).bottom);
+  assert(ds_battle_view(1,true,true,false).bottom);
+  assert(!ds_battle_view(1,true,false,true).bottom);
+  assert(ds_battle_view(2,true,true,false).panel);
+  assert(ds_battle_view(2,true,true,false,1).bottom && !ds_battle_view(2,true,true,false,1).panel);
+  assert(ds_battle_view(2,false,false,true).bottom);
+  std::vector<uint32_t> topPixels(256*192,0xff112233),bottomPixels(256*192,0xffabcdef),panel;
+  ds_battle_panel(topPixels.data(),bottomPixels.data(),panel);
+  assert(panel.size()==341*256 && panel[0]==0x112233 && panel[64*341+85]==0xabcdef && panel.back()==0xabcdef);
+  std::puts("PASS battle view transitions, override and native-screen panel composition");
   assert(argc==3 || argc==4);std::ifstream file(argv[1],std::ios::binary);
   std::vector<uint8_t> ram{std::istreambuf_iterator<char>(file),{}};
   assert(ram.size()==4*1024*1024);
