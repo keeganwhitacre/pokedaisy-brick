@@ -227,3 +227,10 @@ need explicit validation before this could be proposed upstream. There is no
 custom action injection, forced move selection or synthetic menu artwork.
 `POCKET_DS_STOP_ON_BATTLE_INPUT=1` ends a diagnostic run on the command phase,
 allowing its real screen to be captured with --shot. This is not normal play.
+
+Validated on a real Platinum wild Starly encounter: command panel, Fight →
+move list, confirming Close Combat, and automatic return to the top-screen
+animation. The ARM/JIT binary also restores and displays the live move menu
+under QEMU. This does not validate physical hardware, doubles or all submenus.
+Resume restoration now initializes direct-boot context before deserializing
+into its fresh console, as a normal launch does.

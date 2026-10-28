@@ -4,11 +4,18 @@
 #include "companion.h"
 #include "wide.h"
 #include "battle_view.h"
+#include "pk_nds_field.h"
+#include <filesystem>
 #include "map_art.h"
 #include <cassert>
 #include <fstream>
 #include <cstdio>
 #include <cstring>
+static std::vector<uint8_t> battleRam;
+static uint32_t battle_read32(uint32_t addr){
+  if(addr<0x02000000 || addr>0x023ffffc)return 0;
+  uint32_t value;std::memcpy(&value,battleRam.data()+addr-0x02000000,4);return value;
+}
 int main(int argc,char** argv){
   assert(!ds_battle_view(0,true,true,false).bottom);
   assert(ds_battle_view(1,true,true,false).bottom);
@@ -23,6 +30,20 @@ int main(int argc,char** argv){
   assert(argc==3 || argc==4);std::ifstream file(argv[1],std::ios::binary);
   std::vector<uint8_t> ram{std::istreambuf_iterator<char>(file),{}};
   assert(ram.size()==4*1024*1024);
+  auto battlePath=std::filesystem::path(argv[1]).parent_path().parent_path()/"platinum_battle"/"mainram.bin";
+  std::ifstream capturedBattle(battlePath,std::ios::binary);
+  battleRam={std::istreambuf_iterator<char>(capturedBattle),{}};
+  assert(battleRam.size()==4*1024*1024);
+  const auto* game=pk_nds_field_game("CPUE",1);assert(game && game->offBattleContext==0x30 && game->offCommand==8);
+  assert(pk_nds_field_state(game,battle_read32,nullptr,0)&PK_NDS_FIELD_BATTLE);
+  auto fs=battle_read32(game->fieldSystemPtr),pm=battle_read32(fs+game->offProcessManager),child=battle_read32(pm+4);
+  auto system=battle_read32(child+0x1c),context=battle_read32(system+game->offBattleContext);
+  assert(context>=0x02000000 && context<=0x023ffff0);
+  // The captured fixture omits the controller head; seed just that test field.
+  uint32_t command=PK_NDS_BATTLE_SELECTING;
+  std::memcpy(battleRam.data()+context-0x02000000+game->offCommand,&command,4);
+  assert(pk_nds_battle_command(game,battle_read32)==pk_nds_battle_selecting(game));
+  std::puts("PASS captured battle pointer chain and Platinum controller metadata");
   auto s=ds_read_companion(ram.data(),ram.size());
   assert(s.valid && s.party.size()==1);
   assert(s.party[0].species==387 && s.party[0].level==6);
