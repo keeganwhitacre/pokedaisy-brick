@@ -235,7 +235,7 @@ private fun readGen5Battle(r: MemoryReader, b: Gen5Battle): Gen5BattleRead? {
     val foes = if (inMain(foeParty)) {
         val count = u32(r.readCoreMemory(foeParty + 4, 4), 0).toInt().coerceIn(0, PARTY_SIZE)
         val raw = r.readCoreMemory(foeParty + 8, PARTY_SIZE * GEN5_MON_SIZE)
-        (0 until count).mapNotNull { decodeGen4PartyMon(raw, it * GEN5_MON_SIZE, 649) }
+        (0 until count).mapNotNull { decodeGen4PartyMon(raw, it * GEN5_MON_SIZE, 649, GEN5_MON_SIZE) }
     } else emptyList()
     return Gen5BattleRead(mons, foes, foeOut.takeIf { it in foes.indices } ?: -1, competitor != 0, doubles)
 }
@@ -252,7 +252,7 @@ fun readGen5Telemetry(r: MemoryReader, cfg: Gen5Config): Telemetry {
         val off = slot * GEN5_MON_SIZE
         val personality = u32(partyRaw, off)
         val steady = (off until off + GEN5_MON_SIZE).all { partyRaw[it] == again[it] }
-        (if (steady) decodeGen4PartyMon(partyRaw, off, cfg.maxSpecies) else null)?.also { lastGoodParty[slot] = it }
+        (if (steady) decodeGen4PartyMon(partyRaw, off, cfg.maxSpecies, GEN5_MON_SIZE) else null)?.also { lastGoodParty[slot] = it }
             ?: lastGoodParty[slot]?.takeIf { it.personality == personality }
     }
     val items = readGen5Bag(r, cfg, img)

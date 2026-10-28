@@ -356,8 +356,10 @@ private fun gen4Crypt(raw: ByteArray, off: Int, len: Int, seed: Long): ByteArray
  * as encrypted dropped the lead every few seconds: the game looks at it that often on the field.) HeartGold / SoulSilver
  * also hold one party Pokémon's blocks in plaintext between frames with the flags clear (slot 1 on both players' saves,
  * on the field), so whichever way the checksum adds up is taken, and likewise the party fields that make sense.
- * Gen 5 keeps the same struct (Black: [maxSpecies] 649). */
-fun decodeGen4PartyMon(raw: ByteArray, off: Int, maxSpecies: Int = 493): Mon? {
+ * Gen 5 keeps the same struct with shorter party fields (Black: [maxSpecies] 649, [size] 220: read as 236, a full
+ * party's sixth slot ran past the read and threw, and the companion showed nothing). */
+fun decodeGen4PartyMon(raw: ByteArray, off: Int, maxSpecies: Int = 493, size: Int = GEN4_MON_SIZE): Mon? {
+    if (off < 0 || off + size > raw.size) return null
     val personality = u32(raw, off)
     val decrypted = u16(raw, off + 4)
     val checksum = u16(raw, off + 6)
@@ -380,9 +382,9 @@ fun decodeGen4PartyMon(raw: ByteArray, off: Int, maxSpecies: Int = 493): Mon? {
     val flags = u8(blocks, b + 0x18)
     // The party fields carry no checksum: a level or HP no Pokémon has is a read gone wrong.
     fun sane(p: ByteArray) = u8(p, 4) in 1..100 && u16(p, 8) in 1..999 && u16(p, 6) <= u16(p, 8)
-    val plainParty = raw.copyOfRange(off + GEN4_BOX_SIZE, off + GEN4_MON_SIZE)
+    val plainParty = raw.copyOfRange(off + GEN4_BOX_SIZE, off + size)
     val party = (if (decrypted and 1 != 0) plainParty.takeIf(::sane)
-        else gen4Crypt(raw, off + GEN4_BOX_SIZE, GEN4_MON_SIZE - GEN4_BOX_SIZE, personality).takeIf(::sane)
+        else gen4Crypt(raw, off + GEN4_BOX_SIZE, size - GEN4_BOX_SIZE, personality).takeIf(::sane)
             ?: plainParty.takeIf(::sane)) ?: return null
     return Mon(
         species = species,
