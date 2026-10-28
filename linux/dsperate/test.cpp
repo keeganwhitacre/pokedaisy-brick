@@ -14,6 +14,10 @@ int main(int argc,char** argv){
   auto s=ds_read_companion(ram.data(),ram.size());
   assert(s.valid && s.party.size()==1);
   assert(s.party[0].species==387 && s.party[0].level==6);
+  assert(s.dexValid && s.seenCount==2 && s.caughtCount==1);
+  assert(s.dexSeen[387] && s.dexSeen[390] && s.dexCaught[387] && !s.dexCaught[390]);
+  assert(s.dexSeen.size()==494);
+
   bool potion=false,balls=false;
   for(auto i:s.bag){potion|=i.id==17 && i.count==3;balls|=i.id==4 && i.count==5;}
   assert(potion && balls);

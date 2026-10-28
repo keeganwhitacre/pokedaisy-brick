@@ -62,6 +62,17 @@ DsCompanion ds_read_companion(const uint8_t* ram,size_t size) {
     auto p=at(base+pd_ds_data::bagOff+slot*4,4);if(!p)return {};
     if(u16(p) && u16(p+2))out.bag.push_back({u16(p),u16(p+2),pocket});
   }pocket++;}
+  auto dex=at(base+pd_ds_data::pokedexOff,pd_ds_data::dexSize);
+  if(dex && u32(dex)==pd_ds_data::dexMagic){
+    out.dexValid=true;out.nationalDex=dex[pd_ds_data::nationalDexOff]!=0;
+    out.dexSeen.resize(pd_ds_data::dexMax+1);out.dexCaught.resize(pd_ds_data::dexMax+1);
+    for(unsigned n=1;n<=pd_ds_data::dexMax;n++){
+      unsigned byte=(n-1)/8,bit=(n-1)%8;
+      out.dexSeen[n]=(dex[pd_ds_data::dexSeenBase+byte]>>bit)&1;
+      out.dexCaught[n]=out.dexSeen[n] && ((dex[pd_ds_data::dexCaughtBase+byte]>>bit)&1);
+      out.seenCount+=out.dexSeen[n];out.caughtCount+=out.dexCaught[n];
+    }
+  }
   out.valid=true;return out;
 }
 const char* ds_species(int id){return name(pd_ds_data::species,id);}

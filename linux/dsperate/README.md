@@ -17,7 +17,10 @@ No Pokémon ROM, save, proprietary BIOS or game art is bundled.
   It shows party, HP, held items, moves/PP, bag, trainer, money and location.
   Summary Left/Right switches between moves and information (EXP, nature,
   gender, egg flag and health status); Up/Down switches party members.
-  This is not the full Android companion; there is no dex, map, field action,
+  DEX reads upstream seen/caught flags, counts and National unlock status. It
+  browses species by National number; unseen names are hidden. Left/Right pages
+  through the dex or bag. This does not implement Sinnoh ordering or dex entries.
+  This is not the full Android companion; there is no map, field action,
   sprites, battle UI replacement, auto-resume or persistent DS settings yet.
 - Experimental 340×256 overworld view: optional DSperate hooks capture geometry
   before clipping and render eight auxiliary views. The original 256×192 center
@@ -126,3 +129,24 @@ For reproducible frontend smoke tests, `POCKET_DS_KEYS` accepts comma-separated
 `frame:DS-button-bitmask:duration` entries and `POCKET_DS_COMPANION_AT=N` pauses
 into the companion at host iteration N. Normal `--frames` / `--shot` also work.
 These are test controls, not evidence of a live Pokémon run.
+
+## Companion compatibility audit
+
+| Upstream capability | DS Linux experiment |
+| --- | --- |
+| Party / basic summary / moves | Live read-only data; limited text presentation |
+| Bag | Live names/quantities; scrolling and page movement |
+| Pokédex | Live seen/caught flags and counts, National-number browser |
+| Regional ordering, dex descriptions, pictures | Not integrated; upstream ROM-art extraction needs a Linux path |
+| Trainer/location | Basic live fields and National Dex unlock status |
+| Town map / visited destinations | Upstream Gen4 data exists; not integrated |
+| Battle telemetry / enemy party | Upstream decoder exists; not integrated |
+| Repels / field actions | Upstream RAM/call paths exist; not integrated or tested here |
+| DS persistent settings / auto-resume | Not integrated |
+| Other supported DS ROMs | Companion disabled until a matching adapter is verified |
+
+The current shared C companion targets Gen 3. Reusing its widgets is practical,
+but passing DS data through its game-specific readers is not. The experiment
+keeps DS reads separate and generates reference data from the Kotlin sources.
+A shared game-independent snapshot boundary should be agreed with upstream
+before attempting full menu parity. No parallel game-address registry is added.

@@ -60,8 +60,8 @@ void blit(SDL_Renderer* r,SDL_Texture* t,const uint32_t* px,int w,int h,int ow,i
 void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int selected,bool summary,int scroll,int page){
   pd_fill(&c,0,0,c.w,c.h,0x50a8a8);pd_title_box(&c,5,5,c.w-10,25,0xffffff);
   pd_text(&c,12,10,"PokeDaisy DS / EXPERIMENT",0x303030,PD_NO_SHADOW);
-  const char* tabs[]={"PARTY","BAG","STATUS"};
-  for(int i=0;i<3;i++){int x=5+i*(c.w-10)/3;pd_title_box(&c,x,34,(c.w-10)/3-2,23,i==tab?0xffefbc:0xffffff);pd_text(&c,x+8,38,tabs[i],0x303030,PD_NO_SHADOW);}
+  const char* tabs[]={"PARTY","BAG","DEX","STATUS"};
+  for(int i=0;i<4;i++){int x=5+i*(c.w-10)/4;pd_title_box(&c,x,34,(c.w-10)/4-2,23,i==tab?0xffefbc:0xffffff);pd_text(&c,x+8,38,tabs[i],0x303030,PD_NO_SHADOW);}
   pd_list_box(&c,5,61,c.w-10,c.h-86);int y=68;
   auto line=[&](const std::string& t){pd_text_fit(&c,13,y,c.w-26,t.c_str(),0x303030,PD_NO_SHADOW);y+=20;};
   if(!supported)line("Companion: Platinum USA Rev 1 only");
@@ -80,8 +80,19 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
     auto& m=s.party[i];if(int(i)==selected)pd_fill(&c,10,y-2,c.w-20,20,0xffe4a0);
     line(m.nickname+" Lv"+std::to_string(m.level)+"  "+std::to_string(m.hp)+"/"+std::to_string(m.maxHp));
   }}else if(tab==1){int rows=(c.h-100)/20;for(int i=scroll;i<int(s.bag.size()) && i<scroll+rows;i++)line(std::string(ds_item(s.bag[i].id))+" x"+std::to_string(s.bag[i].count));}
-  else {line("TRAINER: "+s.trainer);line("MONEY: "+std::to_string(s.money));line(std::string("PLACE: ")+ds_place(s.map));line("MAP: "+std::to_string(s.map));}
-  pd_text_fit(&c,9,c.h-20,c.w-18,summary?"Left/Right info/moves  Up/Down Pokemon":"L/R tabs  A summary  B back  L2 game",0xffffff,PD_NO_SHADOW);
+  else if(tab==2){
+    if(!s.dexValid)line("Pokedex data unavailable");
+    else {
+      line("SEEN "+std::to_string(s.seenCount)+"  OWN "+std::to_string(s.caughtCount));
+      int rows=(c.h-120)/20;
+      for(int n=scroll+1;n<int(s.dexSeen.size()) && n<scroll+1+rows;n++){
+        char number[12];std::snprintf(number,sizeof number,"%03d ",n);
+        line(std::string(number)+(s.dexSeen[n]?ds_species(n):"???")+(s.dexCaught[n]?"  OWN":s.dexSeen[n]?"  SEEN":""));
+      }
+    }
+  }
+  else {line("TRAINER: "+s.trainer);line("MONEY: "+std::to_string(s.money));line(std::string("PLACE: ")+ds_place(s.map));line("MAP: "+std::to_string(s.map));line(s.dexValid?(s.nationalDex?"NATIONAL DEX: UNLOCKED":"NATIONAL DEX: LOCKED"):"DEX: UNAVAILABLE");}
+  pd_text_fit(&c,9,c.h-20,c.w-18,tab==0 && summary?"Left/Right info/moves  Up/Down Pokemon":tab==1 || tab==2?"Up/Down scroll  Left/Right page  L/R tabs":"L/R tabs  A summary  B back  L2 game",0xffffff,PD_NO_SHADOW);
 }
 }
 extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* shot,SDL_Renderer* renderer,bool (*keepRunning)()) {
@@ -151,12 +162,17 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
       if(pressed&1){ds::state::Writer w;if(!nds->save_state(w,err) || !atomic_file(state,w.data().data(),w.data().size())){std::fprintf(stderr,"DS state save failed: %s\n",err.c_str());failed=true;done=true;}paused=false;}
       if(pressed&(1u<<10)){auto data=read_file(state);if(!data.empty()){ds::state::Reader r(data.data(),data.size());wide.enable(false);if(!nds->load_state(r,err)){failed=true;done=true;std::fprintf(stderr,"DS state load failed: %s\n",err.c_str());}}paused=false;}
     }else if(showCompanion){
-      if(summary && (pressed&((1u<<4)|(1u<<5))))page=1-page;
-      if(pressed&(1u<<8)){tab=(tab+1)%3;summary=false;scroll=0;}
-      if(pressed&(1u<<9)){tab=(tab+2)%3;summary=false;scroll=0;}
-      if(pressed&(1u<<6)){if(tab==1)scroll=std::max(0,scroll-1);else selected=std::max(0,selected-1);}
-      if(pressed&(1u<<7)){if(tab==1)scroll=std::min(std::max(0,int(snap.bag.size())-1),scroll+1);else selected=std::min(std::max(0,int(snap.party.size())-1),selected+1);}
-      if(pressed&1)summary=true;
+      if(tab==0 && summary && (pressed&((1u<<4)|(1u<<5))))page=1-page;
+      if(pressed&(1u<<8)){tab=(tab+1)%4;summary=false;scroll=0;}
+      if(pressed&(1u<<9)){tab=(tab+3)%4;summary=false;scroll=0;}
+      if(pressed&(1u<<6)){if(tab==1 || tab==2)scroll=std::max(0,scroll-1);else selected=std::max(0,selected-1);}
+      if(pressed&(1u<<7)){if(tab==1 || tab==2)scroll=std::min(std::max(0,(tab==1?int(snap.bag.size()):int(snap.dexSeen.size())-1)-1),scroll+1);else selected=std::min(std::max(0,int(snap.party.size())-1),selected+1);}
+      if(tab==1 || tab==2){
+        int last=std::max(0,(tab==1?int(snap.bag.size()):int(snap.dexSeen.size())-1)-1);
+        if(pressed&(1u<<4))scroll=std::min(last,scroll+7);
+        if(pressed&(1u<<5))scroll=std::max(0,scroll-7);
+      }
+      if(tab==0 && (pressed&1))summary=true;
       if(pressed&(1u<<1)){if(summary)summary=false;else showCompanion=false;}
     }else{
       bool touchMode=bottom && (keys&(1u<<2));

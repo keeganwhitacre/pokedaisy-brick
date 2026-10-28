@@ -14,7 +14,14 @@ config = re.search(r'val GEN4_PLATINUM_US = Gen4Config\((.*?)\n\)', reader, re.S
 def number(text, name):
     return int(re.search(r'\b' + name + r'(?:\s*:\s*\w+)?\s*=\s*(0x[0-9a-fA-F]+|\d+)', text)[1], 0)
 fields = {name: number(config, name) for name in
-          ['saveDataPtr', 'trainerOff', 'partyOff', 'bagOff', 'locationOff']}
+          ['saveDataPtr', 'trainerOff', 'partyOff', 'bagOff', 'locationOff', 'pokedexOff', 'nationalDexOff']}
+dex = (data / 'Gen4Dex.kt').read_text()
+fields['dexSize'] = int(re.search(r'val d = r.readCoreMemory\(body \+ off, (0x[0-9A-Fa-f]+)\)', dex)[1], 0)
+fields['dexMagic'] = int(re.search(r'if \(magic != (0x[0-9A-Fa-f]+)L\)', dex)[1], 0)
+fields['dexMax'] = int(re.search(r'val seen = \(1\.\.(\d+)\)', dex)[1])
+assert 'bit(4 + 64, it)' in dex and 'bit(4, it)' in dex
+fields['dexCaughtBase'] = 4
+fields['dexSeenBase'] = 4 + 64
 fields['bodyOff'] = number(reader, 'bodyOff')
 fields['monSize'] = number(reader, 'GEN4_MON_SIZE')
 fields['boxSize'] = number(reader, 'GEN4_BOX_SIZE')
