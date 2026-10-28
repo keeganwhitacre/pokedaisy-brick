@@ -245,3 +245,27 @@ companion and the pause screen being enlarged and cropped after selecting a ROM.
 Native and ARM/QEMU checks cover this transition's renderer state; physical
 Brick confirmation is still required. Menu opens the pause screen; Start there
 returns to the ROM picker.
+
+### Shared Linux shell integration
+
+L2 (Tab on a keyboard) opens the existing Linux GLASS quick-menu renderer.
+D-pad selects; A confirms; B or L2 closes. The four entries are COMPANION,
+SAVE STATE, LOAD STATE and LEAVE GAME. LOAD STATE is disabled until its slot
+exists. L2 inside the companion returns to the game. Overlay navigation is
+consumed by the host, with held buttons blocked until released.
+
+A party HUD reuses linux/hud.c's level, HP, lead highlight and status drawing.
+The DS reader supplies the party data and an asset callback instead of using
+GBA ROM tables. Species names are a temporary text fallback; native DS icons,
+minimap and ball HUD integration remain incomplete. SET -> HUD toggles it,
+persisted in ds-settings.ini. It is hidden during battles and locked/menu scenes.
+
+This step does not implement projection/camera expansion or custom battle
+commands. Keep EXPANSION off on the Brick: the old auxiliary-view experiment
+is too slow there. Battle AUTO/PANEL behavior is unchanged. No game addresses
+or game-data tables were added by this shell integration.
+
+Tests drive the actual host input path through POCKET_DS_HOST_KEYS and verify
+companion access, disabled loading, manual save/load, leave game and pause.
+The shared HUD callback is exercised with captured Platinum party RAM.
+These automated checks do not validate the new overlay on a physical Brick.

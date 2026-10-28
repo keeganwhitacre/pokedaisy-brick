@@ -36,6 +36,37 @@ with tempfile.TemporaryDirectory(prefix='pd-ds-frontend-') as directory:
     result = subprocess.run(command + ['--data', directory, '--frames', '5', rom],
                             env=env, capture_output=True, text=True, timeout=70)
     assert result.returncode == 0 and 'core frames 2' in result.stderr, result.stderr
+    env.pop('POCKET_DS_COMPANION_AT')
+    # Enter the shared quick menu through the actual L2 host path, select its
+    # companion tile and prove emulation stays paused throughout both overlays.
+    env['POCKET_DS_HOST_KEYS'] = '2:4096:1,4:1:1'
+    result = subprocess.run(command + ['--data', directory, '--frames', '8', rom],
+                            env=env, capture_output=True, text=True, timeout=70)
+    assert result.returncode == 0 and 'core frames 2' in result.stderr, result.stderr
+    # A missing manual state stays disabled, with the menu still paused.
+    env['POCKET_DS_HOST_KEYS'] = '2:4096:1,4:128:1,6:1:1'
+    result = subprocess.run(command + ['--data', directory, '--frames', '10', rom],
+                            env=env, capture_output=True, text=True, timeout=70)
+    assert result.returncode == 0 and 'core frames 2' in result.stderr, result.stderr
+    # RIGHT selects SAVE STATE; it uses the existing DS state slot.
+    env['POCKET_DS_HOST_KEYS'] = '2:4096:1,4:16:1,6:1:1'
+    result = subprocess.run(command + ['--data', directory, '--frames', '10', rom],
+                            env=env, capture_output=True, text=True, timeout=70)
+    assert result.returncode == 0, result.stderr
+    assert (Path(directory) / 'states' / (Path(rom).name + '.dsperate.ss')).stat().st_size > 1000
+    # DOWN selects LOAD STATE: restore the actual state saved at core frame 2.
+    env['POCKET_DS_HOST_KEYS'] = '2:4096:1,4:128:1,6:1:1'
+    result = subprocess.run(command + ['--data', directory, '--frames', '10', rom],
+                            env=env, capture_output=True, text=True, timeout=70)
+    assert result.returncode == 0 and 'manual state loaded at core frame 2' in result.stderr, result.stderr
+    # LEFT selects LEAVE GAME, returning without advancing a guest frame.
+    env['POCKET_DS_HOST_KEYS'] = '2:4096:1,4:32:1,6:1:1'
+    result = subprocess.run(command + ['--data', directory, '--frames', '10', rom],
+                            env=env, capture_output=True, text=True, timeout=70)
+    assert result.returncode == 0 and 'core frames 2' in result.stderr, result.stderr
+    env.pop('POCKET_DS_HOST_KEYS')
+    env['POCKET_DS_COMPANION_AT'] = '2'
+    print('PASS shared quick menu: companion, save state, leave game and paused core')
     # Real process restarts: default-off, persisted opt-in, separate resume slot,
     # failed deserialization recovery, explicit bypass and newer-save precedence.
     env.pop('POCKET_DS_COMPANION_AT')

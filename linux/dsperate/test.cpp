@@ -11,6 +11,10 @@
 #include <fstream>
 #include <cstdio>
 #include <cstring>
+extern "C" {
+#include "../hud.h"
+#include "../quick_menu.h"
+}
 static std::vector<uint8_t> battleRam;
 static uint32_t battle_read32(uint32_t addr){
   if(addr<0x02000000 || addr>0x023ffffc)return 0;
@@ -47,6 +51,17 @@ int main(int argc,char** argv){
   auto s=ds_read_companion(ram.data(),ram.size());
   assert(s.valid && s.party.size()==1);
   assert(s.party[0].species==387 && s.party[0].level==6);
+  pd_snapshot hs{};hs.valid=true;hs.partyCount=1;
+  hs.party[0].species=s.party[0].species;hs.party[0].level=s.party[0].level;
+  hs.party[0].hp=s.party[0].hp;hs.party[0].maxHp=s.party[0].maxHp;
+  std::vector<uint32_t> hpixels(341*256,QUICK_CLEAR);pd_canvas hc;pd_canvas_init(&hc,341,256,hpixels.data());
+  int icons=0;
+  hud_party_draw(&hc,&hs,&icons,[](pd_canvas*,void* ctx,const pd_mon* mon,int,int,bool){
+    assert(mon->species==387 && mon->level==6);++*static_cast<int*>(ctx);
+  });
+  assert(icons==1);quick_finish(&hc);
+  bool drawn=false;for(auto p:hpixels)drawn|=p!=0;assert(drawn);
+  std::puts("PASS shared party HUD with captured Gen 4 data and backend asset callback");
   assert(s.dexValid && s.seenCount==2 && s.caughtCount==1);
   assert(s.dexSeen[387] && s.dexSeen[390] && s.dexCaught[387] && !s.dexCaught[390]);
   assert(s.dexSeen.size()==494);
