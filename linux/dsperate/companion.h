@@ -10,6 +10,7 @@ struct DsMon {
   int species=0, level=0, hp=0, maxHp=0, heldItem=0;
   uint32_t personality=0, experience=0, status=0;
   bool egg=false;
+  int gender=0, nature=0;
   std::array<int,4> moves{}, pp{};
   std::string nickname;
 };
@@ -27,3 +28,6 @@ const char* ds_species(int id);
 const char* ds_move(int id);
 const char* ds_item(int id);
 const char* ds_place(int id);
+
+const char* ds_nature(int id);
+const char* ds_status(const DsMon& mon);

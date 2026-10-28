@@ -32,6 +32,10 @@ maps = {'species': string_map('speciesNamesPlatinum'),
         'moves': string_map('moveDataPlatinum', True),
         'items': string_map('itemNamesPlatinum'),
         'places': string_map('mapPlacesPlatinum')}
+stats = (data / 'MonStats.kt').read_text()
+natures = re.findall(r'"([^"\n]+)"', re.search(r'private val natureNames = listOf\((.*?)\n\)', stats, re.S)[1])
+assert len(natures) == 25
+maps['natures'] = dict(enumerate(natures))
 charmap = (data / 'Gen4Charmap.kt').read_text()
 def literal(name):
     return json.loads('"'+re.search(name+r'\s*=\s*"((?:\\.|[^"\\])*)"', charmap)[1]+'"')

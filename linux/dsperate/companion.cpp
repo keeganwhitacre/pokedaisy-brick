@@ -38,6 +38,7 @@ bool ds_decode_mon(const uint8_t* raw,size_t size,DsMon& mon) {
   else {crypt(party,sizeof party,pid);if(!sane(party)){std::memcpy(party,raw+pd_ds_data::boxSize,sizeof party);if(!sane(party))return false;} }
   mon={};mon.species=species;mon.personality=pid;mon.level=party[4];mon.hp=u16(party+6);mon.maxHp=u16(party+8);
   mon.status=u32(party);mon.heldItem=u16(a+2);mon.experience=u32(a+8);mon.egg=(u32(b+16)>>30)&1;
+  mon.gender=(b[24]&4)?0:(b[24]&2)?2:1;mon.nature=pid%25;
   mon.nickname=text(c,11);if(mon.nickname.empty())mon.nickname=ds_species(species);
   for(int i=0;i<4;i++){mon.moves[i]=u16(b+2*i);mon.pp[i]=b[8+i];}return true;
 }
@@ -67,3 +68,14 @@ const char* ds_species(int id){return name(pd_ds_data::species,id);}
 const char* ds_move(int id){return name(pd_ds_data::moves,id);}
 const char* ds_item(int id){return name(pd_ds_data::items,id);}
 const char* ds_place(int id){return name(pd_ds_data::places,id);}
+
+const char* ds_nature(int id){return name(pd_ds_data::natures,id);}
+const char* ds_status(const DsMon& m){
+  if(m.hp==0)return "FAINTED";
+  if(m.status&7)return "SLEEP";
+  if(m.status&0x88)return "POISON";
+  if(m.status&0x10)return "BURN";
+  if(m.status&0x20)return "FREEZE";
+  if(m.status&0x40)return "PARALYSIS";
+  return "OK";
+}

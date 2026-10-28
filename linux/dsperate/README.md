@@ -15,13 +15,17 @@ No Pokémon ROM, save, proprietary BIOS or game art is bundled.
   USA Rev 1 ROM recognized by the Android app:
   SHA-1 `0862ec35b24de5c7e2dcb88c9eea0873110d755c`.
   It shows party, HP, held items, moves/PP, bag, trainer, money and location.
+  Summary Left/Right switches between moves and information (EXP, nature,
+  gender, egg flag and health status); Up/Down switches party members.
   This is not the full Android companion; there is no dex, map, field action,
   sprites, battle UI replacement, auto-resume or persistent DS settings yet.
 - Experimental 340×256 overworld view: optional DSperate hooks capture geometry
   before clipping and render eight auxiliary views. The original 256×192 center
   is copied from the real screen, not stretched. Upstream's Platinum RAM field
   state gates expansion off during battles, menus and locked field tasks.
-  Text overlays, transitions, sprite/2D layers and seams need real-game testing.
+  Margins use DSperate's RGB conversion, master brightness and BG0 brightness
+  fades. Alpha blending against other 2D layers, scanline-specific effects,
+  text overlays, transitions and remaining geometric seams need further work.
   Auxiliary rendering may be too expensive on a Brick; it is OFF initially.
 
 The native tests use a captured upstream Platinum RAM fixture, an original
