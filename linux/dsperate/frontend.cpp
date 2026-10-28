@@ -175,7 +175,9 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
       auto data=read_file(resume);
       if(data.size()<8)std::fprintf(stderr,"DS resume ignored: truncated state; booting normally\n");
       else {ds::state::Reader reader(data.data(),data.size());
-      if(candidate->load_bios("","","",{},&problem) && candidate->load_rom(rom) && candidate->load_state(reader,problem)){
+      bool ready=candidate->load_bios("","","",{},&problem) && candidate->load_rom(rom);
+      if(ready)candidate->setup_direct_boot();
+      if(ready && candidate->load_state(reader,problem)){
         nds=std::move(candidate);active=nds.get();autoResumed=true;std::fprintf(stderr,"DS auto-resumed at core frame %llu\n",(unsigned long long)nds->frame_count);
       }else std::fprintf(stderr,"DS resume ignored: %s; booting normally\n",problem.c_str());
       }
