@@ -36,4 +36,45 @@ with tempfile.TemporaryDirectory(prefix='pd-ds-frontend-') as directory:
     result = subprocess.run(command + ['--data', directory, '--frames', '5', rom],
                             env=env, capture_output=True, text=True, timeout=70)
     assert result.returncode == 0 and 'core frames 2' in result.stderr, result.stderr
+    # Real process restarts: default-off, persisted opt-in, separate resume slot,
+    # failed deserialization recovery, explicit bypass and newer-save precedence.
+    env.pop('POCKET_DS_COMPANION_AT')
+    env.pop('POCKET_DS_RESUME', None)
+    env.pop('POCKET_DS_EXPAND', None)
+    root = Path(directory)
+    resume = root / 'states' / (Path(rom).name + '.dsperate.resume.ss')
+    manual = root / 'states' / (Path(rom).name + '.dsperate.ss')
+    assert not resume.exists()
+    manual.write_bytes(b'manual-slot-must-not-change')
+    (root / 'ds-settings.ini').write_text('bottom=0\nexpand=1\nresume=1\nunknown=1\n')
+
+    def run(frames=2):
+        result = subprocess.run(command + ['--data', directory, '--frames', str(frames), rom],
+                                env=env, capture_output=True, text=True, timeout=70)
+        assert result.returncode == 0, result.stderr
+        return result.stderr
+
+    assert 'resume captured at core frame 5' in run(5)
+    assert resume.stat().st_size > 1000
+    log = run()
+    assert 'auto-resumed at core frame 5' in log and 'resume captured at core frame 7' in log, log
+    assert manual.read_bytes() == b'manual-slot-must-not-change'
+    before = resume.read_bytes()
+    env['POCKET_DS_RESUME'] = '0'
+    log = run()
+    assert 'auto-resumed' not in log and 'core frames 2' in log, log
+    assert resume.read_bytes() == before
+    env.pop('POCKET_DS_RESUME')
+    for bad in (b'', b'DSST' + b'\0' * 28, before[:len(before)//2]):
+        resume.write_bytes(bad)
+        log = run()
+        assert 'resume ignored:' in log and 'core frames 2' in log, log
+    # A battery save supplied after the resume file takes precedence.
+    battery = root / 'saves' / (Path(rom).name + '.sav')
+    battery.write_bytes(b'\xff' * 65536)
+    now = resume.stat().st_mtime_ns
+    os.utime(battery, ns=(now + 2_000_000_000, now + 2_000_000_000))
+    log = run()
+    assert 'resume skipped: battery save is newer' in log and 'core frames 2' in log, log
+print('PASS restart/resume, corrupt-state recovery, bypass and newer-save precedence')
 print('PASS real DS launcher, diagnostic display screenshot and companion pause')

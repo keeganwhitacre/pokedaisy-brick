@@ -21,7 +21,8 @@ No Pokémon ROM, save, proprietary BIOS or game art is bundled.
   browses species by National number; unseen names are hidden. Left/Right pages
   through the dex or bag. This does not implement Sinnoh ordering or dex entries.
   This is not the full Android companion; there is no map, field action,
-  sprites, battle UI replacement, auto-resume or persistent DS settings yet.
+  sprites or battle UI replacement yet. SET persists DS screen, expansion and
+  optional auto-resume preferences independently of GBA settings.
 - Experimental 340×256 overworld view: optional DSperate hooks capture geometry
   before clipping and render eight auxiliary views. The original 256×192 center
   interior is copied from the real screen, not stretched. The one-pixel
@@ -142,7 +143,7 @@ These are test controls, not evidence of a live Pokémon run.
 | Town map / visited destinations | Upstream Gen4 data exists; not integrated |
 | Battle telemetry / enemy party | Upstream decoder exists; not integrated |
 | Repels / field actions | Upstream RAM/call paths exist; not integrated or tested here |
-| DS persistent settings / auto-resume | Not integrated |
+| DS persistent settings / auto-resume | SET tab; separate clean-exit resume slot, opt-in |
 | Other supported DS ROMs | Companion disabled until a matching adapter is verified |
 
 The current shared C companion targets Gen 3. Reusing its widgets is practical,
@@ -150,3 +151,29 @@ but passing DS data through its game-specific readers is not. The experiment
 keeps DS reads separate and generates reference data from the Kotlin sources.
 A shared game-independent snapshot boundary should be agreed with upstream
 before attempting full menu parity. No parallel game-address registry is added.
+
+## DS settings and auto-resume
+
+Open the companion with L2, then use L/R to select SET. Up/Down selects SCREEN,
+EXPANSION or AUTO-RESUME; A toggles it. Preferences are atomically saved to
+`DATA/ds-settings.ini`, separate from the existing GBA settings file. Screen
+swaps (R2) and expansion changes (F or paused Y) also update DS preferences.
+Expansion and auto-resume both default OFF. These settings apply to DS games
+in this data directory, while resume files are per ROM filename.
+
+When AUTO-RESUME is ON, a successful clean exit captures
+`DATA/states/ROM.nds.dsperate.resume.ss`. The next launch restores it; manual
+states remain in the separate `.dsperate.ss` slot. A forced shutdown does not
+capture a new resume state. Keep using the game's own Save menu too.
+
+Resume states contain battery memory. A newer battery-save timestamp skips an
+older resume file, allowing a newly supplied save to boot normally. Invalid,
+truncated, wrong-ROM or incompatible resume states fall back to a fresh boot;
+restoration occurs in a separate console so a failed load cannot partially
+corrupt the fresh session. The next successful clean exit replaces that resume
+file. Filesystem timestamps are a precedence hint, not a substitute for backups.
+
+`POCKET_DS_RESUME=0` bypasses auto-resume and automatic resume capture for one
+launch, leaving an existing resume file untouched. `POCKET_DS_EXPAND=0` similarly
+overrides the initial expansion preference. Changing a preference in the UI
+persists the current DS preferences. No GBA save, state or setting is migrated.

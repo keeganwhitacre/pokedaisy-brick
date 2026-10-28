@@ -54,3 +54,8 @@ An experimental DSperate build exists on the DS testing branch only. Its
 companion is a limited, read-only Platinum USA Rev 1 reader. DS expansion and
 Brick performance require game and hardware testing. It is disabled in normal
 builds; see `linux/dsperate/README.md` before trying it.
+
+The DS testing branch now has a SET tab for screen selection, expansion and
+optional auto-resume. Auto-resume is off initially and uses a separate state
+slot captured on clean exit; it does not replace in-game saving. See the DS
+experiment README for recovery controls and remaining testing limits.
