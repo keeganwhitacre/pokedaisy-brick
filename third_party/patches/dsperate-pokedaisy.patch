@@ -1,0 +1,103 @@
+diff --git a/src/core/gpu/gpu3d.cpp b/src/core/gpu/gpu3d.cpp
+index 5c4076c..76f197c 100644
+--- a/src/core/gpu/gpu3d.cpp
++++ b/src/core/gpu/gpu3d.cpp
+@@ -613,6 +613,7 @@ void Gpu3D::exec_single(u8 cmd, const u32* p) {
+     flush_attr_ = param & 3;   // finalise_list's sort mode
+     // Takes effect now: list finalised and bank flipped immediately; render
+     // happens at VBlank. swap_wait_ carries the busy bit until then.
++    if (poke_swap) poke_swap(poke_user, *this);
+     if (rendering_on_) finalise_list();
+     swapped_ = true;
+     swap_wait_ = true;
+@@ -837,6 +838,11 @@ void Gpu3D::submit_polygon() {
+   }
+   for (int i = clipstart; i < nverts; ++i) src[i] = vptr_[i];
+ 
++  if (poke_submit) {
++    const Vertex* raw[4] = {vptr_[0], vptr_[1], vptr_[2], vptr_[3]};
++    poke_submit(poke_user, *this, raw, nverts);
++  }
++
+   // Trivial reject: every new vertex outside the same plane. Reused strip
+   // vertices are untested and forbid the reject, as in the clipper.
+   unsigned oc_all = clipstart == 0 ? 0x3Fu : 0u, oc_any = 0;
+@@ -1000,6 +1006,36 @@ void Gpu3D::finish_polygon(Polygon* poly, int nverts) {
+   last_strip_poly_ = poly_mode_ >= 2 ? poly : nullptr;
+ }
+ 
++// Auxiliary views use the same clipper, polygon setup, texture decoder and
++// software rasteriser as the game. Shift clip X/Y by a camera-sized fraction
++// of W; the game renderer and its polygon/vertex counters remain untouched.
++void Gpu3D::poke_polygon(const Gpu3D& source, const Vertex* const* v, int count, int dx, int dy) {
++  cur_polygon_attr_ = source.cur_polygon_attr_;
++  texparam_ = source.texparam_; texpal_ = source.texpal_;
++  viewport_ = source.viewport_; zero_dot_w_limit_ = source.zero_dot_w_limit_;
++  poly_mode_ = count == 4 ? 1 : 0; last_strip_poly_ = nullptr;
++  reset_vptr();
++  for (int i = 0; i < count; ++i) {
++    temp_vtx_[i] = *v[i];
++    temp_vtx_[i].pos[0] -= static_cast<s32>((static_cast<s64>(v[i]->pos[3]) * 2 * dx) / 256);
++    temp_vtx_[i].pos[1] += static_cast<s32>((static_cast<s64>(v[i]->pos[3]) * 2 * dy) / 192);
++    temp_vtx_[i].oc = outcode(temp_vtx_[i].pos);
++    temp_vtx_[i].clipped = false;
++  }
++  submit_polygon();
++}
++void Gpu3D::poke_swap_list(const Gpu3D& source) {
++  renderer_.sync_all(); flush_attr_ = source.flush_attr_;
++  finalise_list();
++  { std::lock_guard<std::mutex> lk(bank_mu_);
++    render_bank_ = raster_bank_ = pending_bank_ = bank_; bank_ = next_write_bank(); }
++  num_vertices_ = num_polygons_ = num_opaque_ = 0; last_strip_poly_ = nullptr;
++}
++void Gpu3D::poke_render(const Gpu3D& source) {
++  renderer_.sync_all(); rstate_ = source.rstate_; render_identical_ = false;
++  renderer_.render(*this); renderer_.sync_all();
++}
++
+ void Gpu3D::calculate_lighting() {
+   if ((texparam_ >> 30) == 2) {
+     texcoords_[0] = static_cast<s16>(raw_texcoords_[0] + ((static_cast<s64>(normal_[0]) * tex_[0] + static_cast<s64>(normal_[1]) * tex_[4] + static_cast<s64>(normal_[2]) * tex_[8]) >> 21));
+@@ -1060,6 +1096,19 @@ void Gpu3D::box_test(const u32* params) {
+     for (int i = 0; i < 4; ++i) face[i] = cube[f[i]];
+     if (clip_polygon<false>(face, 4, 0, cur_polygon_attr_ & (1 << 12)) > 0) { box_result_ = 1u << 1; return; }
+   }
++  // Retry the box against the requested wider frustum, as PokéDaisy does
++  // on melonDS. This makes the game submit geometry needed in the margins.
++  if (poke_submit && (poke_width > 256 || poke_height > 192)) {
++    for (const auto& f : faces) {
++      Vertex face[10];
++      for (int i = 0; i < 4; ++i) {
++        face[i] = cube[f[i]];
++        face[i].pos[0] = static_cast<s32>(static_cast<s64>(face[i].pos[0]) * 256 / poke_width);
++        face[i].pos[1] = static_cast<s32>(static_cast<s64>(face[i].pos[1]) * 192 / poke_height);
++      }
++      if (clip_polygon<false>(face, 4, 0, cur_polygon_attr_ & (1 << 12)) > 0) { box_result_ = 1u << 1; return; }
++    }
++  }
+ }
+ 
+ void Gpu3D::pos_test() {
+diff --git a/src/core/gpu/gpu3d.h b/src/core/gpu/gpu3d.h
+index 91ab402..5efb403 100644
+--- a/src/core/gpu/gpu3d.h
++++ b/src/core/gpu/gpu3d.h
+@@ -130,6 +130,17 @@ public:
+   void debug_dump(FILE* f) { renderer_.debug_dump(f); }
+   void set_render_xpos(u16 value, u16 mask);
+ 
++  // Optional embedder hooks, before clipping and at list swap. No guest state
++  // is changed; auxiliary renderers share texture VRAM through the same NDS.
++  void* poke_user = nullptr;
++  void (*poke_submit)(void*, const Gpu3D&, const Vertex* const*, int) = nullptr;
++  void (*poke_swap)(void*, const Gpu3D&) = nullptr;
++  int poke_width = 256, poke_height = 192;
++  void poke_polygon(const Gpu3D& source, const Vertex* const* v, int count, int dx, int dy);
++  void poke_swap_list(const Gpu3D& source);
++  void poke_render(const Gpu3D& source);
++
++
+   void check_fifo_irq();
+   void check_fifo_irq_fast() { if (gxstat_ >> 30) check_fifo_irq(); }
+   void check_fifo_dma();

@@ -49,3 +49,8 @@ This early version does not include the Polished Crystal companion, the longer
 summaries or firmware power handling. Earlier
 builds ran on the Brick and Smart Pro, but this separated foundation still
 needs fresh device testing. Other Linux handhelds are not verified.
+
+An experimental DSperate build exists on the DS testing branch only. Its
+companion is a limited, read-only Platinum USA Rev 1 reader. DS expansion and
+Brick performance require game and hardware testing. It is disabled in normal
+builds; see `linux/dsperate/README.md` before trying it.

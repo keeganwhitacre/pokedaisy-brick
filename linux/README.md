@@ -167,3 +167,10 @@ or extracted artwork is included in commits or install artifacts.
 
 GPL-3.0, preserving Lidor Itzhari's attribution. Existing dependency/font notices
 are in NOTICE and the packaged licenses. No new third-party library is added.
+
+## Optional DS experiment
+
+The `experiment/dsperate-linux` branch has an opt-in DSperate prototype.
+See [dsperate/README.md](dsperate/README.md) for its build flag, Platinum-only
+companion scope, controls and unverified gameplay/hardware limitations.
+Normal builds keep DS disabled.

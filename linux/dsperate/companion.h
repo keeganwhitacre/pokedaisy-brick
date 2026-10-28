@@ -1,0 +1,29 @@
+// GPL-3.0. Experimental live Gen 4 reader, adapted from Gen4Reader.kt.
+#pragma once
+#include <cstddef>
+#include <cstdint>
+#include <array>
+#include <vector>
+#include <string>
+
+struct DsMon {
+  int species=0, level=0, hp=0, maxHp=0, heldItem=0;
+  uint32_t personality=0, experience=0, status=0;
+  bool egg=false;
+  std::array<int,4> moves{}, pp{};
+  std::string nickname;
+};
+struct DsItem { int id, count, pocket; };
+struct DsCompanion {
+  bool valid=false;
+  int money=0, badges=0, map=0;
+  std::string trainer;
+  std::vector<DsMon> party;
+  std::vector<DsItem> bag;
+};
+bool ds_decode_mon(const uint8_t* raw, size_t size, DsMon& mon);
+DsCompanion ds_read_companion(const uint8_t* ram, size_t size);
+const char* ds_species(int id);
+const char* ds_move(int id);
+const char* ds_item(int id);
+const char* ds_place(int id);
