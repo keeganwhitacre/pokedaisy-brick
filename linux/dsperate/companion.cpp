@@ -73,6 +73,21 @@ DsCompanion ds_read_companion(const uint8_t* ram,size_t size) {
       out.seenCount+=out.dexSeen[n];out.caughtCount+=out.dexCaught[n];
     }
   }
+  out.playerGender=trainer[24];
+  auto read=[&](uint32_t addr)->uint32_t{auto p=at(addr,4);return p?u32(p):0;};
+  uint32_t fs=read(pd_ds_data::fieldSystemPtr),header=out.map;
+  uint32_t x=read(base+pd_ds_data::locationOff+8),z=read(base+pd_ds_data::locationOff+12);
+  if(at(fs,4)){
+    uint32_t location=read(fs+pd_ds_data::map_offLocation),avatar=read(fs+pd_ds_data::map_offPlayerAvatar);
+    uint32_t obj=at(avatar,4)?read(avatar+pd_ds_data::map_offAvatarMapObject):0;
+    if(at(location,4) && at(obj,4)){header=read(location);x=read(obj+pd_ds_data::map_offObjectX);z=read(obj+pd_ds_data::map_offObjectZ);out.map=header;}
+  }
+  if(std::find(std::begin(pd_ds_data::mainHeaders),std::end(pd_ds_data::mainHeaders),int(header))==std::end(pd_ds_data::mainHeaders)){
+    x=read(base+pd_ds_data::locationOff+pd_ds_data::map_offExitLocation+8);z=read(base+pd_ds_data::locationOff+pd_ds_data::map_offExitLocation+12);
+  }
+  if(x/32<30 && z/32<30){out.mapX=x/32;out.mapY=z/32;}
+  uint32_t flags=base+pd_ds_data::map_varsOff+pd_ds_data::map_numVars*2;
+  for(unsigned i=0;i<56;i++){unsigned bit=pd_ds_data::map_firstArrivalFlag+i;auto p=at(flags+bit/8,1);if(p && ((*p>>(bit%8))&1))out.arrivals|=uint64_t(1)<<i;}
   out.valid=true;return out;
 }
 const char* ds_species(int id){return name(pd_ds_data::species,id);}

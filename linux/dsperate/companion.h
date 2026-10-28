@@ -19,6 +19,8 @@ struct DsCompanion {
   bool valid=false, dexValid=false, nationalDex=false;
   std::vector<uint8_t> dexSeen, dexCaught;
   int seenCount=0, caughtCount=0;
+  int mapX=-1,mapY=-1,playerGender=0;
+  uint64_t arrivals=0;
   int money=0, badges=0, map=0;
   std::string trainer;
   std::vector<DsMon> party;

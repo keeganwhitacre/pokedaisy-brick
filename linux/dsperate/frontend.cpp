@@ -8,6 +8,7 @@
 #include "companion.h"
 #include "data_gen.h"
 #include "wide.h"
+#include "map_art.h"
 #include "pk_nds_field.h"
 #include <SDL.h>
 #include <filesystem>
@@ -75,11 +76,11 @@ void blit(SDL_Renderer* r,SDL_Texture* t,const uint32_t* px,int w,int h,int ow,i
   SDL_UpdateTexture(t,nullptr,px,w*4);int scale=std::max(1,std::min(ow/w,oh/h));
   SDL_Rect dst{(ow-w*scale)/2,(oh-h*scale)/2,w*scale,h*scale};SDL_RenderCopy(r,t,nullptr,&dst);
 }
-void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int selected,bool summary,int scroll,int page,const DsPrefs& prefs,int setting){
+void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int selected,bool summary,int scroll,int page,const DsPrefs& prefs,int setting,const DsMapArt& art,int mapX,int mapY){
   pd_fill(&c,0,0,c.w,c.h,0x50a8a8);pd_title_box(&c,5,5,c.w-10,25,0xffffff);
   pd_text(&c,12,10,"PokeDaisy DS / EXPERIMENT",0x303030,PD_NO_SHADOW);
-  const char* tabs[]={"PARTY","BAG","DEX","STATUS","SET"};
-  for(int i=0;i<5;i++){int x=5+i*(c.w-10)/5;pd_title_box(&c,x,34,(c.w-10)/5-2,23,i==tab?0xffefbc:0xffffff);pd_text(&c,x+8,38,tabs[i],0x303030,PD_NO_SHADOW);}
+  const char* tabs[]={"PARTY","BAG","DEX","STATUS","SET","MAP"};
+  for(int i=0;i<6;i++){int x=5+i*(c.w-10)/6;pd_title_box(&c,x,34,(c.w-10)/6-2,23,i==tab?0xffefbc:0xffffff);pd_text(&c,x+8,38,tabs[i],0x303030,PD_NO_SHADOW);}
   pd_list_box(&c,5,61,c.w-10,c.h-86);int y=68;
   auto line=[&](const std::string& t){pd_text_fit(&c,13,y,c.w-26,t.c_str(),0x303030,PD_NO_SHADOW);y+=20;};
   if(tab==4){
@@ -89,6 +90,28 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
   }
   else if(!supported)line("Companion: Platinum USA Rev 1 only");
   else if(!s.valid){line("Waiting for the game's save data");line("Return to the game to finish booting");}
+  else if(tab==5){
+    if(art.background.empty())line("Map art unavailable");
+    else {
+      int ox=(c.w-art.width)/2,oy=61;
+      for(int y=0;y<art.height;y++)for(int x=0;x<art.width;x++)c.px[(oy+y)*c.w+ox+x]=art.background[y*art.width+x]&0xffffff;
+      auto sprite=[&](const std::vector<uint32_t>& img,int cx,int cy){for(int y=0;y<16;y++)for(int x=0;x<16;x++){
+        int dx=cx-8+x,dy=cy-8+y;if(dx>=0 && dx<art.width && dy>=0 && dy<art.height && (img[y*16+x]>>24))c.px[(oy+dy)*c.w+ox+dx]=img[y*16+x]&0xffffff;
+      }};
+      for(auto mark:pd_ds_data::mapMarks){
+        bool visited=mark.arrival<56 && ((s.arrivals>>mark.arrival)&1);
+        if(mark.hidden && !visited)continue;
+        int variant=visited?1+mark.palette:0,index=mark.shape*3+variant;
+        if(index<int(art.blocks.size()))sprite(art.blocks[index],mark.x-pd_ds_data::mapLeft,mark.y-pd_ds_data::mapTop);
+      }
+      if(s.mapX>=0 && s.mapY>=0 && !art.heads.empty())sprite(art.heads[s.playerGender==1?1:0],pd_ds_data::mapOriginX+s.mapX*pd_ds_data::mapTile+3,pd_ds_data::mapOriginY+s.mapY*pd_ds_data::mapTile+3);
+      int cx=ox+pd_ds_data::mapOriginX+mapX*pd_ds_data::mapTile,cy=oy+pd_ds_data::mapOriginY+mapY*pd_ds_data::mapTile;
+      pd_clip(&c,ox,oy,art.width,art.height);
+      pd_fill(&c,cx,cy,7,1,0xe84840);pd_fill(&c,cx,cy+6,7,1,0xe84840);pd_fill(&c,cx,cy,1,7,0xe84840);pd_fill(&c,cx+6,cy,1,7,0xe84840);pd_unclip(&c);
+      pd_fill(&c,10,9,c.w-20,17,0xffffff);
+      const char* name=ds_map_name(ds_map_section(mapX,mapY));pd_text_fit(&c,12,10,c.w-24,*name?name:"No location",0x303030,PD_NO_SHADOW);
+    }
+  }
   else if(tab==0 && summary && selected<int(s.party.size())){
     auto& m=s.party[selected];line(m.nickname+"  Lv"+std::to_string(m.level));
     line(std::string(ds_species(m.species))+"  HP "+std::to_string(m.hp)+"/"+std::to_string(m.maxHp));
@@ -115,13 +138,14 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
     }
   }
   else {line("TRAINER: "+s.trainer);line("MONEY: "+std::to_string(s.money));line(std::string("PLACE: ")+ds_place(s.map));line("MAP: "+std::to_string(s.map));line(s.dexValid?(s.nationalDex?"NATIONAL DEX: UNLOCKED":"NATIONAL DEX: LOCKED"):"DEX: UNAVAILABLE");}
-  pd_text_fit(&c,9,c.h-20,c.w-18,tab==4?"Up/Down select  A change  L/R tabs":tab==0 && summary?"Left/Right info/moves  Up/Down Pokemon":tab==1 || tab==2?"Up/Down scroll  Left/Right page  L/R tabs":"L/R tabs  A summary  B back  L2 game",0xffffff,PD_NO_SHADOW);
+  pd_text_fit(&c,9,c.h-20,c.w-18,tab==5?"D-pad move  A player  L/R tabs":tab==4?"Up/Down select  A change  L/R tabs":tab==0 && summary?"Left/Right info/moves  Up/Down Pokemon":tab==1 || tab==2?"Up/Down scroll  Left/Right page  L/R tabs":"L/R tabs  A summary  B back  L2 game",0xffffff,PD_NO_SHADOW);
 }
 }
 extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* shot,SDL_Renderer* renderer,bool (*keepRunning)()) {
   auto bytes=read_file(rom);if(bytes.size()<512 || bytes.size()>512u*1024*1024){std::fprintf(stderr,"DS: invalid ROM size\n");return 1;}
   uint8_t digest[20];ds::crypto::sha1(bytes.data(),bytes.size(),digest);char hex[41];for(int i=0;i<20;i++)std::sprintf(hex+2*i,"%02x",digest[i]);
   bool supported=!std::strcmp(hex,pd_ds_data::sha1);char code[5]={};std::memcpy(code,bytes.data()+12,4);int revision=bytes[30];
+  DsMapArt mapArt=supported?ds_map_art(bytes):DsMapArt{};
   bytes.clear();bytes.shrink_to_fit();
   std::fprintf(stderr,"DSperate %s rev %d SHA1 %s, companion %s\n",code,revision,hex,supported?"Platinum":"unsupported");
   auto nds=std::make_unique<ds::NDS>();active=nds.get();
@@ -167,7 +191,7 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
   DsWide wide(*nds);const auto* field=supported?pk_nds_field_game(code,revision):nullptr;
   bool& bottom=prefs.bottom;bool& expand=prefs.expand;
   bool done=false,showCompanion=false,paused=false,summary=false,failed=false;
-  int setting=0,page=0,tab=0,selected=0,scroll=0,touchX=128,touchY=96;uint32_t keys=0;unsigned repeat[8]={};int frame=0;
+  int mapX=-1,mapY=-1,setting=0,page=0,tab=0,selected=0,scroll=0,touchX=128,touchY=96;uint32_t keys=0;unsigned repeat[8]={};int frame=0;
   const int raw[]={1,0,11,10,9,8,2,3,15,-1,12,13};
   struct Press{int at,n;uint32_t mask;};std::vector<Press> script;
   if(auto s=std::getenv("POCKET_DS_KEYS")){std::string text=s;size_t pos=0;while(pos<text.size()){Press p{};int used=0;if(std::sscanf(text.c_str()+pos,"%d:%u:%d%n",&p.at,&p.mask,&p.n,&used)!=3)break;script.push_back(p);pos+=used+1;}}
@@ -208,15 +232,25 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
       if(pressed&(1u<<10)){auto data=read_file(state);if(!data.empty()){ds::state::Reader r(data.data(),data.size());wide.enable(false);if(!nds->load_state(r,err)){failed=true;done=true;std::fprintf(stderr,"DS state load failed: %s\n",err.c_str());}}paused=false;}
     }else if(showCompanion){
       if(tab==0 && summary && (pressed&((1u<<4)|(1u<<5))))page=1-page;
-      if(pressed&(1u<<8)){tab=(tab+1)%5;summary=false;scroll=0;}
-      if(pressed&(1u<<9)){tab=(tab+4)%5;summary=false;scroll=0;}
+      if(pressed&(1u<<8)){tab=(tab+1)%6;summary=false;scroll=0;}
+      if(pressed&(1u<<9)){tab=(tab+5)%6;summary=false;scroll=0;}
+      if(tab==5){
+        int minY=std::max(0,int(std::ceil(double(-pd_ds_data::mapOriginY-3)/pd_ds_data::mapTile)));
+        int maxY=std::min(29,int((pd_ds_data::mapHeight-1-pd_ds_data::mapOriginY-3)/pd_ds_data::mapTile));
+        if(mapX<0 || (pressed&((1u<<8)|(1u<<9)|1))){mapX=snap.mapX>=0?snap.mapX:0;mapY=snap.mapY>=0?snap.mapY:minY;}
+        if(pressed&(1u<<4))mapX++;
+        if(pressed&(1u<<5))mapX--;
+        if(pressed&(1u<<6))mapY--;
+        if(pressed&(1u<<7))mapY++;
+        mapX=std::clamp(mapX,0,29);mapY=std::clamp(mapY,minY,maxY);
+      }
       if(tab==4){
         if(pressed&(1u<<6))setting=(setting+2)%3;
         if(pressed&(1u<<7))setting=(setting+1)%3;
         if(pressed&1){if(setting==0)bottom=!bottom;else if(setting==1)expand=!expand;else prefs.resume=!prefs.resume;}
       }
-      if(tab!=4 && (pressed&(1u<<6))){if(tab==1 || tab==2)scroll=std::max(0,scroll-1);else selected=std::max(0,selected-1);}
-      if(tab!=4 && (pressed&(1u<<7))){if(tab==1 || tab==2)scroll=std::min(std::max(0,(tab==1?int(snap.bag.size()):int(snap.dexSeen.size())-1)-1),scroll+1);else selected=std::min(std::max(0,int(snap.party.size())-1),selected+1);}
+      if(tab!=4 && tab!=5 && (pressed&(1u<<6))){if(tab==1 || tab==2)scroll=std::max(0,scroll-1);else selected=std::max(0,selected-1);}
+      if(tab!=4 && tab!=5 && (pressed&(1u<<7))){if(tab==1 || tab==2)scroll=std::min(std::max(0,(tab==1?int(snap.bag.size()):int(snap.dexSeen.size())-1)-1),scroll+1);else selected=std::min(std::max(0,int(snap.party.size())-1),selected+1);}
       if(tab==1 || tab==2){
         int last=std::max(0,(tab==1?int(snap.bag.size()):int(snap.dexSeen.size())-1)-1);
         if(pressed&(1u<<4))scroll=std::min(last,scroll+7);
@@ -241,7 +275,7 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
     if(prefs!=previous && !save_prefs(config,prefs))std::fprintf(stderr,"DS settings write failed\n");
     if((paused || showCompanion) && audio.id)SDL_ClearQueuedAudio(audio.id);
     int ow=1024,oh=768;SDL_GetRendererOutputSize(renderer,&ow,&oh);SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
-    if(showCompanion){companion(canvas,snap,supported,tab,selected,summary,scroll,page,prefs,setting);blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);}
+    if(showCompanion){companion(canvas,snap,supported,tab,selected,summary,scroll,page,prefs,setting,mapArt,mapX,mapY);blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);}
     else if(!bottom && expand && wide.compose(nds->gpu.framebuffer(0),widePixels))blit(renderer,wideTexture.p,widePixels.data(),340,256,ow,oh);
     else blit(renderer,top.p,nds->gpu.framebuffer(bottom?1:0),256,192,ow,oh);
     if(bottom && !showCompanion && !paused && (keys&(1u<<2))){

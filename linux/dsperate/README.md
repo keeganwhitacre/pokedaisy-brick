@@ -20,7 +20,11 @@ No Pokémon ROM, save, proprietary BIOS or game art is bundled.
   DEX reads upstream seen/caught flags, counts and National unlock status. It
   browses species by National number; unseen names are hidden. Left/Right pages
   through the dex or bag. This does not implement Sinnoh ordering or dex entries.
-  This is not the full Android companion; there is no map, field action,
+  MAP decodes the Town Map background, town blocks and player heads from the
+  owner's ROM. It uses the generated grid, live location/indoor exit fallback
+  and upstream first-arrival flags. D-pad moves across visible grid cells
+  (including blank ones); A recenters. No Fly action or game-memory writes.
+  This is not the full Android companion; there is no field action,
   sprites or battle UI replacement yet. SET persists DS screen, expansion and
   optional auto-resume preferences independently of GBA settings.
 - Experimental 340×256 overworld view: optional DSperate hooks capture geometry
@@ -140,7 +144,7 @@ These are test controls, not evidence of a live Pokémon run.
 | Pokédex | Live seen/caught flags and counts, National-number browser |
 | Regional ordering, dex descriptions, pictures | Not integrated; upstream ROM-art extraction needs a Linux path |
 | Trainer/location | Basic live fields and National Dex unlock status |
-| Town map / visited destinations | Upstream Gen4 data exists; not integrated |
+| Town map / visited destinations | ROM-derived map, grid navigation, player marker and upstream arrival flags; read-only |
 | Battle telemetry / enemy party | Upstream decoder exists; not integrated |
 | Repels / field actions | Upstream RAM/call paths exist; not integrated or tested here |
 | DS persistent settings / auto-resume | SET tab; separate clean-exit resume slot, opt-in |
@@ -177,3 +181,24 @@ file. Filesystem timestamps are a precedence hint, not a substitute for backups.
 launch, leaving an existing resume file untouched. `POCKET_DS_EXPAND=0` similarly
 overrides the initial expansion preference. Changing a preference in the UI
 persists the current DS preferences. No GBA save, state or setting is migrated.
+
+## Platinum Town Map
+
+L/R selects MAP. The D-pad moves one grid cell at a time and repeats while
+held; blank cells display "No location". A returns the cursor to the player's
+block. The cursor is constrained to the displayed map area. The player's head
+stays at their own block while browsing elsewhere.
+
+The background's two tilemaps, town-marker cells and player heads are decoded
+at launch directly from `/graphic/tmap_gra.narc`, following Android's NdsArt
+pipeline. Nothing is exported into or bundled with the application package.
+Grid data, section names, pointer/field offsets, sprite member ids and map
+coordinates are generated from existing upstream sources. No independent map
+or address list is maintained.
+
+Live field position is used outdoors; when indoors the saved exit block is
+used, matching upstream's Town Map reader. Visited colouring follows the same
+56 first-arrival bits as that reader; special island markers beyond that bit
+range remain limited by the upstream telemetry. Fly selection, island unlock
+extensions and route previews are not implemented. Only Platinum USA Rev 1
+is enabled, and physical Brick navigation still needs validation.

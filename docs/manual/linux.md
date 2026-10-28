@@ -59,3 +59,8 @@ The DS testing branch now has a SET tab for screen selection, expansion and
 optional auto-resume. Auto-resume is off initially and uses a separate state
 slot captured on clean exit; it does not replace in-game saving. See the DS
 experiment README for recovery controls and remaining testing limits.
+
+The DS experiment also has a read-only Platinum MAP tab. It reads artwork
+from your ROM and shows the player and visited town markers. D-pad moves the
+cursor over the map grid, including blank cells; A recenters on the player.
+Fly actions are not implemented.

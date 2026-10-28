@@ -3,12 +3,13 @@
 #include "core/state/state.h"
 #include "companion.h"
 #include "wide.h"
+#include "map_art.h"
 #include <cassert>
 #include <fstream>
 #include <cstdio>
 #include <cstring>
 int main(int argc,char** argv){
-  assert(argc==3);std::ifstream file(argv[1],std::ios::binary);
+  assert(argc==3 || argc==4);std::ifstream file(argv[1],std::ios::binary);
   std::vector<uint8_t> ram{std::istreambuf_iterator<char>(file),{}};
   assert(ram.size()==4*1024*1024);
   auto s=ds_read_companion(ram.data(),ram.size());
@@ -18,6 +19,19 @@ int main(int argc,char** argv){
   assert(s.dexSeen[387] && s.dexSeen[390] && s.dexCaught[387] && !s.dexCaught[390]);
   assert(s.dexSeen.size()==494);
 
+  assert(s.mapX==3 && s.mapY==27); // Player's house: use its outside exit block.
+  assert(ds_map_section(s.mapX,s.mapY)==1);
+  assert(std::strcmp(ds_map_name(1),"Twinleaf Town")==0);
+  assert(ds_map_section(0,0)==-1 && ds_map_section(-1,0)==-1 && ds_map_section(30,0)==-1);
+  assert(ds_map_art({}).background.empty());
+  if(argc==4){
+    std::ifstream cart(argv[3],std::ios::binary);std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(cart),{}};
+    auto art=ds_map_art(bytes);assert(art.width==216 && art.height==168);
+    assert(art.background.size()==216*168 && art.blocks.size()==21 && art.heads.size()==2);
+    bool varied=false;for(auto px:art.background)varied|=px!=art.background[0];assert(varied);
+    std::puts("PASS real ROM Town Map tiles/palettes/cells and player heads decoded");
+  }
+  std::puts("PASS map grid blank/bounds and captured indoor exit-location fallback");
   bool potion=false,balls=false;
   for(auto i:s.bag){potion|=i.id==17 && i.count==3;balls|=i.id==4 && i.count==5;}
   assert(potion && balls);
