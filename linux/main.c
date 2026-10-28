@@ -888,6 +888,10 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   if (ext && !strcasecmp(ext, ".nds")) {
     if (audio) { SDL_CloseAudioDevice(audio); audio = 0; }
     appError = pd_ds_run(path, root, maxFrames, shot, renderer, ds_running);
+    // The DS backend owns its device while running. Restore the normal host's
+    // device for the next GB/GBA game selected without restarting the app.
+    audio_open();
+    audioLost = !audio;
     held = pressed = 0;
     return;
   }
