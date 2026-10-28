@@ -9,6 +9,7 @@
 #include "data_gen.h"
 #include "wide.h"
 #include "battle_view.h"
+#include "display.h"
 #include "map_art.h"
 #include "pk_nds_field.h"
 #include <SDL.h>
@@ -293,7 +294,9 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
     }
     if(prefs!=previous && !save_prefs(config,prefs))std::fprintf(stderr,"DS settings write failed\n");
     if((paused || showCompanion) && audio.id)SDL_ClearQueuedAudio(audio.id);
-    int ow=1024,oh=768;SDL_GetRendererOutputSize(renderer,&ow,&oh);SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
+    int ow=1024,oh=768;
+    if(!ds_display_pixels(renderer,ow,oh)){std::fprintf(stderr,"DS display setup failed: %s\n",SDL_GetError());failed=true;break;}
+    SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
     if(showCompanion){companion(canvas,snap,supported,tab,selected,summary,scroll,page,prefs,setting,mapArt,mapX,mapY);blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);}
     else if(view.panel){ds_battle_panel(nds->gpu.framebuffer(0),nds->gpu.framebuffer(1),uiPixels);blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);}
     else if(!view.bottom && expand && wide.compose(nds->gpu.framebuffer(0),widePixels))blit(renderer,wideTexture.p,widePixels.data(),340,256,ow,oh);

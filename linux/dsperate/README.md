@@ -234,3 +234,14 @@ animation. The ARM/JIT binary also restores and displays the live move menu
 under QEMU. This does not validate physical hardware, doubles or all submenus.
 Resume restoration now initializes direct-boot context before deserializing
 into its fresh console, as a normal launch does.
+
+### Launcher display scaling regression
+
+The DS renderer resets the ROM picker's SDL logical size, integer scaling and
+viewport before drawing in physical output pixels. This prevents gameplay, the
+companion and the pause screen being enlarged and cropped after selecting a ROM.
+`ds-launcher-display` reproduces inherited picker scaling at 1024x768 (Brick),
+1280x720 and 640x480, and checks both opposite output corners remain visible.
+Native and ARM/QEMU checks cover this transition's renderer state; physical
+Brick confirmation is still required. Menu opens the pause screen; Start there
+returns to the ROM picker.
