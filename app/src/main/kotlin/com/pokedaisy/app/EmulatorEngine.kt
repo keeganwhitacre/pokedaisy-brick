@@ -678,6 +678,12 @@ class EmulatorEngine(
     @Volatile private var lastVsyncNanos = 0L
     /** The game screen's refresh period, averaged over recent ticks; 0 = not known yet. */
     @Volatile private var vsyncPeriodNanos = 0.0
+    /** The same over every tick since the screen's rate last changed, for the audio's rate: the ticks come when the GL
+     * thread wakes, a millisecond or more either side of the refresh, and [vsyncPeriodNanos] carried that into the
+     * resampling - the rate swung 47,390 - 48,660 Hz frame to frame on the Thor (SoulGold), a pitch wobble on held
+     * notes (#80's "tonal shifts"). Total time over refreshes cancels it out; 0 = not enough ticks yet. */
+    @Volatile private var audioPeriodNanos = 0.0
+    private val refreshAverage = RefreshAverage()
 
     /** Game frames run since the core started - SETTINGS > FPS / CPU counts them per second. */
     @Volatile var framesRun = 0L
@@ -720,6 +726,7 @@ class EmulatorEngine(
         if (d in 4_000_000L..34_000_000L) {
             val p = vsyncPeriodNanos
             vsyncPeriodNanos = if (p == 0.0) d.toDouble() else p + (d - p) * 0.05
+            audioPeriodNanos = refreshAverage.tick(d, vsyncPeriodNanos)
         }
         // At 1x two frames' worth of refreshes banked: one was too few - refreshes arriving unevenly (two close
         // together, then a gap) were dropped, each a game frame never run and its audio missing (GitHub #80).
@@ -1292,7 +1299,7 @@ class EmulatorEngine(
                         // Samples per emulated second so that a frame's worth lasts one frame of the
                         // display's, nudged towards a half-full buffer (dynamic rate control).
                         val fill = queued.toDouble() / bufferFrames
-                        val frameHz = 1e9 / (vsyncPeriodNanos * perFrame)
+                        val frameHz = 1e9 / ((audioPeriodNanos.takeIf { it > 0.0 } ?: vsyncPeriodNanos) * perFrame)
                         val drc = 1.0 + DRC_MAX * (1.0 - 2.0 * fill).coerceIn(-1.0, 1.0)
                         // The core's own frame rate: a DS makes 59.83 frames a second, not the GBA's 59.73 (0.17% that DRC
                         // otherwise spent a third of its range on, GitHub #215).
@@ -1890,6 +1897,39 @@ internal fun vsyncPace(queued: Int, bufferFrames: Int): VsyncPace = when {
     queued < bufferFrames * 3 / 8 -> VsyncPace.CATCH_UP
     queued > bufferFrames * 7 / 10 -> VsyncPace.HOLD
     else -> VsyncPace.ON_TICK
+}
+
+/**
+ * A screen's refresh period as total time over refreshes ([EmulatorEngine]'s audioPeriodNanos): each tick's own
+ * lateness cancels out, so the longer it runs the steadier it gets. An interval of two or more refreshes (a skipped
+ * tick) counts as that many; a [fast] average more than [CHANGE] off this one for [CHANGED_TICKS] ticks in a row means
+ * the screen's rate changed (60 / 120 Hz), and it starts over (a skipped tick alone throws the quick one ~5% for a few).
+ */
+internal class RefreshAverage {
+    private var nanos = 0L
+    private var refreshes = 0L
+    private var offTicks = 0
+
+    /** One tick [interval] after the last ([fast]: the quick average including it); the period, or 0 while too few. */
+    fun tick(interval: Long, fast: Double): Double {
+        if (fast <= 0.0) return 0.0
+        offTicks = if (refreshes > 0 && kotlin.math.abs(fast * refreshes / nanos - 1.0) > CHANGE) offTicks + 1 else 0
+        if (offTicks >= CHANGED_TICKS) {
+            nanos = 0L
+            refreshes = 0L
+            offTicks = 0
+        }
+        val n = kotlin.math.round(interval / fast).toLong().coerceAtLeast(1L)
+        nanos += interval
+        refreshes += n
+        return if (refreshes >= MIN_REFRESHES) nanos.toDouble() / refreshes else 0.0
+    }
+
+    private companion object {
+        const val CHANGE = 0.03
+        const val CHANGED_TICKS = 30
+        const val MIN_REFRESHES = 120L
+    }
 }
 
 /** [max] underruns within [windowNanos] under vsync pacing: [record] says it's time to go back to the timer. */
