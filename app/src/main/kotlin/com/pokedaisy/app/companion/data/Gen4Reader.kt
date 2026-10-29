@@ -305,8 +305,8 @@ val GEN4_SOULSILVER_US = gen4HeartGoldFamily(saveDataPtr = HEARTGOLD_SAVE_DATA_P
 /** A DS game ([readGen4Telemetry], [readGen5Telemetry]): two screens, its own look and tables. */
 val GameKind?.isDsGame: Boolean get() = this == GameKind.PLATINUM || isHgss || isGen5
 
-/** Gen 5 (Black): [readGen5Telemetry], its own tables. */
-val GameKind?.isGen5: Boolean get() = this == GameKind.BLACK
+/** Gen 5 (Black, White): [readGen5Telemetry], their own tables (one set for both). */
+val GameKind?.isGen5: Boolean get() = this == GameKind.BLACK || this == GameKind.WHITE
 
 /** The Gen 4 config for [kind], or null. */
 fun gen4ConfigFor(kind: GameKind?): Gen4Config? = when (kind) {

@@ -58,14 +58,14 @@ enum class DsPattern(internal val tile: List<String>, internal val colors: Map<C
 
 /** The party screen's pattern behind every tab of [game], or null for its art / stripes ([GameBackdrop]). */
 fun dsPartyPattern(game: GameKind): DsPattern? = when (game) {
-    GameKind.BLACK -> DsPattern.BLACK_PARTY
+    GameKind.BLACK, GameKind.WHITE -> DsPattern.BLACK_PARTY
     GameKind.PLATINUM -> DsPattern.PLATINUM_PARTY
     else -> null
 }
 
 /** The Pokédex's own pattern over the party one while DEX is open (Black's green grid, HG / SS's white one), or null. */
 fun dsDexPattern(game: GameKind): DsPattern? = when (game) {
-    GameKind.BLACK -> DsPattern.BLACK_DEX
+    GameKind.BLACK, GameKind.WHITE -> DsPattern.BLACK_DEX
     GameKind.HEARTGOLD, GameKind.SOULSILVER -> DsPattern.HGSS_DEX
     else -> null
 }

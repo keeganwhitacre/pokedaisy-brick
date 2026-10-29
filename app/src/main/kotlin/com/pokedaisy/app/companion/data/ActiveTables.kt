@@ -26,7 +26,7 @@ package com.pokedaisy.app.companion.data
 // NativeReader.kt. Heart and Soul and Lazarus now have their own
 // ROM-extracted tables (*Hns.kt / *Lazarus.kt, scripts/gen_expansion_tables.py).
 enum class GameKind { FIRERED, EMERALD, UNBOUND, GAIA, RADICAL_RED, ODYSSEY, HEART_AND_SOUL, LAZARUS, ROWE, EMERALD_ROGUE, AMETHYST, EMERALD_SEAGLASS, CELIA, TMT2, SOULGOLD, YELLOW, GLAZED, IMPERIUM, QUETZAL, ORANGE_ISLANDS, RECHARGED_YELLOW, MARIOMON, SWORD_SHIELD, GS_CHRONICLES, CRYSTAL, CRYSTAL_CLEAR, PRISM,
-    GOLD, SILVER, RED, BLUE, ELITE_REDUX, POLISHED_CRYSTAL, PLATINUM, HEARTGOLD, SOULSILVER, TEAM_ROCKET, BLACK,
+    GOLD, SILVER, RED, BLUE, ELITE_REDUX, POLISHED_CRYSTAL, PLATINUM, HEARTGOLD, SOULSILVER, TEAM_ROCKET, BLACK, WHITE,
     WISHES, PURE_RED, PURE_BLUE, DREAMSTONE }
 
 @Volatile
@@ -100,7 +100,8 @@ private inline val platinum get() = activeGame == GameKind.PLATINUM
 private inline val heartGold get() = activeGame.isHgss
 private inline val gen4 get() = activeGame.isDsGame
 // Pokémon Black (Nintendo DS, Gen 5): its own tables from the cart (gen_gen5_tables.py), checked before Gen 4's.
-private inline val black get() = activeGame == GameKind.BLACK
+// White shares them (its cart has the same names, gen_gen5_tables.py checks).
+private inline val black get() = activeGame.isGen5
 
 /** SoulGold v1.2 runs on v1.1.4's tables (byte for byte the same) but for one TM: its
  * TM75 teaches Agility, not Swords Dance. Set with [activeGame] by the Poller. */
@@ -672,6 +673,7 @@ fun GameKind.displayName(): String = when (this) {
     GameKind.HEARTGOLD -> "Pokémon HeartGold"
     GameKind.SOULSILVER -> "Pokémon SoulSilver"
     GameKind.BLACK -> "Pokémon Black"
+    GameKind.WHITE -> "Pokémon White"
     GameKind.PURE_RED -> "Pokémon PureRed"
     GameKind.PURE_BLUE -> "Pokémon PureBlue"
 }

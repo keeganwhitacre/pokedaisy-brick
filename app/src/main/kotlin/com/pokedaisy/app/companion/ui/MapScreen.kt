@@ -80,6 +80,7 @@ import com.pokedaisy.app.companion.data.activeRegionMap
 import com.pokedaisy.app.companion.data.flySpotName
 import com.pokedaisy.app.companion.data.gameCase
 import com.pokedaisy.app.companion.data.isDsGame
+import com.pokedaisy.app.companion.data.isGen5
 import com.pokedaisy.app.companion.data.isHgss
 import kotlin.math.floor
 
@@ -219,7 +220,7 @@ fun MapScreen(
                         bitmap = bitmap,
                         style = style,
                         head = regionMapBitmap(
-                            if (snapshot.game == GameKind.BLACK) NdsArt.BLACK_PLAYER
+                            if (snapshot.game.isGen5) NdsArt.BLACK_PLAYER
                             else if (snapshot.game.isHgss) (if (snapshot.playerGender == 1) com.pokedaisy.app.companion.data.PokegearMap.HEAD_F else com.pokedaisy.app.companion.data.PokegearMap.HEAD_M)
                             else if (snapshot.game.isDsGame) (if (snapshot.playerGender == 1) NdsArt.PLATINUM_HEAD_F else NdsArt.PLATINUM_HEAD_M)
                             else style.headAsset(snapshot.playerGender, snapshot.game),
@@ -239,7 +240,7 @@ fun MapScreen(
                             val small = regionMapBitmap(com.pokedaisy.app.companion.data.PokegearMap.cursor(0))
                             val big = regionMapBitmap(com.pokedaisy.app.companion.data.PokegearMap.cursor(1))
                             if (small != null && big != null) small to big else null
-                        } else if (snapshot.game == GameKind.BLACK) {
+                        } else if (snapshot.game.isGen5) {
                             val small = regionMapBitmap(NdsArt.blackCursor(0))
                             val big = regionMapBitmap(NdsArt.blackCursor(1))
                             if (small != null && big != null) small to big else null

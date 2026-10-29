@@ -1965,8 +1965,8 @@ built-in frames, storage + import - ui-preview compiles it, `OverlaysTest` cover
 
 ## Nintendo DS (melonDS)
 
-Platinum (USA rev 1, `CPUE`), HeartGold / SoulSilver (USA, `IPKE` / `IPGE`) and Black (USA / Europe, `IRBO`, a DSi
-enhanced cart that runs in DS mode) run on melonDS, with the companion, EXPAND and STEADY music.
+Platinum (USA rev 1, `CPUE`), HeartGold / SoulSilver (USA, `IPKE` / `IPGE`) and Black / White (USA / Europe, `IRBO` /
+`IRAO`, DSi enhanced carts that run in DS mode) run on melonDS, with the companion, EXPAND and STEADY music.
 
 **The core.** `third_party/melonds` (a submodule pinned to upstream 1.1) builds its core library only, with the
 software 3D renderer (unthreaded: on the emulation thread, since melonDS's render thread raced fast-forward's frame skip
@@ -2150,6 +2150,29 @@ saved at Gear Station) and from the cart's own files. Heap blocks keep their sou
   battle carry, tuned on HG/SS, stretched its HP boxes across them; a battle pulls the view back to the screen anyway.
 - Not done: battle input, the Elite Four's done flags (they're
   cleared at the League's door), Ghetsis' and N's (done with the National Dex, which Juniper hands over after the end).
+
+**White (Gen 5).** White (`IRAO` rev 0, `GameKind.WHITE`, `isGen5` with Black) is Black's game: only 5 of the cart's 247
+files differ (the wild sets `/a/1/2/6`, the Town Map's places `/a/0/8/6`, and `/a/0/2/6`, `/a/1/7/8`, `/a/2/3/1`, which the
+companion doesn't read), and the ARM9 and overlays are Black's code with the overlays and the statics 0x20 higher (the
+ARM9's low code - `returnZero`, `GameSystem_SetEvent` - where Black's is). Each address was found again through the code
+that uses it in both carts (a literal-pool word's code before it, found in White's binary; a function by its bytes) and
+checked headless: White loads Black's save as its own, so the `white*` fixtures are that save (Gear Station, Route 1, a
+wild battle, White Forest).
+- `pk_nds_field.cpp`'s `WHITE_US` and `pk_nds_call.cpp`'s `WHITE` (callSet 4), `GEN5_WHITE` (`Gen5Reader.kt`): the
+  SaveControl pointer 0x020A72B8, the GameSystem 0x02146268, the BGM stack 0x020AA1D0 / 0x020AA1DC, sSeqPlayer 0x0214E044;
+  the field's event check 0x0218A095, the PC's script event 0x02158789, FLY's skill calls 0x0215E861 / 0x0215EA35 /
+  0x0215EA59. Checked: the field, a text box, the X menu, a wild battle (command 3 at FIGHT), the PC, FLY refused on the
+  platform (indoors) then to Accumula Town and White Forest, WILD ENCOUNTERS' hold.
+- Its names, items, icons, zones and their places are Black's (`gen_gen5_tables.py BLACK WHITE` checks it, table for
+  table), so White reads Black's tables; its Town Map has White Forest (zone 424) where Black's has Black City (zone 0),
+  at the same point: `Gen5TownMapWhite.kt` (its places, zones and FLY spots), `whiteTownMap`. The Town Map's picture and
+  sprites, the icons and the fronts are the same files, so `NdsArt` writes them to Black's paths; White's DEX
+  descriptions are the text's bank 236 (Black's 235; both carts hold both): `NdsArt.WHITE_DEX`, `POKEDEX_WHITE`.
+- GUIDE: `gen_gen5_guide.py` takes either cart (`GuideGen5WhiteGen.kt`, `WHITE_WORLD`): its own wild sets (29 of 112
+  differ), IRIS (trainer 132) in Opelucid City's gym where Black has DRAYDEN (133), N with RESHIRAM (trainer 586; Black's
+  587 has ZEKROM). Its scripts, trainers and zone events are Black's file for file, so the hand-written pages and every
+  flag are Black's (`GUIDE_WHITE` = `bwGuide(WHITE_WORLD, "IRIS")`).
+- Its party, bag and Pokédex screens are Black's (the same files; checked headless), so the companion keeps Black's look.
 
 ## Build
 

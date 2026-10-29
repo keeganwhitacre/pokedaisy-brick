@@ -615,6 +615,11 @@ for a frame (traced with nds_dump's `watch`), FLY's destinations are the towns' 
 (`pk_nds_battle_3d`), not with Gen 4's BG3 battle carry. Its companion look - and Platinum's, HG / SS's DEX - is the game's own
 screens' (`BlackPartyPalette` with cut corners, `DsBackdrops.kt`'s patterns; the party's columns stay level, not lowered
 on the right like the games' - the user's call). docs/DEVELOPMENT.md's "Black".
+**White (IRAO; 2026-10-29)**: `GameKind.WHITE`, `isGen5` with Black: Black's code with its overlays and statics 0x20 higher
+(`WHITE_US`, pk_nds_call's `WHITE`, `GEN5_WHITE`), Black's tables, art and hand-written guide (the cart's files are the same
+but 5); its own Town Map places (White Forest for Black City: `Gen5TownMapWhite.kt`), DEX text (`NdsArt.WHITE_DEX`), wild
+sets and NEXT BOSS (IRIS, N's RESHIRAM: `GuideGen5WhiteGen.kt`). White loads Black's save: the `white*` fixtures are it.
+docs/DEVELOPMENT.md's "White".
 **Companion options (2026-10-08)**: RESUME GAMES (`Prefs.autoResume`, top-screen Settings > LIBRARY; off =
 a launch boots the save, a return from HOME still resumes - `freshLaunch`), CLOSE COMPANION (SETTINGS, two
 screens: the Presentation goes away until BACK on the game), STATUS BAR OFF / GAME / COMPANION (`Prefs.statusBarOnCompanion`,

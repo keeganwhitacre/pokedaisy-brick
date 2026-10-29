@@ -1781,6 +1781,7 @@ class PokeDaisyActivity : Activity() {
             "IPKE" -> com.pokedaisy.app.companion.data.HEARTGOLD_WORLD::wildRates
             "IPGE" -> com.pokedaisy.app.companion.data.SOULSILVER_WORLD::wildRates
             "IRBO" -> { { com.pokedaisy.app.companion.data.BLACK_WORLD.wildRateWords() } }
+            "IRAO" -> { { com.pokedaisy.app.companion.data.WHITE_WORLD.wildRateWords() } }
             else -> null
         }
         input.ds = nds

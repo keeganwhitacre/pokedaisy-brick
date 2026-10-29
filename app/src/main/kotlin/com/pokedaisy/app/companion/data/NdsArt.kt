@@ -33,6 +33,9 @@ object NdsArt {
     const val BLACK_ITEMS = "nds/black/items"
     const val BLACK_DEX = "nds/black/dex.tsv"
     const val BLACK_FRONT = "nds/black/front"
+    /** Pokémon White (IRAO rev 0): its cart's art is Black's, file for file, so it shares Black's paths; only its DEX
+     * descriptions are its own (the text's bank 236, Black's 235), in this file. */
+    const val WHITE_DEX = "nds/white/dex.tsv"
     /** The egg's party icon under [BLACK_ICONS] (the icon archive's 650th; 651 is Manaphy's egg). */
     const val BLACK_EGG = 650
     /** Black's Town Map under rom-art/regionmap ([townMapBlack]): the map (256 x 168), the sprite a place of kind n
@@ -104,13 +107,14 @@ object NdsArt {
         val rev = header[0x1E].toInt() and 0xFF
         val platinum = code == "CPUE" && rev == 1
         val heartGold = (code == "IPKE" || code == "IPGE") && rev == 0
-        val black = code == "IRBO" && rev == 0
+        val white = code == "IRAO" && rev == 0
+        val black = code == "IRBO" && rev == 0 || white
         if (!platinum && !heartGold && !black) return false
-        val marker = File(dir, if (black) "nds/black-built" else if (platinum) "nds/platinum-built" else "nds/heartgold-built")
+        val marker = File(dir, if (white) "nds/white-built" else if (black) "nds/black-built" else if (platinum) "nds/platinum-built" else "nds/heartgold-built")
         val stamp = "v$VERSION $code $rev"
         if (marker.isFile && runCatching { marker.readText() }.getOrNull() == stamp) return false
         if (black) {
-            if (!extractBlack(f, header, dir)) return false
+            if (!extractBlack(f, header, dir, white)) return false
             marker.parentFile?.mkdirs()
             marker.writeText(stamp)
             return true
@@ -189,9 +193,9 @@ object NdsArt {
      * its female one (empty where there's none); which palette is [iconPalettesBlack] (the cart's ARM9 table, a byte an
      * icon: low nibble the icon's, high nibble its female icon's). The bag's icons are a/0/2/5's NCGR / NCLR members by
      * [itemIconsBlack] (the ARM9's pairs by item id). Both generated from the cart, NdsArtBlackTest checks them against
-     * it. Then [dexBlack].
+     * it. Then [dexBlack]. White's cart ([white]) has the same art, written to the same paths, and its own DEX text.
      */
-    private fun extractBlack(f: RandomAccessFile, header: ByteArray, dir: File): Boolean {
+    private fun extractBlack(f: RandomAccessFile, header: ByteArray, dir: File, white: Boolean = false): Boolean {
         val narc = Narc(file(f, header, "/a/0/0/7") ?: return false)
         val palettes = palettes(narc.member(0))
         for (species in 1..BLACK_EGG) {
@@ -207,7 +211,7 @@ object NdsArt {
             }
         }
         file(f, header, "/a/0/8/5")?.let { townMapBlack(Narc(it), dir) }
-        dexBlack(f, header, dir)
+        dexBlack(f, header, dir, white)
         return true
     }
 
@@ -273,8 +277,9 @@ object NdsArt {
 
     /**
      * Black's DEX pages ([BLACK_DEX], the columns [dex] writes, plus a 24th: the hidden ability) and front pictures
-     * ([BLACK_FRONT]), all from the cart:
-     * - text (a/0/0/2, [Gen5Text]): 235 the descriptions (White's are 236), 260 categories, 182 ability names;
+     * ([BLACK_FRONT]), all from the cart; [white]: White's pages ([WHITE_DEX]), from its own descriptions:
+     * - text (a/0/0/2, [Gen5Text]): 235 the descriptions (White's are 236; both carts hold both), 260 categories, 182
+     *   ability names;
      * - the personal record (a/0/1/6 by species, 0x3C bytes): base stats (HP, ATTACK, DEFENSE, SPEED, SP. ATK, SP. DEF),
      *   types (Gen 5's ids: no ??? type, FIRE is 9), catch rate, gender ratio 0x12, egg groups 0x16, abilities 0x18-0x1A
      *   (the third the hidden one), height (dm) 0x24 and weight (hg) 0x26, and the TM / HM bits from 0x28 (TM01 .. TM95,
@@ -288,9 +293,9 @@ object NdsArt {
      *   in 8 x 8 tiles laid out as four OAM blocks (64 x 64, 32 x 64 right of it, 64 x 32 and 32 x 32 under them); its
      *   palette member species x 20 + 18 (+ 19 the shiny one).
      */
-    private fun dexBlack(f: RandomAccessFile, header: ByteArray, dir: File) {
+    private fun dexBlack(f: RandomAccessFile, header: ByteArray, dir: File, white: Boolean = false) {
         val msg = Narc(file(f, header, "/a/0/0/2") ?: return)
-        val text = msg.member(235)?.let { Gen5Text.lines(it) } ?: return
+        val text = msg.member(if (white) 236 else 235)?.let { Gen5Text.lines(it) } ?: return
         val category = msg.member(260)?.let { Gen5Text.lines(it) } ?: return
         val abilities = msg.member(182)?.let { Gen5Text.lines(it) } ?: emptyList()
         val personal = Narc(file(f, header, "/a/0/1/6") ?: return)
@@ -336,7 +341,7 @@ object NdsArt {
             )
             sb.append(cells.joinToString("\t") { it.replace("\t", " ") }).append('\n')
         }
-        write(dir, BLACK_DEX, sb.toString().toByteArray())
+        write(dir, if (white) WHITE_DEX else BLACK_DEX, sb.toString().toByteArray())
         val pics = Narc(file(f, header, "/a/0/0/4") ?: return)
         for (species in 1..649) {
             val pal = palettes(pics.member(species * 20 + 18)).firstOrNull() ?: continue
@@ -554,7 +559,7 @@ object NdsArt {
         val header = f.read(0, 0x200)
         val code = String(header, 0x0C, 4, Charsets.US_ASCII)
         val rev = header[0x1E].toInt() and 0xFF
-        if (code == "IRBO" && rev == 0) {
+        if ((code == "IRBO" || code == "IRAO") && rev == 0) {
             val msg = Narc(file(f, header, NAMES_BLACK.msg) ?: return null)
             fun lines(bank: Int) = msg.member(bank)?.let { Gen5Text.lines(it) }.orEmpty()
             val types = lines(NAMES_BLACK.types)

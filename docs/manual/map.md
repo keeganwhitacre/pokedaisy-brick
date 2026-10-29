@@ -53,7 +53,7 @@ It works in FireRed, LeafGreen, Emerald, Ruby and Sapphire in every language and
 
 On the Game Boy it works in Red, Blue, Yellow (in every language), PureRed, PureBlue and Crystal. The list is the one the game's own map would give you: in Red, Blue, Yellow, PureRed and PureBlue every town you've been to, and in Crystal the towns you've been to in the region you're in (Kanto's once you've reached the Indigo Plateau).
 
-On the DS it works in Platinum, HeartGold, SoulSilver and Black. Black asks for no badge: once someone knows the move, every town you've arrived at is on the list.
+On the DS it works in Platinum, HeartGold, SoulSilver, Black and White. Black and White ask for no badge: once someone knows the move, every town you've arrived at is on the list.
 
 ## Which games get a picture
 

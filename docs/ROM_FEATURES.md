@@ -33,6 +33,7 @@ change to any of the places listed under "Where it's decided" updates its rows h
 | HeartGold (DS) | USA | ✅ ¹⁴ | — | — | — | — | ✅ ¹⁴ | — | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | — | n/a | — |
 | SoulSilver (DS) | USA | ✅ ¹⁴ | — | — | — | — | ✅ ¹⁴ | — | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | — | n/a | — |
 | Black (DS) | USA/Europe | ✅ ¹⁴ | — | — | — | — | ✅ ¹⁴ | — | ✅ ¹⁴ | ◐ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁶ | n/a | — |
+| White (DS) | USA/Europe | ✅ ¹⁴ | — | — | — | — | ✅ ¹⁴ | — | ✅ ¹⁴ | ◐ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁶ | n/a | — |
 | Amethyst | 1.3.0, 1.4.1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ ¹⁹ |
 | Ash Gray | 4.5.3, Fork Bug Fix 1.0 | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ ⁹ | — | ◐ ⁹ | ◐ ⁹ | ◐ ⁹ | ◐ ⁹ | — | — | ✅ ¹⁹ |
 | Celia's Stupid Romhack | 1.1.4 | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | — | ✅ ¹⁵ | — | — |
@@ -194,6 +195,10 @@ change to any of the places listed under "Where it's decided" updates its rows h
     game's own events: the Pokémon Center PC's script (10090), and FLY the party menu's way (its field-skill check of the
     place, then the skill's event to the town's zone); traced with nds_dump's `watch`, checked headless (the PC's boxes
     opened and closed, FLY to all 15 open towns, refused indoors, an in-game save after each loaded again).
+    White (IRAO rev 0) is Black's code with its overlays and statics 0x20 higher (the ARM9's low code where Black's is):
+    each address found again through the code that uses it in both carts, then checked headless on Black's save, which
+    White loads (`fieldinfo` on the field, a text box and a wild battle with its command 3; the PC's boxes; FLY refused
+    on the platform, then to Accumula Town and to White Forest, White's own town; WILD ENCOUNTERS' hold on Route 1).
 15. REUSABLE TMS patches the branch where the game uses a TM up after it teaches a move (`if (item < ITEM_HM01)
     RemoveBagItem`), found in the ROM by its code (`ReusableTms.find`): the FireRed engine has three (after the TM case's
     animation, after forgetting a move, Task_LearnedMove), Emerald and Ruby / Sapphire one; every one must call the same

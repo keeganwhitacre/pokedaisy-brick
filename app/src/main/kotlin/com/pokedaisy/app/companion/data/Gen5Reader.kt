@@ -327,8 +327,24 @@ val GEN5_BLACK = Gen5Config(
     libertyPass = 574,
 )
 
+/** Pokémon White (USA / Europe, IRAO rev 0): Black's code with its statics 0x20 higher (the SaveControl and GameSystem
+ * pointers, found through the code that uses them in both carts and checked on White's headless captures of Black's
+ * save, which it loads), Black's save layout, its own DEX text and Town Map. */
+val GEN5_WHITE = GEN5_BLACK.copy(
+    saveControlPtr = 0x020A72B8,
+    pokedexTables = POKEDEX_WHITE,
+    gameSystemPtr = 0x02146268,
+    battle = Gen5Battle(gameSystemPtr = 0x02146268),
+    townMapPlaces = townMapPlacesWhite,
+    townMapZones = townMapZonesWhite,
+)
+
 /** The Gen 5 config for [kind], or null. */
-fun gen5ConfigFor(kind: GameKind?): Gen5Config? = if (kind == GameKind.BLACK) GEN5_BLACK else null
+fun gen5ConfigFor(kind: GameKind?): Gen5Config? = when (kind) {
+    GameKind.BLACK -> GEN5_BLACK
+    GameKind.WHITE -> GEN5_WHITE
+    else -> null
+}
 
 /**
  * Uses one Repel ([itemId], [steps]) the way [useGen4Repel] does on Gen 4: one off its slot in the bag's first pocket

@@ -3,6 +3,7 @@ package com.pokedaisy.app.companion.ui
 import com.pokedaisy.app.companion.data.guideId
 import com.pokedaisy.app.companion.data.gameGuide
 import com.pokedaisy.app.companion.data.isDsGame
+import com.pokedaisy.app.companion.data.isGen5
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -963,8 +964,8 @@ private fun HudMiniMap(
     val region = model?.sections?.get(snapshot.regionMapSectionId)?.region?.takeIf { it in model.images.indices }
     val bitmap = regionMapBitmap(region?.let { model.images[it] })
     val labelStyle = MapLabelStyle.of(snapshot.game)
-    // Black's Town Map: the player's figure, on their place's point (the reader's cell, [blackTownMap]'s points).
-    val black = snapshot.game == com.pokedaisy.app.companion.data.GameKind.BLACK
+    // Black's and White's Town Map: the player's figure, on their place's point (the reader's cell, [blackTownMap]'s points).
+    val black = snapshot.game.isGen5
     val head = regionMapBitmap(if (black) com.pokedaisy.app.companion.data.NdsArt.BLACK_PLAYER else labelStyle.headAsset(snapshot.playerGender, snapshot.game))
     val cursor = labelStyle.cursorColor
     val small = rememberGbaTextMetrics(0.75f)

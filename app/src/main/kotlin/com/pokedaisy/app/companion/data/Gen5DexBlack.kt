@@ -26,3 +26,7 @@ val POKEDEX_BLACK = PokedexTables(
     speciesCount = 650, nationalCount = 649, regionalCount = 156, regionName = "UNOVA",
     gen4 = GEN5_DEX_BLACK, categorySuffix = "Pokémon",
 )
+
+/** White's: Black's in every way but the pages' descriptions ([NdsArt.WHITE_DEX]). */
+val GEN5_DEX_WHITE = Gen4DexTables(NdsArt.WHITE_DEX, NdsArt.BLACK_FRONT, tmMovesBlack, tmCount = 95, lastSpecies = 649, gen5 = true)
+val POKEDEX_WHITE = POKEDEX_BLACK.copy(gen4 = GEN5_DEX_WHITE)

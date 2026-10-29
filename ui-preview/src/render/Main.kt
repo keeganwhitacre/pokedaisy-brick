@@ -1091,7 +1091,7 @@ fun homeMapsec(game: GameKind) = when (game) {
 /** A Pokémon in the game's regional Dex, for the DEX entry shots: Sinnoh's opens on TURTWIG. */
 fun ndsFirstMon(game: GameKind) = when (game) {
     GameKind.PLATINUM -> "TURTWIG"
-    GameKind.BLACK -> "Snivy"
+    GameKind.BLACK, GameKind.WHITE -> "Snivy"
     else -> "BULBASAUR"
 }
 
@@ -1105,8 +1105,8 @@ fun ndsSnapshot(): SnapshotView {
         }
     }
     // connected / game: what the Poller adds once it has detected the cart
-    val telemetry = if (activeGame == GameKind.BLACK) com.pokedaisy.app.companion.data.readGen5Telemetry(reader, com.pokedaisy.app.companion.data.GEN5_BLACK)
-        else com.pokedaisy.app.companion.data.readGen4Telemetry(reader, com.pokedaisy.app.companion.data.gen4ConfigFor(activeGame) ?: error("not a DS game: $activeGame"))
+    val telemetry = com.pokedaisy.app.companion.data.gen5ConfigFor(activeGame)?.let { com.pokedaisy.app.companion.data.readGen5Telemetry(reader, it) }
+        ?: com.pokedaisy.app.companion.data.readGen4Telemetry(reader, com.pokedaisy.app.companion.data.gen4ConfigFor(activeGame) ?: error("not a DS game: $activeGame"))
     return com.pokedaisy.app.companion.data.buildSnapshotView(telemetry).copy(connected = true, game = activeGame)
 }
 
@@ -1171,7 +1171,7 @@ fun main(args: Array<String>) {
         },
         Shot("$g-real-map", bw, bh, bd, companion("MAP", snap = ::ndsSnapshot)),
         // Black's Town Map: PLACES, a place picked from it, and a tap by a town's point (the cursor snaps to it).
-        *(if (game == GameKind.BLACK) arrayOf(
+        *(if (game == GameKind.BLACK || game == GameKind.WHITE) arrayOf(
             Shot("$g-real-map-places", bw, bh, bd, companion("MAP", snap = ::ndsSnapshot)) { onNodeWithText("PLACES").performClick() },
             Shot("$g-real-map-pick", bw, bh, bd, companion("MAP", snap = ::ndsSnapshot)) {
                 onNodeWithText("PLACES").performClick()
@@ -1210,10 +1210,10 @@ fun main(args: Array<String>) {
         // Black's Route 1).
         Shot("$g-real-guide-route", bw, bh, bd, companion("GUIDE", snap = {
             ndsSnapshot().let { s ->
-                val header = when (game) { GameKind.PLATINUM -> 342; GameKind.BLACK -> 317; else -> 33 }
+                val header = when (game) { GameKind.PLATINUM -> 342; GameKind.BLACK, GameKind.WHITE -> 317; else -> 33 }
                 val name = when (game) {
                     GameKind.PLATINUM -> com.pokedaisy.app.companion.data.mapPlacesPlatinum
-                    GameKind.BLACK -> com.pokedaisy.app.companion.data.mapPlacesBlack
+                    GameKind.BLACK, GameKind.WHITE -> com.pokedaisy.app.companion.data.mapPlacesBlack
                     else -> com.pokedaisy.app.companion.data.mapPlacesHeartGold
                 }[header].orEmpty()
                 s.copy(mapNum = header, location = s.location.copy(mapSecName = name))

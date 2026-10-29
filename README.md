@@ -29,15 +29,15 @@
 </div>
 
 PokeDaisy is a Game Boy, Game Boy Color, GBA and Nintendo DS player for Android handhelds with two screens or one,
-made for the Pokemon games of every generation from Red to Black and popular ROM hacks. Next to the game runs a
-live companion that reads it as you play: your party, bag, map, battle matchups, Pokedex and a spoiler-free guide,
-all drawn in the game's own menu style.
+made for the Pokemon games of every generation from Red to Black and White and popular ROM hacks. Next to the game
+runs a live companion that reads it as you play: your party, bag, map, battle matchups, Pokedex and a spoiler-free
+guide, all drawn in the game's own menu style.
 
 - **Two screens** (AYN Thor, Retroid Pocket Duo, ...): the game on top, the companion on the bottom screen.
 - **One screen** (Retroid Pocket 6, phones, ...): the companion opens as a window over the game or a panel beside
   it, and a HUD, a quick menu and battle buttons keep the essentials on the game screen.
-- **DS games** (Platinum, HeartGold, SoulSilver, Black): the touch screen goes on the bottom screen, one tap swaps it for
-  the companion.
+- **DS games** (Platinum, HeartGold, SoulSilver, Black, White): the touch screen goes on the bottom screen, one tap
+  swaps it for the companion.
 
 ## Devices
 
@@ -138,6 +138,7 @@ shows a "not supported" notice).
 | HeartGold (DS)                 | USA                        |  ✅   | ✅  |   —    | ✅  |   ✅    |  ✅   |
 | SoulSilver (DS)                | USA                        |  ✅   | ✅  |   —    | ✅  |   ✅    |  ✅   |
 | Black (DS)                     | USA/Europe                 |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
+| White (DS)                     | USA/Europe                 |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
 | Unbound                        | 2.1.1.1                    |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
 | Unbound                        | 2.1.1.1 French             |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |
 | Radical Red                    | 4.1                        |  ✅   | ✅  |   ◐    | ✅  |   ✅    |  ✅   |

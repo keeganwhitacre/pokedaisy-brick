@@ -139,6 +139,7 @@ class RegionMapModel(
 /** The Map tab's maps for the running game - the same source [lookupLocation] names places from. */
 fun activeRegionMap(): RegionMapModel? {
     if (activeGame == GameKind.BLACK) return blackTownMap
+    if (activeGame == GameKind.WHITE) return whiteTownMap
     if (activeGame == GameKind.PLATINUM) return platinumTownMap
     if (activeGame.isHgss) return PokegearMap.model()
     val rom = if (readsRomRegionMap) RomRegionMap.current else null
@@ -196,7 +197,12 @@ private val platinumTownMap: RegionMapModel by lazy {
  * map may not show: a house's, a cave's), named by the cart. Arrived-at towns, Victory Road and Unity Tower get the
  * game's sprite (Unity Tower none before), Liberty Garden its island's once the bag holds the Liberty Pass.
  */
-internal val blackTownMap: RegionMapModel by lazy {
+internal val blackTownMap: RegionMapModel by lazy { gen5TownMap(townMapPlacesBlack) }
+
+/** White's: Black's picture (the same files in its cart), its own places - White Forest where Black City is. */
+internal val whiteTownMap: RegionMapModel by lazy { gen5TownMap(townMapPlacesWhite) }
+
+private fun gen5TownMap(places: List<Gen5TownMapPlace>): RegionMapModel {
     val tile = GEN5_TOWN_MAP_TILE
     val w = 256 / tile
     val h = 168 / tile
@@ -207,21 +213,21 @@ internal val blackTownMap: RegionMapModel by lazy {
         val cy = ty * tile + tile / 2
         var best = none
         var bestD = Int.MAX_VALUE
-        for (p in townMapPlacesBlack) {
+        for (p in places) {
             val dy = when { cy < p.y - 4 -> p.y - 4 - cy; cy > p.y + 4 -> cy - p.y - 4; else -> 0 }
             val d = (cx - p.x) * (cx - p.x) + dy * dy
             if (d <= 8 * 8 && d < bestD) { bestD = d; best = p.place }
         }
         cells[ty * w + tx] = best
     }
-    for (p in townMapPlacesBlack) cells[(p.y / tile) * w + p.x / tile] = p.place
+    for (p in places) cells[(p.y / tile) * w + p.x / tile] = p.place
     val grid = ByteArray(w * h * 2) { i -> (cells[i / 2] shr (8 * (i % 2))).toByte() }
-    RegionMapModel(
+    return RegionMapModel(
         images = arrayOf(NdsArt.BLACK_MAP),
         sections = placeNamesBlack.mapValues { (id, name) -> MapSecInfo(NdsArt.names?.place(id) ?: name, 0, 0, 0, 0, 0) },
         layouts = listOf(RegionLayout(0, 0, w, h, none, listOf(grid), cellBytes = 2)),
         tile = tile,
-        marks = townMapPlacesBlack.mapNotNull { p ->
+        marks = places.mapNotNull { p ->
             val bit = when {
                 p.kind == 4 -> GEN5_LIBERTY_PASS_BIT
                 p.flag >= 0 && p.kind in intArrayOf(0, 3, 5) -> p.flag - GEN5_FIRST_ARRIVAL
@@ -229,7 +235,7 @@ internal val blackTownMap: RegionMapModel by lazy {
             }
             RegionMapMark(p.x, p.y, NdsArt.blackTown(p.kind), NdsArt.blackTown(p.kind), bit, hiddenUntilVisited = true)
         },
-        points = townMapPlacesBlack.associate { it.place to (it.x to it.y) },
+        points = places.associate { it.place to (it.x to it.y) },
     )
 }
 

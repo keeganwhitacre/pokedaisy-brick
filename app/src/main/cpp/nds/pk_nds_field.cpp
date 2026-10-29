@@ -84,6 +84,36 @@ static const PkNdsFieldGame BLACK_US = {
     0x020AA1B0,   // the BGM stack's depth: 0 on the field, 1 in a battle
 };
 
+// White (USA / Europe, IRAO rev 0): Black's code, its statics and overlays 0x20 higher (each word found through the code
+// that uses it in both carts, then checked in White's headless captures of the same save); the structs are Black's.
+static const PkNdsFieldGame WHITE_US = {
+    "White (USA / Europe)",
+    0x02146268,   // the GameSystem
+    0,
+    0, 0, 0, 0,
+    0,
+    0, 0, 0,
+    0,
+    0,
+    0x020AA1DC,   // the BGM stack's first song
+    0x0214E044,   // sSeqPlayer
+    0,
+    4,            // pk_nds_call's Gen 5 jobs (WHITE there)
+    0, 0,
+    5,
+    0x08, 0x08, 0x04, 21, 93,
+    0x14, 0x18,
+    0x14, 0x10, 0x50, 0x0F,
+    3,
+    1,
+    0x1C,
+    0x114,
+    0x154,
+    0x158,
+    0x38,
+    0x020AA1D0,   // the BGM stack's depth
+};
+
 // WILD ENCOUNTERS OFF's hold: the MapHeaderData whose rates it zeroed, for which map, and their values before.
 static uint32_t heldData, heldMap, heldGrass, heldSurf;
 static int holding;
@@ -109,6 +139,7 @@ const PkNdsFieldGame* pk_nds_field_game(const char code[4], int revision)
     if (memcmp(code, "CPUE", 4) == 0 && revision == 1) return &PLATINUM_US_REV1;
     if ((memcmp(code, "IPKE", 4) == 0 || memcmp(code, "IPGE", 4) == 0) && revision == 0) return &HEARTGOLD_US;
     if (memcmp(code, "IRBO", 4) == 0 && revision == 0) return &BLACK_US;
+    if (memcmp(code, "IRAO", 4) == 0 && revision == 0) return &WHITE_US;
     return 0;
 }
 

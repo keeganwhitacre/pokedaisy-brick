@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Pokémon Black's GUIDE data: HERE's wild Pokémon by zone, NEXT BOSS's teams and HERE's item balls, read from the
-player's own cart (there is no pret decomp for Gen 5).
+"""Pokémon Black's and White's GUIDE data: HERE's wild Pokémon by zone, NEXT BOSS's teams and HERE's item balls, read
+from the player's own cart (there is no pret decomp for Gen 5).
 
     python3 -I scripts/gen_gen5_guide.py <Pokemon Black (USA, Europe).nds>      # IRBO, rev 0
+    python3 -I scripts/gen_gen5_guide.py <Pokemon White (USA, Europe).nds>      # IRAO, rev 0
 
-Writes app/src/main/kotlin/com/pokedaisy/app/companion/data/GuideGen5BlackGen.kt: numbers only (species, levels, items
-and moves by id, zone ids, trainer ids, flags) - no text of the game's, which the companion takes from its own tables
-(Gen5TablesBlack.kt). Gen5World (GuideGen5.kt) reads it back.
+Writes app/src/main/kotlin/com/pokedaisy/app/companion/data/GuideGen5BlackGen.kt (or GuideGen5WhiteGen.kt): numbers
+only (species, levels, items and moves by id, zone ids, trainer ids, flags) - no text of the game's, which the companion
+takes from its own tables (Gen5TablesBlack.kt: White's names are Black's). Gen5World (GuideGen5.kt) reads it back. The
+two versions differ in their wild Pokémon, the eighth leader (Black's DRAYDEN, White's IRIS) and N's legend.
 
 The cart's data (Gen 5's numbered NARCs):
   - zones /a/0/1/2 member 0: 427 x 48 bytes, the zone's wild set at +0x14 (0xFFFF none), its place at +0x1A, bit 2
@@ -163,22 +165,31 @@ BLOCK = 0xE8
 # (count, offset) of each method's slots in a block: grass, dark grass, rustling grass, surf, rippling, fish, rippling fish.
 METHODS = [(12, 0x08), (12, 0x38), (12, 0x68), (5, 0x98), (5, 0xAC), (5, 0xC0), (5, 0xD4)]
 
-# NEXT BOSS: key -> (trainer id, the name the cart gives it, its class). The three Striaton leaders: you face the one
-# whose type beats your starter.
-BOSSES = {
-    "CHILI": (11, "Chili", "Leader"), "CILAN": (12, "Cilan", "Leader"), "CRESS": (13, "Cress", "Leader"),
-    "LENORA": (21, "Lenora", "Leader"), "BURGH": (22, "Burgh", "Leader"), "ELESA": (23, "Elesa", "Leader"),
-    "CLAY": (24, "Clay", "Leader"), "SKYLA": (25, "Skyla", "Leader"), "BRYCEN": (131, "Brycen", "Leader"),
-    "DRAYDEN": (133, "Drayden", "Leader"),
-    "SHAUNTAL": (228, "Shauntal", "Elite Four"), "MARSHAL": (229, "Marshal", "Elite Four"),
-    "GRIMSLEY": (230, "Grimsley", "Elite Four"), "CAITLIN": (231, "Caitlin", "Elite Four"),
-    # N's Castle: Black's N has ZEKROM (587; 586 is White's with RESHIRAM), then GHETSIS.
-    "N": (587, "N", "Team Plasma"), "GHETSIS": (232, "Ghetsis", "Team Plasma"),
-    "ALDER": (407, "Alder", "Champion"),
-    # The Elite Four's second round, once the story is over.
-    "SHAUNTAL_2": (563, "Shauntal", "Elite Four"), "MARSHAL_2": (564, "Marshal", "Elite Four"),
-    "GRIMSLEY_2": (565, "Grimsley", "Elite Four"), "CAITLIN_2": (566, "Caitlin", "Elite Four"),
+# The two carts: name, output file, the Kotlin vals' prefix, the eighth leader, N's trainer and his legend's species.
+VERSIONS = {
+    b"IRBO": ("Black", "GuideGen5BlackGen.kt", "BLACK", ("DRAYDEN", 133, "Drayden"), 587, 644),   # N with ZEKROM
+    b"IRAO": ("White", "GuideGen5WhiteGen.kt", "WHITE", ("IRIS", 132, "Iris"), 586, 643),         # N with RESHIRAM
 }
+
+
+def bosses_for(version):
+    """NEXT BOSS: key -> (trainer id, the name the cart gives it, its class). The three Striaton leaders: you face the
+    one whose type beats your starter."""
+    _, _, _, (leader8, leader8_id, leader8_name), n_id, _ = VERSIONS[version]
+    return {
+        "CHILI": (11, "Chili", "Leader"), "CILAN": (12, "Cilan", "Leader"), "CRESS": (13, "Cress", "Leader"),
+        "LENORA": (21, "Lenora", "Leader"), "BURGH": (22, "Burgh", "Leader"), "ELESA": (23, "Elesa", "Leader"),
+        "CLAY": (24, "Clay", "Leader"), "SKYLA": (25, "Skyla", "Leader"), "BRYCEN": (131, "Brycen", "Leader"),
+        leader8: (leader8_id, leader8_name, "Leader"),
+        "SHAUNTAL": (228, "Shauntal", "Elite Four"), "MARSHAL": (229, "Marshal", "Elite Four"),
+        "GRIMSLEY": (230, "Grimsley", "Elite Four"), "CAITLIN": (231, "Caitlin", "Elite Four"),
+        # N's Castle: N with the version's legend, then GHETSIS.
+        "N": (n_id, "N", "Team Plasma"), "GHETSIS": (232, "Ghetsis", "Team Plasma"),
+        "ALDER": (407, "Alder", "Champion"),
+        # The Elite Four's second round, once the story is over.
+        "SHAUNTAL_2": (563, "Shauntal", "Elite Four"), "MARSHAL_2": (564, "Marshal", "Elite Four"),
+        "GRIMSLEY_2": (565, "Grimsley", "Elite Four"), "CAITLIN_2": (566, "Caitlin", "Elite Four"),
+    }
 
 
 def slots(b, n, off):
@@ -190,7 +201,8 @@ def slots(b, n, off):
 
 
 def read(rom):
-    assert rom.d[0xC:0x10] == b"IRBO" and rom.d[0x1E] == 0, "not Pokémon Black (IRBO rev 0)"
+    version = rom.d[0xC:0x10]
+    assert version in VERSIONS and rom.d[0x1E] == 0, "not Pokémon Black / White (IRBO / IRAO rev 0)"
     texts = rom.narc("/a/0/0/2")
     species = text5(texts[284])
     trainer_names, classes = text5(texts[190]), text5(texts[191])
@@ -226,7 +238,7 @@ def read(rom):
 
     tdata, tmons = rom.narc("/a/0/9/2"), rom.narc("/a/0/9/3")
     bosses = []
-    for key, (tid, name, cls) in BOSSES.items():
+    for key, (tid, name, cls) in bosses_for(version).items():
         td, tp = tdata[tid], tmons[tid]
         assert trainer_names[tid] == name and classes[td[1]] == cls, (key, trainer_names[tid], classes[td[1]])
         fmt, count = td[0], td[3]
@@ -244,7 +256,7 @@ def read(rom):
             team.append(f"{m[2]} {u16(m, 4) & 0x7FF} {item} " + ",".join(str(v) for v in moves if v))
         bosses.append(f"{key}|{tid}|" + ";".join(team))
     assert bosses[0].startswith("CHILI|11|12 506 0 44,526;14 513 0 510,526"), bosses[0]
-    assert "52 644 " in next(b for b in bosses if b.startswith("N|")), "N's ZEKROM"
+    assert f"52 {VERSIONS[version][5]} " in next(b for b in bosses if b.startswith("N|")), "N's legend"
 
     events = rom.narc("/a/1/2/5")
     scripts = rom.narc("/a/0/5/7")[864]
@@ -273,17 +285,18 @@ def read(rom):
             o += 0x24
     areas = sorted(set(areas), key=lambda l: (int(l.split("|")[0]), l))
     assert places[place_of[317]] == "Route 1" and any(l.startswith(f"{place_of[317]}|ITEM|") for l in areas)
-    return rows, bosses, areas, len(sets)
+    return version, rows, bosses, areas, len(sets)
 
 
-def write(rows, bosses, areas, nsets):
-    out = os.path.join(OUT_DIR, "GuideGen5BlackGen.kt")
+def write(version, rows, bosses, areas, nsets):
+    name, file, prefix = VERSIONS[version][:3]
+    out = os.path.join(OUT_DIR, file)
     with open(out, "w") as f:
-        f.write("// Generated by scripts/gen_gen5_guide.py from the Pokémon Black cart (IRBO rev 0) - do not edit.\n")
+        f.write(f"// Generated by scripts/gen_gen5_guide.py from the Pokémon {name} cart ({version.decode()} rev 0) - do not edit.\n")
         f.write("package com.pokedaisy.app.companion.data\n\n")
-        f.write(kraw("BW_WILD_RAW", rows, "Black's wild Pokémon by zone (see the generator's doc for the line formats)."))
-        f.write("\n" + kraw("BW_BOSSES_RAW", bosses, "Black's gym leaders, Elite Four, N, Ghetsis and the champion: key|trainer id|team."))
-        f.write("\n" + kraw("BW_AREAS_RAW", areas, "Black's item balls by place (GuideAreas.kt's lines; places are mapPlaceIdsBlack's)."))
+        f.write(kraw(f"{prefix}_WILD_RAW", rows, f"{name}'s wild Pokémon by zone (see the generator's doc for the line formats)."))
+        f.write("\n" + kraw(f"{prefix}_BOSSES_RAW", bosses, f"{name}'s gym leaders, Elite Four, N, Ghetsis and the champion: key|trainer id|team."))
+        f.write("\n" + kraw(f"{prefix}_AREAS_RAW", areas, f"{name}'s item balls by place (GuideAreas.kt's lines; places are mapPlaceIdsBlack's)."))
     print(f"wrote {out}: {nsets} wild sets, {len(bosses)} bosses, {len(areas)} item balls")
 
 

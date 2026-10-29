@@ -68,8 +68,9 @@ private fun rawAreas(guide: GuideId): List<String> = when (guide) {
     // The DS games: item balls and hidden items (scripts/gen_gen4_guide.py), keyed by place - see [areaSection].
     GuideId.PLATINUM -> PT_AREAS_RAW
     GuideId.HEARTGOLD, GuideId.SOULSILVER -> HG_AREAS_RAW
-    // Black's item balls (scripts/gen_gen5_guide.py), keyed by the zone's place.
-    GuideId.BLACK -> BW_AREAS_RAW
+    // Black's and White's item balls (scripts/gen_gen5_guide.py), keyed by the zone's place.
+    GuideId.BLACK -> BLACK_AREAS_RAW
+    GuideId.WHITE -> WHITE_AREAS_RAW
     // The Game Boy games (scripts/gen_gen1_guide.py, gen_crystal_guide.py): Gen 1's keyed by wCurMap, regrouped by
     // [gen1Area]; Crystal's by landmark, like Polished Crystal's.
     GuideId.YELLOW -> G1Y_AREAS_RAW
@@ -90,7 +91,7 @@ private val hgHeaderPlaces: Map<Int, Int> by lazy {
 fun areaSection(game: GameKind?, mapNum: Int, regionSec: Int): Int = when (game) {
     GameKind.PLATINUM -> mapPlaceIdsPlatinum[mapNum] ?: regionSec
     GameKind.HEARTGOLD, GameKind.SOULSILVER -> hgHeaderPlaces[mapNum] ?: regionSec
-    GameKind.BLACK -> mapPlaceIdsBlack[mapNum] ?: regionSec
+    GameKind.BLACK, GameKind.WHITE -> mapPlaceIdsBlack[mapNum] ?: regionSec
     GameKind.YELLOW, GameKind.RED, GameKind.BLUE -> gen1Area(mapNum)
     else -> regionSec
 }
