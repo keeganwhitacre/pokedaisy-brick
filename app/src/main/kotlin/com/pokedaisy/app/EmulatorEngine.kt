@@ -861,11 +861,18 @@ class EmulatorEngine(
         var decimN = 0
         var measuredSpeed = 4f // uncapped FF's real rate, from the fps log below
         // Vsync pacing (see the class comment): the device buffer's size, and what's been
-        // written to it since the last resync - minus its play head, what's still queued.
+        // written to it since it started or was flushed (every write counts) - minus its play head, what's still queued.
         val bufferFrames = track?.bufferSizeInFrames ?: 0
         var framesWritten = 0L
         var underruns = track?.underrunCount ?: 0
         var vsyncMode = false
+        // The track's buffer is used to half until vsync pacing takes 1x (and in FF): the first frames of every launch
+        // run on blocking writes (no refresh reported yet), which filled it to the top, and pacing then took ~30 s to
+        // wear a full buffer down to its half-full target, holding every frame and the music 0.5% flat meanwhile.
+        var trackHalf = false
+        // The same after a flush (FF with a STEADY clip, sleep): a stopped track only plays again once its buffer is as
+        // full as its start threshold - all of it - so until its head moves again it's held to half too.
+        var trackStarted = false
         // Audio queued after this frame's write (vsync pacing only): picks how the next frame is paced. Null on a
         // frame that wrote none (the game's audio paused for a STEADY clip, say): it paces on the tick alone - a
         // stale "low" once ran SMART's 1x menus at up to 3x while the clip played.
@@ -989,6 +996,7 @@ class EmulatorEngine(
                     // As after the audio pausing below: flush() put the play head back at 0. And the frames due while
                     // it slept are not owed.
                     framesWritten = 0L
+                    trackStarted = false
                     vsyncSettledAt = System.nanoTime() + VSYNC_SETTLE_NANOS
                     vsyncTicks.drainPermits()
                     next = System.nanoTime()
@@ -1200,11 +1208,21 @@ class EmulatorEngine(
                         vsyncTicks.drainPermits()   // start on the next refresh, not a banked one
                         vsyncSettledAt = System.nanoTime() + VSYNC_SETTLE_NANOS
                         catchUpRun = 0
-                        // Blocking writes left the buffer about full.
-                        framesWritten = (track!!.playbackHeadPosition.toLong() and 0xFFFFFFFFL) + bufferFrames
+                        // framesWritten already counts every write since the track started or was flushed. It was set to
+                        // "about full" here, but a new track (every launch and resume) starts empty and FF's writes never
+                        // block: the guess ran up to twice the buffer (queued=14886 of 7688 on the Thor), held every frame
+                        // and pinned the rate control at its lowest - the music 0.5% flat - for 15 - 30 s.
                     } else {
                         MgbaCore.pkSetAudioRate(sampleRate.toDouble())
                     }
+                }
+                // The timer fallback keeps the whole buffer: it's there for devices that ran dry. So does a DS game's
+                // STEADY copy, which fills it to the top on purpose (a track starts once its buffer is full).
+                if (!trackStarted && !paused && track != null) trackStarted = track.playbackHeadPosition != 0
+                val half = (!vsyncMode || !trackStarted) && !vsyncFallback && !dsMusicOn
+                if (half != trackHalf && track != null) {
+                    trackHalf = half
+                    runCatching { track.bufferSizeInFrames = if (half) bufferFrames / 2 else bufferFrames }
                 }
                 gameAudioPaused = wantPaused
                 if (wantPaused != paused) {
@@ -1213,6 +1231,7 @@ class EmulatorEngine(
                     else runCatching { track?.play() }
                     // flush() empties the buffer and puts the play head back at 0.
                     framesWritten = 0L
+                    trackStarted = false
                     vsyncSettledAt = System.nanoTime() + VSYNC_SETTLE_NANOS
                 }
 
@@ -1288,6 +1307,7 @@ class EmulatorEngine(
                         lastQueued = queuedAfter
                     } else if (speed == 1f) {
                         val w = track.write(scratch, 0, n)   // blocking → real-time pacing at 1x
+                        if (w > 0) framesWritten += w / 2
                         tap.frame(scratch, n, w, sampleRate.toDouble(), -1, 'b')
                     } else {
                         // The speed the game really runs at: a refresh-paced group the device can't fit runs fewer frames.
@@ -1304,7 +1324,10 @@ class EmulatorEngine(
                             }
                         }
                         // Never block: FF mustn't be paced by the audio device.
-                        if (m > 0) track.write(spedUpOut, 0, m, AudioTrack.WRITE_NON_BLOCKING)
+                        if (m > 0) {
+                            val w = track.write(spedUpOut, 0, m, AudioTrack.WRITE_NON_BLOCKING)
+                            if (w > 0) framesWritten += w / 2
+                        }
                     }
                 }
 
@@ -1695,6 +1718,8 @@ class EmulatorEngine(
                 // keeps it about half full, so give it all of it (and say what it got, for a logcat read: #80).
                 val asked = t.bufferSizeInFrames
                 runCatching { t.setBufferSizeInFrames(t.bufferCapacityInFrames) }
+                // Start (and start again after a flush) at the half-full level vsync pacing keeps, not all of it.
+                if (android.os.Build.VERSION.SDK_INT >= 31) runCatching { t.startThresholdInFrames = t.bufferSizeInFrames / 2 }
                 Log.i("pokedaisy", "audio: %d Hz, buffer %d frames (was %d, capacity %d)".format(
                     sampleRate, t.bufferSizeInFrames, asked, t.bufferCapacityInFrames))
             }
