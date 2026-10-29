@@ -442,7 +442,14 @@ text box's double line) while YELLOW runs. Headless: `mgba_dump`'s `dump` writes
 **Yellow, round two**: `pk_gb_config` reloads options one by one (`reloadConfigOption`): a whole
 `mCoreLoadForeignConfig` left the GB core's volume at 0 (Yellow was silent). It sets the volume to 0x80 (`PK_GB_VOLUME`,
 2026-10-28, r/PokeDaisy's "crushed" Gen 1 / 2 sound): at mGBA's 0x100 the GB mixer overflows its int16 in loud passages
-(Crystal / Yellow clipped headless; at 0x80 the peak is ~28,700 and the music about FireRed's loudness). Never tile a 1px backdrop
+(Crystal / Yellow clipped headless; at 0x80 the peak is ~28,700 and the music about FireRed's loudness). That wasn't the
+crackle players kept hearing (GitHub #269 / #327, 2026-10-29): mGBA 0.10.5's GB core resamples through a blip_buf hookup
+whose 48 kHz output has sudden level drops of up to 25,000 (~4 a second in Crystal, 2.4 in Yellow; its own 131 kHz samples,
+newer mGBA, Gambatte and SameBoy: 0 - 0.5). So both cores take the raw samples from the stream's `postAudioFrame` and
+resample them themselves (`pk_gb_audio.c`, also in mgba_dump: `gbaudio 0` records mGBA's own path); never read a GB core's
+`getAudioChannel`. Count pops by peaks over 4x the RMS on level-matched 90 s recordings, and listen. Debug builds record what
+the AudioTrack is given (`EmulatorEngine.audioTapDir`: an `audio_tap` file in `files/debug/` -> `audio-tap.pcm` / `.txt`, 30 s).
+Never tile a 1px backdrop
 (`GameBackdrop` draws tiles one by one: Yellow's white was ~53,000 draws a frame, 77 ms on the
 RenderThread) - it's stretched once now. A game font is set larger (`LocalGameTextScale`, Gen 1 9/7) except
 where layouts are sized to the line (`rememberGbaTextMetrics(gameScaled = false)`: battle INFO / SUGGESTIONS), and drawn

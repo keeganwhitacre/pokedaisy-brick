@@ -1867,6 +1867,7 @@ class PokeDaisyActivity : Activity() {
         engine = EmulatorEngine(input, states!!, ffMusicCache).apply {
             hudEngine.value = this
             lateFramesSource = { view.lateFrames }
+            if (BuildConfig.DEBUG) audioTapDir = getExternalFilesDir("debug")
             this.gba = gba
             this.nds = nds
             wideCamera = view.camera.also { it.zoomOnText = Prefs(this@PokeDaisyActivity).expandZoomOnText }

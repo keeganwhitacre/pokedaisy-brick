@@ -68,6 +68,11 @@ class EmulatorEngine(
     /** Cap for hold/toggle fast-forward. 0 = unlimited. (Phase 4: make configurable.) */
     @Volatile var ffMaxSpeed = 2f
 
+    /** Debug builds: an `audio_tap` file put in here records the next [AudioTap.SECONDS] s of what the track is given
+     * (`audio-tap.pcm`, 48 kHz stereo s16le) and, per frame, what the core made, what the track took and the rate
+     * (`audio-tap.txt`): the audio as the device gets it, to set beside a headless `wav` of the same game. */
+    @Volatile var audioTapDir: File? = null
+
     /** REWIND (Settings): states kept for the rewind hotkey, 0 = off. Picked up on the emu thread. */
     @Volatile var rewindEntries = 0
 
@@ -805,6 +810,7 @@ class EmulatorEngine(
             .getOrNull()
 
         val scratch = ShortArray(4096)
+        val tap = AudioTap()
         val frameNanos = 1_000_000_000L / 60L
         var next = System.nanoTime()
         var fpsFrames = 0
@@ -1213,6 +1219,7 @@ class EmulatorEngine(
                 queuedAfter = null
                 val n = MgbaCore.pkReadAudio(scratch)
                 fpsAudioMade += n / 2
+                if (BuildConfig.DEBUG && fpsFrames and 63 == 0) tap.arm(audioTapDir)
                 if (BuildConfig.DEBUG && nds) for (i in 0 until n) gamePeak = maxOf(gamePeak, kotlin.math.abs(scratch[i].toInt()))
                 // In FF, the game's sounds for the companion's automated battle presses stay silent but the last.
                 if (n > 0 && speed > 1f && battleInput.muteGame) java.util.Arrays.fill(scratch, 0, n, 0.toShort())
@@ -1270,15 +1277,18 @@ class EmulatorEngine(
                         val drc = 1.0 + DRC_MAX * (1.0 - 2.0 * fill).coerceIn(-1.0, 1.0)
                         // The core's own frame rate: a DS makes 59.83 frames a second, not the GBA's 59.73 (0.17% that DRC
                         // otherwise spent a third of its range on, GitHub #215).
-                        MgbaCore.pkSetAudioRate(sampleRate * (if (nds) NDS_FPS else GBA_FPS) / frameHz * drc)
+                        val rate = sampleRate * (if (nds) NDS_FPS else GBA_FPS) / frameHz * drc
+                        MgbaCore.pkSetAudioRate(rate)
                         val w = track.write(scratch, 0, n, AudioTrack.WRITE_NON_BLOCKING)
+                        tap.frame(scratch, n, w, rate, queued, 'v')
                         if (w > 0) fpsAudioTaken += w / 2
                         if (w > 0) framesWritten += w / 2
                         if (w in 0 until n) fpsDropped += (n - w) / 2   // a full buffer cut it short
                         queuedAfter = queued + maxOf(w, 0) / 2
                         lastQueued = queuedAfter
                     } else if (speed == 1f) {
-                        track.write(scratch, 0, n)   // blocking → real-time pacing at 1x
+                        val w = track.write(scratch, 0, n)   // blocking → real-time pacing at 1x
+                        tap.frame(scratch, n, w, sampleRate.toDouble(), -1, 'b')
                     } else {
                         // The speed the game really runs at: a refresh-paced group the device can't fit runs fewer frames.
                         val factor = if (speed.isInfinite()) measuredSpeed else if (ffPerTick > 0) ffFit.size * speed / ffPerTick else speed
@@ -1422,6 +1432,7 @@ class EmulatorEngine(
             pendingSuspend = null
             runCatching { track?.stop() }
             runCatching { track?.release() }
+            tap.close()
             // The STEADY clip is only told when it changes, and the next loop starts with none: silence it here, or a
             // RESTART GAME (or another ROM) kept the old song playing over the new one.
             runCatching { onFfMusicChanged?.invoke(null) }
@@ -1865,5 +1876,51 @@ internal class AudioTroubleWatch(private val max: Int = 4, private val windowNan
         times.addLast(now)
         while (now - times.first() > windowNanos) times.removeFirst()
         return times.size >= max
+    }
+}
+
+/** Debug builds' recording of what the audio track is given ([EmulatorEngine.audioTapDir]): emu thread only. */
+private class AudioTap {
+    private var pcm: java.io.OutputStream? = null
+    private var log: java.io.PrintWriter? = null
+    private var left = 0L   // audio frames still to record
+    private val bytes = ByteArray(8192)
+
+    /** Starts a recording when [dir] holds the `audio_tap` marker (taken away, so one marker = one recording). */
+    fun arm(dir: File?) {
+        if (pcm != null || dir == null) return
+        val marker = File(dir, "audio_tap")
+        if (!marker.isFile || !marker.delete()) return
+        pcm = File(dir, "audio-tap.pcm").outputStream().buffered(1 shl 16)
+        log = File(dir, "audio-tap.txt").printWriter().also { it.println("made taken rate queued mode") }
+        left = SECONDS * 48_000L
+        Log.i("pokedaisy", "audio tap: recording $SECONDS s")
+    }
+
+    /** One frame's audio: [made] shorts from the core, the first [taken] of [data] given to the track. */
+    fun frame(data: ShortArray, made: Int, taken: Int, rate: Double, queued: Int, mode: Char) {
+        val out = pcm ?: return
+        log?.println("$made $taken ${"%.1f".format(rate)} $queued $mode")
+        val n = taken.coerceIn(0, data.size)
+        for (i in 0 until n) {
+            bytes[i * 2] = data[i].toByte()
+            bytes[i * 2 + 1] = (data[i].toInt() shr 8).toByte()
+        }
+        out.write(bytes, 0, n * 2)
+        left -= n / 2
+        if (left <= 0) close()
+    }
+
+    fun close() {
+        val out = pcm ?: return
+        runCatching { out.close() }
+        runCatching { log?.close() }
+        pcm = null
+        log = null
+        Log.i("pokedaisy", "audio tap: done")
+    }
+
+    companion object {
+        const val SECONDS = 30
     }
 }
