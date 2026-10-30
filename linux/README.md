@@ -102,11 +102,11 @@ gets and the map fills the rest (320x180 at 4x on 1280x720, 256x192 on 1024x768,
 with AUTO ZOOM IN on, text boxes show the game's own picture. Other games read
 ASPECT N/A.
 
-The existing portable core provides the supported retail English Gen 3
-companion. GB/GBC games, including Crystal and Polished Crystal, are emulation
-only in this foundation. Do not mistake the downstream Polished companion or
-Emerald Summary enhancements for features included here. Unsupported games
-keep the existing core's unsupported-companion message.
+The retail Gen 3 companion remains supported. This development branch also
+integrates the recovered Polished Crystal companion, expansion profile, quick
+menu and optional party HUD. See [Polished integration](POLISHED-INTEGRATION.md)
+for version limits, controls and validation status. Other GB/GBC games retain
+emulation-only behavior.
 
 ## PortMaster (ROCKNIX, Knulli, muOS ...)
 

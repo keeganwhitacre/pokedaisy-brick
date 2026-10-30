@@ -63,7 +63,7 @@ static int party_width(const struct pd_snapshot *s) {
 }
 #define PARTY_H (2 * PAD + 2 + 26 + LINE + 6)
 
-static void party_row(struct pd_canvas *c, const struct pd_game *g, const struct pd_snapshot *s, int x, int y) {
+static void party_row(struct pd_canvas *c, const struct pd_game *g, const struct pd_snapshot *s, int x, int y, const struct hud_state *h) {
   int n = s->partyCount < PD_PARTY_SIZE ? s->partyCount : PD_PARTY_SIZE;
   panel(c, x, y, party_width(s), PARTY_H);
   int tx = x + PAD + 1, ty = y + PAD + 1;
@@ -74,7 +74,8 @@ static void party_row(struct pd_canvas *c, const struct pd_game *g, const struct
       pd_round_rect(c, tx - 2, ty - 2, TILE + 4, PARTY_H - 2 * PAD - 2 + 4, 3, ACCENT);
       pd_round_rect(c, tx - 1, ty - 1, TILE + 2, PARTY_H - 2 * PAD - 2 + 2, 3, LEAD_FILL);
     }
-    pd_draw_mon_icon(c, g, m->species, tx + (TILE - PD_ICON) / 2, ty - 5, fainted);
+    if (h->monIcon) h->monIcon(c, m->species, tx + (TILE-PD_ICON)/2, ty-5, h->rom, h->romSize, h->build);
+    else pd_draw_mon_icon(c, g, m->species, tx + (TILE - PD_ICON) / 2, ty - 5, fainted);
     if (egg)
       continue;
     const char *status = fainted ? "FNT" : pd_status_label(m->status);
@@ -224,7 +225,7 @@ bool hud_draw(struct pd_canvas *c, const struct pd_game *g, const struct pd_snap
   }
   int partyRight = 0;
   if (!(hidden & 1 << PD_HUD_PARTY) && s->partyCount > 0) {
-    party_row(c, g, s, EDGE, c->h - EDGE - PARTY_H);
+    party_row(c, g, s, EDGE, c->h - EDGE - PARTY_H, h);
     partyRight = EDGE + party_width(s);
     any = true;
   }

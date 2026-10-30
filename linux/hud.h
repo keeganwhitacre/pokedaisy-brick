@@ -11,6 +11,10 @@
 #include <stdint.h>
 
 struct hud_state {
+  void (*monIcon)(struct pd_canvas *, int, int, int, const unsigned char *, size_t, int);
+  const unsigned char *rom;
+  size_t romSize;
+  int build;
   int repel;     // the Repel's steps left (0 = none working)
   int repelFull; // the steps it started from (the smallest of 100 / 200 / 250 covering the first count seen)
 };

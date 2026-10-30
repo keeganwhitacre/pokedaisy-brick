@@ -1,3 +1,5 @@
+#include "polished.h"
+#include <mgba/internal/gb/gb.h>
 #include "../app/src/main/cpp/pk_wide_gb_profile.h"
 #include "polished_wide_tables.h"
 int pc_lz(const unsigned char *, size_t, size_t, unsigned char *, size_t);
@@ -160,6 +162,12 @@ static void post_audio(struct mAVStream *s, blip_t *l, blip_t *r) {
 static bool read_memory(void *ctx, uint32_t a, void *out, size_t n) {
   struct mCore *c = ctx;
   unsigned char *p = out;
+  if (c->platform(c) == mPLATFORM_GB && (a >> 16)) {
+    unsigned bank=a>>16, addr=a&65535;
+    if (bank>7 || addr<0xd000 || addr>=0xe000 || n>0xe000-addr) return false;
+    memcpy(out, ((struct GB*)c->board)->memory.wram + bank*4096 + addr-0xd000, n);
+    return true;
+  }
   if (c->platform(c) == mPLATFORM_GBA && a >= 0x08000000 && a < 0x0e000000) {
     size_t size = 0;
     const unsigned char *r = c->getMemoryBlock(c, 0x08, &size);
@@ -971,8 +979,12 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   pk_rest_reset(); // pk_call (FLY) learns this game's main loop depth
   unsigned gw, gh;
   c->desiredVideoDimensions(c, &gw, &gh);
+  int polished = c->platform(c) == mPLATFORM_GB ? pc_identify(romdata, (size_t)len) : -1;
+  struct pc_ui pcUi = {0};
+  bool pcSettings = false;
   struct pd_game game;
   pd_game_detect(&game, romdata, (size_t)len);
+  if (polished >= 0) game.title = "Pokémon Polished Crystal";
   game.rom = romdata;
   game.romSize = (size_t)len;
   if (c->platform(c) == mPLATFORM_GBA)
@@ -1007,7 +1019,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   unsigned gameKeys = 0;
   int gameKeyFrames = 0;
   // The HUD: on after 20 frames of the plain field (FieldHud's rule), off at once.
-  struct hud_state hudState = {0, 0};
+  struct hud_state hudState = {0};
+  hudDrawnKey = ~0u;
   int hudFieldFrames = 0;
   hudDrawnKey = 0;
   char repelRows[REPEL_KINDS][48];
@@ -1015,7 +1028,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   struct pd_ui ui;
   pd_ui_init(&ui, &settings);
   struct pd_snapshot snap = {0};
-  struct pd_host_info host = {.hideScreenMode = true, .hasExpand = true, .hasHud = c->platform(c) == mPLATFORM_GBA,
+  struct pd_host_info host = {.hideScreenMode = true, .hasExpand = true, .hasHud = c->platform(c) == mPLATFORM_GBA || polished >= 0,
                               .expandGame = wideSupported, .count = 1, .labels = {"HOST"}};
   snprintf(host.values[0], 40, "PokeDaisy Linux");
   const char *opts[] = {"Resume game",
@@ -1268,11 +1281,23 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
             }
           }
         }
+      } else if (polished >= 0 && !pcSettings) {
+        if (down(START)) { pcSettings = true; ui.tab = PD_TAB_SETTINGS; }
+        if (down(X)) {
+          if (pcUi.section == PC_BAG) pc_ui_input(&pcUi, &snap, PC_FAVORITE);
+          else companion = false;
+        }
+        static const int buttons[] = {UP, DOWN, LEFT, RIGHT, A, B, L, R, Y, SELECT};
+        for (unsigned action=0; action<sizeof buttons/sizeof *buttons; action++)
+          if (down(buttons[action]) && !pc_ui_input(&pcUi, &snap, (enum pc_action)action))
+            companion = false;
       } else {
-        if (down(B) && !pd_ui_back(&ui))
-          companion = false;
+        if (down(B) && !pd_ui_back(&ui)) {
+          if (polished >= 0) pcSettings = false; else companion = false;
+        }
         if (down(L) || down(R)) {
-          pd_ui_next_tab(&ui, down(R) ? 1 : -1);
+          if (polished >= 0) pcSettings = false;
+          else pd_ui_next_tab(&ui, down(R) ? 1 : -1);
         }
         for (int k = RIGHT; k <= DOWN; k++)
           if (down(k))
@@ -1336,7 +1361,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     // The companion's data: fresh when it opens (it pauses the game), else twice a
     // second - read through the bus byte by byte, every frame cost frame time.
     if (!snap.valid || (companion && !companionWas) || (!companion && frames % 30 == 0))
-      pd_snapshot_read(&snap, &game, read_memory, c);
+      { if (polished >= 0) pc_read(&snap, read_memory, c);
+        else pd_snapshot_read(&snap, &game, read_memory, c); }
     companionWas = companion;
     // FLY's steps, each between two frames the game's own code can be called in (pk_call_safe), as the app's
     // field-item jobs wait for one.
@@ -1447,6 +1473,10 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                          "GPL-3.0 | mGBA MPL-2.0 | B: Back");
         } else
           pd_menu_draw(menuOpen == 1 ? &gameMenu : &confirmMenu, &canvas);
+      } else if (polished >= 0 && !pcSettings) {
+        pc_ui_tick(&pcUi, SDL_GetTicks());
+        pc_ui_observe(&pcUi, &snap);
+        pc_ui_draw(&pcUi, &canvas, &snap, romdata, (size_t)len, polished);
       } else {
         pd_ui_update(&ui, &snap);
         // The companion draws the focused hit as its own cursor where it has one.
@@ -1458,18 +1488,24 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       }
       present();
     } else {
-      bool field = (fieldFlags & PK_FIELD_KNOWN) && !(fieldFlags & (PK_FIELD_LOCKED | PK_FIELD_BATTLE)) &&
+      bool field = polished >= 0 ? snap.valid && !snap.inBattle && pk_wide_scene() == PK_WIDE_SCENE_FIELD : (fieldFlags & PK_FIELD_KNOWN) && !(fieldFlags & (PK_FIELD_LOCKED | PK_FIELD_BATTLE)) &&
                    (!wideSupported || pk_wide_scene() == PK_WIDE_SCENE_FIELD) && flyStage == 0;
       hudFieldFrames = field ? hudFieldFrames + 1 : 0;
-      if (settings.hud && game.cfg && c->platform(c) == mPLATFORM_GBA && hudFieldFrames >= 20) {
-        int steps = repel_steps(c, game.cfg);
+      if (settings.hud && (polished >= 0 || (game.cfg && c->platform(c) == mPLATFORM_GBA)) && hudFieldFrames >= 20) {
+        int steps = polished >= 0 ? 0 : repel_steps(c, game.cfg);
         if (steps <= 0)
           hudState.repelFull = 0;
         else if (!hudState.repelFull || steps > hudState.repelFull)
           hudState.repelFull = hud_repel_full(steps);
         hudState.repel = steps > 0 ? steps : 0;
         companion_canvas();
-        present_hud_game(&game, &snap, &hudState, settings.hudHidden, gw, gh);
+        if (polished >= 0) {
+          struct pd_snapshot hs = snap;
+          for (int j=0;j<hs.partyCount;j++) if(hs.party[j].species==255) hs.party[j].species=PD_SPECIES_EGG;
+          hudState.monIcon = pc_hud_icon;
+          hudState.rom=romdata; hudState.romSize=(size_t)len; hudState.build=polished;
+          present_hud_game(&game, &hs, &hudState, settings.hudHidden | (1<<PD_HUD_MAP) | (1<<PD_HUD_BALLS) | (1<<PD_HUD_REPEL), gw, gh);
+        } else present_hud_game(&game, &snap, &hudState, settings.hudHidden, gw, gh);
       } else {
         present_game(gw, gh);
       }
