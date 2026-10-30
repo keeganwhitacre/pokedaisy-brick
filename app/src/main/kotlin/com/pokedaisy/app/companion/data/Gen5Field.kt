@@ -1,6 +1,6 @@
 package com.pokedaisy.app.companion.data
 
-// Gen 5 (Black, White): PC anywhere and FLY. The game does both itself (nds/pk_nds_call.cpp's Gen5Fns: the PC's own script, and
+// Gen 5 (Black, White, Black 2, White 2): PC anywhere and FLY. The game does both itself (nds/pk_nds_call.cpp's Gen5Fns: the PC's own script, and
 // FLY the party menu's way - its check of the place, then its flight); this is what the app decides around them: which
 // towns FLY offers (the game's Town Map offers a town once its arrival flag is set) and what they're called.
 
@@ -8,6 +8,8 @@ package com.pokedaisy.app.companion.data
 fun gen5FlySpots(kind: GameKind?): List<FlySpot> = when (kind) {
     GameKind.BLACK -> flySpotsBlack
     GameKind.WHITE -> flySpotsWhite   // White Forest's zone where Black City's is
+    GameKind.BLACK2 -> flySpotsBlack2
+    GameKind.WHITE2 -> flySpotsWhite2   // White Forest again, where Black 2 has Black City
     else -> emptyList()
 }
 

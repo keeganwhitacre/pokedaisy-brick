@@ -220,7 +220,7 @@ fun MapScreen(
                         bitmap = bitmap,
                         style = style,
                         head = regionMapBitmap(
-                            if (snapshot.game.isGen5) NdsArt.BLACK_PLAYER
+                            if (snapshot.game.isGen5) NdsArt.gen5Player(snapshot.game)
                             else if (snapshot.game.isHgss) (if (snapshot.playerGender == 1) com.pokedaisy.app.companion.data.PokegearMap.HEAD_F else com.pokedaisy.app.companion.data.PokegearMap.HEAD_M)
                             else if (snapshot.game.isDsGame) (if (snapshot.playerGender == 1) NdsArt.PLATINUM_HEAD_F else NdsArt.PLATINUM_HEAD_M)
                             else style.headAsset(snapshot.playerGender, snapshot.game),
@@ -241,8 +241,8 @@ fun MapScreen(
                             val big = regionMapBitmap(com.pokedaisy.app.companion.data.PokegearMap.cursor(1))
                             if (small != null && big != null) small to big else null
                         } else if (snapshot.game.isGen5) {
-                            val small = regionMapBitmap(NdsArt.blackCursor(0))
-                            val big = regionMapBitmap(NdsArt.blackCursor(1))
+                            val small = regionMapBitmap(NdsArt.gen5Cursor(snapshot.game, 0))
+                            val big = regionMapBitmap(NdsArt.gen5Cursor(snapshot.game, 1))
                             if (small != null && big != null) small to big else null
                         } else null,
                         headAt = headPoint?.let { (x, y) -> IntOffset(x, y) },

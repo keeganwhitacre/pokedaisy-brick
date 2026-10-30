@@ -146,7 +146,7 @@ enum class GuideId {
     // The Game Boy games: Yellow (all five languages), Red, Blue, retail Crystal.
     YELLOW, RED, BLUE, CRYSTAL,
     // Gen 5 (Gen5World, from the cart).
-    BLACK, WHITE,
+    BLACK, WHITE, BLACK2, WHITE2,
 }
 
 /** [live]'s guide; else by [game] (a config whose tables didn't check out has no live tables). */
@@ -165,6 +165,8 @@ fun guideId(game: GameKind?, live: GuideTables?): GuideId? = live?.guide ?: when
     GameKind.SOULSILVER -> GuideId.SOULSILVER
     GameKind.BLACK -> GuideId.BLACK
     GameKind.WHITE -> GuideId.WHITE
+    GameKind.BLACK2 -> GuideId.BLACK2
+    GameKind.WHITE2 -> GuideId.WHITE2
     else -> null
 }
 
@@ -212,6 +214,8 @@ fun gameGuide(id: GuideId?): GameGuide? = when (id) {
     GuideId.SOULSILVER -> GUIDE_SOULSILVER
     GuideId.BLACK -> GUIDE_BLACK
     GuideId.WHITE -> GUIDE_WHITE
+    GuideId.BLACK2 -> GUIDE_BLACK2
+    GuideId.WHITE2 -> GUIDE_WHITE2
     GuideId.YELLOW -> GUIDE_YELLOW
     GuideId.RED -> GUIDE_RED
     GuideId.BLUE -> GUIDE_BLUE

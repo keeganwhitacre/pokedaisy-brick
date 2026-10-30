@@ -1782,6 +1782,8 @@ class PokeDaisyActivity : Activity() {
             "IPGE" -> com.pokedaisy.app.companion.data.SOULSILVER_WORLD::wildRates
             "IRBO" -> { { com.pokedaisy.app.companion.data.BLACK_WORLD.wildRateWords() } }
             "IRAO" -> { { com.pokedaisy.app.companion.data.WHITE_WORLD.wildRateWords() } }
+            "IREO" -> { { com.pokedaisy.app.companion.data.BLACK2_WORLD.wildRateWords() } }
+            "IRDO" -> { { com.pokedaisy.app.companion.data.WHITE2_WORLD.wildRateWords() } }
             else -> null
         }
         input.ds = nds

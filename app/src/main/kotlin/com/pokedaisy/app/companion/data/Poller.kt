@@ -338,7 +338,7 @@ class TelemetrySampler {
                 GameKind.CRYSTAL, GameKind.CRYSTAL_CLEAR, GameKind.PRISM, GameKind.GOLD, GameKind.SILVER, GameKind.POLISHED_CRYSTAL ->
                     readGen2Telemetry(reader, gen2Cfg ?: GEN2_CRYSTAL)
                 GameKind.PLATINUM, GameKind.HEARTGOLD, GameKind.SOULSILVER -> readGen4Telemetry(reader, gen4Cfg ?: GEN4_PLATINUM_US)
-                GameKind.BLACK, GameKind.WHITE -> readGen5Telemetry(reader, gen5Cfg ?: GEN5_BLACK)
+                GameKind.BLACK, GameKind.WHITE, GameKind.BLACK2, GameKind.WHITE2 -> readGen5Telemetry(reader, gen5Cfg ?: GEN5_BLACK)
                 else -> {
                     unsupportedHackLabel?.let { return SnapshotView(connected = false, error = it, unsupported = true) }
                     val cfg = nativeCfg ?: return SnapshotView(connected = false, error = "no telemetry source")
@@ -640,8 +640,8 @@ class TelemetrySampler {
     /** A Game Boy / Color cart, by the whole ROM's SHA1 (read from the cart: it's bank-switched). */
     /**
      * A DS cart: by its header's game code and revision (a 128 MB+ ROM isn't hashed live). Platinum USA rev 1 and
-     * HeartGold / SoulSilver USA are mapped (pret/pokeplatinum and pret/pokeheartgold build them), Black and White (USA / Europe) from
-     * headless captures (Gen5Reader); anything else gets the
+     * HeartGold / SoulSilver USA are mapped (pret/pokeplatinum and pret/pokeheartgold build them), Black, White, Black 2 and
+     * White 2 (USA / Europe) from headless captures (Gen5Reader); anything else gets the
      * "not supported" notice.
      */
     private fun detectDs() {
@@ -653,6 +653,8 @@ class TelemetrySampler {
                 "IPGE" -> { kind = GameKind.SOULSILVER; gen4Cfg = GEN4_SOULSILVER_US }
                 "IRBO" -> { kind = GameKind.BLACK; gen5Cfg = GEN5_BLACK }
                 "IRAO" -> { kind = GameKind.WHITE; gen5Cfg = GEN5_WHITE }
+                "IREO" -> { kind = GameKind.BLACK2; gen5Cfg = GEN5_BLACK2 }
+                "IRDO" -> { kind = GameKind.WHITE2; gen5Cfg = GEN5_WHITE2 }
                 else -> { kind = GameKind.PLATINUM; gen4Cfg = GEN4_PLATINUM_US }
             }
             else -> {
@@ -1077,8 +1079,9 @@ class TelemetrySampler {
         const val NDS_SUPPORT = true
 
         /** The DS carts the companion reads, by their header's game code (0x0C) and revision (0x1E): Platinum USA rev 1,
-         * HeartGold / SoulSilver USA (rev 0, their only one), Black and White (USA / Europe, rev 0). The website's ROM check gets them through compat.json. */
-        val NDS_GAMES = mapOf("CPUE" to 1, "IPKE" to 0, "IPGE" to 0, "IRBO" to 0, "IRAO" to 0)
+         * HeartGold / SoulSilver USA (rev 0, their only one), Black, White, Black 2 and White 2 (USA / Europe, rev 0). The
+         * website's ROM check gets them through compat.json. */
+        val NDS_GAMES = mapOf("CPUE" to 1, "IPKE" to 0, "IPGE" to 0, "IRBO" to 0, "IRAO" to 0, "IREO" to 0, "IRDO" to 0)
 
         /** [detectDs] and the library's [com.pokedaisy.app.CompanionSupport] both ask this. */
         fun ndsSupported(code: String?, revision: Int?): Boolean =

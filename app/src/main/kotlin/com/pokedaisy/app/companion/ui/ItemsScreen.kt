@@ -728,7 +728,7 @@ private fun lightBagFor(game: GameKind, hgssPocket: Int = 0): BagPalette = when 
     GameKind.MARIOMON -> MariomonBag
     GameKind.HEARTGOLD, GameKind.SOULSILVER -> hgssBags.getOrElse(hgssPocket) { HeartGoldBag }
     GameKind.PLATINUM -> PlatinumBag
-    GameKind.BLACK, GameKind.WHITE -> BlackBag
+    GameKind.BLACK, GameKind.WHITE, GameKind.BLACK2, GameKind.WHITE2 -> BlackBag
     // Too Many Types 2's, Glazed's, Imperium's and Quetzal's bags are Emerald's; Gaia's and Celia's are FireRed's.
     // Elite Redux's and Team Rocket Edition: Dragonsden's bag screens are Emerald's too.
     // Dreamstone Mysteries' is Emerald's (headless: its bag screen in battle, seven pockets).

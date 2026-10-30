@@ -71,6 +71,9 @@ private fun rawAreas(guide: GuideId): List<String> = when (guide) {
     // Black's and White's item balls (scripts/gen_gen5_guide.py), keyed by the zone's place.
     GuideId.BLACK -> BLACK_AREAS_RAW
     GuideId.WHITE -> WHITE_AREAS_RAW
+    // Black 2's and White 2's (the same item balls; their places are mapPlaceIdsBlack2's).
+    GuideId.BLACK2 -> BLACK2_AREAS_RAW
+    GuideId.WHITE2 -> WHITE2_AREAS_RAW
     // The Game Boy games (scripts/gen_gen1_guide.py, gen_crystal_guide.py): Gen 1's keyed by wCurMap, regrouped by
     // [gen1Area]; Crystal's by landmark, like Polished Crystal's.
     GuideId.YELLOW -> G1Y_AREAS_RAW
@@ -92,6 +95,7 @@ fun areaSection(game: GameKind?, mapNum: Int, regionSec: Int): Int = when (game)
     GameKind.PLATINUM -> mapPlaceIdsPlatinum[mapNum] ?: regionSec
     GameKind.HEARTGOLD, GameKind.SOULSILVER -> hgHeaderPlaces[mapNum] ?: regionSec
     GameKind.BLACK, GameKind.WHITE -> mapPlaceIdsBlack[mapNum] ?: regionSec
+    GameKind.BLACK2, GameKind.WHITE2 -> mapPlaceIdsBlack2[mapNum] ?: regionSec
     GameKind.YELLOW, GameKind.RED, GameKind.BLUE -> gen1Area(mapNum)
     else -> regionSec
 }

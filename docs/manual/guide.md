@@ -35,7 +35,7 @@ In Crystal and Polished Crystal the grass list follows your game's clock (mornin
 
 In Lazarus many outdoor areas have different Pokémon by day and at night. Its night runs from 8 in the evening to 7 in the morning on your game's clock. HERE lists the ones out right now, says under `GRASS / CAVE` whether that's `DAY` or `NIGHT`, and adds an `AT NIGHT` (or `BY DAY`) section for the ones that only show up at the other time. The line at the top that counts how many you've caught here counts both.
 
-In Black and White the wild Pokémon change with the seasons, and the season changes every month: January, May and September are spring, then summer, autumn and winter in turn. The line under `GRASS / CAVE` says which season HERE shows, going by your device's date.
+In Black, White, Black 2 and White 2 the wild Pokémon change with the seasons, and the season changes every month: January, May and September are spring, then summer, autumn and winter in turn. The line under `GRASS / CAVE` says which season HERE shows, going by your device's date.
 - **PEOPLE**: anyone in the area who gives you an item, a Pokémon or an egg, and in-game trades (what they offer and what they want for it). Some of them want something done first.
 - **ITEMS**: items lying on the ground and hidden ones. A hidden item shows as `HIDDEN ITEM` until you tap it: the hint says roughly where it's buried, the answer names it.
 
@@ -55,7 +55,7 @@ Each of their Pokémon is its own entry, with its level showing:
 
 When every boss is beaten, the page says `ALL DONE`.
 
-Some hacks give a boss more than one team, for example one per difficulty in Unbound. Those get a section for each team, so look at the one you're playing on. In Red, Blue and Yellow your rival's team as champion depends on what happened at the start of the game. Once your save has settled it, NEXT BOSS shows that team; before then it shows each team the game could pick. In Polished Crystal the Elite Four and the champion bring stronger teams once you hold all 16 badges, and NEXT BOSS lists that rematch after the Kanto gyms.
+Some hacks give a boss more than one team, for example one per difficulty in Unbound. Those get a section for each team, so look at the one you're playing on. In Red, Blue and Yellow your rival's team as champion depends on what happened at the start of the game. Once your save has settled it, NEXT BOSS shows that team; before then it shows each team the game could pick. In Polished Crystal the Elite Four and the champion bring stronger teams once you hold all 16 badges, and NEXT BOSS lists that rematch after the Kanto gyms. In Black 2 and White 2 every leader, the Elite Four and the champion show two teams: the normal game's and Challenge Mode's. Once you've entered the Hall of Fame, the Elite Four and the champion switch to their stronger second-round teams.
 
 ## EVOLUTIONS
 

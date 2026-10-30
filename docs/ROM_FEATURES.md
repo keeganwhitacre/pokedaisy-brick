@@ -34,6 +34,8 @@ change to any of the places listed under "Where it's decided" updates its rows h
 | SoulSilver (DS) | USA | ✅ ¹⁴ | — | — | — | — | ✅ ¹⁴ | — | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | — | n/a | — |
 | Black (DS) | USA/Europe | ✅ ¹⁴ | — | — | — | — | ✅ ¹⁴ | — | ✅ ¹⁴ | ◐ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁶ | n/a | — |
 | White (DS) | USA/Europe | ✅ ¹⁴ | — | — | — | — | ✅ ¹⁴ | — | ✅ ¹⁴ | ◐ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁶ | n/a | — |
+| Black 2 (DS) | USA/Europe | ✅ ¹⁴ | — | — | — | — | ✅ ¹⁴ | — | ✅ ¹⁴ | ◐ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁶ | n/a | — |
+| White 2 (DS) | USA/Europe | ✅ ¹⁴ | — | — | — | — | ✅ ¹⁴ | — | ✅ ¹⁴ | ◐ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁴ | ✅ ¹⁶ | n/a | — |
 | Amethyst | 1.3.0, 1.4.1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ ¹⁹ |
 | Ash Gray | 4.5.3, Fork Bug Fix 1.0 | ✅ | ✅ | ✅ | ✅ | ✅ | ◐ ⁹ | — | ◐ ⁹ | ◐ ⁹ | ◐ ⁹ | ◐ ⁹ | — | — | ✅ ¹⁹ |
 | Celia's Stupid Romhack | 1.1.4 | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | — | ✅ ¹⁵ | — | — |
@@ -199,6 +201,12 @@ change to any of the places listed under "Where it's decided" updates its rows h
     each address found again through the code that uses it in both carts, then checked headless on Black's save, which
     White loads (`fieldinfo` on the field, a text box and a wild battle with its command 3; the PC's boxes; FLY refused
     on the platform, then to Accumula Town and to White Forest, White's own town; WILD ENCOUNTERS' hold on Route 1).
+    Black 2 (IREO rev 0) is a new build of the same engine: every static moved (the field map is overlay 36, the battle
+    167), each found again through the code that uses it in Black and Black 2 (the PC's script event, FLY's skill calls
+    and the event check matched by their code with the BLs masked; the PC's script is still 10090); White 2 (IRDO) is
+    Black 2's code 0x40 higher. Checked headless on the player's saves: `fieldinfo` on the field, the X menu, the party
+    screen and a wild battle on Humilau City's water (command 3 at FIGHT), the bike and SURF, the PC's boxes, FLY to
+    Humilau City and Virbank City, WILD ENCOUNTERS' hold on the water (no battle in 80 steps, one soon after it's back on).
 15. REUSABLE TMS patches the branch where the game uses a TM up after it teaches a move (`if (item < ITEM_HM01)
     RemoveBagItem`), found in the ROM by its code (`ReusableTms.find`): the FireRed engine has three (after the TM case's
     animation, after forgetting a move, Task_LearnedMove), Emerald and Ruby / Sapphire one; every one must call the same

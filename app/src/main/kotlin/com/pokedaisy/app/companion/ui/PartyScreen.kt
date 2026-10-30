@@ -585,7 +585,7 @@ fun partyPaletteFor(game: GameKind): PartyPalette = when (game) {
     GameKind.SWORD_SHIELD -> SwordShieldPartyPalette
     GameKind.MARIOMON -> MariomonPartyPalette
     GameKind.HEARTGOLD, GameKind.SOULSILVER -> HeartGoldPartyPalette
-    GameKind.BLACK, GameKind.WHITE -> BlackPartyPalette
+    GameKind.BLACK, GameKind.WHITE, GameKind.BLACK2, GameKind.WHITE2 -> BlackPartyPalette
     GameKind.PLATINUM -> PlatinumPartyPalette
     // Celia's and Too Many Types 2's slots are FireRed's own colors (only TMT2's backdrop differs).
     else -> FireRedPartyPalette

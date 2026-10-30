@@ -620,6 +620,13 @@ on the right like the games' - the user's call). docs/DEVELOPMENT.md's "Black".
 but 5); its own Town Map places (White Forest for Black City: `Gen5TownMapWhite.kt`), DEX text (`NdsArt.WHITE_DEX`), wild
 sets and NEXT BOSS (IRIS, N's RESHIRAM: `GuideGen5WhiteGen.kt`). White loads Black's save: the `white*` fixtures are it.
 docs/DEVELOPMENT.md's "White".
+**Black 2 / White 2 (IREO / IRDO; 2026-10-30)**: `GameKind.BLACK2` / `.WHITE2` (`isBw2`, in `isGen5`): Black's engine rebuilt -
+its structs, every static moved (`GEN5_BLACK2`, `BLACK2_US`, pk_nds_call's `BLACK2`; field overlay 36, battle 167), a 0x26000
+save image with moved blocks (event work 0x1FF00, money 0x21100, Pokédex 0x21400, Repel 0x2192D); White 2 is Black 2's code
+0x40 higher and shares its tables, art and DEX (8 of 318 files differ). Black's species and moves; their own places, zones,
+12 added key items, item icons, Town Map (`/a/0/8/4` art, `/a/0/8/5` places, arrival flags from 2469: `GEN5_BW2_FIRST_ARRIVAL`)
+and red Pokédex: `gen_gen5_tables.py` with all four carts, `Gen5TablesBlack2.kt`, `NdsArt.BLACK2_*`. Fixtures `black2*`,
+`white2` (the player's own saves). docs/DEVELOPMENT.md's "Black 2 / White 2".
 **Companion options (2026-10-08)**: RESUME GAMES (`Prefs.autoResume`, top-screen Settings > LIBRARY; off =
 a launch boots the save, a return from HOME still resumes - `freshLaunch`), CLOSE COMPANION (SETTINGS, two
 screens: the Presentation goes away until BACK on the game), STATUS BAR OFF / GAME / COMPANION (`Prefs.statusBarOnCompanion`,

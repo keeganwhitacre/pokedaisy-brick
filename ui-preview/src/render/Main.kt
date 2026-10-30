@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.SkikoComposeUiTest
+import com.pokedaisy.app.companion.data.isGen5
 import com.pokedaisy.app.companion.data.save.BoxSlot
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -1091,7 +1092,7 @@ fun homeMapsec(game: GameKind) = when (game) {
 /** A Pokémon in the game's regional Dex, for the DEX entry shots: Sinnoh's opens on TURTWIG. */
 fun ndsFirstMon(game: GameKind) = when (game) {
     GameKind.PLATINUM -> "TURTWIG"
-    GameKind.BLACK, GameKind.WHITE -> "Snivy"
+    GameKind.BLACK, GameKind.WHITE, GameKind.BLACK2, GameKind.WHITE2 -> "Snivy"
     else -> "BULBASAUR"
 }
 
@@ -1171,7 +1172,7 @@ fun main(args: Array<String>) {
         },
         Shot("$g-real-map", bw, bh, bd, companion("MAP", snap = ::ndsSnapshot)),
         // Black's Town Map: PLACES, a place picked from it, and a tap by a town's point (the cursor snaps to it).
-        *(if (game == GameKind.BLACK || game == GameKind.WHITE) arrayOf(
+        *(if (game.isGen5) arrayOf(
             Shot("$g-real-map-places", bw, bh, bd, companion("MAP", snap = ::ndsSnapshot)) { onNodeWithText("PLACES").performClick() },
             Shot("$g-real-map-pick", bw, bh, bd, companion("MAP", snap = ::ndsSnapshot)) {
                 onNodeWithText("PLACES").performClick()
@@ -1210,10 +1211,16 @@ fun main(args: Array<String>) {
         // Black's Route 1).
         Shot("$g-real-guide-route", bw, bh, bd, companion("GUIDE", snap = {
             ndsSnapshot().let { s ->
-                val header = when (game) { GameKind.PLATINUM -> 342; GameKind.BLACK, GameKind.WHITE -> 317; else -> 33 }
+                val header = when (game) {
+                    GameKind.PLATINUM -> 342
+                    GameKind.BLACK, GameKind.WHITE -> 317
+                    GameKind.BLACK2, GameKind.WHITE2 -> 437   // Route 19, by Aspertia City
+                    else -> 33
+                }
                 val name = when (game) {
                     GameKind.PLATINUM -> com.pokedaisy.app.companion.data.mapPlacesPlatinum
                     GameKind.BLACK, GameKind.WHITE -> com.pokedaisy.app.companion.data.mapPlacesBlack
+                    GameKind.BLACK2, GameKind.WHITE2 -> com.pokedaisy.app.companion.data.mapPlacesBlack2
                     else -> com.pokedaisy.app.companion.data.mapPlacesHeartGold
                 }[header].orEmpty()
                 s.copy(mapNum = header, location = s.location.copy(mapSecName = name))

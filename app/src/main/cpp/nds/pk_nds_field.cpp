@@ -114,6 +114,67 @@ static const PkNdsFieldGame WHITE_US = {
     0x020AA1D0,   // the BGM stack's depth
 };
 
+// Black 2 (USA / Europe, IREO rev 0): a new build of Black's engine, so every static moved, but the GameSystem, its procs,
+// the GameData and the battle module keep Black's shapes (headless captures of the player's save, each word found again
+// through the code that uses it in Black and Black 2). The field map is overlay 36, the battle 167.
+static const PkNdsFieldGame BLACK2_US = {
+    "Black 2 (USA / Europe)",
+    0x021410F4,   // the GameSystem
+    0,
+    0, 0, 0, 0,
+    0,
+    0, 0, 0,
+    0,
+    0,
+    0x0209DA80,   // the BGM stack's first song
+    0x02148EE4,   // sSeqPlayer
+    0,
+    5,            // pk_nds_call's Gen 5 jobs (BLACK2 there)
+    0, 0,
+    5,
+    0x08, 0x08, 0x04, 36, 167,
+    0x14, 0x18,
+    0x14, 0x10, 0x50, 0x0F,
+    3,
+    1,
+    0x1C,
+    0x114,
+    0x154,
+    0x158,
+    0x38,
+    0x0209DA74,   // the BGM stack's depth
+};
+
+// White 2 (USA / Europe, IRDO rev 0): Black 2's code with its statics and overlays 0x40 higher (each word found through
+// the code that uses it in both carts, then checked in White 2's headless captures of the player's save).
+static const PkNdsFieldGame WHITE2_US = {
+    "White 2 (USA / Europe)",
+    0x02141134,   // the GameSystem
+    0,
+    0, 0, 0, 0,
+    0,
+    0, 0, 0,
+    0,
+    0,
+    0x0209DAC0,   // the BGM stack's first song
+    0x02148F24,   // sSeqPlayer
+    0,
+    6,            // pk_nds_call's Gen 5 jobs (WHITE2 there)
+    0, 0,
+    5,
+    0x08, 0x08, 0x04, 36, 167,
+    0x14, 0x18,
+    0x14, 0x10, 0x50, 0x0F,
+    3,
+    1,
+    0x1C,
+    0x114,
+    0x154,
+    0x158,
+    0x38,
+    0x0209DAB4,   // the BGM stack's depth
+};
+
 // WILD ENCOUNTERS OFF's hold: the MapHeaderData whose rates it zeroed, for which map, and their values before.
 static uint32_t heldData, heldMap, heldGrass, heldSurf;
 static int holding;
@@ -140,6 +201,8 @@ const PkNdsFieldGame* pk_nds_field_game(const char code[4], int revision)
     if ((memcmp(code, "IPKE", 4) == 0 || memcmp(code, "IPGE", 4) == 0) && revision == 0) return &HEARTGOLD_US;
     if (memcmp(code, "IRBO", 4) == 0 && revision == 0) return &BLACK_US;
     if (memcmp(code, "IRAO", 4) == 0 && revision == 0) return &WHITE_US;
+    if (memcmp(code, "IREO", 4) == 0 && revision == 0) return &BLACK2_US;
+    if (memcmp(code, "IRDO", 4) == 0 && revision == 0) return &WHITE2_US;
     return 0;
 }
 

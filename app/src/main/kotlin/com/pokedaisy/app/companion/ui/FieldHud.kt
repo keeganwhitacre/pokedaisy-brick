@@ -966,7 +966,7 @@ private fun HudMiniMap(
     val labelStyle = MapLabelStyle.of(snapshot.game)
     // Black's and White's Town Map: the player's figure, on their place's point (the reader's cell, [blackTownMap]'s points).
     val black = snapshot.game.isGen5
-    val head = regionMapBitmap(if (black) com.pokedaisy.app.companion.data.NdsArt.BLACK_PLAYER else labelStyle.headAsset(snapshot.playerGender, snapshot.game))
+    val head = regionMapBitmap(if (black) com.pokedaisy.app.companion.data.NdsArt.gen5Player(snapshot.game) else labelStyle.headAsset(snapshot.playerGender, snapshot.game))
     val cursor = labelStyle.cursorColor
     val small = rememberGbaTextMetrics(0.75f)
     val name = snapshot.location.mapSecName

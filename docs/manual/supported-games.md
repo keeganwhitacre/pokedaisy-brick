@@ -34,8 +34,10 @@ Any GBA, Game Boy or DS game plays in PokeDaisy. "Supported" is about the compan
 - Pokémon SoulSilver: the USA release.
 - Pokémon Black: the USA / Europe release.
 - Pokémon White: the USA / Europe release.
+- Pokémon Black 2: the USA / Europe release.
+- Pokémon White 2: the USA / Europe release.
 
-The companion reads their party, bag, map, Pokédex and guide, with pictures, Pokédex pages and the map read from your cart. Platinum's, Black's and White's battles show in the `BATTLE` tab; HeartGold's and SoulSilver's don't yet. Black's and White's `MAP` is the game's own Town Map: the towns you've arrived at in blue, the others grey, as the game shows them. `PARTY`, `BAG` and `DEX` take each game's own colours: Black's and White's cut-corner slots on their navy grid and their green Pokédex grid, Platinum's blue slots on slate stripes. [Screens and devices](devices.md#ds-games) has how a DS game uses your screens.
+The companion reads their party, bag, map, Pokédex and guide, with pictures, Pokédex pages and the map read from your cart. The battles of Platinum, Black, White, Black 2 and White 2 show in the `BATTLE` tab; HeartGold's and SoulSilver's don't yet. In Black, White, Black 2 and White 2 the `MAP` is the game's own Town Map: the towns you've arrived at marked as the game marks them, the others left plain. `PARTY`, `BAG` and `DEX` take each game's own colours: the cut-corner slots on a navy grid of Black, White and their sequels, Black's and White's green Pokédex grid, Black 2's and White 2's red one, Platinum's blue slots on slate stripes. [Screens and devices](devices.md#ds-games) has how a DS game uses your screens.
 
 **ROM hacks**, each in the versions listed:
 

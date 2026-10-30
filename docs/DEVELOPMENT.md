@@ -1965,8 +1965,9 @@ built-in frames, storage + import - ui-preview compiles it, `OverlaysTest` cover
 
 ## Nintendo DS (melonDS)
 
-Platinum (USA rev 1, `CPUE`), HeartGold / SoulSilver (USA, `IPKE` / `IPGE`) and Black / White (USA / Europe, `IRBO` /
-`IRAO`, DSi enhanced carts that run in DS mode) run on melonDS, with the companion, EXPAND and STEADY music.
+Platinum (USA rev 1, `CPUE`), HeartGold / SoulSilver (USA, `IPKE` / `IPGE`), Black / White (USA / Europe, `IRBO` /
+`IRAO`) and Black 2 / White 2 (USA / Europe, `IREO` / `IRDO`; the Gen 5 carts are DSi enhanced and run in DS mode) run on
+melonDS, with the companion, EXPAND and STEADY music.
 
 **The core.** `third_party/melonds` (a submodule pinned to upstream 1.1) builds its core library only, with the
 software 3D renderer (unthreaded: on the emulation thread, since melonDS's render thread raced fast-forward's frame skip
@@ -2173,6 +2174,44 @@ wild battle, White Forest).
   587 has ZEKROM). Its scripts, trainers and zone events are Black's file for file, so the hand-written pages and every
   flag are Black's (`GUIDE_WHITE` = `bwGuide(WHITE_WORLD, "IRIS")`).
 - Its party, bag and Pokédex screens are Black's (the same files; checked headless), so the companion keeps Black's look.
+
+**Black 2 / White 2 (Gen 5).** Black 2 (`IREO` rev 0, `GameKind.BLACK2`) and White 2 (`IRDO`, `GameKind.WHITE2`; `isBw2`,
+both `isGen5`) are Black's engine rebuilt: the same structs, every address moved, the cart's archives renumbered. White 2
+is Black 2's code with the overlays and statics 0x40 higher, and only 8 of its 318 files differ (its Town Map's places
+`/a/0/8/5`, the wild sets `/a/1/2/7`, and six the companion doesn't read), so it shares Black 2's tables, art and DEX.
+Everything was found the way White's was - a literal-pool word's code before it, a function by its bytes with the BLs
+masked, from Black's RAM to Black 2's - and checked headless on the player's three saves (two Black 2, one White 2:
+`black2`, `black2_wild`, `black2_nimbasa`, `white2`; `Black2DecodeTest`, `NdsArtBlack2Test`).
+- RAM (`GEN5_BLACK2` / `GEN5_WHITE2`, `pk_nds_field.cpp`'s `BLACK2_US` / `WHITE2_US`, `pk_nds_call.cpp`'s `BLACK2` /
+  `WHITE2`): the SaveControl pointer 0x0209A338 (White 2 0x0209A378), the GameSystem 0x021410F4 (0x02141134), the BGM
+  stack 0x0209DA74 / 0x0209DA80, sSeqPlayer 0x02148EE4; the field map is overlay 36 (Black's 21), the party list 165, the
+  battle 167 (the overlay tables' sizes say so too). The GameSystem, its proc system, the GameData (zone +0x114, the move
+  form +0x154, the event data +0x158 and its encounter table +0x38) and the battle module are Black's.
+- The save image is 0x26000 bytes and its blocks moved: the event work 0x1FF00 (431 vars, then 3064 flags), money /
+  badges 0x21100 / 0x21104, the Pokédex 0x21400 (Black's format), the Repel's steps 0x2192D (found by using a Max Repel
+  from the bag headless and diffing the image); party, bag, trainer and Location kept Black's offsets. The Town Map's
+  arrival flags are 2469 (Pokéstar Studios) to 2492, and Victory Road's 2530 (`GEN5_BW2_FIRST_ARRIVAL`, 62 bits). Its Unova
+  Dex has 301 species, older ones among them, so the National Dex is any seen species outside it (`unovaDexBlack2`).
+- PC and FLY: the field's event check (0x0218185D), the script event (0x0215366D, the PC's script is still 10090),
+  GameSystem_SetEvent (0x02016AED) and FLY's skill calls in overlay 12 (0x02159231 / 0x021593FD / 0x02159421) are Black's
+  functions by their code; `returnZero` is an ARM9 `movs r0, #0; bx lr` at 0x020056B9. FLY is skill 4, refused indoors
+  (checked in Humilau City's Pokémon Center).
+- The cart (`gen_gen5_tables.py` with all four carts; Black's and White's files come out unchanged): text banks 90
+  species, 403 moves, 64 items, 109 places, 398 types, 442 DEX descriptions (both versions'), 464 categories, 374
+  abilities; 615 zones; the item icon table opens with the pair (1021, 1022) and is renumbered from item 505 on; 12 key
+  items were added (627-638); the Town Map's places are `/a/0/8/5` (84 of 85: each version leaves out the other's Black
+  City / White Forest, both at the same point) with a +0x20 condition (`Gen5TownMapPlace.shownBy`) and its art
+  `/a/0/8/4` (Black's `/a/0/8/5`, member for member). Kinds: 0 a town, 3 the new places FLY reaches (PWT, Pokéstar
+  Studios, Join Avenue, Victory Road), 4 the places the story shows (N's Castle, the Plasma Frigate, the Abyssal Ruins), 5
+  Unity Tower.
+- GUIDE (`gen_gen5_guide.py` with either sequel's cart -> `GuideGen5Black2Gen.kt` / `GuideGen5White2Gen.kt`, read by
+  `BLACK2_WORLD` / `WHITE2_WORLD`; `GuideBlack2.kt`): wild sets `/a/1/2/7` in Black's block format, a zone's set the low
+  13 bits of its header's +0x14 (0x1FFF none) and its event file its +0x16; trainers `/a/0/9/1` / `/a/0/9/2` (names bank
+  382, classes 383), item-ball scripts `/a/0/5/6` member 1240, zone events `/a/1/2/6`. Every boss has a Normal and a
+  Challenge Mode trainer (shown as two teams), the Elite Four and IRIS a second round after the Hall of Fame (flag
+  0x960, IRIS's done flag); the Elite Four's room flags are 0x967-0x96A, GHETSIS's 0x375, the leaders go by badge. The two
+  versions differ in their wild sets only.
+- Its party and bag screens are Black's; its Pokédex is red (`DsPattern.BLACK2_DEX`, sampled headless).
 
 ## Build
 
