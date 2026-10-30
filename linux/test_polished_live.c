@@ -17,6 +17,17 @@ static void shot(const char *name) {
 }
 static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui,struct pd_snapshot *s) {
   (void)ui;
+  if (getenv("PC_PROBE")) {
+    if(frame==0){char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));}
+    if(frame%30==20){char name[64];snprintf(name,sizeof name,"probe-%03d",frame);shot(name);fprintf(stderr,"probe%d scene%d\n",frame,pk_wide_scene());}
+    if(frame==22) drive(c,32,8);
+    if(frame==52) drive(c,128,100);
+    if(frame==82) drive(c,16,48);
+    if(frame==112) drive(c,64,48);
+    if(frame==142) drive(c,32,96);
+    if(frame==172) drive(c,128,80);
+    return;
+  }
   if(frame==0) {
     FILE *script=fopen(getenv("PC_BOOT"),"r"); assert(script);
     char line[256],key[24];int n;
