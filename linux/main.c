@@ -342,7 +342,9 @@ static bool down(int k) { return (pressed & (1u << k)) != 0; }
  * its pixel text is about as big on every panel: 320x240 at 2x on 640x480,
  * 426x240 at 3x on 1280x720, 341x256 on 1024x768, 480x270 on 1920x1080.
  * POCKET_COMPANION_SCALE=N picks the scale instead. */
+static bool polishedCanvas;
 static void companion_size(int ow, int oh, int *w, int *h) {
+  if (polishedCanvas) { *w=512; *h=384; return; }
   int scale = ow / 320 < oh / 240 ? ow / 320 : oh / 240;
   const char *forced = getenv("POCKET_COMPANION_SCALE");
   if (forced && atoi(forced) > 0)
@@ -980,6 +982,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   unsigned gw, gh;
   c->desiredVideoDimensions(c, &gw, &gh);
   int polished = c->platform(c) == mPLATFORM_GB ? pc_identify(romdata, (size_t)len) : -1;
+  polishedCanvas = polished >= 0;
   struct pc_ui pcUi = {0};
   bool pcSettings = false;
   struct pd_game game;
@@ -1057,7 +1060,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     events();
     audio_check();
     repeat_directions();
-    if (down(X)) {
+    if (down(X) && (polished < 0 || !companion)) {
+      pressed &= ~(1u << X);
       menuOpen = 0;
       companion = !companion;
       c->setKeys(c, 0);
@@ -1543,6 +1547,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   if (audio)
     SDL_ClearQueuedAudio(audio);
 cleanup:
+  polishedCanvas = false;
   pk_wide_configure(0);
   wideSupported = wideReady = false;
   c->unloadROM(c);

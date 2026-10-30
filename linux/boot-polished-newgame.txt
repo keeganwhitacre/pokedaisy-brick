@@ -1,0 +1,344 @@
+# Original normal-input test route: new game to Cyndaquil in Elm lab.
+# Polished Crystal 3.2.3, no battery save, no RAM/ROM writes.
+wait 600
+hold START 3
+wait 200
+hold A 3
+wait 120
+hold A 3
+wait 120
+hold START 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold START 3
+wait 300
+wait 300
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 240
+hold A 3
+wait 240
+hold RIGHT 32
+hold UP 32
+wait 120
+hold RIGHT 9
+hold UP 36
+wait 150
+hold UP 16
+wait 180
+hold RIGHT 9
+hold UP 24
+wait 180
+hold DOWN 64
+wait 180
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold A 3
+wait 150
+hold DOWN 36
+hold LEFT 9
+hold DOWN 36
+wait 180
+hold B 3
+wait 30
+hold DOWN 18
+hold LEFT 36
+hold DOWN 32
+wait 180
+hold RIGHT 9
+hold DOWN 18
+wait 180
+hold LEFT 18
+hold DOWN 18
+wait 180
+hold LEFT 64
+wait 120
+hold LEFT 16
+hold UP 48
+wait 180
+hold DOWN 16
+hold LEFT 64
+hold UP 16
+wait 300
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold UP 32
+wait 300
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold A 3
+wait 180
+hold RIGHT 32
+hold UP 1
+hold A 3
+wait 180
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold A 30
+wait 30
+hold RIGHT 32
+hold UP 3
+hold A 30
+wait 90
+hold A 30
+wait 180
+hold A 30
+wait 120
+hold A 30
+wait 120
+hold A 30
+wait 120
+hold A 30
+wait 120
+hold A 30
+wait 120
+hold A 30
+wait 120
+hold A 30
+wait 120
+hold B 30
+wait 180

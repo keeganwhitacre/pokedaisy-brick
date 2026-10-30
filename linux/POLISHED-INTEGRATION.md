@@ -41,5 +41,17 @@ Includes upstream RAM fixtures for Polished 3.2.0–3.2.3 and faithful, bag capa
 party/forms/eggs, battle/guide navigation and drawing, EXP and generated-table
 freshness, plus existing GB/GBA diagnostic runtime and packaging checks.
 
-No personal-ROM playthrough, screenshot validation, or physical Brick test yet.
+Live native validation now uses the supplied 3.2.3 ROM and a disposable copy of
+the supplied save. Normal guest input starts a new game, reaches Elm's lab and
+obtains Cyndaquil. Actual host captures cover companion pages, expansion, quick
+menu, party HUD and Settings. State roundtrip restores the frame counter; HUD
+and EXPAND settings survive save/reload. Fixed X double-processing and cropped
+legacy canvas found by this run. This does not validate a resumed playthrough:
+the supplied save did not resume one. Physical Brick testing remains outstanding.
+
+Optional runner: build with -DPOCKET_LIVE_TESTS=ON; set PC_BOOT to
+linux/boot-polished-newgame.txt and PC_SHOTS to an existing capture directory.
+Run linux-polished-live-test --data DISPOSABLE_DATA --frames 90 ROM.
+Preload DISPOSABLE_DATA/settings.ini with aspect=1 and hud=1. All guest input is
+normal controller input; no fixture RAM or synthetic party is injected.
 Do not replace a known-good installation without backing it up and its saves.
