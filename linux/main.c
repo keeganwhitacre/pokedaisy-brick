@@ -1,3 +1,6 @@
+#include "../app/src/main/cpp/pk_wide_gb_profile.h"
+#include "polished_wide_tables.h"
+int pc_lz(const unsigned char *, size_t, size_t, unsigned char *, size_t);
 /* Native single-screen host for PokeDaisy. GPL-3.0, see ../NOTICE. */
 #include "../3ds/desktop/pd_png.h"
 #include "pd_menu.h"
@@ -957,6 +960,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   uint32_t crc = 0;
   c->checksum(c, &crc, mCHECKSUM_CRC32);
   wideSupported = pk_wide_configure(crc) != 0;
+  if (crc == PC_WIDE_CRC)
+    wideSupported = pk_wide_configure_gb_profile(pcWideConfig, pc_lz) != 0;
   wideReady = false;
   // WILD ENCOUNTERS: the game's own switch (wild.c finds it), held by pk_wide's field read every frame.
   uint32_t wildSwitch = 0;

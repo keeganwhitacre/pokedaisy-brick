@@ -2003,6 +2003,15 @@ static uint8_t rawHole[BUF_H][BUF_W];   // ... and where it had nothing: the fra
 int pk_wide_frame_w(void) { return gbGame ? PK_WIDE_GB_W : PK_WIDE_W; }
 int pk_wide_frame_h(void) { return gbGame ? PK_WIDE_GB_H : PK_WIDE_H; }
 
+#include "pk_wide_gb_profile.h"
+int pk_wide_configure_gb_profile(const uint32_t addresses[GB_CONFIG],
+                                 pk_wide_gb_decode_fn decode) {
+    pk_wide_configure(0);
+    gbGame = pk_wide_gb_configure_polished(addresses, decode);
+    pk_wide_reset();
+    return gbGame;
+}
+
 int pk_wide_configure(uint32_t crc) {
     lastFault = 0;
     gbGame = crc && pk_wide_gb_configure(crc);
