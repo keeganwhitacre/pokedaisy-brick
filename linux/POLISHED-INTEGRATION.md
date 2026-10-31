@@ -434,3 +434,20 @@ and process-restart persistence passed with the normally earned outdoor state.
 Physical Brick appearance/performance and Android shader matching remain untested.
 TM/HM targeted teaching is still unfinished. Live reproduction: PC_QUICK_GRID=1
 PC_LCD=1 with the usual runner; PC_GRID_RELOAD=1 verifies a second process.
+
+## Companion Potion targeting (normal 3.2.3)
+
+R2 on a highlighted Potion now opens a companion party-target list. D-pad chooses,
+A uses and B backs out. Fainted, full-HP and egg targets are refused. The dispatcher
+uses normal native menu input, verifies the unchanged target record before confirming,
+then requires increased HP, exactly one consumed Potion and a free overworld before
+success. No healing/quantity writes are made by production code. Species labels reuse
+the app-generated Polished names. Other items retain R2's original native menu.
+
+14 native / 13 ARM-QEMU tests pass, including target rejection model cases.
+Actual native and ARM/QEMU personal-ROM runs confirmed selection, healing, consumption
+and clean return. Positive tests explicitly set starter HP to 1 in disposable WRAM;
+the Potion was owned in the earned state. This is an injury fixture, not a naturally
+earned injury test. Physical Brick, non-lead/multiple-party targets, cancellation during
+healing and other item types remain unverified. TM/HM teaching remains unfinished.
+Reproduce with PC_TARGET=1 and --frames 705 using disposable earned-state data.

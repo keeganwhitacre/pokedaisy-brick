@@ -48,6 +48,8 @@ if any(name not in app_items for name in ['Bicycle','Repel','Super Repel','Max R
 keyids=sorted(v-0x200 for v in app_items.values() if 0x200<v<0x300)
 assert keyids==list(range(1,max(keyids)+1)), 'Review sparse key item IDs'
 out.append('#define PD_PC_KEY_ID_MAX '+str(max(keyids))+'u')
+out.append('#define PD_PC_POTION '+str(app_items['Potion'])+'u')
+out.append('#define PD_PC_HP_OFFSET '+str(symbols['wPartyMon1HP']-symbols['wPartyMon1'])+'u')
 out.append('#define PD_PC_BICYCLE '+hex(app_items['Bicycle'])+'u')
 out.append('static const struct {unsigned id;const char *name;} pd_pc_repels[]={'+','.join('{'+str(app_items[n])+',"'+n+'"}' for n in ['Repel','Super Repel','Max Repel'])+'};')
 out.append('#define PD_PC_START_MENU '+hex(symbols['StartMenu.MenuData']&65535)+'u')

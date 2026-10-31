@@ -191,6 +191,16 @@ bool pocket_action_begin_use(struct pocket_action *a,const char *sha,unsigned it
   }
   a->result=PA_RUNNING;return true;
 }
+bool pocket_action_begin_heal(struct pocket_action *a,const char *sha,unsigned item,unsigned slot,pocket_action_read r,void *c) {
+  if(!pocket_action_begin_item(a,sha,item,r,c))return false;
+  a->result=PA_REJECTED;uint8_t count;
+  if(item!=PD_PC_POTION || !read8(r,c,PD_PC_PARTY_COUNT,&count) || count>6 || slot>=count ||
+     !r(c,PD_PC_PARTY_MON+slot*PD_PC_PARTY_SIZE,a->partyRecord,PD_PC_PARTY_SIZE))return false;
+  unsigned hp=(a->partyRecord[PD_PC_HP_OFFSET]<<8)|a->partyRecord[PD_PC_HP_OFFSET+1];
+  unsigned max=(a->partyRecord[PD_PC_HP_OFFSET+2]<<8)|a->partyRecord[PD_PC_HP_OFFSET+3];
+  if(!hp || hp>=max || (a->partyRecord[PD_PC_PARTY_EGG_OFFSET]&PD_PC_PARTY_EGG_MASK))return false;
+  a->healSlot=slot;a->beforeHP=hp;a->useKind=3;a->result=PA_RUNNING;return true;
+}
 static bool remaining_quantity(const struct pocket_action *a,pocket_action_read r,void *c,unsigned *qty) {
   uint8_t raw[152];unsigned max=pd_pc_item_pockets[a->pocket].max;
   if(max>75 || !r(c,pd_pc_item_pockets[a->pocket].addr,raw,2+2*max) || raw[0]>max || raw[1+2*raw[0]]!=255)return false;
@@ -203,7 +213,27 @@ static bool remaining_quantity(const struct pocket_action *a,pocket_action_read 
 }
 static unsigned finish_use(struct pocket_action *a,pocket_action_read r,void *c) {
   uint8_t value,menu,running,queue;unsigned qty=0;
-  if(a->useKind==1) {
+  if(a->useKind==3 && a->phase==5) {
+    uint8_t count,mon[PD_PC_PARTY_SIZE];unsigned row;
+    if(!read8(r,c,PD_PC_PARTY_COUNT,&count) || count>6 || a->healSlot>=count ||
+       !r(c,PD_PC_PARTY_MON+a->healSlot*PD_PC_PARTY_SIZE,mon,sizeof mon) ||
+       memcmp(mon,a->partyRecord,sizeof mon)) {a->result=PA_REJECTED;return 0;}
+    if(!menu_cursor(r,c,1,0,count+1,&row)){a->stable=0;return 0;}
+    if(++a->stable<6)return 0;
+    a->stable=0;a->pulse=12;a->hold=1;
+    a->heldKey=row==a->healSlot+1 ? 1 : row<a->healSlot+1 ? 128 : 64;
+    if(a->heldKey==1)a->phase=6;
+    return a->heldKey;
+  }
+  if(a->useKind==3) {
+    uint8_t mon[PD_PC_PARTY_SIZE];
+    if(!r(c,PD_PC_PARTY_MON+a->healSlot*PD_PC_PARTY_SIZE,mon,sizeof mon) ||
+       mon[0]!=a->partyRecord[0] || !remaining_quantity(a,r,c,&qty) ||
+       (qty!=a->quantity && qty+1!=a->quantity)) {a->result=PA_REJECTED;return 0;}
+    unsigned hp=(mon[PD_PC_HP_OFFSET]<<8)|mon[PD_PC_HP_OFFSET+1];
+    if(hp>a->beforeHP && qty+1==a->quantity)a->effectSeen=true;
+    if(hp>a->beforeHP && qty==a->quantity){a->pulse=12;a->hold=1;a->heldKey=2;return 2;}
+  } else if(a->useKind==1) {
     unsigned slot;
     if(!key_slot(r,c,a->item,&slot) || !read8(r,c,PD_PC_PLAYER_STATE,&value)) {a->result=PA_REJECTED;return 0;}
     if(value==(a->beforeState^1))a->effectSeen=true;
@@ -363,6 +393,7 @@ const char *pocket_action_message(const struct pocket_action *a) {
   case PA_DONE:
     if(a->useKind==1)return a->beforeState ? "Off bicycle" : "On bicycle";
     if(a->useKind==2)return "Repel used";
+    if(a->useKind==3)return "Pokemon healed";
     if(a->target==1)return "Fly handed to game; choose a destination";
     return a->item ? "Selected item actions opened" : "Original game Bag opened";
   case PA_REJECTED:
@@ -377,6 +408,7 @@ const char *pocket_action_message(const struct pocket_action *a) {
   default:
     if(a->useKind==1)return a->beforeState ? "Getting off bicycle - B cancels" : "Getting on bicycle - B cancels";
     if(a->useKind==2)return "Using Repel - B cancels";
+    if(a->useKind==3)return "Healing Pokemon - B cancels";
     if(a->target==1)return "Opening original Fly menu - B cancels";
     return "Opening original game Bag - B cancels";
   }

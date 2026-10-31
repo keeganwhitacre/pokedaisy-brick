@@ -1080,6 +1080,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     pocket_favorites_load(root, pcSha, &pcUi.favorites);
   }
   bool pcSettings = false;
+  bool itemTarget=false;int itemTargetSlot=0;unsigned targetItem=0;
+  char targetRows[6][96];const char *targetNames[6];
   struct pd_game game;
   pd_game_detect(&game, romdata, (size_t)len);
   if (polished >= 0) game.title = "Pokémon Polished Crystal";
@@ -1440,6 +1442,15 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
             }
           }
         }
+      } else if(itemTarget) {
+        if(down(B))itemTarget=false;
+        if(down(UP) && snap.partyCount)itemTargetSlot=(itemTargetSlot+snap.partyCount-1)%snap.partyCount;
+        if(down(DOWN) && snap.partyCount)itemTargetSlot=(itemTargetSlot+1)%snap.partyCount;
+        if(down(A)) {
+          if(pocket_action_begin_heal(&pcBagAction,pcSha,targetItem,itemTargetSlot,read_memory,c)) {
+            itemTarget=false;companion=false;held &= ~1023u;
+          } else notice("Choose an injured, conscious Pokemon");
+        }
       } else if (polished >= 0 && !pcSettings) {
         if(pcUi.battleSupported) {
           if(!pocket_battle_read(read_memory,c,&pcUi.battleMenu))
@@ -1513,6 +1524,9 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       if (down(R2)) {
         if (polished >= 0 && !pcSettings && pcUi.section == PC_BAG) {
           int item=pc_bag_selected_item(&pcUi,&snap);
+          if(item==PD_PC_POTION && polished_field_supported(pcSha) && snap.partyCount>0 && snap.partyCount<=6) {
+            itemTarget=true;itemTargetSlot=0;targetItem=item;
+          } else {
           bool begun=(item>0 && item<255) || (item>0x200 && item<0x300) ? pocket_action_begin_item(&pcBagAction,pcSha,(unsigned)item,read_memory,c)
                           : pocket_action_begin(&pcBagAction,pcSha,read_memory,c);
           if (begun) {
@@ -1520,6 +1534,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
             held &= ~1023u;
           }
           notice(pocket_action_message(&pcBagAction));
+          }
         } else {
           menuOpen = 2;
           confirmMenu.title = "Load state? Current progress will rewind.";
@@ -1705,6 +1720,13 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       present_quick(&game, quick, quickN, quickSel, flyList ? "FLY" : "REPEL", rows,
                     flyList ? flyT.count : repelKindCount,
                     flyList ? flySel : repelSel, gw, gh,polished,settings.quickGrid);
+    } else if(companion && itemTarget) {
+      companion_canvas();
+      for(int j=0;j<snap.partyCount && j<6;j++) {
+        snprintf(targetRows[j],sizeof targetRows[j],"%s  %d/%d HP",pc_species_name(snap.party[j].species),snap.party[j].hp,snap.party[j].maxHp);
+        targetNames[j]=targetRows[j];
+      }
+      present_quick(&game,NULL,0,0,"POTION: choose Pokemon",targetNames,snap.partyCount,itemTargetSlot,gw,gh,polished,false);
     } else if (companion && menuOpen && menuOpen != 4) {
       present_menu(menuOpen == 1 ? &gameMenu : &confirmMenu, gw, gh);
     } else if (companion) {

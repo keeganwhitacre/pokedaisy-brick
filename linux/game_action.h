@@ -22,7 +22,7 @@ struct pocket_action {
   unsigned flyMenu;
   unsigned hold, heldKey;
   uint8_t partyRecord[64];
-  unsigned useKind, beforeState, useFrames;
+  unsigned useKind, beforeState, useFrames, healSlot, beforeHP;
   bool effectSeen;
 };
 /* Supported only for verified normal Polished Crystal 3.2.3.
@@ -38,6 +38,7 @@ bool pocket_action_begin_item(struct pocket_action *, const char *sha, unsigned 
  * the free overworld. R2's general item-action menu remains a separate API. */
 bool pocket_action_begin_use(struct pocket_action *,const char *sha,unsigned item,
                             pocket_action_read,void *ctx);
+bool pocket_action_begin_heal(struct pocket_action *,const char *,unsigned,unsigned,pocket_action_read,void *);
 /* Fly uses the original party submenu and destination map. No destination,
  * badge, move, cursor or party writes; the user selects the actual flight. */
 int pocket_action_flyer(const char *sha, pocket_action_read, void *ctx);

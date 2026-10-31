@@ -347,3 +347,7 @@ int pc_bag_selected_item(struct pc_ui *u,const struct pd_snapshot *s) {
   int n=bag_entries(s,u->pocket,u->bagSort,u->bagBuild,&u->favorites,rows);
   return u->item>=0 && u->item<n ? rows[u->item].id : 0;
 }
+
+const char *pc_species_name(int species) {
+  return species==255 ? "Egg" : species>0 && species<512 && names[species] ? names[species] : "Unknown";
+}

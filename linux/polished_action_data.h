@@ -62,6 +62,8 @@
 #define PD_PC_KEY_MAX 38u
 #define PD_PC_KEY_USE_SEL_MENU 0x4213u
 #define PD_PC_KEY_ID_MAX 38u
+#define PD_PC_POTION 25u
+#define PD_PC_HP_OFFSET 34u
 #define PD_PC_BICYCLE 0x201u
 static const struct {unsigned id;const char *name;} pd_pc_repels[]={{93,"Repel"},{94,"Super Repel"},{95,"Max Repel"}};
 #define PD_PC_START_MENU 0x6160u

@@ -161,6 +161,22 @@ int main(void) {
   assert(!pocket_action_tick(&a,read_mem,NULL) && a.result==PA_REJECTED);
   puts("PASS automatic Bike requires observed mount/dismount; Repel requires effect plus one-item consumption; rejects active Repel, invalid state and unexpected inventory changes (model)");
   memset(ram,0,sizeof ram);ram[PD_PC_MAP]=2;ram[PD_PC_PARTY_COUNT]=1;
+  for(unsigned p=0;p<sizeof pd_pc_item_pockets/sizeof *pd_pc_item_pockets;p++)ram[pd_pc_item_pockets[p].addr+1]=255;
+  unsigned healpack=pd_pc_item_pockets[1].addr;
+  ram[healpack]=1;ram[healpack+1]=PD_PC_POTION;ram[healpack+2]=2;ram[healpack+3]=255;
+  ram[PD_PC_PARTY_MON]=155;ram[PD_PC_PARTY_MON+PD_PC_HP_OFFSET+1]=1;
+  ram[PD_PC_PARTY_MON+PD_PC_HP_OFFSET+3]=20;
+  assert(pocket_action_begin_heal(&a,PD_PC_ACTION_SHA,PD_PC_POTION,0,read_mem,NULL));
+  pocket_action_cancel(&a);
+  assert(!pocket_action_begin_heal(&a,PD_PC_ACTION_SHA,PD_PC_POTION,1,read_mem,NULL));
+  ram[PD_PC_PARTY_MON+PD_PC_HP_OFFSET+1]=20;
+  assert(!pocket_action_begin_heal(&a,PD_PC_ACTION_SHA,PD_PC_POTION,0,read_mem,NULL));
+  ram[PD_PC_PARTY_MON+PD_PC_HP_OFFSET+1]=0;
+  assert(!pocket_action_begin_heal(&a,PD_PC_ACTION_SHA,PD_PC_POTION,0,read_mem,NULL));
+  ram[PD_PC_PARTY_MON+PD_PC_HP_OFFSET+1]=1;ram[PD_PC_PARTY_MON+PD_PC_PARTY_EGG_OFFSET]=PD_PC_PARTY_EGG_MASK;
+  assert(!pocket_action_begin_heal(&a,PD_PC_ACTION_SHA,PD_PC_POTION,0,read_mem,NULL));
+  puts("PASS Potion targeting refuses missing slot, full HP, fainted and egg targets (model)");
+  memset(ram,0,sizeof ram);ram[PD_PC_MAP]=2;ram[PD_PC_PARTY_COUNT]=1;
   unsigned mon=PD_PC_PARTY_MON;ram[mon]=155;
   ram[mon+PD_PC_PARTY_EGG_OFFSET]=0x80; /* Female is NOT the egg flag. */
   ram[mon+PD_PC_PARTY_MOVES_OFFSET+3]=PD_PC_FLY_MOVE;

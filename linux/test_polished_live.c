@@ -94,6 +94,28 @@ static void earn_injury(struct mCore *c) {
 static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui,struct pd_snapshot *s,
                        struct pc_ui *pc,struct pocket_battle_action *battleJob,struct pocket_action *bagJob) {
   (void)ui;
+  if(getenv("PC_TARGET")) {
+    static int before,quantity;static bool done;
+    if(frame==0) {
+      char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));
+      unsigned char hp[2]={0,1};assert(pk_gb_write(c,PD_PC_PARTY_MON+PD_PC_HP_OFFSET,hp,2));
+      pc_read(s,read_memory,c);before=s->party[0].hp;quantity=bag_count(s,PD_PC_POTION);
+      assert(quantity>0);fprintf(stderr,"FIXTURE injured starter HP=1; Potion owned in earned state. Not naturally earned injury.\n");
+    }
+    if(frame==2)tap(SDLK_TAB);
+    if(frame==4)tap(SDLK_e);
+    if(frame==6){assert(pc->section==PC_BAG && pc_bag_selected_item(pc,s)==PD_PC_POTION);tap(SDLK_2);}
+    if(frame==8){assert(companion);shot("potion-target-choice");}
+    if(frame==9)tap(SDLK_z);
+    if(frame>10 && bagJob->result==PA_DONE && !done) {
+      pc_read(s,read_memory,c);assert(s->party[0].hp>before && bag_count(s,PD_PC_POTION)+1==quantity);
+      assert(!companion && !polished_field_reason(PD_PC_ACTION_SHA,read_memory,c));
+      shot("potion-target-result");fprintf(stderr,"PASS companion target -> automatic Potion -> verified HP and one-item consumption -> overworld (injury fixture)\n");
+      SDL_Event quit={.type=SDL_QUIT};assert(SDL_PushEvent(&quit)==1);done=true;
+    }
+    if(frame==700){fprintf(stderr,"target result=%d phase=%u frames=%u\n",bagJob->result,bagJob->phase,bagJob->frames);assert(done);}
+    return;
+  }
   if(getenv("PC_QUICK_GRID")) {
     bool filter=getenv("PC_LCD")!=NULL;
     static int phase,at;
