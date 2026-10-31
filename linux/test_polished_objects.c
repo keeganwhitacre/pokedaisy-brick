@@ -118,6 +118,15 @@ int main(int argc, char **argv) {
     fprintf(stderr, "template-layer visible pixel changes: %u\n", changed);
     assert(changed);
     assert(screenshot("runtime-phase18-route29-templates-off.png", before));
+    bool returned=false;
+    for(int i=0;i<80 && !returned;i++) {
+      tick(core,16,1);tick(core,0,17);gbTake(&current);
+      returned=current.w==10 && current.h==9;
+    }
+    assert(returned);tick(core,0,120);
+    assert(pk_wide_gb_last_score()>=GB_MIN_SCORE);
+    assert(screenshot("runtime-return-new-bark.png",out));
+    puts("PASS eastward connection back to NewBarkTown");
     puts("PASS actual lab exit, NewBarkTown and west connection into Route29; "
          "original PPU preserved throughout");
   }

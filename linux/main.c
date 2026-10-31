@@ -1,4 +1,5 @@
 #include "polished.h"
+#include "rom_identity.h"
 #include <mgba/internal/gb/gb.h>
 #include "../app/src/main/cpp/pk_wide_gb_profile.h"
 #include "polished_wide_tables.h"
@@ -984,6 +985,12 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   int polished = c->platform(c) == mPLATFORM_GB ? pc_identify(romdata, (size_t)len) : -1;
   polishedCanvas = polished >= 0;
   struct pc_ui pcUi = {0};
+  char pcSha[41] = "";
+  bool pcFavoritesUnsaved = false;
+  if (polished >= 0) {
+    pocket_rom_sha1(romdata, (size_t)len, pcSha);
+    pocket_favorites_load(root, pcSha, &pcUi.favorites);
+  }
   bool pcSettings = false;
   struct pd_game game;
   pd_game_detect(&game, romdata, (size_t)len);
@@ -1362,6 +1369,11 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
         wideMs += ms_since(t);
       }
     }
+    if (polished >= 0 && pcUi.favoritesDirty) {
+      pcFavoritesUnsaved = !pocket_favorites_save(root, pcSha, &pcUi.favorites);
+      pcUi.favoritesDirty = false;
+      if (pcFavoritesUnsaved) notice("Favorites could not be saved");
+    }
     // The companion's data: fresh when it opens (it pauses the game), else twice a
     // second - read through the bus byte by byte, every frame cost frame time.
     if (!snap.valid || (companion && !companionWas) || (!companion && frames % 30 == 0))
@@ -1544,6 +1556,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     else if (now - due > SDL_GetPerformanceFrequency() / 5)
       due = now;
   }
+  if (pcFavoritesUnsaved && !pocket_favorites_save(root, pcSha, &pcUi.favorites))
+    notice("Favorites still not saved");
   if (audio)
     SDL_ClearQueuedAudio(audio);
 cleanup:

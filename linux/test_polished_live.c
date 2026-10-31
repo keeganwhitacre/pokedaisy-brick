@@ -28,6 +28,10 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
     if(frame==172) drive(c,128,80);
     return;
   }
+  if(frame==0 && getenv("PC_RESUME")) {
+    char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);
+    assert(state(c,path,false));return;
+  }
   if(frame==0) {
     FILE *script=fopen(getenv("PC_BOOT"),"r"); assert(script);
     char line[256],key[24];int n;
@@ -42,6 +46,25 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
     for(int i=0;i<30;i++){drive(c,1,3);drive(c,0,120);}
     for(int i=0;i<20;i++){drive(c,2,30);drive(c,0,60);}
     drive(c,128,160);drive(c,0,120);
+    if (getenv("PC_OUTDOOR")) {
+      bool outside=false;
+      drive(c,32,16);drive(c,0,30);
+      for(int i=0;i<120 && !outside;i++) {
+        struct pd_snapshot now;pc_read(&now,read_memory,c);
+        if (now.inBattle) {
+          drive(c,2,3);drive(c,0,30);drive(c,2,3);drive(c,0,30);
+          drive(c,64,3);drive(c,0,3);drive(c,32,3);drive(c,0,3);
+          drive(c,1,3);drive(c,0,30);drive(c,1,3);drive(c,0,180);
+        } else {
+          drive(c,1,3);drive(c,0,120);drive(c,128,16);drive(c,0,30);
+        }
+        uint8_t dims[2];
+        outside=read_memory(c,pcWideConfig[GB_MAP_HEIGHT],dims,2) && dims[0]==9 && dims[1]==10;
+      }
+      struct pd_snapshot position; pc_read(&position,read_memory,c);
+      fprintf(stderr,"OUTDOOR=%d map=%d,%d pos=%d,%d battle=%d\n",outside,position.mapGroup,position.mapNum,position.x,position.y,position.inBattle);assert(outside);
+      drive(c,0,120);
+    }
   }
   if(frame==5) {fprintf(stderr,"LIVE party=%d valid=%d money=%ld battle=%d scene=%d\n",s->partyCount,s->valid,s->money,s->inBattle,pk_wide_scene());shot("01-overworld");tap(SDLK_f);}
   if(frame==8) {shot("02-quick-menu");tap(SDLK_f);}
@@ -49,7 +72,16 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
   if(frame==14) {assert(companion && canvasW==512 && canvasH==384); assert(s->partyCount==1 && s->party[0].species==155); fprintf(stderr,"COMPANION=%d\n",companion);shot("03-party");tap(SDLK_z);}
   if(frame==17) {shot("04-summary");tap(SDLK_x);}
   if(frame==20) tap(SDLK_e);
-  if(frame==23) {shot("05-bag");tap(SDLK_e);}
+  if(frame==23) {shot("05-bag");if(!getenv("PC_FAVORITES"))tap(SDLK_e);}
+  if(frame==24 && getenv("PC_FAVORITES") && !getenv("PC_FAVORITES_RELOAD")) tap(SDLK_TAB);
+  if(frame==25 && getenv("PC_FAVORITES")) tap(SDLK_e);
+  if(frame==26 && getenv("PC_FAVORITES")) {
+    struct pocket_favorites f;
+    assert(pocket_favorites_load(root,"6930b48af5844d373e3c9130f26d6dd1084cf4ed",&f));
+    assert(s->bag[PD_POCKET_ITEMS].count>0);
+    assert(pocket_favorite_has(&f,s->bag[PD_POCKET_ITEMS].items[0].id));
+    fprintf(stderr,"PASS live bag favorite %s\n",getenv("PC_FAVORITES_RELOAD")?"survives process restart":"X saves atomically");
+  }
   if(frame==26) {shot("06-battle-info");tap(SDLK_e);}
   if(frame==29) {shot("07-dex");tap(SDLK_e);}
   if(frame==32) {shot("08-map");tap(SDLK_e);}
