@@ -175,6 +175,59 @@ bool pocket_action_begin_item(struct pocket_action *a,const char *sha,unsigned i
   if(matches!=1 || !a->quantity)return false;
   a->item=item;a->result=PA_RUNNING;return true;
 }
+bool pocket_action_begin_use(struct pocket_action *a,const char *sha,unsigned item,
+                            pocket_action_read r,void *c) {
+  if(!pocket_action_begin_item(a,sha,item,r,c))return false;
+  a->result=PA_REJECTED;
+  uint8_t value;
+  if(item==PD_PC_BICYCLE) {
+    if(!read8(r,c,PD_PC_PLAYER_STATE,&value) || value>1)return false;
+    a->useKind=1;a->beforeState=value;
+  } else {
+    bool repel=false;
+    for(unsigned i=0;i<sizeof pd_pc_repels/sizeof *pd_pc_repels;i++)repel=repel || item==pd_pc_repels[i].id;
+    if(!repel || !read8(r,c,PD_PC_REPEL_STEPS,&value) || value)return false;
+    a->useKind=2;
+  }
+  a->result=PA_RUNNING;return true;
+}
+static bool remaining_quantity(const struct pocket_action *a,pocket_action_read r,void *c,unsigned *qty) {
+  uint8_t raw[152];unsigned max=pd_pc_item_pockets[a->pocket].max;
+  if(max>75 || !r(c,pd_pc_item_pockets[a->pocket].addr,raw,2+2*max) || raw[0]>max || raw[1+2*raw[0]]!=255)return false;
+  *qty=0;bool found=false;
+  for(unsigned i=0;i<raw[0];i++)if(raw[1+2*i]==a->item) {
+    if(found)return false;
+    found=true;*qty=raw[2+2*i];
+  }
+  return true;
+}
+static unsigned finish_use(struct pocket_action *a,pocket_action_read r,void *c) {
+  uint8_t value,menu,running,queue;unsigned qty=0;
+  if(a->useKind==1) {
+    unsigned slot;
+    if(!key_slot(r,c,a->item,&slot) || !read8(r,c,PD_PC_PLAYER_STATE,&value)) {a->result=PA_REJECTED;return 0;}
+    if(value==(a->beforeState^1))a->effectSeen=true;
+  } else {
+    if(!read8(r,c,PD_PC_REPEL_STEPS,&value) || !remaining_quantity(a,r,c,&qty) ||
+       (qty!=a->quantity && qty+1!=a->quantity)) {a->result=PA_REJECTED;return 0;}
+    if(value>0 && qty+1==a->quantity)a->effectSeen=true;
+    /* UsedItemText waits for A/B before TossItem consumes the stack. Only
+     * dismiss it after observing the Repel effect; never confirm another Use. */
+    if(value>0 && qty==a->quantity) {a->pulse=12;a->hold=1;a->heldKey=2;return 2;}
+  }
+  if(!a->effectSeen) {
+    if(++a->useFrames>180)a->result=PA_REJECTED;
+    return 0;
+  }
+  bool free=field(r,c) && read8(r,c,PD_PC_IN_MENU,&menu) && !menu &&
+    read8(r,c,PD_PC_SCRIPT_RUNNING,&running) && !running && read8(r,c,PD_PC_QUEUE,&queue) && !queue;
+  if(free) {
+    if(++a->stable>=6)a->result=PA_DONE;
+    return 0;
+  }
+  a->stable=0;a->pulse=12;a->hold=1;a->heldKey=2;
+  return 2; /* Close text / Bag / Start only after the requested effect. */
+}
 static unsigned select_item(struct pocket_action *a,pocket_action_read r,void *c,
                             unsigned menu,unsigned state,unsigned script) {
   if(!selected_stack(a,r,c)) {
@@ -191,7 +244,19 @@ static unsigned select_item(struct pocket_action *a,pocket_action_read r,void *c
     for(unsigned i=0;i<sizeof pd_pc_item_submenus/sizeof *pd_pc_item_submenus;i++)
       submenu=submenu || menu==pd_pc_item_submenus[i];
     if(a->item>0x200)submenu=menu==pd_pc_item_submenus[2] || menu==PD_PC_KEY_USE_SEL_MENU;
-    if(submenu && item==(a->item&255)) {if(++a->stable>=6)a->result=PA_DONE;}
+    if(submenu && item==(a->item&255)) {
+      if(++a->stable>=6) {
+        if(!a->useKind)a->result=PA_DONE;
+        else {
+          bool useMenu=menu==pd_pc_item_submenus[0] || menu==pd_pc_item_submenus[2] ||
+                       (a->useKind==1 && menu==PD_PC_KEY_USE_SEL_MENU);
+          if(!useMenu){a->result=PA_REJECTED;return 0;}
+          a->stable=0;a->pulse=12;a->hold=1;
+          if(cursor!=1){a->heldKey=64;return 64;}
+          a->phase=5;a->heldKey=1;return 1;
+        }
+      }
+    }
     else a->stable=0;
     return 0;
   }
@@ -238,6 +303,7 @@ unsigned pocket_action_tick(struct pocket_action *a, pocket_action_read r,
     return 0;
   }
   if (a->target==1 && a->phase>=2)return select_fly(a,r,c);
+  if (a->useKind && a->phase>=5)return finish_use(a,r,c);
   if (a->item && a->phase>=3) return select_item(a,r,c,menu,state,script);
   if (a->phase == 2) {
     bool pack = false;
@@ -295,9 +361,12 @@ void pocket_action_cancel(struct pocket_action *a) {
 const char *pocket_action_message(const struct pocket_action *a) {
   switch (a->result) {
   case PA_DONE:
+    if(a->useKind==1)return a->beforeState ? "Off bicycle" : "On bicycle";
+    if(a->useKind==2)return "Repel used";
     if(a->target==1)return "Fly handed to game; choose a destination";
     return a->item ? "Selected item actions opened" : "Original game Bag opened";
   case PA_REJECTED:
+    if(a->useKind)return "Action unavailable or refused; game control restored";
     if(a->target==1)return "Fly unavailable or party changed; use game controls";
     return "Item shortcut unavailable or inventory changed";
   case PA_TIMEOUT:
@@ -306,6 +375,8 @@ const char *pocket_action_message(const struct pocket_action *a) {
   case PA_CANCELLED:
     return "Shortcut cancelled; game control restored";
   default:
+    if(a->useKind==1)return a->beforeState ? "Getting off bicycle - B cancels" : "Getting on bicycle - B cancels";
+    if(a->useKind==2)return "Using Repel - B cancels";
     if(a->target==1)return "Opening original Fly menu - B cancels";
     return "Opening original game Bag - B cancels";
   }

@@ -22,6 +22,8 @@ struct pocket_action {
   unsigned flyMenu;
   unsigned hold, heldKey;
   uint8_t partyRecord[64];
+  unsigned useKind, beforeState, useFrames;
+  bool effectSeen;
 };
 /* Supported only for verified normal Polished Crystal 3.2.3.
  * Opens the original Bag (target 2), or locates a unique ordinary/key item and
@@ -32,6 +34,10 @@ bool pocket_action_begin(struct pocket_action *, const char *sha,
  * No selection is made inside that menu; the game owns legality and targeting. */
 bool pocket_action_begin_item(struct pocket_action *, const char *sha, unsigned item,
                               pocket_action_read, void *ctx);
+/* Complete only the verified Bicycle / Repel actions, including returning to
+ * the free overworld. R2's general item-action menu remains a separate API. */
+bool pocket_action_begin_use(struct pocket_action *,const char *sha,unsigned item,
+                            pocket_action_read,void *ctx);
 /* Fly uses the original party submenu and destination map. No destination,
  * badge, move, cursor or party writes; the user selects the actual flight. */
 int pocket_action_flyer(const char *sha, pocket_action_read, void *ctx);

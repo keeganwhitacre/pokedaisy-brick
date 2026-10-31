@@ -130,6 +130,36 @@ int main(void) {
   for(int i=0;i<6;i++)assert(!pocket_action_tick(&a,read_mem,NULL));
   assert(a.result==PA_DONE);
   puts("PASS key item lookup, changed slot/removal, duplicate/unterminated list refusal and original Use/Sel menu handoff (model)");
+  memset(ram,0,sizeof ram);ram[PD_PC_MAP]=2;
+  ram[PD_PC_KEYS]=PD_PC_BICYCLE-0x200;
+  assert(pocket_action_begin_use(&a,PD_PC_ACTION_SHA,PD_PC_BICYCLE,read_mem,NULL));
+  a.phase=5;
+  for(unsigned i=0;i<182;i++)assert(!pocket_action_tick(&a,read_mem,NULL));
+  assert(a.result==PA_REJECTED); /* Never report a refused Bike effect as success. */
+  assert(pocket_action_begin_use(&a,PD_PC_ACTION_SHA,PD_PC_BICYCLE,read_mem,NULL));
+  a.phase=5;ram[PD_PC_PLAYER_STATE]=1;
+  for(unsigned i=0;i<6;i++)assert(!pocket_action_tick(&a,read_mem,NULL));
+  assert(a.result==PA_DONE && a.effectSeen);
+  ram[PD_PC_PLAYER_STATE]=2;
+  assert(!pocket_action_begin_use(&a,PD_PC_ACTION_SHA,PD_PC_BICYCLE,read_mem,NULL));
+  ram[PD_PC_PLAYER_STATE]=0;
+  for(unsigned p=0;p<sizeof pd_pc_item_pockets/sizeof *pd_pc_item_pockets;p++)ram[pd_pc_item_pockets[p].addr+1]=255;
+  unsigned pack=pd_pc_item_pockets[0].addr;
+  ram[pack]=1;ram[pack+1]=pd_pc_repels[1].id;ram[pack+2]=2;ram[pack+3]=255;
+  ram[PD_PC_REPEL_STEPS]=1;
+  assert(!pocket_action_begin_use(&a,PD_PC_ACTION_SHA,pd_pc_repels[1].id,read_mem,NULL));
+  ram[PD_PC_REPEL_STEPS]=0;
+  assert(pocket_action_begin_use(&a,PD_PC_ACTION_SHA,pd_pc_repels[1].id,read_mem,NULL));
+  a.phase=5;ram[PD_PC_REPEL_STEPS]=200;
+  assert(pocket_action_tick(&a,read_mem,NULL)==2 && !a.effectSeen); /* Text before consumption. */
+  a.hold=a.pulse=0;ram[pack+2]=1;
+  for(unsigned i=0;i<6;i++)assert(!pocket_action_tick(&a,read_mem,NULL));
+  assert(a.result==PA_DONE && a.effectSeen);
+  ram[PD_PC_REPEL_STEPS]=0;ram[pack+2]=2;
+  assert(pocket_action_begin_use(&a,PD_PC_ACTION_SHA,pd_pc_repels[1].id,read_mem,NULL));
+  a.phase=5;ram[pack+2]=3;
+  assert(!pocket_action_tick(&a,read_mem,NULL) && a.result==PA_REJECTED);
+  puts("PASS automatic Bike requires observed mount/dismount; Repel requires effect plus one-item consumption; rejects active Repel, invalid state and unexpected inventory changes (model)");
   memset(ram,0,sizeof ram);ram[PD_PC_MAP]=2;ram[PD_PC_PARTY_COUNT]=1;
   unsigned mon=PD_PC_PARTY_MON;ram[mon]=155;
   ram[mon+PD_PC_PARTY_EGG_OFFSET]=0x80; /* Female is NOT the egg flag. */

@@ -586,6 +586,40 @@ static bool overlay_texture(void) {
   }
   return true;
 }
+/* Preserve the actual pre-action frame while controller-only Bike/Repel
+ * navigation runs. Failures/cancellation immediately reveal the real game;
+ * this is a busy view, never an emulated frame or a prediction of success. */
+static SDL_Texture *actionTexture;
+static unsigned actionW, actionH;
+static void action_capture(unsigned gw,unsigned gh) {
+  SDL_DestroyTexture(actionTexture);
+  actionW=wideReady ? wideW : gw;actionH=wideReady ? wideH : gh;
+  actionTexture=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_BGR888,
+                                  SDL_TEXTUREACCESS_STATIC,actionW,actionH);
+  if(actionTexture && SDL_UpdateTexture(actionTexture,NULL,wideReady ? wideFrame : video,
+                                        (wideReady ? actionW : 256)*4)<0) {
+    SDL_DestroyTexture(actionTexture);actionTexture=NULL;
+  }
+}
+static void present_action(const struct pocket_action *a,unsigned gw,unsigned gh) {
+  if(!actionTexture || !overlay_texture()) {present_game(gw,gh);return;}
+  int ow,oh;SDL_GetRendererOutputSize(renderer,&ow,&oh);
+  SDL_RenderSetLogicalSize(renderer,ow,oh);SDL_RenderSetIntegerScale(renderer,SDL_FALSE);
+  int scale=ow/(int)actionW < oh/(int)actionH ? ow/(int)actionW : oh/(int)actionH;
+  if(scale<1)scale=1;
+  SDL_Rect area={(ow-(int)actionW*scale)/2,(oh-(int)actionH*scale)/2,actionW*scale,actionH*scale};
+  SDL_RenderClear(renderer);SDL_RenderCopy(renderer,actionTexture,NULL,&area);
+  struct pd_canvas ac;pd_canvas_init(&ac,canvasW,canvasH,menuPixels);
+  pd_fill(&ac,0,0,canvasW,canvasH,MENU_KEY);
+  pd_round_rect(&ac,12,canvasH-54,canvasW-24,42,4,0x121620);
+  pd_text_fit(&ac,22,canvasH-45,canvasW-44,pocket_action_message(a),0xffffff,PD_NO_SHADOW);
+  quick_finish(&ac);
+  SDL_UpdateTexture(menuTexture,&(SDL_Rect){0,0,canvasW,canvasH},menuPixels,canvasW*4);
+  scale=ow/canvasW < oh/canvasH ? ow/canvasW : oh/canvasH;if(scale<1)scale=1;
+  area=(SDL_Rect){(ow-canvasW*scale)/2,(oh-canvasH*scale)/2,canvasW*scale,canvasH*scale};
+  SDL_RenderCopy(renderer,menuTexture,&(SDL_Rect){0,0,canvasW,canvasH},&area);
+  timed_present();
+}
 /* The QUICK MENU over the running game: a light dim, the ring at the companion's canvas scale. */
 static void present_quick(const struct pd_game *g, const struct quick_item *items, int n, int sel,
                           const char *title, const char *const *rows, int rowCount, int rowSel, unsigned gw,
@@ -1196,7 +1230,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       else if (down(A)) {
         quickOpen = repelList = false;
         if(pcField) {
-          pocket_action_begin_item(&pcBagAction,pcSha,repelKinds[repelSel],read_memory,c);
+          pocket_action_begin_use(&pcBagAction,pcSha,repelKinds[repelSel],read_memory,c);
           held &= ~1023u;
           notice(pocket_action_message(&pcBagAction));
         } else {
@@ -1265,7 +1299,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           break;
         case QUICK_REPEL:
           if(pcField) {
-            pocket_action_begin_item(&pcBagAction,pcSha,repelKinds[0],read_memory,c);
+            pocket_action_begin_use(&pcBagAction,pcSha,repelKinds[0],read_memory,c);
             held &= ~1023u;
             notice(pocket_action_message(&pcBagAction));
             break;
@@ -1276,7 +1310,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           break;
         case QUICK_BIKE:
           if(pcField) {
-            pocket_action_begin_item(&pcBagAction,pcSha,PD_PC_BICYCLE,read_memory,c);
+            pocket_action_begin_use(&pcBagAction,pcSha,PD_PC_BICYCLE,read_memory,c);
             held &= ~1023u;
             notice(pocket_action_message(&pcBagAction));
             break;
@@ -1464,6 +1498,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       }
     } else {
       muted = ff;
+      if(pcBagAction.result==PA_RUNNING && pcBagAction.useKind && !pcBagAction.frames)
+        action_capture(gw,gh);
       c->setKeys(c, (quickOpen || pcBattleAction.result==PA_RUNNING || battleReturn!=PB_NONE ? 0 : held & 1023) |
                    (gameKeyFrames > 0 ? gameKeys : 0));
       int count = ff && pcBagAction.result != PA_RUNNING && pcBattleAction.result!=PA_RUNNING && battleReturn==PB_NONE ? settings.ffSpeed : 1;
@@ -1475,7 +1511,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           c->setKeys(c,keys);
           if (pcBagAction.result != PA_RUNNING) {
             notice(pcBagAction.target==1 && pcBagAction.result==PA_DONE ? "" : pocket_action_message(&pcBagAction));
-            if (pcBagAction.result != PA_DONE) companion=true;
+            if (pcBagAction.result != PA_DONE && !pcBagAction.useKind) companion=true;
           }
         }
         if(pcBattleAction.result==PA_RUNNING) {
@@ -1630,7 +1666,10 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       job = JOB_NONE;
       notice(item_reason(ITEM_FAILED));
     }
-    if (quickOpen && !companion) {
+    if (pcBagAction.result==PA_RUNNING && pcBagAction.useKind && !companion) {
+      companion_canvas();
+      present_action(&pcBagAction,gw,gh);
+    } else if (quickOpen && !companion) {
       companion_canvas();
       const char *const *rows = flyList ? flyNames : repelList ? repelNames : NULL;
       present_quick(&game, quick, quickN, quickSel, flyList ? "FLY" : "REPEL", rows,
@@ -1866,6 +1905,7 @@ int main(int argc, char **argv) {
   texture = NULL;
   SDL_DestroyTexture(gameTexture);
   SDL_DestroyTexture(wideTexture);
+  SDL_DestroyTexture(actionTexture);actionTexture=NULL;
   if (menuTexture)
     SDL_DestroyTexture(menuTexture);
   menuTexture = NULL;

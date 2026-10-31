@@ -196,12 +196,18 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
   }
   if(getenv("PC_FIELD_FIXTURE")) {
     const char *mode=getenv("PC_FIELD_FIXTURE");
-    bool repel=!strcmp(mode,"repel"),r2=!strcmp(mode,"key-r2"),cancel=!strcmp(mode,"cancel");
+    bool repel=!strcmp(mode,"repel"),r2=!strcmp(mode,"key-r2"),cancel=!strcmp(mode,"cancel"),refused=!strcmp(mode,"bike-refused");
     static int phase,at;static unsigned char registered[5];
     unsigned target=repel ? pd_pc_repels[1].id : PD_PC_BICYCLE;
     if(frame==0) {
       char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));
       assert(!polished_field_reason(PD_PC_ACTION_SHA,read_memory,c));
+      if(refused) {
+        struct pd_snapshot outside,inside;pc_read(&outside,read_memory,c);
+        drive(c,64,60);drive(c,0,180);pc_read(&inside,read_memory,c);
+        assert(inside.mapGroup!=outside.mapGroup || inside.mapNum!=outside.mapNum);
+        assert(!polished_field_reason(PD_PC_ACTION_SHA,read_memory,c));
+      }
       /* Explicit disposable inventory fixture, NOT normally earned items.
        * The actual ROM, host menus and item effects execute afterwards. */
       unsigned char keys[PD_PC_KEY_MAX+1]={2,3,4,5,6,7,8,9,PD_PC_BICYCLE-0x200,0};
@@ -220,6 +226,7 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
     if(frame==5 && r2)tap(SDLK_e);
     if(frame==8 && !r2)shot("fixture-field-quick-menu");
     if(frame==9 && !r2){tap(SDLK_z);phase=1;}
+    if(frame==40 && !r2 && !cancel)shot("fixture-automatic-action-progress");
     if(frame==12 && repel)shot("fixture-repel-choice");
     if(frame==14 && repel)tap(SDLK_z); /* Strongest owned kind is selected. */
     if(r2 && frame>=8 && frame%2==0 && phase==0) {
@@ -233,27 +240,31 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
         assert(bagJob->result==PA_CANCELLED);
         shot("fixture-key-cancelled");fprintf(stderr,"PASS fixture key shortcut cancellation\n");phase=9;at=frame;
       }
+    } else if(refused && phase==1 && bagJob->result==PA_REJECTED) {
+      unsigned char value;assert(read_memory(c,PD_PC_PLAYER_STATE,&value,1) && value==0);
+      assert(!companion && !bagJob->effectSeen);
+      shot("fixture-bike-refused-indoors");
+      fprintf(stderr,"PASS actual indoor Bicycle refusal stops automation without claiming success (inventory fixture; normal door entry)\n");
+      phase=9;at=frame;
     } else if(phase==1 && bagJob->result==PA_DONE) {
-      unsigned char item;assert(read_memory(c,PD_PC_ITEM,&item,1) && item==(target&255));
+      assert(!refused);
       assert(!companion && bagJob->item==target);
       if(!repel)assert(bagJob->slot==8);
-      shot(repel?"fixture-repel-actions":"fixture-key-actions");
-      if(r2){fprintf(stderr,"PASS actual companion R2 selected key actions with scrolled key pocket (inventory fixture)\n");phase=9;}
-      else phase=2;
-      at=frame;
-    } else if(phase==2 && frame==at+2) {
-      drive(c,1,3);drive(c,0,180); /* User confirms Use, never the product dispatcher. */
-      for(int i=0;i<6;i++){drive(c,2,3);drive(c,0,80);}
-      unsigned char value;
-      assert(read_memory(c,repel?PD_PC_REPEL_STEPS:PD_PC_PLAYER_STATE,&value,1));
-      if(repel) {
+      if(r2) {
+        unsigned char item;assert(read_memory(c,PD_PC_ITEM,&item,1) && item==(target&255));
+        shot("fixture-key-actions");fprintf(stderr,"PASS actual companion R2 selected key actions with scrolled key pocket (inventory fixture)\n");phase=9;
+      } else if(repel) {
+        unsigned char value;assert(read_memory(c,PD_PC_REPEL_STEPS,&value,1));
         assert(value==200);
         struct pd_snapshot now;pc_read(&now,read_memory,c);
         assert(bag_count(&now,target)==1 && bag_count(&now,pd_pc_repels[0].id)==2);
-        fprintf(stderr,"PASS fixture Super Repel: user Use sets 200 steps, quantity 2 -> 1\n");
-      } else assert(value==1);
-      assert(!polished_field_reason(PD_PC_ACTION_SHA,read_memory,c));
-      phase=3;at=frame;
+        fprintf(stderr,"PASS automatic Super Repel sets 200 steps, quantity 2 -> 1, without manual Use (inventory fixture)\n");phase=3;
+      } else {
+        unsigned char value;assert(read_memory(c,PD_PC_PLAYER_STATE,&value,1) && value==1);
+        fprintf(stderr,"PASS automatic Bike mounts without manual Use (inventory fixture)\n");phase=3;
+      }
+      if(!r2)assert(!polished_field_reason(PD_PC_ACTION_SHA,read_memory,c));
+      at=frame;
     } else if(phase==3 && frame==at+2) {shot(repel?"fixture-repel-used":"fixture-bike-mounted");tap(SDLK_f);}
     else if(phase==3 && frame==at+5) {
       shot(repel?"fixture-repel-active":"fixture-bike-get-off");tap(SDLK_z);phase=4;at=frame;
@@ -262,11 +273,9 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
       assert(bagJob->result==PA_DONE && bag_count(&now,target)==1);
       fprintf(stderr,"PASS active Repel shortcut does not consume another item (inventory fixture)\n");phase=9;at=frame;
     } else if(phase==4 && !repel && bagJob->result==PA_DONE && frame>at+1) {
-      drive(c,1,3);drive(c,0,180);
-      for(int i=0;i<6;i++){drive(c,2,3);drive(c,0,80);}
       unsigned char value,after[5];assert(read_memory(c,PD_PC_PLAYER_STATE,&value,1) && value==0);
       assert(read_memory(c,PD_PC_REGISTERED_FLAGS,after,sizeof after) && !memcmp(after,registered,sizeof after));
-      fprintf(stderr,"PASS fixture Bike Use: mount and dismount; registered shortcuts unchanged\n");phase=9;at=frame;
+      fprintf(stderr,"PASS automatic Bike dismounts without manual Use; registered shortcuts unchanged (inventory fixture)\n");phase=9;at=frame;
     }
     if(phase==9 && frame==at+2) {
       shot("fixture-field-complete");SDL_Event quit={.type=SDL_QUIT};assert(SDL_PushEvent(&quit)==1);

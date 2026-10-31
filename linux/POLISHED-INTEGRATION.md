@@ -139,9 +139,8 @@ and app-owned data; no new handwritten memory table is added.
 
 Key-item audit: Gen2Reader.kt stores Polished keys as a zero-terminated list of
 up to keyItemsMax=38 IDs, with companion namespace 0x200. These cannot be fed to
-the ordinary count/{id,quantity} parser. Key items retain the original Bag handoff
-until an earned inventory, current-key identity and context-specific submenu
-have live validation. Neither targeted key-item use nor TM teaching is claimed.
+the ordinary count/{id,quantity} parser. General key-item actions retain the original Bag handoff described below.
+Bike and Repel have a separate automatic path; TM teaching remains unfinished.
 
 
 ## PC anywhere (normal 3.2.3)
@@ -253,7 +252,7 @@ Add PC_BATTLE_BAG=1 for native Bag handoff, or PC_BATTLE_CANCEL=1 with
 they do not set its selection, synthesize Pokemon or patch battle memory.
 
 
-## Key items, Bike and Repel handoffs (normal 3.2.3)
+## Key-item menus and automatic Bike / Repel (normal 3.2.3)
 
 R2 on the companion BAG now finds the highlighted key item as well as ordinary
 items. The native key list is zero-terminated, not a quantity-pair pocket; it
@@ -263,17 +262,28 @@ for non-registerable keys). It refuses unknown IDs, duplicate/malformed key
 lists, changed slots and missing items. No key, cursor or registered-slot writes.
 TM/HM selection still opens the whole native Bag; targeted teaching is unfinished.
 
-Y -> BIKE opens the owned Bicycle's action menu. A confirms Use in the game;
-this mounts or dismounts where the original game permits it. The tile says GET
-OFF when riding. It does not borrow or replace a registered shortcut.
-Y -> REPEL lists the owned kinds when there is more than one, then opens the
-selected kind's original action menu. A confirms Use. While a Repel is active,
-the tile shows its remaining steps and is disabled. No extra item is consumed
-by reopening or trying the disabled shortcut. Both tiles are disabled without
-the relevant owned item, or away from a free overworld. The game's own item
-code owns environment restrictions and effects. These are handoffs, not automatic
-item use. The app's existing BAG_ICON supplies a fallback satchel when item art
-is unavailable to the quick menu; GBA item-art behavior is preserved.
+Y -> BIKE now completes mounting or dismounting through normal game input,
+then returns to the overworld. The tile says GET OFF when riding. It does not
+borrow or replace a registered shortcut. Y -> REPEL lists owned kinds when
+there is more than one, then uses the selected kind and returns to gameplay.
+An active Repel disables the tile and shows remaining steps. Missing items or
+a busy field disable these shortcuts. No companion inventory writes are used.
+
+The automatic dispatcher selects Use only in the verified item's known native
+submenu. It requires an observed player-state change for Bike, or a positive
+Repel counter plus exactly one consumed item for Repel. Only then does it send
+B to close remaining text/menus, and require a stable free overworld before
+reporting completion. Unexpected inventory changes, read failures, battles,
+cancellation or bounded timeouts release input. The game retains environment
+restrictions; a refused effect never becomes success. R2 general item actions
+still stop at their native menu, preserving target/Give/Toss decisions.
+
+During automatic Bike/Repel navigation, the host displays the last actual
+pre-action overworld frame and a short cancellable status bar. This is a frozen
+busy view, not live gameplay or a generated preview. Success, refusal, timeout
+or cancellation reveals the current real game immediately. B cancels the host
+controller; any native menus already opened can then be closed normally.
+The app's BAG_ICON remains the fallback when quick-menu item art is unavailable.
 
 Item IDs and Repel names come from ItemNamesPolishedCrystal.kt. Key capacity
 and memory layout are app data cross-checked against pinned release symbols;
@@ -289,7 +299,7 @@ The fixture changes private emulator WRAM before testing; these items were NOT
 normally earned. After setup, real UI/controller inputs opened the ninth key's
 native action menu, mounted and dismounted through user Use, and preserved all
 four registered shortcuts. Companion R2 also found that scrolled key. The Repel
-picker selected Super Repel; user Use set 200 steps and reduced its quantity
+picker selected Super Repel; automatic Use set 200 steps and reduced its quantity
 2 -> 1, leaving the other kind unchanged. An active Repel refused a second use.
 Cancellation passed. These are actual emulation captures with fixture inventory,
 not mockups or evidence of a naturally acquired Bicycle/Repel playthrough.
@@ -301,7 +311,7 @@ passed. Physical Brick operation, real progression inventories, unusual key
 items and game-specific dismount restrictions remain unverified.
 
 Optional reproduction: after PC_OUTDOOR normally earns live-test.ss, use
-PC_FIELD_FIXTURE=bike|repel|key-r2|cancel with --frames 705. Each process needs
+PC_FIELD_FIXTURE=bike|repel|key-r2|cancel|bike-refused with --frames 705. Each process needs
 its own disposable --data directory, PC_BOOT and PC_SHOTS. It quits normally
 once its assertions and capture complete. Capture names start with fixture-.
 PC_FIELD_NO_ITEMS=1 with --frames 26 tests the earned no-item state without
@@ -365,3 +375,22 @@ PC_FLY_BASELINE=1 is the unmodified earned-state test. Successful cases quit
 normally after assertions/capture. Fixtures are never in the shipped app binary;
 test images are real emulation with test-only progression, not mockups or hardware
 captures. Do not distribute the private ROM, battery saves or states.
+
+
+### Automatic-action follow-up
+
+Bike and Repel fixture tests now assert their effects and clean overworld return
+without any manual Use input. Bike tests cover mount, dismount and unchanged
+registered shortcuts; Repel tests cover choosing Super Repel, 200 steps, exactly
+one consumed item and no second use while active. The busy-view screenshots
+are actual application captures of the frozen-background status display.
+R2 selected-key handoff and pending cancellation retain separate live checks.
+The bike-refused mode normally walks into Elm's lab before adding inventory and
+verifies that the game's indoor refusal leaves the player on foot, stops the
+controller and reveals the native refusal instead of falsely reporting success.
+These are disposable inventory fixtures, not normally earned item progression.
+
+General item target/quantity choices, TM/HM teaching, naturally acquired items,
+special dismount restrictions and physical Brick testing remain outstanding.
+The next companion action should use the same pattern: explicit player choices,
+normal game-owned execution and observed outcome, rather than only opening Bag.
