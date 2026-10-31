@@ -188,3 +188,23 @@ aperture/scanline mask covering gameplay, expanded views and companion menus.
 It is not an exact port of Android's shader presets. The choice persists as
 lcd=0/1; existing configurations default to OFF. Texture generation occurs
 only when output dimensions change; emulator/companion buffers stay intact.
+
+## Quick resume and power behavior
+
+SETTINGS offers QUICK RESUME and SAVE ON QUIT (both OFF for older settings).
+Enabling QUICK RESUME also enables SAVE ON QUIT; disabling SAVE ON QUIT turns
+QUICK RESUME off. A normal exit creates a separate states/<ROM-SHA1>.auto.ss,
+then records the last ROM in last-rom.txt. With Quick Resume on, reopening the
+app automatically opens that readable ROM and loads its automatic state.
+Manual states remain separate. This saves emulator progress, not the game's
+own Save command. Polished automatic states include battery SRAM: loading
+rewinds save progress and boxes to the snapshot. Keep independent backups.
+Failed/missing auto states fall back to normal boot. Forced power loss/SIGKILL
+cannot save a new state. Save write errors are reported and set a failure exit.
+
+Minimizing the SDL window pauses emulation/rendering, clears queued audio and
+polls restoration at 50 ms intervals. Firmware sleep may not send SDL minimize
+events; this is not a NextUI sleep-button integration. Existing frame pacing
+and CrossMix ondemand clock policy remain unchanged. POCKET_CPU=keep in the
+launcher environment opts out of CrossMix's existing performance boost; its
+frame rate and battery impact require device measurement, not assumptions.

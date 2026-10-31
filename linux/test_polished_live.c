@@ -91,9 +91,37 @@ static void earn_injury(struct mCore *c) {
   assert(!s.inBattle && s.party[0].hp>0 && s.party[0].hp<s.party[0].maxHp);
   char path[1024];snprintf(path,sizeof path,"%s/states/injured.ss",root);assert(state(c,path,true));
 }
+static Uint32 restore_test_window(Uint32 interval,void *ctx) {
+  (void)interval;(void)ctx;SDL_Event e={.type=SDL_WINDOWEVENT};e.window.event=SDL_WINDOWEVENT_RESTORED;SDL_PushEvent(&e);return 0;
+}
 static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui,struct pd_snapshot *s,
                        struct pc_ui *pc,struct pocket_battle_action *battleJob,struct pocket_action *bagJob) {
   (void)ui;
+  if(getenv("PC_MIN_TEST")) {
+    static unsigned before,started;
+    if(frame==0) {
+      before=c->frameCounter(c);started=SDL_GetTicks();
+      SDL_Event e={.type=SDL_WINDOWEVENT};e.window.event=SDL_WINDOWEVENT_MINIMIZED;assert(SDL_PushEvent(&e)==1);
+      assert(SDL_AddTimer(150,restore_test_window,NULL));
+    }
+    if(frame==1) {
+      assert(SDL_GetTicks()-started>=140 && c->frameCounter(c)==before+1);
+      fprintf(stderr,"PASS minimized window suspends emulation until restore\n");SDL_Event e={.type=SDL_QUIT};SDL_PushEvent(&e);
+    }
+    return;
+  }
+  if(getenv("PC_POWER_TEST")) {
+    if(frame==0) {
+      char path[1200];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));
+      ui->settings->saveOnQuit=ui->settings->quickResume=true;
+      snprintf(path,sizeof path,"%s/settings.ini",root);assert(pd_settings_save(ui->settings,path));
+    }
+    if(frame==3) {
+      fprintf(stderr,"EXIT frame %u\n",c->frameCounter(c));
+      SDL_Event quit={.type=SDL_QUIT};assert(SDL_PushEvent(&quit)==1);
+    }
+    return;
+  }
   if(getenv("PC_TARGET")) {
     static int before,quantity;static bool done;
     if(frame==0) {

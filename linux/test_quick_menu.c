@@ -45,9 +45,9 @@ int main(void) {
   }
   assert(found && settings.quickGrid && pd_ui_take_action(&ui)==PD_ACTION_SETTINGS_CHANGED);
   char path[128];snprintf(path,sizeof path,"/tmp/pokedaisy-grid-%ld.ini",(long)getpid());
-  settings.lcdFilter=true;
+  settings.lcdFilter=true;settings.quickResume=settings.saveOnQuit=true;
   assert(pd_settings_save(&settings,path));
-  struct pd_settings loaded;assert(pd_settings_load(&loaded,path) && loaded.quickGrid && loaded.lcdFilter);
+  struct pd_settings loaded;assert(pd_settings_load(&loaded,path) && loaded.quickGrid && loaded.lcdFilter && loaded.quickResume && loaded.saveOnQuit);
   FILE *f=fopen(path,"w");assert(f);fputs("quickgrid=9\n",f);assert(!fclose(f));
   assert(pd_settings_load(&loaded,path) && !loaded.quickGrid);unlink(path);
   struct quick_item items[QUICK_COUNT]={0};for(int i=0;i<QUICK_COUNT;i++)items[i].action=i;

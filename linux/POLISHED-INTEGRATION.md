@@ -451,3 +451,12 @@ the Potion was owned in the earned state. This is an injury fixture, not a natur
 earned injury test. Physical Brick, non-lead/multiple-party targets, cancellation during
 healing and other item types remain unverified. TM/HM teaching remains unfinished.
 Reproduce with PC_TARGET=1 and --frames 705 using disposable earned-state data.
+
+## Resume and idle efficiency follow-up
+
+Quick Resume / Save on Quit use optional shared Settings rows; Linux lifecycle
+changes are separate. Native and ARM/QEMU CTest: 14 / 13 checks passed.
+Native actual-ROM exit/reopen without a ROM argument restored the saved frame.
+Native synthetic SDL minimize/restore events verified no emulation advance
+while minimized. No clock/voltage redesign was made; no physical battery-life,
+NextUI sleep-button or forced-power-loss guarantees are claimed.

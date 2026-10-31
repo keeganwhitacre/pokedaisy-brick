@@ -63,6 +63,7 @@ static bool wideSupported, wideReady;
 static unsigned wideW, wideH;
 static SDL_AudioDeviceID audio;
 static volatile sig_atomic_t running = 1;
+static bool minimized;
 static bool muted;
 static int appError;
 #ifdef POCKET_TEST
@@ -291,6 +292,10 @@ static void events(void) {
   pressed = 0;
   SDL_Event e;
   while (SDL_PollEvent(&e)) {
+    if(e.type==SDL_WINDOWEVENT) {
+      if(e.window.event==SDL_WINDOWEVENT_MINIMIZED)minimized=true;
+      if(e.window.event==SDL_WINDOWEVENT_RESTORED || e.window.event==SDL_WINDOWEVENT_SHOWN)minimized=false;
+    }
     if (e.type == SDL_QUIT)
       running = 0;
     if (e.type == SDL_JOYDEVICEADDED && !SDL_IsGameController(e.jdevice.which))
@@ -1094,6 +1099,14 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   struct pd_settings settings;
   pd_settings_load(&settings, config);
   lcdEnabled=settings.lcdFilter;
+  char autoState[1200],lastRom[1200],romSha[41];pocket_rom_sha1(romdata,(size_t)len,romSha);
+  snprintf(autoState,sizeof autoState,"%s/states/%s.auto.ss",root,romSha);
+  snprintf(lastRom,sizeof lastRom,"%s/last-rom.txt",root);
+  if(settings.quickResume && access(autoState,F_OK)==0) {
+    bool restored=state(c,autoState,false);
+    notice(restored ? "Quick resume loaded" : "Quick resume unavailable; using in-game save");
+    if(restored)fprintf(stderr,"Quick resume frame %u\n",c->frameCounter(c));
+  }
   if (wildSwitch)
     pk_field_wild(wildSwitch, settings.wildOff);
   bool quickOpen = false;
@@ -1129,7 +1142,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   struct pd_ui ui;
   pd_ui_init(&ui, &settings);
   struct pd_snapshot snap = {0};
-  struct pd_host_info host = {.hasDisplayFilter = true, .hasQuickMenu = true, .hideScreenMode = true, .hasExpand = true, .hasHud = c->platform(c) == mPLATFORM_GBA || polished >= 0,
+  struct pd_host_info host = {.hasResume = true, .hasDisplayFilter = true, .hasQuickMenu = true, .hideScreenMode = true, .hasExpand = true, .hasHud = c->platform(c) == mPLATFORM_GBA || polished >= 0,
                               .expandGame = wideSupported, .count = 1, .labels = {"HOST"}};
   snprintf(host.values[0], 40, "PokeDaisy Linux");
   const char *opts[] = {"Resume game",
@@ -1156,6 +1169,11 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     uint64_t frameStart = SDL_GetPerformanceCounter();
     if(saveStatus.failed) { appError=1; notice("Save I/O failed; stopping game"); break; }
     events();
+    if(minimized) {
+      c->setKeys(c,0);held=pressed=0;
+      if(audio)SDL_ClearQueuedAudio(audio);
+      SDL_Delay(50);due=lastFrame=SDL_GetPerformanceCounter();continue;
+    }
     audio_check();
     repeat_directions();
     if ((pcBattleAction.result==PA_RUNNING || battleReturn!=PB_NONE) &&
@@ -1804,6 +1822,16 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     else if (now - due > SDL_GetPerformanceFrequency() / 5)
       due = now;
   }
+  if(settings.saveOnQuit && !saveStatus.failed) {
+    if(!state(c,autoState,true)) {appError=1;notice("Automatic resume state failed; previous state retained");}
+    else if(!strchr(path,'\n')) {
+      char temp[1250];snprintf(temp,sizeof temp,"%s.tmp",lastRom);
+      FILE *last=fopen(temp,"w");bool ok=false;
+      if(last){bool written=fprintf(last,"%s\n",path)>0;ok=fclose(last)==0 && written;}
+      if(ok)ok=rename(temp,lastRom)==0;
+      if(!ok){unlink(temp);appError=1;notice("Last-game record failed");}
+    }
+  }
   if (pcFavoritesUnsaved && !pocket_favorites_save(root, pcSha, &pcUi.favorites))
     notice("Favorites still not saved");
   if (audio)
@@ -1901,6 +1929,15 @@ int main(int argc, char **argv) {
     if (SDL_IsGameController(i))
       controller_added(i);
   SDL_Joystick *js = !controller && rawTrimui && SDL_NumJoysticks() ? SDL_JoystickOpen(0) : NULL;
+  char resumeRom[1024];
+  if(!rom) {
+    char cfg[1200];struct pd_settings pref;snprintf(cfg,sizeof cfg,"%s/settings.ini",root);
+    pd_settings_load(&pref,cfg);
+    if(pref.quickResume) {
+      snprintf(cfg,sizeof cfg,"%s/last-rom.txt",root);FILE *last=fopen(cfg,"r");
+      if(last){if(fgets(resumeRom,sizeof resumeRom,last)){resumeRom[strcspn(resumeRom,"\r\n")]=0;if(access(resumeRom,R_OK)==0)rom=resumeRom;}fclose(last);}
+    }
+  }
   if (rom)
     run_game(rom, frames, shot);
   else {
