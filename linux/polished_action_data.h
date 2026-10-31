@@ -37,10 +37,26 @@
 #define PD_PC_REPEL_STEPS 0x1dc99u /* wRepelEffect */
 #define PD_PC_REGISTERED_FLAGS 0x1dfeeu /* wRegisteredItemFlags */
 #define PD_PC_REGISTERED_ITEMS 0x1dfefu /* wRegisteredItems */
+#define PD_PC_BADGES 0x1d7eeu /* wJohtoBadges */
+#define PD_PC_CUR_PARTY 0x1d10cu /* wCurPartyMon */
+#define PD_PC_MON_COUNT 0x1d1f0u /* wBuffer1 */
+#define PD_PC_MON_LIST 0x1d1f1u /* wBuffer2 */
+#define PD_PC_FLY_START 0x1d005u /* wStartFlypoint */
+#define PD_PC_FLY_END 0x1d006u /* wEndFlypoint */
+#define PD_PC_FLY_CURSOR 0x1d002u /* wTownMapPlayerIconLandmark */
+#define PD_PC_PARTY_NICK 0x1de38u /* wPartyMon1Nickname */
+#define PD_PC_PARTY_OT 0x1ddf6u /* wPartyMon1OT */
 #define PD_PC_PARTY_SIZE 48u
 #define PD_PC_BATTLE_SIZE 35u
 #define PD_PC_MOVES_OFFSET 2u
 #define PD_PC_PP_OFFSET 11u
+#define PD_PC_PARTY_MOVES_OFFSET 2u
+#define PD_PC_PARTY_EGG_OFFSET 21u
+#define PD_PC_NICK_SIZE 11u
+#define PD_PC_OT_SIZE 11u
+#define PD_PC_PARTY_EGG_MASK 0x40u
+#define PD_PC_FLY_MOVE 19u
+#define PD_PC_MON_OPTIONS 0x94f0du
 #define PD_PC_PC_SCRIPT 0x2f41e2u
 #define PD_PC_PC_MENU 0x50d2u
 #define PD_PC_KEY_MAX 38u

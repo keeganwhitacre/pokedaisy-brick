@@ -589,7 +589,7 @@ static bool overlay_texture(void) {
 /* The QUICK MENU over the running game: a light dim, the ring at the companion's canvas scale. */
 static void present_quick(const struct pd_game *g, const struct quick_item *items, int n, int sel,
                           const char *title, const char *const *rows, int rowCount, int rowSel, unsigned gw,
-                          unsigned gh) {
+                          unsigned gh, int polishedBuild) {
   if (!render_game(gw, gh) || !overlay_texture())
     return;
   int ow, oh;
@@ -601,7 +601,7 @@ static void present_quick(const struct pd_game *g, const struct quick_item *item
   pd_canvas_init(&qc, canvasW, canvasH, menuPixels);
   if (rows)
     quick_list_draw(&qc, title, rows, rowCount, rowSel);
-  else if (!quick_draw(&qc, g, items, n, sel))
+  else if (!quick_draw(&qc, g, items, n, sel,polishedBuild))
     return;
   quick_finish(&qc);
   SDL_UpdateTexture(menuTexture, &(SDL_Rect){0, 0, canvasW, canvasH}, menuPixels, canvasW * 4);
@@ -1139,11 +1139,12 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     if (pcOk || polished_field_supported(pcSha))
       quick[quickN++] = (struct quick_item){QUICK_PC, false, false,
           polished_field_supported(pcSha) ? polished_pc_reason(pcSha,read_memory,c) : NULL, 0, 0, NULL};
-    if (flyCfg) {
-      int flyer = fly_flyer(&snap);
+    if (flyCfg || pcField) {
+      int flyer = pcField ? pocket_action_flyer(pcSha,read_memory,c) : fly_flyer(&snap);
       quick[quickN++] = (struct quick_item){QUICK_FLY, false, false,
-                                            flyer < 0 ? "No one in your party knows FLY" : NULL,
-                                            flyer < 0 ? 0 : snap.party[flyer].species, 0, NULL};
+          pcField ? (polished_field_reason(pcSha,read_memory,c) ? "Return to the overworld first" :
+                     pocket_action_fly_reason(pcSha,read_memory,c)) : flyer < 0 ? "No one in your party knows FLY" : NULL,
+          flyer < 0 || flyer>=snap.partyCount ? 0 : snap.party[flyer].species, 0, NULL};
     }
     if (itemsOk || pcField) {
       // The strongest kind held for the icon; dimmed while one works (the steps left).
@@ -1227,7 +1228,12 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       if (dx || dy)
         quickSel = quick_step(quickN, quickSel, dx, dy, canvasW, canvasH);
       if (down(A) && !quick[quickSel].why && quick[quickSel].action == QUICK_FLY) {
-        flyAsk = 1; // answered below, between two frames
+        if(pcField) {
+          quickOpen=false;
+          pocket_action_begin_fly(&pcBagAction,pcSha,romdata,(size_t)len,read_memory,c);
+          held &= ~1023u;
+          notice(pocket_action_message(&pcBagAction));
+        } else flyAsk = 1; // answered below, between two frames
       } else if (down(A) && !quick[quickSel].why && quick[quickSel].action == QUICK_REPEL && repelKindCount > 1) {
         // More than one kind: their list (QuickMenu.kt's RepelKinds), each with how many and its steps.
         for (int k = 0; k < repelKindCount; k++) {
@@ -1468,7 +1474,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           unsigned keys=pocket_action_tick(&pcBagAction,read_memory,c);
           c->setKeys(c,keys);
           if (pcBagAction.result != PA_RUNNING) {
-            notice(pocket_action_message(&pcBagAction));
+            notice(pcBagAction.target==1 && pcBagAction.result==PA_DONE ? "" : pocket_action_message(&pcBagAction));
             if (pcBagAction.result != PA_DONE) companion=true;
           }
         }
@@ -1629,7 +1635,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       const char *const *rows = flyList ? flyNames : repelList ? repelNames : NULL;
       present_quick(&game, quick, quickN, quickSel, flyList ? "FLY" : "REPEL", rows,
                     flyList ? flyT.count : repelKindCount,
-                    flyList ? flySel : repelSel, gw, gh);
+                    flyList ? flySel : repelSel, gw, gh,polished);
     } else if (companion && menuOpen && menuOpen != 4) {
       present_menu(menuOpen == 1 ? &gameMenu : &confirmMenu, gw, gh);
     } else if (companion) {

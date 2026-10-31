@@ -7,7 +7,7 @@ verified old profile for normal 3.2.3 (CRC32 f98367e4).
 
 ## Controls
 
-- Y while playing: current Linux quick-menu ring (PC, REPEL, BIKE and WILD on normal 3.2.3, save/load
+- Y while playing: current Linux quick-menu ring (PC, FLY, REPEL, BIKE and WILD on normal 3.2.3, save/load
   state, fast-forward and companion; other unavailable actions stay disabled).
 - In the companion: L/R sections, D-pad navigation, A select, B back.
 - X: return to game, except BAG where it toggles a favorite.
@@ -82,8 +82,8 @@ special/unloaded-palette sprites are still omitted, so NPC pop-in is possible.
 The Polished field adapter now reuses Android's Crystal queued-script mechanism
 and the unmodified shared pk_gb_field.c writer. Its PC entry and observations
 are generated from the pinned official 3.2.3 symbols, with the ROM identity
-still owned by the app. Fly still needs its own verified adapter;
-the retail Crystal addresses are not used for Polished.
+still owned by the app. Fly uses the controller-only native party/menu path
+described below; retail Crystal addresses are not used for Polished.
 Original item actions are now accessible through the selected-item handoff below;
 companion-driven item target/quantity confirmation remains unimplemented. Persistent favorites
 was the first independent feature restored in this follow-up.
@@ -306,3 +306,62 @@ its own disposable --data directory, PC_BOOT and PC_SHOTS. It quits normally
 once its assertions and capture complete. Capture names start with fixture-.
 PC_FIELD_NO_ITEMS=1 with --frames 26 tests the earned no-item state without
 inventory setup. Do not distribute any private game, save or state files.
+
+
+## Native Fly handoff (normal 3.2.3)
+
+Y -> FLY finds a non-egg party member that knows Fly, opens the game's PARTY
+menu, selects that member and selects its Fly action. The user then chooses
+a destination on the original Fly map and confirms with A; B cancels there.
+The shortcut never chooses or writes a destination or invokes a warp routine.
+The normal Storm Badge requirement is checked before starting; the game's own
+FlyFunction retains map/environment, special indoor-map, region, visited-town,
+cancellation, animation and landing rules. These tables are not copied to C.
+Other supported Polished reader versions do not gain Fly controls implicitly.
+
+The input controller reuses Start-menu navigation, requires exact visible
+party/submenu geometry and a filled cursor, and emits two-frame input pulses
+with releases. The selected party record must remain unchanged while navigating.
+Changed records/battles, malformed menus and bounded timeouts stop input; the
+existing B/X/Y/Menu/direction cancellation applies. Once the Fly action has
+been handed to the game, no more confirmation input is emitted. It does not
+force a flight, grant a badge, teach Fly, or mark any town visited.
+
+Move ID and egg mask come from current app data, memory observations and record
+strides from pinned official symbols. The actual Fly menu ID is looked up in
+the user's ROM's MonMenuOptions table instead of maintaining a second ID list.
+The selector respects Polished's separate female and egg bits and its ninth
+species bit. The quick tile reuses the existing Polished HUD ROM-icon decoder.
+GBA quick-menu calls continue with their existing art path. No shared-core files
+or game-data architecture were changed.
+
+Actual native and ARM/QEMU tests used clearly labelled PROGRESSION FIXTURES.
+A normally earned Cyndaquil/outdoor state was loaded; normal movement with the
+existing WILD suppression reached Route 29. The fixture added Fly to move slot
+four and the Storm Badge in private WRAM. A second positive test copied the
+starter into party slot two and gave only that copy Fly, proving non-lead
+selection. These are not legal teaching/catching or normal story progression.
+No destination flags, coordinates or spawn point were patched. In both tests
+the real quick menu opened the original Fly map, then user A triggered the
+actual game animation and landed in New Bark Town (the normally visited home).
+
+Native and ARM/QEMU also passed Fly-map B cancellation without changing map or
+position, pending-input cancellation, refusal after a changed party record,
+and blocked no-badge / no-move / egg fixtures. A separate normally earned
+unmodified state correctly refused Fly. Model tests cover female-vs-egg and
+extended-species decoding, ROM-owned menu IDs, truncated/duplicate ROM tables,
+changed records, cancellation and timeout. Those model checks are not live tests.
+The established native PC / Bag / remembered TM / WILD / battle / Bike / Repel
+regressions still pass, alongside 13 native and 12 ARM/QEMU CTest checks.
+
+Physical Brick testing, naturally acquired Fly parties/badges, other destinations
+and regions, and special indoor Fly exceptions remain unverified. Targeted TM/HM
+teaching remains unfinished. The native game owns those final Fly validations.
+
+Reproduce after PC_OUTDOOR earns live-test.ss: PC_FLY_FIXTURE=fly|second-flyer|
+map-cancel|pending-cancel|changed-party|no-badge|no-move|egg with --frames 705,
+PC_BOOT and PC_SHOTS, using a separate disposable data directory per process.
+PC_FLY_BASELINE=1 is the unmodified earned-state test. Successful cases quit
+normally after assertions/capture. Fixtures are never in the shipped app binary;
+test images are real emulation with test-only progression, not mockups or hardware
+captures. Do not distribute the private ROM, battery saves or states.

@@ -1,6 +1,7 @@
 /* The QUICK MENU (quick_menu.h): tiles of one size round a circle, the first at the top, clockwise; the
  * highlighted one's name in the middle, with why it's dimmed. GPL-3.0, see ../NOTICE. */
 #include "quick_menu.h"
+#include "polished.h"
 
 #include "pd_icon.h"
 #include "pd_style.h"
@@ -142,7 +143,8 @@ int quick_step(int n, int sel, int dx, int dy, int w, int h) {
   return best;
 }
 
-bool quick_draw(struct pd_canvas *c, const struct pd_game *g, const struct quick_item *items, int n, int sel) {
+bool quick_draw(struct pd_canvas *c, const struct pd_game *g, const struct quick_item *items, int n, int sel,
+                int polishedBuild) {
   if (c->w < 3 * TILE_W || c->h < 3 * TILE_H)
     return false;
   for (int i = 0; i < c->w * c->h; i++)
@@ -161,6 +163,11 @@ bool quick_draw(struct pd_canvas *c, const struct pd_game *g, const struct quick
       art = pd_draw_mon_icon(c, g, items[i].species, x + (TILE_W - PD_ICON) / 2, y - 3, dim);
     else if (items[i].item)
       art = pd_draw_item_icon(c, g, items[i].item, x + (TILE_W - PD_ITEM_ICON) / 2, y + 2, dim);
+    if(!art && polishedBuild>=0 && items[i].action==QUICK_FLY && items[i].species>0) {
+      /* Reuse the existing HUD's ROM decoder; no new icon assets. */
+      pc_hud_icon(c,items[i].species,x+(TILE_W-32)/2,y-3,g->rom,g->romSize,polishedBuild);
+      art=true;
+    }
     if (!art && items[i].action != QUICK_FLY)
       icon(c, items[i].action, x + TILE_W / 2, y + 14, 1, dim || items[i].off);
     const char *label = items[i].label ? items[i].label : quick_label(items[i].action);

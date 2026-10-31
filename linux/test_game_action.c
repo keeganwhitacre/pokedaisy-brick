@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 static unsigned char ram[0x20000];
 static bool fail;
 static bool read_mem(void *ctx,uint32_t addr,void *out,size_t n) {
@@ -129,4 +130,36 @@ int main(void) {
   for(int i=0;i<6;i++)assert(!pocket_action_tick(&a,read_mem,NULL));
   assert(a.result==PA_DONE);
   puts("PASS key item lookup, changed slot/removal, duplicate/unterminated list refusal and original Use/Sel menu handoff (model)");
+  memset(ram,0,sizeof ram);ram[PD_PC_MAP]=2;ram[PD_PC_PARTY_COUNT]=1;
+  unsigned mon=PD_PC_PARTY_MON;ram[mon]=155;
+  ram[mon+PD_PC_PARTY_EGG_OFFSET]=0x80; /* Female is NOT the egg flag. */
+  ram[mon+PD_PC_PARTY_MOVES_OFFSET+3]=PD_PC_FLY_MOVE;
+  assert(pocket_action_fly_reason(PD_PC_ACTION_SHA,read_mem,NULL));
+  ram[PD_PC_BADGES]=0x20;
+  assert(!pocket_action_fly_reason(PD_PC_ACTION_SHA,read_mem,NULL));
+  assert(pocket_action_flyer(PD_PC_ACTION_SHA,read_mem,NULL)==0);
+  ram[mon+PD_PC_PARTY_EGG_OFFSET]|=PD_PC_PARTY_EGG_MASK;
+  assert(pocket_action_flyer(PD_PC_ACTION_SHA,read_mem,NULL)==-1);
+  ram[mon+PD_PC_PARTY_EGG_OFFSET]=0x20;ram[mon]=0; /* Extended species 256. */
+  assert(pocket_action_flyer(PD_PC_ACTION_SHA,read_mem,NULL)==0);
+  ram[mon]=155;ram[mon+PD_PC_PARTY_EGG_OFFSET]=0x80;
+  size_t table=(PD_PC_MON_OPTIONS>>16)*0x4000u+(PD_PC_MON_OPTIONS&0x3fffu);
+  unsigned char *cart=calloc(table+16,1);assert(cart);
+  cart[table+1]=37;cart[table+2]=PD_PC_FLY_MOVE;cart[table+3]=255;
+  assert(!pocket_action_begin_fly(&a,"wrong ROM",cart,table+16,read_mem,NULL));
+  assert(!pocket_action_begin_fly(&a,PD_PC_ACTION_SHA,cart,table+2,read_mem,NULL));
+  assert(pocket_action_begin_fly(&a,PD_PC_ACTION_SHA,cart,table+16,read_mem,NULL) && a.flyMenu==37);
+  pocket_action_cancel(&a);assert(!pocket_action_tick(&a,read_mem,NULL));
+  cart[table+3]=0;cart[table+4]=38;cart[table+5]=PD_PC_FLY_MOVE;cart[table+6]=255;
+  assert(!pocket_action_begin_fly(&a,PD_PC_ACTION_SHA,cart,table+16,read_mem,NULL));
+  cart[table+3]=255;
+  assert(pocket_action_begin_fly(&a,PD_PC_ACTION_SHA,cart,table+16,read_mem,NULL));
+  a.phase=2;ram[mon+PD_PC_PARTY_MOVES_OFFSET+3]=0;
+  assert(!pocket_action_tick(&a,read_mem,NULL) && a.result==PA_REJECTED);
+  ram[mon+PD_PC_PARTY_MOVES_OFFSET+3]=PD_PC_FLY_MOVE;
+  assert(pocket_action_begin_fly(&a,PD_PC_ACTION_SHA,cart,table+16,read_mem,NULL));
+  a.phase=3;memset(ram+PD_PC_MENU2D,0,7);
+  for(int i=0;i<1802;i++)assert(!pocket_action_tick(&a,read_mem,NULL));
+  assert(a.result==PA_TIMEOUT);free(cart);
+  puts("PASS Fly badge/egg/female/extended-species guards, ROM-owned menu ID, truncated/duplicate table, changed-party/cancel/timeout (model)");
 }

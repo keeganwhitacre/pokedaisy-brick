@@ -22,8 +22,9 @@ struct quick_item {
 #define QUICK_CLEAR 0x00FF00FFu
 
 /* Draws the ring (n tiles, sel highlighted) and the middle's hint over QUICK_CLEAR; returns false if it
- * doesn't fit the canvas. */
-bool quick_draw(struct pd_canvas *c, const struct pd_game *g, const struct quick_item *items, int n, int sel);
+ * doesn't fit the canvas. polishedBuild is the matched ROM-art profile, or -1. */
+bool quick_draw(struct pd_canvas *c, const struct pd_game *g, const struct quick_item *items, int n, int sel,
+                int polishedBuild);
 /* FLY's places / REPEL's kinds (QuickMenu.kt's PickList): a titled list over QUICK_CLEAR, row sel highlighted,
  * scrolled to keep it in view. */
 void quick_list_draw(struct pd_canvas *c, const char *title, const char *const *rows, int n, int sel);

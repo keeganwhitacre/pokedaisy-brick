@@ -24,20 +24,20 @@ static void tap(SDL_Keycode key) {
 }
 /* Real directional input through the production quick-menu navigation. */
 static void quick_path(int from,int to,int frame,int first) {
-  int prev[8],via[8],queue[8],head=0,tail=0;
+  int prev[QUICK_COUNT],via[QUICK_COUNT],queue[QUICK_COUNT],head=0,tail=0;
   const int dx[]={0,0,-1,1},dy[]={-1,1,0,0};
   const SDL_Keycode keys[]={SDLK_UP,SDLK_DOWN,SDLK_LEFT,SDLK_RIGHT};
-  for(int i=0;i<8;i++)prev[i]=-1;
+  for(int i=0;i<QUICK_COUNT;i++)prev[i]=-1;
   prev[from]=from;queue[tail++]=from;
   while(head<tail && prev[to]<0) {
     int p=queue[head++];
     for(int k=0;k<4;k++) {
-      int n=quick_step(8,p,dx[k],dy[k],512,384);
+      int n=quick_step(QUICK_COUNT,p,dx[k],dy[k],512,384);
       if(prev[n]<0){prev[n]=p;via[n]=k;queue[tail++]=n;}
     }
   }
   assert(prev[to]>=0);
-  int path[8],n=0;for(int i=to;i!=from;i=prev[i])path[n++]=via[i];
+  int path[QUICK_COUNT],n=0;for(int i=to;i!=from;i=prev[i])path[n++]=via[i];
   int at=frame-first;
   if(at>=0 && at<n)tap(keys[path[n-at-1]]);
 }
@@ -94,6 +94,89 @@ static void earn_injury(struct mCore *c) {
 static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui,struct pd_snapshot *s,
                        struct pc_ui *pc,struct pocket_battle_action *battleJob,struct pocket_action *bagJob) {
   (void)ui;
+  if(getenv("PC_FLY_FIXTURE") || getenv("PC_FLY_BASELINE")) {
+    const char *mode=getenv("PC_FLY_FIXTURE");
+    bool baseline=mode==NULL,blocked=baseline || !strcmp(mode,"no-badge") || !strcmp(mode,"no-move") || !strcmp(mode,"egg");
+    static int phase,at,homeGroup,homeMap;static struct pd_snapshot origin;
+    if(frame==0) {
+      char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));
+      pc_read(s,read_memory,c);homeGroup=s->mapGroup;homeMap=s->mapNum;
+      if(!blocked) {ui->settings->wildOff=true;liveSettings=ui->settings;reach_grass(c);}
+      if(!baseline) {
+        /* Explicit progression fixture: Fly in the starter's fourth move
+         * slot and/or the Storm Badge. Not earned / legal teaching evidence.
+         * No destination flags, spawn point or coordinates are patched. */
+        bool second=!strcmp(mode,"second-flyer");
+        if(second) {
+          uint8_t mon[PD_PC_PARTY_SIZE],nick[PD_PC_NICK_SIZE],ot[PD_PC_OT_SIZE];
+          assert(read_memory(c,PD_PC_PARTY_MON,mon,sizeof mon) && read_memory(c,PD_PC_PARTY_NICK,nick,sizeof nick) && read_memory(c,PD_PC_PARTY_OT,ot,sizeof ot));
+          assert(pk_gb_write(c,PD_PC_PARTY_MON+PD_PC_PARTY_SIZE,mon,sizeof mon) && pk_gb_write(c,PD_PC_PARTY_NICK+PD_PC_NICK_SIZE,nick,sizeof nick) && pk_gb_write(c,PD_PC_PARTY_OT+PD_PC_OT_SIZE,ot,sizeof ot));
+          fprintf(stderr,"FIXTURE party: copied starter into slot 2; only that copy receives Fly, not normally caught/trained\n");
+        }
+        uint8_t badges,fly=PD_PC_FLY_MOVE;
+        if(strcmp(mode,"no-move"))assert(pk_gb_write(c,PD_PC_PARTY_MON+(second?PD_PC_PARTY_SIZE:0)+PD_PC_PARTY_MOVES_OFFSET+3,&fly,1));
+        if(second){uint8_t two=2;assert(pk_gb_write(c,PD_PC_PARTY_COUNT,&two,1));}
+        assert(read_memory(c,PD_PC_BADGES,&badges,1));
+        if(strcmp(mode,"no-badge")){badges|=0x20;assert(pk_gb_write(c,PD_PC_BADGES,&badges,1));}
+        if(!strcmp(mode,"egg")) {uint8_t egg;assert(read_memory(c,PD_PC_PARTY_MON+PD_PC_PARTY_EGG_OFFSET,&egg,1));egg|=PD_PC_PARTY_EGG_MASK;assert(pk_gb_write(c,PD_PC_PARTY_MON+PD_PC_PARTY_EGG_OFFSET,&egg,1));}
+        fprintf(stderr,"FIXTURE Fly progression (%s): starter move/badge setup, NOT normal progression\n",mode);
+      }
+      pc_read(&origin,read_memory,c);pc_read(s,read_memory,c);
+      drive(c,0,120);
+      const char *why=pocket_action_fly_reason(PD_PC_ACTION_SHA,read_memory,c);
+      fprintf(stderr,"Fly preflight: %s (flyer %d)\n",why?why:"ready",pocket_action_flyer(PD_PC_ACTION_SHA,read_memory,c));
+      if(mode && !strcmp(mode,"second-flyer"))assert(pocket_action_flyer(PD_PC_ACTION_SHA,read_memory,c)==1);
+      if(blocked)assert(why);else assert(!why);
+    }
+    if(frame==2)tap(SDLK_f);
+    quick_path(QUICK_PC,QUICK_FLY,frame,4);
+    if(frame==8)shot(baseline?"earned-fly-unavailable":"fixture-fly-quick-menu");
+    if(frame==9){tap(SDLK_z);phase=1;}
+    if(blocked) {
+      if(frame==14){assert(bagJob->result==PA_IDLE);fprintf(stderr,"PASS Fly shortcut refuses %s state\n",baseline?"normally earned":mode);phase=9;at=frame;}
+    } else if(!strcmp(mode,"pending-cancel")) {
+      if(frame==14){assert(bagJob->result==PA_RUNNING);tap(SDLK_x);}
+      if(frame==18){assert(bagJob->result==PA_CANCELLED);fprintf(stderr,"PASS pending Fly shortcut cancellation (progression fixture)\n");phase=9;at=frame;}
+    } else if(!strcmp(mode,"changed-party")) {
+      if(frame==14){uint8_t changed=0;assert(bagJob->result==PA_RUNNING);assert(pk_gb_write(c,PD_PC_PARTY_MON+PD_PC_PARTY_MOVES_OFFSET+3,&changed,1));}
+      if(phase!=9 && bagJob->result==PA_REJECTED){fprintf(stderr,"PASS Fly refuses changed party record (progression fixture)\n");phase=9;at=frame;}
+    } else if(phase==1 && bagJob->result==PA_DONE) {phase=2;at=frame;}
+    else if(phase==1 && (bagJob->result==PA_REJECTED || bagJob->result==PA_TIMEOUT)) {
+      uint8_t geometry[7],cur[2],list[10];read_memory(c,PD_PC_MENU2D,geometry,sizeof geometry);read_memory(c,PD_PC_CURSOR,cur,2);read_memory(c,PD_PC_MON_COUNT,list,sizeof list);
+      fprintf(stderr,"Fly failure phase=%u keys=%u geometry=%u,%u,%u,%u,%u,%u,%u cursor=%u,%u list=%u,%u,%u\n",bagJob->phase,bagJob->frames,geometry[0],geometry[1],geometry[2],geometry[3],geometry[4],geometry[5],geometry[6],cur[0],cur[1],list[0],list[1],list[2]);
+      shot("fixture-fly-failed");assert(false);
+    } else if(phase==2 && frame==at+30) {
+      uint8_t start,end,cursor;
+      assert(read_memory(c,PD_PC_FLY_START,&start,1) && read_memory(c,PD_PC_FLY_END,&end,1) && read_memory(c,PD_PC_FLY_CURSOR,&cursor,1));
+      assert(start<end && cursor>=start && cursor<=end && !companion);
+      shot("fixture-native-fly-map");
+      if(!strcmp(mode,"map-cancel")) {
+        for(int i=0;i<8;i++){drive(c,2,3);drive(c,0,90);}
+        struct pd_snapshot now;pc_read(&now,read_memory,c);
+        assert(!polished_field_reason(PD_PC_ACTION_SHA,read_memory,c) && now.mapGroup==origin.mapGroup && now.mapNum==origin.mapNum && now.x==origin.x && now.y==origin.y);
+        fprintf(stderr,"PASS native Fly map cancellation leaves player on original map (progression fixture)\n");
+      } else {
+        drive(c,1,3); /* Actual player confirmation on the game's Fly map. */
+        struct pd_snapshot now;
+        for(int i=0;i<150;i++) {
+          drive(c,0,30);pc_read(&now,read_memory,c);
+          if(now.mapGroup==homeGroup && now.mapNum==homeMap && !polished_field_reason(PD_PC_ACTION_SHA,read_memory,c))break;
+        }
+        fprintf(stderr,"FLIGHT map %d,%d (%d,%d) -> %d,%d (%d,%d)\n",origin.mapGroup,origin.mapNum,origin.x,origin.y,now.mapGroup,now.mapNum,now.x,now.y);
+        assert((origin.mapGroup!=homeGroup || origin.mapNum!=homeMap) && now.mapGroup==homeGroup && now.mapNum==homeMap && !polished_field_reason(PD_PC_ACTION_SHA,read_memory,c));
+        fprintf(stderr,"PASS user-confirmed native Fly animation and landing (progression fixture)\n");
+      }
+      phase=9;at=frame;
+    }
+    if(phase==9 && frame==at+2){shot(baseline?"earned-fly-complete":"fixture-fly-complete");SDL_Event quit={.type=SDL_QUIT};assert(SDL_PushEvent(&quit)==1);}
+    if(frame==180 && phase!=9) {
+      uint8_t geometry[7],cur[2],list[10];read_memory(c,PD_PC_MENU2D,geometry,sizeof geometry);read_memory(c,PD_PC_CURSOR,cur,2);read_memory(c,PD_PC_MON_COUNT,list,sizeof list);
+      fprintf(stderr,"Fly progress phase=%u result=%d frames=%u geometry=%u,%u,%u,%u,%u,%u,%u cursor=%u,%u list=%u,%u,%u\n",bagJob->phase,bagJob->result,bagJob->frames,geometry[0],geometry[1],geometry[2],geometry[3],geometry[4],geometry[5],geometry[6],cur[0],cur[1],list[0],list[1],list[2]);
+      shot("fixture-fly-progress");
+    }
+    if(frame==700)assert(phase==9);
+    return;
+  }
   if(getenv("PC_FIELD_NO_ITEMS")) {
     if(frame==0) {
       char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));
@@ -101,11 +184,11 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
       for(unsigned i=0;i<sizeof pd_pc_repels/sizeof *pd_pc_repels;i++)assert(!bag_count(s,pd_pc_repels[i].id));
     }
     if(frame==2)tap(SDLK_f);
-    quick_path(0,2,frame,4);
+    quick_path(QUICK_PC,QUICK_BIKE,frame,4);
     if(frame==8)shot("earned-no-bicycle");
     if(frame==9)tap(SDLK_z);
     if(frame==12)assert(bagJob->result==PA_IDLE && !companion);
-    quick_path(2,1,frame,14);
+    quick_path(QUICK_BIKE,QUICK_REPEL,frame,14);
     if(frame==18)shot("earned-no-repel");
     if(frame==19)tap(SDLK_z);
     if(frame==22){assert(bagJob->result==PA_IDLE && !companion);fprintf(stderr,"PASS normally earned no-item state refuses Bike and Repel shortcuts\n");}
@@ -133,7 +216,7 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
       fprintf(stderr,"FIXTURE inventory: Bicycle at key slot 9, Repel x2, Super Repel x2; not an earned save\n");
     }
     if(frame==2)tap(r2?SDLK_TAB:SDLK_f);
-    if(!r2)quick_path(0,repel?1:2,frame,4);
+    if(!r2)quick_path(QUICK_PC,repel?QUICK_REPEL:QUICK_BIKE,frame,4);
     if(frame==5 && r2)tap(SDLK_e);
     if(frame==8 && !r2)shot("fixture-field-quick-menu");
     if(frame==9 && !r2){tap(SDLK_z);phase=1;}
@@ -268,7 +351,7 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
       tap(SDLK_f);
     }
     if(frame==3)shot(reload?"wild-off-reloaded":"wild-before-toggle");
-    quick_path(0,3,frame,3);
+    quick_path(QUICK_PC,QUICK_WILD,frame,3);
     if(frame==8)tap(SDLK_z);
     if(frame==11) {
       assert(!companion && ui->settings->wildOff==!reload);
