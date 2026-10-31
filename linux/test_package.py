@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix='pd-linux-package-') as d:
         assert z.read(name+'/pokedaisy-linux')==binary.read_bytes()
         assert z.getinfo(name+'/launch.sh').external_attr>>16 & 0o111
         assert z.read(name+'/SOURCE.txt').startswith(b'Source: https://github.com/lidor30/pokedaisy')
-        assert not any(n.lower().endswith(('.gb','.gbc','.gba','.sav','.ss','.srm','.bin')) for n in names)
+        assert not any(n.lower().endswith(('.gb','.gbc','.gba','.nds','.sav','.ss','.srm','.bin')) for n in names)
     before=archive.read_bytes()
     result=subprocess.run([sys.executable,str(script),*options,str(binary),d],capture_output=True,text=True)
     assert result.returncode!=0 and archive.read_bytes()==before
@@ -42,3 +42,14 @@ with tempfile.TemporaryDirectory(prefix='pd-linux-package-') as d:
         assert not any(n.endswith('launch.sh') for n in names)
         assert all(n==pm+'/PokeDaisy.sh' or n.startswith(pm+'/pokedaisy/') for n in names)
 print('PASS architecture-specific package, actual executable, license/source records, overwrite refusal and the PortMaster layout')
+
+if arch==183:
+    with tempfile.TemporaryDirectory(prefix='pd-nextui-package-') as d:
+        subprocess.run([sys.executable,str(script),'--nextui',*options,str(binary),d],check=True,capture_output=True)
+        pak='PokeDaisy-DS.pak' if extra else 'PokeDaisy.pak'
+        with zipfile.ZipFile(Path(d)/(pak+'.zip')) as z:
+            assert all(n.startswith(pak+'/') for n in z.namelist())
+            assert z.read(pak+'/pokedaisy-linux')==binary.read_bytes()
+            assert z.getinfo(pak+'/launch.sh').external_attr>>16 & 0o111
+            assert not any(n.lower().endswith(('.nds','.gb','.gbc','.gba','.bin','.sav','.ss')) for n in z.namelist())
+    print('PASS isolated NextUI pak layout; no private game files')

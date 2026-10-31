@@ -6,6 +6,7 @@ import argparse, shutil, subprocess, zipfile
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('binary',type=Path);p.add_argument('output',type=Path)
 p.add_argument('--portmaster',action='store_true',help='a PortMaster port: PokeDaisy.sh + pokedaisy/')
+p.add_argument('--nextui',action='store_true',help='separate NextUI Tools .pak folder (AArch64 only)')
 p.add_argument('--dsperate',action='store_true',help='label the opt-in DS experiment and include its notices')
 a=p.parse_args();repo=Path(__file__).resolve().parents[1]
 header=a.binary.read_bytes()[:20]
@@ -13,9 +14,11 @@ if header[:6] != b'\x7fELF\x02\x01':p.error('Expected a 64-bit little-endian Lin
 arch=int.from_bytes(header[18:20],'little')
 if arch not in (62,183):p.error('Supported package targets: x86_64 or AArch64')
 name=('pokedaisy-portmaster-' if a.portmaster else 'pokedaisy-linux-')+('aarch64' if arch==183 else 'x86_64')
+if a.nextui and (a.portmaster or arch!=183):p.error('--nextui requires AArch64 and cannot be combined with --portmaster')
 if a.dsperate:
     if b'DSperate %s' not in a.binary.read_bytes():p.error('Expected a POCKET_DSPERATE build')
     name+='-ds-experiment'
+if a.nextui:name='PokeDaisy-DS.pak' if a.dsperate else 'PokeDaisy.pak'
 a.output.mkdir(parents=True,exist_ok=True);top=a.output/name
 top.mkdir() # Refuse to overwrite an earlier package.
 # A PortMaster port is its launcher in the ports folder beside the port's own folder.
@@ -58,5 +61,5 @@ with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
         if f.is_file():z.write(f,f.relative_to(a.output))
 with zipfile.ZipFile(archive) as z:
     assert z.testzip() is None
-    assert not any(n.lower().endswith(('.gb','.gbc','.gba','.sav','.ss','.srm','.bin')) for n in z.namelist())
+    assert not any(n.lower().endswith(('.gb','.gbc','.gba','.nds','.sav','.ss','.srm','.bin')) for n in z.namelist())
 print(archive)
