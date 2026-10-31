@@ -76,7 +76,7 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
     int y = listTop - ui->settingsScroll;
     char buf[40];
     if (s->valid) {
-        const char* place = pd_mapsec_name(g, s->mapsec);
+        const char* place = host && host->placeName ? host->placeName : pd_mapsec_name(g, s->mapsec);
         ui_row(c, ix, y, iw, "PLACE", *place ? place : "-", false);
         y += ROW_H;
         ui_format_money(s->money, buf, sizeof(buf));
