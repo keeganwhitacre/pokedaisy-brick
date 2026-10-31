@@ -297,7 +297,7 @@ on both architectures used an explicitly labelled DISPOSABLE INVENTORY FIXTURE:
 Bicycle placed ninth in a nine-key list, plus two Repels and two Super Repels.
 The fixture changes private emulator WRAM before testing; these items were NOT
 normally earned. After setup, real UI/controller inputs opened the ninth key's
-native action menu, mounted and dismounted through user Use, and preserved all
+native action menu, mounted and dismounted automatically, and preserved all
 four registered shortcuts. Companion R2 also found that scrolled key. The Repel
 picker selected Super Repel; automatic Use set 200 steps and reduced its quantity
 2 -> 1, leaving the other kind unchanged. An active Repel refused a second use.
