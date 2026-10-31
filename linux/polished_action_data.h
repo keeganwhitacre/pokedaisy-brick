@@ -18,6 +18,16 @@
 #define PD_PC_TILEMAP 0xc1a0u /* wTilemap */
 #define PD_PC_PACK_STATE 0xce47u /* wJumptableIndex */
 #define PD_PC_IN_MENU 0xff9au /* hInMenu */
+#define PD_PC_QUEUE 0x1d469u /* wMapReentryScriptQueueFlag */
+#define PD_PC_SCRIPT_RUNNING 0x1d437u /* wScriptRunning */
+#define PD_PC_MAP_EVENTS 0x1d432u /* wMapEventStatus */
+#define PD_PC_DIRECTION 0x1d4d4u /* wPlayerDirection */
+#define PD_PC_PARTY_COUNT 0x1dcceu /* wPartyCount */
+#define PD_PC_BOX 0x1db7au /* wCurBox */
+#define PD_PC_BOX_CURSOR 0xc7e8u /* wBillsPC_CursorPos */
+#define PD_PC_BOX_MODE 0xc7edu /* wBillsPC_CursorMode */
+#define PD_PC_PC_SCRIPT 0x2f41e2u
+#define PD_PC_PC_MENU 0x50d2u
 #define PD_PC_START_MENU 0x6160u
 static const unsigned pd_pc_pack_menus[]={0x4791,0x47a9,0x47c1,0x47d9,0x47f1};
 static const unsigned pd_pc_item_submenus[]={0x41c9,0x422e,0x41ec};

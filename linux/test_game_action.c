@@ -1,5 +1,6 @@
 /* Explicit controller model tests: failure, timeout and cancellation boundaries. */
 #include "game_action.h"
+#include "polished_field.h"
 #include "polished_action_data.h"
 #include <assert.h>
 #include <stdio.h>
@@ -61,4 +62,21 @@ int main(void) {
   puts("PASS TM pocket requires live waiting cursor as well as menu geometry");
   puts("PASS selected ordinary item lookup, special-namespace rejection, duplicate rejection and changed-quantity guard");
   puts("PASS Bag controller rejects wrong ROM/battle/text/read failures and malformed menus; timeout/cancel release input");
+  memset(ram,0,sizeof ram);ram[PD_PC_MAP]=2;
+  ram[PD_PC_PARTY_COUNT]=1;ram[PD_PC_DIRECTION]=4;
+  assert(!polished_field_supported("other ROM"));
+  assert(polished_pc_reason("other ROM",read_mem,NULL));
+  assert(!polished_pc_reason(PD_PC_ACTION_SHA,read_mem,NULL));
+  const unsigned blocked[]={PD_PC_SCRIPT,PD_PC_BATTLE,PD_PC_SCRIPT_RUNNING,
+      PD_PC_MAP_EVENTS,PD_PC_QUEUE,PD_PC_IN_MENU};
+  for(unsigned i=0;i<sizeof blocked/sizeof *blocked;i++) {
+    ram[blocked[i]]=1;assert(polished_pc_reason(PD_PC_ACTION_SHA,read_mem,NULL));
+    ram[blocked[i]]=0;
+  }
+  ram[PD_PC_STATE]=0x40;assert(polished_pc_reason(PD_PC_ACTION_SHA,read_mem,NULL));ram[PD_PC_STATE]=0;
+  ram[PD_PC_PARTY_COUNT]=0;assert(polished_pc_reason(PD_PC_ACTION_SHA,read_mem,NULL));ram[PD_PC_PARTY_COUNT]=1;
+  ram[PD_PC_DIRECTION]=0;assert(polished_pc_reason(PD_PC_ACTION_SHA,read_mem,NULL));ram[PD_PC_DIRECTION]=4;
+  fail=true;assert(polished_pc_reason(PD_PC_ACTION_SHA,read_mem,NULL));fail=false;
+  assert(!polished_pc_open(NULL,PD_PC_ACTION_SHA,read_mem,NULL) && !ram[PD_PC_QUEUE]);
+  puts("PASS PC rejects wrong ROM, busy field/menu/queue, no party, wrong facing and failed reads/writes");
 }

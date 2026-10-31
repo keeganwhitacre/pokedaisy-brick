@@ -7,8 +7,8 @@ verified old profile for normal 3.2.3 (CRC32 f98367e4).
 
 ## Controls
 
-- Y while playing: current Linux quick-menu ring (save/load state, fast-forward,
-  companion; unavailable GBA actions stay disabled or absent).
+- Y while playing: current Linux quick-menu ring (PC on normal 3.2.3, save/load
+  state, fast-forward and companion; other unavailable actions stay disabled).
 - In the companion: L/R sections, D-pad navigation, A select, B back.
 - X: return to game, except BAG where it toggles a favorite.
 - Start: current Linux SETTINGS, including aspect, auto zoom and optional HUD.
@@ -78,12 +78,11 @@ checking every original PPU pixel each frame. Captures showed no obvious
 phantom/duplicate person in these samples. This is limited map coverage;
 special/unloaded-palette sprites are still omitted, so NPC pop-in is possible.
 
-Current upstream Android GbField.forGame selects retail Crystal, not Polished,
-for its Gen 2 PC/Fly/Wild implementation. Those actions cannot be enabled just
-by connecting a Linux menu. The old game_action.c offers a controller-only
-open-Bag prototype, but its handwritten addresses are not in the current app
-configuration. It was not imported as a second address list. A future action
-adapter needs generated, version-verified data and completion/failure checks.
+The Polished field adapter now reuses Android's Crystal queued-script mechanism
+and the unmodified shared pk_gb_field.c writer. Its PC entry and observations
+are generated from the pinned official 3.2.3 symbols, with the ROM identity
+still owned by the app. Fly, Repel, Bike and Wild need their own verified adapters;
+the retail Crystal addresses are not used for Polished.
 Original item actions are now accessible through the selected-item handoff below;
 companion-driven target/quantity confirmation and battle commands remain disabled. Persistent favorites
 was the first independent feature restored in this follow-up.
@@ -142,3 +141,43 @@ up to keyItemsMax=38 IDs, with companion namespace 0x200. These cannot be fed to
 the ordinary count/{id,quantity} parser. Key items retain the original Bag handoff
 until an earned inventory, current-key identity and context-specific submenu
 have live validation. Neither targeted key-item use nor TM teaching is claimed.
+
+
+## PC anywhere (normal 3.2.3)
+
+Face up on the overworld, press Y, choose PC and press A. Advance the original
+text with A, then use Bill's PC or the player's PC normally. The game owns
+storage, item actions, summaries, release confirmations and legality checks.
+B cancels; leaving Bill's storage asks whether to continue box operations.
+No companion box editor or automatic deposit/withdraw/release is implemented.
+
+The quick-menu tile explains why it is unavailable during battles, menus,
+scripted events, queued events, before obtaining a Pokemon, or while facing
+another direction. Recheck all guards at activation. Write the queue payload
+first and publish the flag last, between frames, through the existing shared
+GB adapter. No new CPU calls, script bytes or manually maintained offsets.
+The original PC script's facing check is respected rather than bypassed.
+The host hides expansion and HUD during the requested PC session and restores
+them on return to the overworld.
+
+Polished save states now capture and restore battery memory with working RAM.
+This is necessary for its SRAM-access integrity counter and boxed Pokemon.
+Loading a state also rewinds in-game save progress to that snapshot. Legacy
+states without SRAM are refused before changing the core; resume an in-game
+save and create a new state. Other games' state policy is unchanged.
+
+Actual-ROM native and ARM/QEMU checks: quick-menu activation; PC top-menu
+identity; Bill's storage; all three cursor modes; switching boxes and back;
+party Pokemon action menu; game's refusal to deposit the last healthy Pokemon;
+clean exit with party intact. A fresh normally earned state roundtrip succeeds;
+legacy-state rejection leaves the frame counter unchanged. The remembered-TM
+Bag handoff still reaches the selected Potion's original action menu.
+Successful Pokemon deposit/withdraw, player's item storage, an established
+playthrough's boxes, and physical Brick operation still need validation.
+
+Reproduce the PC check after earning the outdoor state with PC_OUTDOOR=1:
+set PC_STORAGE=1, PC_BOOT and PC_SHOTS, then run linux-polished-live-test with
+--data DISPOSABLE_DATA --frames 24 ROM. It uses the earned live-test.ss and
+normal guest inputs. Only the actual feature writes the verified script queue;
+the test does not inject Pokemon, items or fixture memory. Do not distribute
+its ROM, battery saves or states.

@@ -59,6 +59,79 @@ static void earn_injury(struct mCore *c) {
 }
 static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui,struct pd_snapshot *s) {
   (void)ui;
+  if(getenv("PC_STORAGE")) {
+    static unsigned char originalBox;
+    if(frame==0) {
+      char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);
+      assert(state(c,path,false));
+      drive(c,64,1);drive(c,0,120); /* Face up through normal guest movement. */
+      const char *why=polished_pc_reason(PD_PC_ACTION_SHA,read_memory,c);
+      fprintf(stderr,"PC readiness: %s\n",why?why:"ready");assert(!why);
+      tap(SDLK_f);
+    }
+    if(frame==3){shot("pc-quick-menu");tap(SDLK_z);}
+    if(frame==6) {
+      unsigned char queue;assert(read_memory(c,PD_PC_QUEUE,&queue,1));
+      fprintf(stderr,"PC queued flag after host selection: %d\n",queue);
+      for(int i=0;i<12;i++) {
+        unsigned char ptr[2];assert(read_memory(c,PD_PC_POINTER,ptr,2));
+        if((ptr[0]|ptr[1]<<8)==PD_PC_PC_MENU)break;
+        drive(c,1,3);drive(c,0,90);
+      }
+    }
+    if(frame==8) {
+      unsigned char ptr[2];assert(read_memory(c,PD_PC_POINTER,ptr,2));
+      fprintf(stderr,"PC menu pointer %04x\n",ptr[0]|ptr[1]<<8);
+      assert((ptr[0]|ptr[1]<<8)==PD_PC_PC_MENU && !companion);
+      shot("pc-top-menu");
+    }
+    if(frame==10) {for(int i=0;i<3;i++){drive(c,1,3);drive(c,0,180);}}
+    if(frame==12) {
+      unsigned char cursor,mode;
+      assert(read_memory(c,PD_PC_BOX,&originalBox,1));
+      assert(read_memory(c,PD_PC_BOX_CURSOR,&cursor,1));
+      fprintf(stderr,"PC storage cursor=%02x box=%d\n",cursor,originalBox);
+      shot("pc-storage-debug");
+      assert(cursor==0x12 || cursor==2);
+      assert(read_memory(c,PD_PC_BOX_MODE,&mode,1) && mode==0);
+      assert(!wideReady);shot("pc-storage");
+      for(int i=1;i<=3;i++) {
+        drive(c,4,3);drive(c,0,30);
+        assert(read_memory(c,PD_PC_BOX_MODE,&mode,1) && mode==i%3);
+      }
+      drive(c,8,3);drive(c,0,30); /* Box name. */
+      drive(c,16,3);drive(c,0,90);
+    }
+    if(frame==14) {
+      unsigned char box;assert(read_memory(c,PD_PC_BOX,&box,1) && box!=originalBox);
+      shot("pc-next-box");
+      drive(c,32,3);drive(c,0,90);
+      assert(read_memory(c,PD_PC_BOX,&box,1) && box==originalBox);
+      for(int i=0;i<3;i++){drive(c,128,3);drive(c,0,30);}
+      for(int i=0;i<2;i++){drive(c,32,3);drive(c,0,30);}
+      unsigned char cursor;assert(read_memory(c,PD_PC_BOX_CURSOR,&cursor,1));
+      fprintf(stderr,"PC party cursor=%02x\n",cursor);
+      assert(cursor==0x30);
+      drive(c,1,3);drive(c,0,60);
+    }
+    if(frame==16) {
+      shot("pc-party-actions");
+      drive(c,1,3);drive(c,0,90); /* The game must refuse the last healthy mon. */
+    }
+    if(frame==17) {
+      shot("pc-last-healthy-guard");
+      /* Cancel the mon's menu; decline Continue Box operations; close PC. */
+      for(int i=0;i<10;i++){drive(c,2,3);drive(c,0,120);}
+    }
+    if(frame==20) {
+      assert(!polished_pc_busy(read_memory,c));
+      struct pd_snapshot after;pc_read(&after,read_memory,c);
+      assert(after.partyCount==1 && after.party[0].species==155);
+      shot("pc-return-overworld");
+      fprintf(stderr,"PASS actual quick-menu PC, storage, mode cycle, box switching, party actions, clean exit and intact party\n");
+    }
+    return;
+  }
   if(getenv("PC_INJURE")) {
     if(frame==0){char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));earn_injury(c);}
     if(frame==5)shot("earned-injury");

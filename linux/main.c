@@ -1,4 +1,5 @@
 #include "polished.h"
+#include "polished_field.h"
 #include "rom_identity.h"
 #include <mgba/internal/gb/gb.h>
 #include "../app/src/main/cpp/pk_wide_gb_profile.h"
@@ -1004,6 +1005,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   polishedCanvas = polished >= 0;
   struct pc_ui pcUi = {0};
   struct pocket_action pcBagAction = {0};
+  bool pcSession = false;
   char pcSha[41] = "";
   bool pcFavoritesUnsaved = false;
   if (polished >= 0) {
@@ -1115,8 +1117,9 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     struct quick_item quick[QUICK_COUNT];
     int quickN = 0;
     char repelWhy[32] = "";
-    if (pcOk)
-      quick[quickN++] = (struct quick_item){QUICK_PC, false, false, NULL, 0, 0, NULL};
+    if (pcOk || polished_field_supported(pcSha))
+      quick[quickN++] = (struct quick_item){QUICK_PC, false, false,
+          polished_field_supported(pcSha) ? polished_pc_reason(pcSha,read_memory,c) : NULL, 0, 0, NULL};
     if (flyCfg) {
       int flyer = fly_flyer(&snap);
       quick[quickN++] = (struct quick_item){QUICK_FLY, false, false,
@@ -1213,6 +1216,11 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
         quickOpen = false;
         switch (quick[quickSel].action) {
         case QUICK_PC:
+          if(polished_field_supported(pcSha)) {
+            pcSession=polished_pc_open(c,pcSha,read_memory,c);
+            if(!pcSession)notice("PC unavailable right now");
+            break;
+          }
           job = JOB_PC;
           jobFrames = 0;
           break;
@@ -1411,6 +1419,10 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
         emuMs += ms_since(t);
         t = SDL_GetPerformanceCounter();
         wide_tick(c, i < count - 1, &settings);
+        if(pcSession) {
+          pcSession=polished_pc_busy(read_memory,c);
+          if(pcSession)wideReady=false; /* Storage owns the whole game screen. */
+        }
         wideMs += ms_since(t);
       }
     }
@@ -1551,7 +1563,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     } else {
       bool field = polished >= 0 ? snap.valid && !snap.inBattle && pk_wide_scene() == PK_WIDE_SCENE_FIELD : (fieldFlags & PK_FIELD_KNOWN) && !(fieldFlags & (PK_FIELD_LOCKED | PK_FIELD_BATTLE)) &&
                    (!wideSupported || pk_wide_scene() == PK_WIDE_SCENE_FIELD) && flyStage == 0;
-      hudFieldFrames = field ? hudFieldFrames + 1 : 0;
+      hudFieldFrames = field && !pcSession ? hudFieldFrames + 1 : 0;
       if (settings.hud && (polished >= 0 || (game.cfg && c->platform(c) == mPLATFORM_GBA)) && hudFieldFrames >= 20) {
         int steps = polished >= 0 ? 0 : repel_steps(c, game.cfg);
         if (steps <= 0)

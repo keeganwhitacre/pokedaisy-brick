@@ -4,11 +4,10 @@ SDL2 host for the pinned mGBA library and the existing portable companion in
 `3ds/core/`. The host is isolated here beside `3ds/`. It does not introduce
 another emulator, companion decoder, game-address table or data generator.
 
-It has EXPAND (below). It leaves out the downstream Polished adapter,
-enhanced summaries, filters, automatic recovery and
-firmware suspend/shutdown. Those implementations remain on the development
-branches of keeganwhitacre/pokedaisy-brick. This branch is not an update of the installed
-Brick development package. Use a separate data directory when evaluating it.
+This development branch includes the downstream Polished Crystal adapter.
+See [Polished integration](POLISHED-INTEGRATION.md) for its supported versions
+and actions. Filters, automatic recovery and firmware suspend/shutdown remain
+separate work. Use a separate data directory when evaluating a new build.
 
 ## Native build
 
