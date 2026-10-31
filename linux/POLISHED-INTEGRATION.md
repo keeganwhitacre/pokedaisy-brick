@@ -20,8 +20,8 @@ verified old profile for normal 3.2.3 (CRC32 f98367e4).
 
 The old party/summary, bag, map, dex, guide and read-only battle views are
 reused. They have the old Polished layout, not Android's newest redesigned UI.
-Battle commands are not enabled in the companion. Ordinary item actions hand
-off to the game as described below. Favorites load and save atomically per ROM
+Normal 3.2.3 battle commands are connected through the controller-only
+dispatcher described below. Ordinary item actions hand off to the game. Favorites load and save atomically per ROM
 SHA-1 under DATA/favorites/. No DS or Seaglass work is included.
 
 ## Architecture
@@ -84,7 +84,7 @@ are generated from the pinned official 3.2.3 symbols, with the ROM identity
 still owned by the app. Fly, Repel and Bike need their own verified adapters;
 the retail Crystal addresses are not used for Polished.
 Original item actions are now accessible through the selected-item handoff below;
-companion-driven target/quantity confirmation and battle commands remain disabled. Persistent favorites
+companion-driven item target/quantity confirmation remains unimplemented. Persistent favorites
 was the first independent feature restored in this follow-up.
 
 
@@ -194,7 +194,8 @@ expires normally. No encounter-rate, map or inventory tables are changed.
 
 Native and AArch64/QEMU supplied-ROM tests each walked 200 actual Route 29 grass
 steps without random battles while OFF, restarted and verified the setting was
-still OFF, then enabled WILD and entered a normal wild battle after three steps.
+still OFF, then enabled WILD and entered a normal wild battle (three steps initially,
+20 on the latest repeat; encounter timing varies).
 A normal input-earned battle state is retained privately for subsequent tests.
 The accelerated guest-input helper calls the same production hold once per frame;
 quick-menu activation and persisted settings are exercised through the real host.
@@ -204,3 +205,48 @@ and long playthroughs with WILD OFF still need integration coverage.
 Reproduce after PC_OUTDOOR's earned state: PC_WILD=1 with --frames 18, then a
 second process with PC_WILD=1 PC_WILD_RELOAD=1 and the same disposable data.
 PC_BOOT and PC_SHOTS are required as for the other personal-ROM checks.
+
+
+## Companion battle actions (normal 3.2.3)
+
+During a battle, X opens the companion. L/R to BATTLE, then Select on the INFO
+page opens CONTROLS. D-pad picks a cell; A confirms. Fight opens the companion
+move grid after the game's move menu is visibly ready. B from that move grid
+returns to the action grid. Y returns to battle information, X to the game,
+and Start opens host settings as elsewhere.
+
+Moves, Run and a successful switch return to the original game for animations,
+dialogue and outcomes. Open the companion again on the next turn to issue
+another command. Bag hands off to the game's original battle Bag: the user
+chooses an item and target there. This does not automate turns, dialogue,
+catching, item confirmations or the battle's outcome.
+
+The existing BattleControlsScreen-inspired cells and party picker are reused;
+no new artwork or layout system. Their requests now reach pocket_battle_begin
+and pocket_battle_tick. Those emit ordinary bounded guest inputs and observe the
+real menu cursor. Fight / Back reopen the companion only after six frames of
+the expected visible menu, with a bounded timeout. B/X/Y/Menu or directions
+cancel pending automation and return control. FF is suspended during a command
+or pending menu handoff. Unsupported ROMs retain the read-only battle pages.
+
+Removed the battle dispatcher's duplicate literal addresses and ROM identity:
+all now come from the same pinned-symbol generator, cross-checked against the
+app's Gen2Reader fields. Party stride, battle-mon size and move/PP offsets are
+also derived from release symbols. No shared-core files changed.
+
+Actual native and ARM/QEMU checks used an input-earned wild battle: INFO ->
+CONTROLS -> Fight -> moves -> Back -> actions -> Fight -> Tackle. PP fell from
+35 to 34 and foe HP from 13 to 7, then Run returned to the overworld. Separate
+runs verified cancellation during a pending action and Bag handoff. PC storage
+navigation and the existing GB/GBA diagnostic checks still pass.
+Model tests additionally cover unavailable ROMs, empty/zero-PP moves, fainted /
+egg / already-active party choices, timeout and cancellation. These model
+checks do not establish successful switching. Live switch / forced replacement,
+trainer battles, native battle item use, fast-forward interaction and physical
+Brick behavior still need validation; the earned test party has one Pokemon.
+
+Reproduce after PC_WILD_RELOAD earns wild-battle.ss: PC_BATTLE_CONTROLS=1 with
+--frames 235, using the same PC_BOOT / PC_SHOTS and disposable data convention.
+Add PC_BATTLE_BAG=1 for native Bag handoff, or PC_BATTLE_CANCEL=1 with
+--frames 22 for cancellation. Tests observe the real UI / dispatcher state;
+they do not set its selection, synthesize Pokemon or patch battle memory.

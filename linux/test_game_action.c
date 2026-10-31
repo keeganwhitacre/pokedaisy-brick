@@ -1,6 +1,7 @@
 /* Explicit controller model tests: failure, timeout and cancellation boundaries. */
 #include "game_action.h"
 #include "polished_field.h"
+#include "battle_action.h"
 #include "polished_action_data.h"
 #include <assert.h>
 #include <stdio.h>
@@ -87,4 +88,25 @@ int main(void) {
   ram[PD_PC_WILD_COOLDOWN]=5;assert(polished_wild_hold(NULL,PD_PC_ACTION_SHA,read_mem,NULL));
   ram[PD_PC_WILD_COOLDOWN]=2;assert(!polished_wild_hold(NULL,PD_PC_ACTION_SHA,read_mem,NULL));
   puts("PASS WILD rejects unsupported ROM/read/write failures and skips menu/battle/title or an adequate cooldown");
+  /* Explicit RAM model: availability / cancellation / timeout boundaries,
+   * not a replacement for the personal-ROM host integration test. */
+  memset(ram,0,sizeof ram);ram[PD_PC_BATTLE]=1;
+  const unsigned char actionGrid[]={14,9,2,2,0,0,0x25};
+  memcpy(ram+PD_PC_MENU2D,actionGrid,sizeof actionGrid);
+  ram[PD_PC_CURSOR]=ram[PD_PC_CURSOR+1]=1;
+  ram[PD_PC_TILEMAP+14*20+9]=PD_PC_CURSOR_TILE;
+  struct pocket_battle_action b={0};
+  assert(!pocket_battle_begin(&b,"wrong ROM",PB_CHOOSE_ACTION,0,read_mem,NULL));
+  assert(!pocket_battle_begin(&b,PD_PC_ACTION_SHA,PB_CHOOSE_ACTION,4,read_mem,NULL));
+  assert(!pocket_battle_begin(&b,PD_PC_ACTION_SHA,PB_CHOOSE_MOVE,0,read_mem,NULL));
+  ram[PD_PC_BATTLE_MON+PD_PC_MOVES_OFFSET]=33;
+  assert(!pocket_battle_begin(&b,PD_PC_ACTION_SHA,PB_CHOOSE_MOVE,0,read_mem,NULL));
+  ram[PD_PC_BATTLE_MON+PD_PC_PP_OFFSET]=1;
+  assert(pocket_battle_begin(&b,PD_PC_ACTION_SHA,PB_CHOOSE_MOVE,0,read_mem,NULL));
+  pocket_battle_cancel(&b);assert(b.result==PA_CANCELLED && !pocket_battle_tick(&b,read_mem,NULL));
+  assert(pocket_battle_begin(&b,PD_PC_ACTION_SHA,PB_CHOOSE_ACTION,0,read_mem,NULL));
+  ram[PD_PC_TILEMAP+14*20+9]=0; /* Menu disappeared: don't send blind inputs. */
+  for(int i=0;i<242;i++)assert(!pocket_battle_tick(&b,read_mem,NULL));
+  assert(b.result==PA_TIMEOUT);
+  puts("PASS battle controller rejects unsupported ROM, invalid action, empty/zero-PP moves; cancel/timeout release inputs");
 }

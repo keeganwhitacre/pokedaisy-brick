@@ -155,7 +155,9 @@ static void test_field_items(struct mCore* c,struct pd_game* game,const uint8_t*
   assert(!(flags&PK_FIELD_LOCKED));
   printf("%s PC: opened and closed, the field free again\n",liveName);
 }
-static void test_frame(struct mCore* c,bool companion,int frame,struct pd_ui* ui,struct pd_snapshot* snap) {
+static void test_frame(struct mCore* c,bool companion,int frame,struct pd_ui* ui,struct pd_snapshot* snap,
+                       struct pc_ui *pc,struct pocket_battle_action *battleJob) {
+  (void)pc;(void)battleJob;
   if(live) {
     assert(frame==0);
     bool isGba=c->platform(c)==mPLATFORM_GBA;

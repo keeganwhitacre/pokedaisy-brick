@@ -3,6 +3,7 @@
  * Addresses/geometry: Gen2Reader.GEN2_POLISHED_CRYSTAL, readGen2BattleInput,
  * readGen2PartyMenu; release source ram/wram{0,x}.asm. */
 #include "battle_action.h"
+#include "polished_action_data.h"
 #include <string.h>
 enum {
   KEY_A = 1,
@@ -16,18 +17,18 @@ static bool byte(pocket_action_read r, void *c, uint32_t addr, uint8_t *v) {
   return r(c, addr, v, 1);
 }
 bool pocket_battle_supported(const char *sha) {
-  return sha && !strcmp(sha, "6930b48af5844d373e3c9130f26d6dd1084cf4ed");
+  return sha && !strcmp(sha, PD_PC_ACTION_SHA);
 }
 bool pocket_battle_read(pocket_action_read r, void *c,
                         struct pocket_battle_menu *o) {
   *o = (struct pocket_battle_menu){.cursor = -1, .out = -1};
   uint8_t battle, m[7], cur[2], tile, count, action, out;
-  if (!byte(r, c, 0x1d233, &battle))
+  if (!byte(r, c, PD_PC_BATTLE, &battle))
     return false;
   if (battle != 1 && battle != 2)
     return true;
   o->state = PB_BUSY;
-  if (!r(c, 0xce7c, m, 7) || !r(c, 0xce84, cur, 2))
+  if (!r(c, PD_PC_MENU2D, m, 7) || !r(c, PD_PC_CURSOR, cur, 2))
     return false;
   int top = m[0], left = m[1], rows = m[2], cols = m[3], y = cur[0], x = cur[1];
   if (y < 1 || y > rows || x < 1 || x > cols)
@@ -35,9 +36,9 @@ bool pocket_battle_read(pocket_action_read r, void *c,
   int tx = left + (x - 1) * (m[6] & 15), ty = top + (y - 1) * (m[6] >> 4);
   if (tx >= 20 || ty >= 18)
     return true;
-  if (!byte(r, c, 0xc1a0 + ty * 20 + tx, &tile))
+  if (!byte(r, c, PD_PC_TILEMAP + ty * 20 + tx, &tile))
     return false;
-  if (tile != 0xf0)
+  if (tile != PD_PC_CURSOR_TILE)
     return true; /* Hollow/absent arrow means the game is busy. */
   o->rows = rows;
   if (cols == 1 && m[6] == 0x20 && top == 12 && left == 11 && rows == 3) {
@@ -46,8 +47,8 @@ bool pocket_battle_read(pocket_action_read r, void *c,
     return true;
   }
   if (cols == 1 && m[6] == 0x20 && top == 1 && left == 0) {
-    if (!byte(r, c, 0x1dcce, &count) || !byte(r, c, 0x1d113, &action) ||
-        !byte(r, c, 0x1d0da, &out))
+    if (!byte(r, c, PD_PC_PARTY_COUNT, &count) || !byte(r, c, PD_PC_PARTY_MENU, &action) ||
+        !byte(r, c, PD_PC_ACTIVE_MON, &out))
       return false;
     if (count < 1 || count > 6 || rows != count + 1 ||
         (action != 0 && action != 2))
@@ -66,7 +67,7 @@ bool pocket_battle_read(pocket_action_read r, void *c,
   }
   uint8_t type;
   if (top == 13 && left == 5 && cols == 1 && rows >= 1 && rows <= 4) {
-    if (!byte(r, c, 0x1d239, &type))
+    if (!byte(r, c, PD_PC_MOVE_MENU, &type))
       return false;
     if (!type) {
       o->state = PB_MOVE;
@@ -78,7 +79,7 @@ bool pocket_battle_read(pocket_action_read r, void *c,
 /* Same immutable identity principle as gbMonKey: species, OT ID and DVs.
  * Retain the third Polished DV byte plus personality/form bits as additional
  * collision guards. Raw identities avoid duplicating species/form tables. */
-static void identity(const uint8_t p[48], uint8_t id[8]) {
+static void identity(const uint8_t p[PD_PC_PARTY_SIZE], uint8_t id[8]) {
   id[0] = p[0];
   id[1] = p[6];
   id[2] = p[7];
@@ -88,13 +89,13 @@ static void identity(const uint8_t p[48], uint8_t id[8]) {
 }
 static int target_slot(struct pocket_battle_action *a, pocket_action_read r,
                        void *c, int requested) {
-  uint8_t count, out, p[48];
-  if (!byte(r, c, 0x1dcce, &count) || count < 1 || count > 6 ||
-      !byte(r, c, 0x1d0da, &out))
+  uint8_t count, out, p[PD_PC_PARTY_SIZE];
+  if (!byte(r, c, PD_PC_PARTY_COUNT, &count) || count < 1 || count > 6 ||
+      !byte(r, c, PD_PC_ACTIVE_MON, &out))
     return -1;
   int found = -1;
   for (int i = 0; i < count; i++) {
-    if (!r(c, 0x1dcd6 + 48 * i, p, 48))
+    if (!r(c, PD_PC_PARTY_MON + PD_PC_PARTY_SIZE * i, p, sizeof p))
       return -1;
     uint8_t id[8];
     identity(p, id);
@@ -126,10 +127,10 @@ bool pocket_battle_begin(struct pocket_battle_action *a, const char *sha,
     a->menu = PB_ACTION;
     a->pick = (int[]){0, 2, 1, 3}[value];
   } else if (cmd == PB_CHOOSE_MOVE) {
-    uint8_t mon[35];
+    uint8_t mon[PD_PC_BATTLE_SIZE];
     if ((m.state != PB_ACTION && m.state != PB_MOVE) || value < 0 ||
-        value > 3 || !r(c, 0xc4a5, mon, 35) || !mon[2 + value] ||
-        !(mon[11 + value] & 63) || (m.state == PB_MOVE && value >= m.rows))
+        value > 3 || !r(c, PD_PC_BATTLE_MON, mon, sizeof mon) || !mon[PD_PC_MOVES_OFFSET + value] ||
+        !(mon[PD_PC_PP_OFFSET + value] & 63) || (m.state == PB_MOVE && value >= m.rows))
       return false;
     a->menu = m.state;
     a->pick = m.state == PB_ACTION ? 0 : value;
@@ -251,12 +252,12 @@ unsigned pocket_battle_tick(struct pocket_battle_action *a,
   int want = target_slot(a, r, c, -1);
   if (a->phase == 3 || (a->phase == 2 && (a->forced || a->switchSent))) {
     uint8_t out;
-    if (!byte(r, c, 0x1d0da, &out))
+    if (!byte(r, c, PD_PC_ACTIVE_MON, &out))
       return reject(a);
     /* target_slot deliberately refuses the active slot; match its identity
      * independently here to confirm the game actually sent the chosen mon. */
-    uint8_t p[48], id[8];
-    if (out < 6 && r(c, 0x1dcd6 + 48 * out, p, 48)) {
+    uint8_t p[PD_PC_PARTY_SIZE], id[8];
+    if (out < 6 && r(c, PD_PC_PARTY_MON + PD_PC_PARTY_SIZE * out, p, sizeof p)) {
       identity(p, id);
       if (!memcmp(id, a->identity, 8)) {
         a->result = PA_DONE;

@@ -577,8 +577,13 @@ bool pc_ui_input(struct pc_ui *u, const struct pd_snapshot *s,
         u->battlePage = 2;
       }
     }
-    if (a == PC_PLACES)
-      u->battleFoe = 0;
+    if (a == PC_PLACES) {
+      if (!u->battlePage && u->battleSupported && s->inBattle) {
+        u->battleControls = true;
+        u->battleParty = false;
+        u->battleChoice = 0;
+      } else u->battleFoe = 0;
+    }
   } else if (u->section == PC_GUIDE) {
     guide_input(u, s, a);
   } else if (u->section == PC_MAP) {

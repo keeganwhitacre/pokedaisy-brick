@@ -71,8 +71,76 @@ static void earn_injury(struct mCore *c) {
   assert(!s.inBattle && s.party[0].hp>0 && s.party[0].hp<s.party[0].maxHp);
   char path[1024];snprintf(path,sizeof path,"%s/states/injured.ss",root);assert(state(c,path,true));
 }
-static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui,struct pd_snapshot *s) {
+static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui,struct pd_snapshot *s,
+                       struct pc_ui *pc,struct pocket_battle_action *battleJob) {
   (void)ui;
+  if(getenv("PC_BATTLE_CONTROLS")) {
+    static int phase,beforePP,beforeFoeHP,at;
+    if(frame==0) {
+      char path[1024];snprintf(path,sizeof path,"%s/states/wild-battle.ss",root);
+      assert(state(c,path,false));tap(SDLK_TAB);
+    }
+    if(frame==3 || frame==6)tap(SDLK_e);
+    if(frame==9)tap(SDLK_BACKSPACE);
+    if(frame==12) {
+      assert(companion && pc->section==PC_BATTLE && pc->battleControls && pc->battleMenu.state==PB_ACTION);
+      shot("battle-companion-actions");
+      if(getenv("PC_BATTLE_BAG")){tap(SDLK_DOWN);phase=10;}
+      else {tap(SDLK_z);phase=1;}
+    }
+    if(getenv("PC_BATTLE_CANCEL")) {
+      if(frame==14){assert(battleJob->result==PA_RUNNING);tap(SDLK_x);}
+      if(frame==18) {
+        assert(!companion && battleJob->result==PA_CANCELLED);
+        shot("battle-cancelled");fprintf(stderr,"PASS actual companion battle action cancellation restores game control\n");
+      }
+      return;
+    }
+    if(getenv("PC_BATTLE_BAG")) {
+      if(phase==10 && frame==14){assert(pc->battleChoice==2);tap(SDLK_z);phase=11;}
+      if(phase==11 && !companion && battleJob->result==PA_DONE) {
+        unsigned char ptr[2];assert(read_memory(c,PD_PC_POINTER,ptr,2));
+        unsigned menu=ptr[0]|ptr[1]<<8;bool pack=false;
+        for(unsigned i=0;i<sizeof pd_pc_pack_menus/sizeof *pd_pc_pack_menus;i++)pack=pack || menu==pd_pc_pack_menus[i];
+        if(pack){phase=12;at=frame;}
+      }
+      if(phase==12 && frame==at+20) {
+        shot("battle-native-bag");fprintf(stderr,"PASS actual companion Bag opens the original battle Bag without choosing an item\n");phase=13;
+      }
+      if(frame==230)assert(phase==13);
+      return;
+    }
+    if(phase==1 && frame>12 && companion && pc->battleMenu.state==PB_MOVE) {
+      assert(pc->battleControls && battleJob->result==PA_DONE);
+      shot("battle-companion-moves");tap(SDLK_x);phase=2;
+    } else if(phase==2 && companion && pc->battleMenu.state==PB_ACTION) {
+      assert(battleJob->result==PA_DONE);
+      shot("battle-companion-back");tap(SDLK_z);phase=3;
+    } else if(phase==3 && companion && pc->battleMenu.state==PB_MOVE) {
+      assert(s->battlers[0].moves[0] && s->battlers[0].pp[0]>0);
+      beforePP=s->battlers[0].pp[0];beforeFoeHP=s->battlers[1].hp;
+      tap(SDLK_z);phase=4;
+    } else if(phase==4 && !companion && battleJob->result==PA_DONE) {
+      struct pocket_battle_menu menu;
+      for(int i=0;i<2500;i++) {
+        assert(pocket_battle_read(read_memory,c,&menu));
+        if(menu.state==PB_ACTION || menu.state==PB_NONE)break;
+        drive(c,i%120<3?1:0,1);
+      }
+      struct pd_snapshot now;pc_read(&now,read_memory,c);
+      fprintf(stderr,"BATTLE move PP %d -> %d; foe HP %d -> %d\n",beforePP,now.battlers[0].pp[0],beforeFoeHP,now.battlers[1].hp);
+      assert(now.inBattle && menu.state==PB_ACTION && now.battlers[0].pp[0]==beforePP-1 && now.battlers[1].hp<beforeFoeHP);
+      phase=5;at=frame;
+    } else if(phase==5 && frame==at+2) {shot("battle-move-result");tap(SDLK_TAB);}
+    else if(phase==5 && frame==at+5) {assert(companion);tap(SDLK_DOWN);tap(SDLK_RIGHT);}
+    else if(phase==5 && frame==at+7) {assert(pc->battleChoice==3);tap(SDLK_z);phase=6;}
+    else if(phase==6 && !companion && battleJob->result==PA_DONE) {
+      struct pd_snapshot now;pc_read(&now,read_memory,c);assert(!now.inBattle);
+      fprintf(stderr,"PASS actual companion Fight, moves, Back, chosen move PP/damage and Run\n");phase=7;at=frame;
+    } else if(phase==7 && frame==at+2)shot("battle-run-overworld");
+    if(frame==230)assert(phase==7);
+    return;
+  }
   if(getenv("PC_WILD")) {
     bool reload=getenv("PC_WILD_RELOAD")!=NULL;
     if(frame==0) {

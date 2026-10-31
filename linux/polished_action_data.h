@@ -27,6 +27,15 @@
 #define PD_PC_BOX_CURSOR 0xc7e8u /* wBillsPC_CursorPos */
 #define PD_PC_BOX_MODE 0xc7edu /* wBillsPC_CursorMode */
 #define PD_PC_WILD_COOLDOWN 0x1d464u /* wWildEncounterCooldown */
+#define PD_PC_PARTY_MON 0x1dcd6u /* wPartyMon1 */
+#define PD_PC_BATTLE_MON 0xc4a5u /* wBattleMon */
+#define PD_PC_PARTY_MENU 0x1d113u /* wPartyMenuActionText */
+#define PD_PC_ACTIVE_MON 0x1d0dau /* wCurBattleMon */
+#define PD_PC_MOVE_MENU 0x1d239u /* wMoveSelectionMenuType */
+#define PD_PC_PARTY_SIZE 48u
+#define PD_PC_BATTLE_SIZE 35u
+#define PD_PC_MOVES_OFFSET 2u
+#define PD_PC_PP_OFFSET 11u
 #define PD_PC_PC_SCRIPT 0x2f41e2u
 #define PD_PC_PC_MENU 0x50d2u
 #define PD_PC_START_MENU 0x6160u

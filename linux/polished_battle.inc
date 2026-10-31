@@ -140,7 +140,7 @@ static void pc_battle_controls_draw(struct pc_ui *u, struct pd_canvas *c,
         pocket_fade_rect(c, x + 12, y + 12, 220, 94, 0xffffff, 55);
     }
   txt(c, 12, 346, "D-pad:Pick A:Use B:Back");
-  txt(c, 12, 366, "Start:Info X:Game");
+  txt(c, 12, 366, "Start:Settings X:Game");
 }
 static int battle_pct(int type, int d1, int d2) {
   int pct = type_percent(type, d1);
@@ -419,7 +419,8 @@ static void pc_battle_pages(struct pc_ui *u, struct pd_canvas *c,
   txt(c, 12, 346,
       u->battlePage == 3   ? "D-pad:Choose A:Details"
       : u->battlePage == 4 ? "Left/Right:Group Up/Down:More"
-                           : "Select:Live foe Y:Page");
+                           : !u->battlePage && u->battleSupported
+                             ? "Select:Controls Y:Page" : "Select:Live foe Y:Page");
   txt(c, 12, 366,
       u->battlePage || u->battleFoe ? "L/R:Section B:Back X:Play"
                                     : "Start:Settings L/R:Section");

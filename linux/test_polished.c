@@ -225,6 +225,38 @@ static void test_battle_advice(void) {
   puts("PASS battle matchups, upstream ranking/ties, PP/fainted/egg exclusion, "
        "faithful moves, seen/reset and navigation");
 }
+static void test_battle_controls(void) {
+  struct pd_snapshot s={.inBattle=true,.partyCount=2,.partyActive=0};
+  struct pc_ui u={.section=PC_BATTLE,.battleMenu={.state=PB_ACTION}};
+  assert(pc_ui_input(&u,&s,PC_PLACES) && !u.battleControls);
+  u.battleSupported=true;
+  assert(pc_ui_input(&u,&s,PC_PLACES) && u.battleControls);
+  assert(pc_ui_input(&u,&s,PC_CONFIRM) && u.battleRequest==PB_CHOOSE_ACTION && u.battleValue==0);
+  u.battleRequest=0;u.battleChoice=2;
+  assert(pc_ui_input(&u,&s,PC_CONFIRM) && u.battleRequest==PB_CHOOSE_ACTION && u.battleValue==1);
+  u.battleRequest=0;u.battleChoice=3;
+  assert(pc_ui_input(&u,&s,PC_CONFIRM) && u.battleValue==3);
+  u.battleRequest=0;u.battleChoice=0;u.battleMenu.state=PB_MOVE;
+  assert(pc_ui_input(&u,&s,PC_CONFIRM) && !u.battleRequest);
+  s.battlers[0].moves[0]=33;
+  assert(pc_ui_input(&u,&s,PC_CONFIRM) && !u.battleRequest);
+  s.battlers[0].pp[0]=1;
+  assert(pc_ui_input(&u,&s,PC_CONFIRM) && u.battleRequest==PB_CHOOSE_MOVE);
+  u.battleRequest=0;
+  assert(pc_ui_input(&u,&s,PC_BACK) && u.battleRequest==PB_BACK);
+  u.battleRequest=0;u.battleMenu.state=PB_ACTION;u.battleChoice=1;
+  assert(pc_ui_input(&u,&s,PC_CONFIRM) && u.battleParty && !u.battleRequest);
+  u.battleChoice=1;s.party[1].species=155;s.party[1].hp=0;
+  assert(pc_ui_input(&u,&s,PC_CONFIRM) && !u.battleRequest);
+  s.party[1].hp=10;s.party[1].species=255;
+  assert(pc_ui_input(&u,&s,PC_CONFIRM) && !u.battleRequest);
+  s.party[1].species=155;
+  assert(pc_ui_input(&u,&s,PC_CONFIRM) && u.battleRequest==PB_SWITCH && u.battleValue==1);
+  u.battleRequest=0;u.battleChoice=0;s.party[0].species=155;s.party[0].hp=10;
+  assert(pc_ui_input(&u,&s,PC_CONFIRM) && !u.battleRequest);
+  assert(pc_ui_input(&u,&s,PC_ALTERNATE) && !u.battleControls);
+  puts("PASS companion battle request mapping and unsupported/empty-PP/egg/fainted/active selection guards (model)");
+}
 static void test_phase9(void) {
   struct pd_snapshot s = {.dexOk = true};
   int ids[512];
@@ -484,6 +516,7 @@ static void test_pixel_widgets(void) {
 int main(int argc, char **argv) {
   assert(argc == 2 || argc == 3);
   test_battle_advice();
+  test_battle_controls();
   test_phase9();
   test_experience();
   test_pixel_widgets();

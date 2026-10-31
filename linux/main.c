@@ -909,7 +909,7 @@ static void perf_frame(uint64_t start, double hz) {
 }
 #ifdef POCKET_TEST
 static void test_frame(struct mCore *, bool, int, struct pd_ui *,
-                       struct pd_snapshot *);
+                       struct pd_snapshot *, struct pc_ui *, struct pocket_battle_action *);
 #endif
 static void run_game(const char *path, int maxFrames, const char *shot) {
   FILE *f = fopen(path, "rb");
@@ -1005,11 +1005,15 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   polishedCanvas = polished >= 0;
   struct pc_ui pcUi = {0};
   struct pocket_action pcBagAction = {0};
+  struct pocket_battle_action pcBattleAction = {0};
+  enum pocket_battle_state battleReturn = PB_NONE;
+  unsigned battleReturnFrames = 0, battleReturnStable = 0;
   bool pcSession = false;
   char pcSha[41] = "";
   bool pcFavoritesUnsaved = false;
   if (polished >= 0) {
     pocket_rom_sha1(romdata, (size_t)len, pcSha);
+    pcUi.battleSupported = pocket_battle_supported(pcSha);
     pocket_favorites_load(root, pcSha, &pcUi.favorites);
   }
   bool pcSettings = false;
@@ -1088,6 +1092,14 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     events();
     audio_check();
     repeat_directions();
+    if ((pcBattleAction.result==PA_RUNNING || battleReturn!=PB_NONE) &&
+        (pressed & ((1u<<B)|(1u<<X)|(1u<<Y)|(1u<<MENU)|
+                    (1u<<UP)|(1u<<DOWN)|(1u<<LEFT)|(1u<<RIGHT)))) {
+      pocket_battle_cancel(&pcBattleAction);
+      battleReturn=PB_NONE;
+      c->setKeys(c,0);
+      notice(pocket_battle_message(&pcBattleAction));
+    }
     if (pcBagAction.result == PA_RUNNING &&
         (pressed & ((1u<<B)|(1u<<X)|(1u<<Y)|(1u<<MENU)|
                     (1u<<UP)|(1u<<DOWN)|(1u<<LEFT)|(1u<<RIGHT)))) {
@@ -1328,6 +1340,10 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           }
         }
       } else if (polished >= 0 && !pcSettings) {
+        if(pcUi.battleSupported) {
+          if(!pocket_battle_read(read_memory,c,&pcUi.battleMenu))
+            pcUi.battleMenu=(struct pocket_battle_menu){.state=PB_BUSY};
+        }
         if (down(START)) { pcSettings = true; ui.tab = PD_TAB_SETTINGS; }
         if (down(X)) {
           if (pcUi.section == PC_BAG) pc_ui_input(&pcUi, &snap, PC_FAVORITE);
@@ -1337,6 +1353,19 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
         for (unsigned action=0; action<sizeof buttons/sizeof *buttons; action++)
           if (down(buttons[action]) && !pc_ui_input(&pcUi, &snap, (enum pc_action)action))
             companion = false;
+        if(pcUi.battleRequest) {
+          enum pocket_battle_command request=pcUi.battleRequest;
+          pcUi.battleRequest=0;
+          if(companion && !pcSettings && pcUi.section==PC_BATTLE && pcUi.battleControls &&
+             pcUi.battleSupported && pcBagAction.result!=PA_RUNNING &&
+             pocket_battle_begin(&pcBattleAction,pcSha,request,pcUi.battleValue,read_memory,c)) {
+            battleReturn = request==PB_CHOOSE_ACTION && pcUi.battleValue==0 ? PB_MOVE
+              : request==PB_BACK ? (pcUi.battleMenu.state==PB_SUBMENU ? PB_PARTY : PB_ACTION) : PB_NONE;
+            battleReturnFrames=battleReturnStable=0;
+            companion=false;
+            c->setKeys(c,0);
+          } else notice("Battle action unavailable; use game controls");
+        }
       } else {
         if (down(B) && !pd_ui_back(&ui)) {
           if (polished >= 0) pcSettings = false; else companion = false;
@@ -1397,8 +1426,9 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       }
     } else {
       muted = ff;
-      c->setKeys(c, (quickOpen ? 0 : held & 1023) | (gameKeyFrames > 0 ? gameKeys : 0));
-      int count = ff && pcBagAction.result != PA_RUNNING ? settings.ffSpeed : 1;
+      c->setKeys(c, (quickOpen || pcBattleAction.result==PA_RUNNING || battleReturn!=PB_NONE ? 0 : held & 1023) |
+                   (gameKeyFrames > 0 ? gameKeys : 0));
+      int count = ff && pcBagAction.result != PA_RUNNING && pcBattleAction.result!=PA_RUNNING && battleReturn==PB_NONE ? settings.ffSpeed : 1;
       audio_rate(c, hz);
       for (int i = 0; i < count; i++) {
         uint64_t t = SDL_GetPerformanceCounter();
@@ -1410,6 +1440,15 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
             if (pcBagAction.result != PA_DONE) companion=true;
           }
         }
+        if(pcBattleAction.result==PA_RUNNING) {
+          c->setKeys(c,pocket_battle_tick(&pcBattleAction,read_memory,c));
+          if(pcBattleAction.result!=PA_RUNNING) {
+            if(pcBattleAction.result!=PA_DONE) {
+              notice(pocket_battle_message(&pcBattleAction));
+              battleReturn=PB_NONE;
+            }
+          }
+        }
         if(settings.wildOff && polished_field_supported(pcSha) &&
            !polished_wild_hold(c,pcSha,read_memory,c)) {
           settings.wildOff=false;
@@ -1417,6 +1456,22 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           notice("Wild encounter shortcut failed; encounters restored");
         }
         c->runFrame(c);
+        if(battleReturn!=PB_NONE) {
+          struct pocket_battle_menu menu;
+          bool ready=pcBattleAction.result==PA_DONE && pocket_battle_read(read_memory,c,&menu) &&
+                     menu.state==battleReturn;
+          battleReturnStable=ready ? battleReturnStable+1 : 0;
+          if(battleReturnStable>=6) {
+            battleReturn=PB_NONE;
+            pcUi.battleMenu=menu;
+            pcUi.battleChoice=0;
+            companion=true;
+            c->setKeys(c,0);
+          } else if(++battleReturnFrames>360) {
+            battleReturn=PB_NONE;
+            notice("Battle menu not ready; game control restored");
+          }
+        }
         if (gameKeyFrames > 0 && --gameKeyFrames == 0)
           c->setKeys(c, quickOpen ? 0 : held & 1023);
         if (c->platform(c) == mPLATFORM_GBA)
@@ -1591,7 +1646,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       }
     }
 #ifdef POCKET_TEST
-    test_frame(c, companion, frames, &ui, &snap);
+    test_frame(c, companion, frames, &ui, &snap, &pcUi, &pcBattleAction);
 #endif
     frames++;
     if (maxFrames && frames >= maxFrames) {
