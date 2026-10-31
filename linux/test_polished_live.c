@@ -95,16 +95,17 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
                        struct pc_ui *pc,struct pocket_battle_action *battleJob,struct pocket_action *bagJob) {
   (void)ui;
   if(getenv("PC_QUICK_GRID")) {
+    bool filter=getenv("PC_LCD")!=NULL;
     static int phase,at;
     if(frame==0) {
       char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));
-      if(getenv("PC_GRID_RELOAD"))assert(ui->settings->quickGrid);
-      else assert(!ui->settings->quickGrid);
+      if(getenv("PC_GRID_RELOAD"))assert(filter ? ui->settings->lcdFilter : ui->settings->quickGrid);
+      else assert(filter ? !ui->settings->lcdFilter : !ui->settings->quickGrid);
     }
     if(getenv("PC_GRID_RELOAD")) {
       if(frame==2)tap(SDLK_f);
       if(frame==6) {
-        shot("grid-after-restart");fprintf(stderr,"PASS actual host Grid style survives process restart\n");
+        shot("grid-after-restart");fprintf(stderr,"PASS actual host display preference survives process restart\n");
         SDL_Event quit={.type=SDL_QUIT};assert(SDL_PushEvent(&quit)==1);
       }
       return;
@@ -113,20 +114,20 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
     if(frame==4)tap(SDLK_RETURN);
     if(frame>=6 && phase==0 && frame%2==0) {
       assert(companion && ui->tab==PD_TAB_SETTINGS);
-      if(focusId==HIT_SETTING+SETTING_QUICK_MENU){tap(SDLK_z);phase=1;at=frame;}
+      if(focusId==HIT_SETTING+(filter ? SETTING_FILTER : SETTING_QUICK_MENU)){tap(SDLK_z);phase=1;at=frame;}
       else tap(SDLK_DOWN);
       assert(frame<40);
     } else if(phase==1 && frame==at+3) {
-      assert(ui->settings->quickGrid);shot("settings-quick-menu-grid");tap(SDLK_x);phase=2;at=frame;
+      assert(filter ? ui->settings->lcdFilter : ui->settings->quickGrid);shot(filter ? "settings-lcd" : "settings-quick-menu-grid");tap(SDLK_x);phase=2;at=frame;
     } else if(phase==2) {
       if(frame==at+2)tap(SDLK_TAB);
-      if(frame==at+4)tap(SDLK_f);
+      if(frame==at+4){if(filter)shot("gameplay-lcd");tap(SDLK_f);}
       if(frame==at+6){assert(!companion);shot("quick-grid");tap(SDLK_DOWN);}
       if(frame==at+8){shot("quick-grid-navigate");tap(SDLK_x);}
       if(frame==at+10) {
         char path[1024];snprintf(path,sizeof path,"%s/settings.ini",root);struct pd_settings saved;
-        assert(pd_settings_load(&saved,path) && saved.quickGrid);
-        fprintf(stderr,"PASS actual Settings D-pad/A changes Ring to Grid, renders/navigates quick menu and persists style (earned state, no inventory fixture)\n");
+        assert(pd_settings_load(&saved,path) && (filter ? saved.lcdFilter : saved.quickGrid));
+        fprintf(stderr,"PASS actual Settings D-pad/A changes display preference, renders/navigates quick menu and persists selection (earned state, no inventory fixture)\n");
         SDL_Event quit={.type=SDL_QUIT};assert(SDL_PushEvent(&quit)==1);phase=3;
       }
     }

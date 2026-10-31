@@ -182,3 +182,9 @@ at 512x384); left/right stays in its row and up/down selects the nearest tile
 in the adjacent row. The selection explanation stays below the grid.
 This adds layout selection only: Android's action-visibility, appearance and
 shortcut customization pages are not yet implemented on Linux.
+
+SETTINGS > FILTER toggles OFF / LCD. LCD is a lightweight output-space RGB
+aperture/scanline mask covering gameplay, expanded views and companion menus.
+It is not an exact port of Android's shader presets. The choice persists as
+lcd=0/1; existing configurations default to OFF. Texture generation occurs
+only when output dimensions change; emulator/companion buffers stay intact.

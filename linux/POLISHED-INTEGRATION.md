@@ -422,3 +422,15 @@ inventory or party fixtures. Physical Brick readability/control testing is
 still required; Android's other quick-menu customization remains missing.
 Reproduce using PC_QUICK_GRID=1 with --frames 65; restart the same disposable
 data with PC_GRID_RELOAD=1 to verify persistence (PC_BOOT / PC_SHOTS as above).
+
+## LCD filter
+
+SETTINGS > FILTER now offers OFF / LCD for the complete Linux output, including
+expanded Polished gameplay and companion screens. This is a lightweight RGB
+aperture/scanline mask, not Android's exact shader or an emulated LCD response.
+The optional shared setting and Linux rendering changes are separate commits.
+14 native and 13 ARM/QEMU tests pass. Native actual-ROM Settings input, drawing
+and process-restart persistence passed with the normally earned outdoor state.
+Physical Brick appearance/performance and Android shader matching remain untested.
+TM/HM targeted teaching is still unfinished. Live reproduction: PC_QUICK_GRID=1
+PC_LCD=1 with the usual runner; PC_GRID_RELOAD=1 verifies a second process.

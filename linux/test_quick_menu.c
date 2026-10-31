@@ -1,5 +1,6 @@
 /* GPL-3.0: layout reachability, actual settings hit and persistence. */
 #include "quick_menu.h"
+#include "display_filter.h"
 #include "pd_settings.h"
 #include "pd_ui_internal.h"
 #include <assert.h>
@@ -28,6 +29,9 @@ int main(void) {
   assert(quick_step_layout(9,8,0,1,512,384,true)==8);
   assert(quick_step_layout(9,8,1,0,512,384,true)==8);
   assert(quick_step_layout(9,5,-1,0,512,384,true)==5);
+  assert(pocket_lcd_pixel(0,0)==pocket_lcd_pixel(3,3));
+  assert(pocket_lcd_pixel(0,0)!=pocket_lcd_pixel(1,0));
+  assert((pocket_lcd_pixel(0,2)&255)<(pocket_lcd_pixel(0,0)&255));
   struct pd_settings settings;pd_settings_defaults(&settings);assert(!settings.quickGrid);
   struct pd_ui ui;pd_ui_init(&ui,&settings);ui.tab=PD_TAB_SETTINGS;
   struct pd_game game={0};struct pd_snapshot snap={0};struct pd_host_info host={0};
@@ -41,8 +45,9 @@ int main(void) {
   }
   assert(found && settings.quickGrid && pd_ui_take_action(&ui)==PD_ACTION_SETTINGS_CHANGED);
   char path[128];snprintf(path,sizeof path,"/tmp/pokedaisy-grid-%ld.ini",(long)getpid());
+  settings.lcdFilter=true;
   assert(pd_settings_save(&settings,path));
-  struct pd_settings loaded;assert(pd_settings_load(&loaded,path) && loaded.quickGrid);
+  struct pd_settings loaded;assert(pd_settings_load(&loaded,path) && loaded.quickGrid && loaded.lcdFilter);
   FILE *f=fopen(path,"w");assert(f);fputs("quickgrid=9\n",f);assert(!fclose(f));
   assert(pd_settings_load(&loaded,path) && !loaded.quickGrid);unlink(path);
   struct quick_item items[QUICK_COUNT]={0};for(int i=0;i<QUICK_COUNT;i++)items[i].action=i;

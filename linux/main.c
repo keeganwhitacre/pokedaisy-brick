@@ -19,6 +19,7 @@ int pc_lz(const unsigned char *, size_t, size_t, unsigned char *, size_t);
 #include "hud.h"
 #include "../app/src/main/cpp/pk_call.h"
 #include "quick_menu.h"
+#include "display_filter.h"
 #include "wild.h"
 #include "../app/src/main/cpp/pk_wide.h"
 #include <SDL.h>
@@ -394,7 +395,33 @@ static double presentMs, emuMs, wideMs;
 static double ms_since(uint64_t t) {
   return (double)(SDL_GetPerformanceCounter() - t) * 1000.0 / SDL_GetPerformanceFrequency();
 }
+static bool lcdEnabled;
+static SDL_Texture *lcdTexture;
+static int lcdW,lcdH;
+static void render_lcd(void) {
+  if(!lcdEnabled)return;
+  int w,h;if(SDL_GetRendererOutputSize(renderer,&w,&h)<0 || w<=0 || h<=0)return;
+  if(!lcdTexture || lcdW!=w || lcdH!=h) {
+    SDL_DestroyTexture(lcdTexture);lcdTexture=NULL;
+    uint32_t *mask=malloc((size_t)w*h*4);if(!mask)return;
+    for(int y=0;y<h;y++)for(int x=0;x<w;x++)mask[y*w+x]=pocket_lcd_pixel(x,y);
+    lcdTexture=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_ARGB8888,SDL_TEXTUREACCESS_STATIC,w,h);
+    if(lcdTexture) {
+      if(SDL_UpdateTexture(lcdTexture,NULL,mask,w*4)<0 || SDL_SetTextureBlendMode(lcdTexture,SDL_BLENDMODE_MOD)<0) {
+        SDL_DestroyTexture(lcdTexture);lcdTexture=NULL;
+      }
+    }
+    free(mask);lcdW=w;lcdH=h;
+  }
+  if(!lcdTexture)return;
+  int lw,lh;SDL_RenderGetLogicalSize(renderer,&lw,&lh);
+  SDL_bool integer=SDL_RenderGetIntegerScale(renderer);
+  SDL_RenderSetLogicalSize(renderer,w,h);SDL_RenderSetIntegerScale(renderer,SDL_FALSE);
+  SDL_RenderCopy(renderer,lcdTexture,NULL,NULL);
+  SDL_RenderSetLogicalSize(renderer,lw,lh);SDL_RenderSetIntegerScale(renderer,integer);
+}
 static void timed_present(void) {
+  render_lcd();
   uint64_t t = SDL_GetPerformanceCounter();
   SDL_RenderPresent(renderer);
   presentMs += (double)(SDL_GetPerformanceCounter() - t) * 1000.0 / SDL_GetPerformanceFrequency();
@@ -598,7 +625,8 @@ static void action_capture(unsigned gw,unsigned gh) {
                                   SDL_TEXTUREACCESS_STATIC,actionW,actionH);
   if(actionTexture && SDL_UpdateTexture(actionTexture,NULL,wideReady ? wideFrame : video,
                                         (wideReady ? actionW : 256)*4)<0) {
-    SDL_DestroyTexture(actionTexture);actionTexture=NULL;
+    SDL_DestroyTexture(lcdTexture);lcdTexture=NULL;lcdW=lcdH=0;lcdEnabled=false;
+  SDL_DestroyTexture(actionTexture);actionTexture=NULL;
   }
 }
 static void present_action(const struct pocket_action *a,unsigned gw,unsigned gh) {
@@ -1063,6 +1091,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   snprintf(config, sizeof config, "%s/settings.ini", root);
   struct pd_settings settings;
   pd_settings_load(&settings, config);
+  lcdEnabled=settings.lcdFilter;
   if (wildSwitch)
     pk_field_wild(wildSwitch, settings.wildOff);
   bool quickOpen = false;
@@ -1098,7 +1127,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   struct pd_ui ui;
   pd_ui_init(&ui, &settings);
   struct pd_snapshot snap = {0};
-  struct pd_host_info host = {.hasQuickMenu = true, .hideScreenMode = true, .hasExpand = true, .hasHud = c->platform(c) == mPLATFORM_GBA || polished >= 0,
+  struct pd_host_info host = {.hasDisplayFilter = true, .hasQuickMenu = true, .hideScreenMode = true, .hasExpand = true, .hasHud = c->platform(c) == mPLATFORM_GBA || polished >= 0,
                               .expandGame = wideSupported, .count = 1, .labels = {"HOST"}};
   snprintf(host.values[0], 40, "PokeDaisy Linux");
   const char *opts[] = {"Resume game",
@@ -1469,6 +1498,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           notice(state(c, ss, false) ? "State loaded" : "State load failed");
           break;
         case PD_ACTION_SETTINGS_CHANGED:
+          lcdEnabled=settings.lcdFilter;
           pd_settings_save(&settings, config);
           break;
         default:
@@ -1905,6 +1935,7 @@ int main(int argc, char **argv) {
   texture = NULL;
   SDL_DestroyTexture(gameTexture);
   SDL_DestroyTexture(wideTexture);
+  SDL_DestroyTexture(lcdTexture);lcdTexture=NULL;lcdW=lcdH=0;lcdEnabled=false;
   SDL_DestroyTexture(actionTexture);actionTexture=NULL;
   if (menuTexture)
     SDL_DestroyTexture(menuTexture);
