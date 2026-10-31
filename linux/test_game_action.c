@@ -46,6 +46,19 @@ int main(void) {
   unsigned items=pd_pc_item_pockets[0].addr;
   ram[items]=1;ram[items+1]=25;ram[items+2]=1;ram[items+3]=255;
   assert(!pocket_action_begin_item(&a,PD_PC_ACTION_SHA,25,read_mem,NULL));
+  memset(ram,0,sizeof ram);ram[PD_PC_MAP]=2;
+  assert(pocket_action_begin(&a,PD_PC_ACTION_SHA,read_mem,NULL));
+  a.phase=2;ram[PD_PC_STATE]=0x40;ram[PD_PC_SCRIPT]=1;
+  ram[PD_PC_POCKET]=3;ram[PD_PC_PACK_STATE]=2;ram[PD_PC_IN_MENU]=1;
+  const unsigned char geometry[]={2,7,1,1,0x0c,0,0x20,0xfb};
+  memcpy(ram+PD_PC_MENU2D,geometry,sizeof geometry);
+  ram[PD_PC_CURSOR]=ram[PD_PC_CURSOR+1]=1;
+  for(int i=0;i<10;i++)assert(!pocket_action_tick(&a,read_mem,NULL));
+  assert(a.result==PA_RUNNING); /* stale geometry without visible cursor is insufficient */
+  ram[PD_PC_TILEMAP+2*20+7]=PD_PC_CURSOR_TILE;
+  for(int i=0;i<6;i++)pocket_action_tick(&a,read_mem,NULL);
+  assert(a.result==PA_DONE);
+  puts("PASS TM pocket requires live waiting cursor as well as menu geometry");
   puts("PASS selected ordinary item lookup, special-namespace rejection, duplicate rejection and changed-quantity guard");
   puts("PASS Bag controller rejects wrong ROM/battle/text/read failures and malformed menus; timeout/cancel release input");
 }

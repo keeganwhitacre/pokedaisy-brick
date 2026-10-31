@@ -100,8 +100,9 @@ This is not a companion-rendered target chooser or automatic confirmation.
 Only normal 3.2.3 is enabled. The item ID is resolved from the companion’s sorted
 or favorite-filtered list. A unique ordinary stack is required; duplicate IDs,
 changed quantities, malformed lists and unavailable menu states are rejected.
-Empty bags, TMs and key items retain the original Bag handoff. The TM/HM screen
-is not a verified completion state and may time out if it was remembered.
+Empty bags, TMs and key items retain the original Bag handoff. The remembered TM/HM screen is recognized by its verified waiting-menu geometry
+and filled cursor, so returning to an ordinary item does not time out. Targeted
+TM teaching is still not implemented.
 
 All observations are generated from pinned official release symbols, with
 app-owned addresses/capacities and the app’s ROM identity cross-checked. The
@@ -125,3 +126,19 @@ an action with normal game controls. PC_INJURE=1 normally reaches Route 29 grass
 earns damage, escapes and saves private injured.ss; PC_HEAL=1 plus the use mode
 loads that state. These routes assume the generated Cyndaquil starter fixture,
 not an arbitrary personal playthrough. Tests never publish ROMs/saves/states.
+
+
+### Remembered TM pocket regression
+
+PC_HANDOFF_TM=1 with PC_HANDOFF=1 (235 frames) opens the game Bag, navigates to
+its empty TM/HM pocket, captures it, closes both Bag and Start menu, then uses
+the actual companion R2 action to find the Potion. This passed natively and under ARM/QEMU. The
+model regression rejects stale TM geometry when the filled cursor is absent.
+Menu addresses and the cursor glyph are generated from pinned official symbols
+and app-owned data; no new handwritten memory table is added.
+
+Key-item audit: Gen2Reader.kt stores Polished keys as a zero-terminated list of
+up to keyItemsMax=38 IDs, with companion namespace 0x200. These cannot be fed to
+the ordinary count/{id,quantity} parser. Key items retain the original Bag handoff
+until an earned inventory, current-key identity and context-specific submenu
+have live validation. Neither targeted key-item use nor TM teaching is claimed.

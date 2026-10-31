@@ -3,6 +3,7 @@
 #ifndef PD_POLISHED_ACTION_DATA_H
 #define PD_POLISHED_ACTION_DATA_H
 #define PD_PC_ACTION_SHA "6930b48af5844d373e3c9130f26d6dd1084cf4ed"
+#define PD_PC_CURSOR_TILE 0xF0u
 #define PD_PC_STATE 0x1d0f5u /* wStateFlags */
 #define PD_PC_SCRIPT 0x1d436u /* wScriptMode */
 #define PD_PC_MAP 0x1d431u /* wMapStatus */
@@ -13,6 +14,10 @@
 #define PD_PC_POCKET 0xce48u /* wCurPocket */
 #define PD_PC_SCROLL 0x1d0ecu /* wMenuScrollPosition */
 #define PD_PC_ITEM 0x1d109u /* wCurItem */
+#define PD_PC_MENU2D 0xce7cu /* w2DMenuCursorInitY */
+#define PD_PC_TILEMAP 0xc1a0u /* wTilemap */
+#define PD_PC_PACK_STATE 0xce47u /* wJumptableIndex */
+#define PD_PC_IN_MENU 0xff9au /* hInMenu */
 #define PD_PC_START_MENU 0x6160u
 static const unsigned pd_pc_pack_menus[]={0x4791,0x47a9,0x47c1,0x47d9,0x47f1};
 static const unsigned pd_pc_item_submenus[]={0x41c9,0x422e,0x41ec};

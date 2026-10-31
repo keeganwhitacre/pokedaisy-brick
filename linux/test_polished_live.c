@@ -68,11 +68,19 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
     static struct pd_snapshot beforeItem;
     static unsigned chosenItem,chosenQty;
     if(frame==0){char path[1024];snprintf(path,sizeof path,"%s/states/%s",root,getenv("PC_HEAL")?"injured.ss":"live-test.ss");assert(state(c,path,false));pc_read(&beforeItem,read_memory,c);chosenItem=beforeItem.bag[PD_POCKET_ITEMS].items[0].id;chosenQty=beforeItem.bag[PD_POCKET_ITEMS].items[0].quantity;}
+    if(frame==0 && getenv("PC_HANDOFF_TM")) {
+      struct pocket_action open={0};assert(pocket_action_begin(&open,PD_PC_ACTION_SHA,read_memory,c));
+      for(int i=0;i<400 && open.result==PA_RUNNING;i++)drive(c,pocket_action_tick(&open,read_memory,c),1);
+      assert(open.result==PA_DONE);
+      for(int i=0;i<6;i++){unsigned char pocket;assert(read_memory(c,PD_PC_POCKET,&pocket,1));if(pocket==3)break;drive(c,16,3);drive(c,0,60);}
+      unsigned char pocket;assert(read_memory(c,PD_PC_POCKET,&pocket,1) && pocket==3);
+    }
+    if(frame==1 && getenv("PC_HANDOFF_TM")){shot("remembered-tm-pocket");drive(c,2,3);drive(c,0,120);drive(c,2,3);drive(c,0,120);}
     if(frame==2)tap(SDLK_TAB);
     if(frame==5)tap(SDLK_e);
     if(frame==8)tap(SDLK_2);
     if(frame==10 && getenv("PC_HANDOFF_CANCEL"))tap(SDLK_x);
-    if(frame==130) {
+    if(frame==(getenv("PC_HANDOFF_TM")?230:130)) {
       unsigned char raw[2];assert(read_memory(c,PD_PC_POINTER,raw,2));
       unsigned menu=raw[0]|(raw[1]<<8);bool pack=false;
       for(unsigned i=0;i<sizeof pd_pc_pack_menus/sizeof *pd_pc_pack_menus;i++)pack=pack||menu==pd_pc_pack_menus[i];

@@ -11,6 +11,22 @@ static bool field(pocket_action_read r, void *c) {
          read8(r, c, PD_PC_MAP, &map) && read8(r, c, PD_PC_BATTLE, &battle) &&
          !(state & 0x40) && script == 0 && map == 2 && battle == 0;
 }
+/* tmhm2.asm uses DoMenuJoypadLoop rather than the scrolling-menu header.
+ * Require its complete menu geometry, flags and visible waiting cursor. */
+static bool tm_pocket_waiting(pocket_action_read r,void *c) {
+  uint8_t pocket,phase,inMenu,geometry[8],cursor[2],tile;
+  if(!read8(r,c,PD_PC_POCKET,&pocket) || pocket!=3 ||
+     !read8(r,c,PD_PC_PACK_STATE,&phase) || phase!=2 ||
+     !read8(r,c,PD_PC_IN_MENU,&inMenu) || inMenu!=1 ||
+     !r(c,PD_PC_MENU2D,geometry,sizeof geometry) ||
+     !r(c,PD_PC_CURSOR,cursor,sizeof cursor))return false;
+  if(geometry[0]!=2 || geometry[1]!=7 || geometry[2]<1 || geometry[2]>5 ||
+     geometry[3]!=1 || geometry[4]!=0x0c || geometry[5]!=0 ||
+     geometry[6]!=0x20 || geometry[7]!=0xfb || cursor[0]<1 ||
+     cursor[0]>geometry[2] || cursor[1]!=1)return false;
+  unsigned row=2+2*(cursor[0]-1);
+  return read8(r,c,PD_PC_TILEMAP+row*20+7,&tile) && tile==PD_PC_CURSOR_TILE;
+}
 bool pocket_action_begin(struct pocket_action *a, const char *sha,
                          pocket_action_read r, void *c) {
   if (a->result == PA_RUNNING)
@@ -110,6 +126,7 @@ unsigned pocket_action_tick(struct pocket_action *a, pocket_action_read r,
     bool pack = false;
     for (unsigned i=0;i<sizeof pd_pc_pack_menus/sizeof *pd_pc_pack_menus;i++)
       pack = pack || menu == pd_pc_pack_menus[i];
+    pack = pack || tm_pocket_waiting(r,c);
     if (pack && (state & 0x40) && script == 1) {
       if (++a->stable >= 6) {
         if(a->item){a->phase=3;a->stable=0;}else a->result=PA_DONE;
