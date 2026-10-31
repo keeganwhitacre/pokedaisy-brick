@@ -16,10 +16,58 @@ static void shot(const char *name) {
   char path[1024];snprintf(path,sizeof path,"%s/%s.png",getenv("PC_SHOTS"),name);
   assert(capture_frame(path,NULL));
 }
+/* Earn damage through normal wild-battle inputs; never patch HP or inventory. */
+static void earn_injury(struct mCore *c) {
+  struct pd_snapshot s;
+  pc_read(&s,read_memory,c);
+  for(int i=0;i<30 && s.y<7;i++){drive(c,128,1);drive(c,0,17);pc_read(&s,read_memory,c);}
+  for(int i=0;i<8 && s.x>3;i++){drive(c,32,1);drive(c,0,17);pc_read(&s,read_memory,c);}
+  for(int i=0;i<8 && s.y<8;i++){drive(c,128,1);drive(c,0,17);pc_read(&s,read_memory,c);}
+  bool route=false;
+  for(int i=0;i<65 && !route;i++) {
+    drive(c,32,1);drive(c,0,17);uint8_t dims[2];
+    route=read_memory(c,pcWideConfig[GB_MAP_HEIGHT],dims,2) && dims[0]==9 && dims[1]==30;
+  }
+  assert(route);
+  /* Official Route29 block/collision source: nearest grass from the east
+   * connection is (53,12), reached west then south. Normal movement only. */
+  pc_read(&s,read_memory,c);
+  for(int i=0;i<40 && s.x>53;i++){drive(c,32,3);drive(c,0,17);pc_read(&s,read_memory,c);}
+  for(int i=0;i<40 && s.y<12;i++){drive(c,128,3);drive(c,0,17);pc_read(&s,read_memory,c);if(s.inBattle)break;}
+  for(int i=0;i<120 && !s.inBattle;i++) {
+    drive(c,i%2?16:32,16);drive(c,0,8);pc_read(&s,read_memory,c);
+  }
+  fprintf(stderr,"INJURY encounter=%d location=%d,%d HP=%d/%d\n",s.inBattle,s.x,s.y,s.party[0].hp,s.party[0].maxHp);
+  assert(s.inBattle && !s.isTrainer);
+  struct pocket_battle_action action={0};bool damaged=false;
+  for(int i=0;i<12000;i++) {
+    pc_read(&s,read_memory,c);damaged=damaged || (s.party[0].hp>0 && s.party[0].hp<s.party[0].maxHp);
+    if(!s.inBattle)break;
+    if(action.result!=PA_RUNNING) {
+      struct pocket_battle_menu menu;
+      if(pocket_battle_read(read_memory,c,&menu) && (menu.state==PB_ACTION || menu.state==PB_MOVE)) {
+        pocket_battle_begin(&action,PD_PC_ACTION_SHA,damaged?PB_CHOOSE_ACTION:PB_CHOOSE_MOVE,damaged?3:1,read_memory,c);
+      }
+    }
+    unsigned keys=action.result==PA_RUNNING?pocket_battle_tick(&action,read_memory,c):(i%120<3?1:0);
+    drive(c,keys,1);
+  }
+  drive(c,0,180);pc_read(&s,read_memory,c);
+  fprintf(stderr,"INJURY final battle=%d HP=%d/%d\n",s.inBattle,s.party[0].hp,s.party[0].maxHp);
+  assert(!s.inBattle && s.party[0].hp>0 && s.party[0].hp<s.party[0].maxHp);
+  char path[1024];snprintf(path,sizeof path,"%s/states/injured.ss",root);assert(state(c,path,true));
+}
 static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui,struct pd_snapshot *s) {
   (void)ui;
+  if(getenv("PC_INJURE")) {
+    if(frame==0){char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));earn_injury(c);}
+    if(frame==5)shot("earned-injury");
+    return;
+  }
   if (getenv("PC_HANDOFF")) {
-    if(frame==0){char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));}
+    static struct pd_snapshot beforeItem;
+    static unsigned chosenItem,chosenQty;
+    if(frame==0){char path[1024];snprintf(path,sizeof path,"%s/states/%s",root,getenv("PC_HEAL")?"injured.ss":"live-test.ss");assert(state(c,path,false));pc_read(&beforeItem,read_memory,c);chosenItem=beforeItem.bag[PD_POCKET_ITEMS].items[0].id;chosenQty=beforeItem.bag[PD_POCKET_ITEMS].items[0].quantity;}
     if(frame==2)tap(SDLK_TAB);
     if(frame==5)tap(SDLK_e);
     if(frame==8)tap(SDLK_2);
@@ -29,10 +77,45 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
       unsigned menu=raw[0]|(raw[1]<<8);bool pack=false;
       for(unsigned i=0;i<sizeof pd_pc_pack_menus/sizeof *pd_pc_pack_menus;i++)pack=pack||menu==pd_pc_pack_menus[i];
       assert(!companion);
-      if(getenv("PC_HANDOFF_CANCEL"))assert(!pack);else assert(pack);
-      shot(getenv("PC_HANDOFF_CANCEL")?"handoff-cancelled":"handoff-original-bag");
+      bool actions=false;
+      for(unsigned i=0;i<sizeof pd_pc_item_submenus/sizeof *pd_pc_item_submenus;i++)actions=actions||menu==pd_pc_item_submenus[i];
+      if(getenv("PC_HANDOFF_CANCEL"))assert(!actions);else {
+        unsigned char item;assert(read_memory(c,PD_PC_ITEM,&item,1));
+        assert(actions && item==s->bag[PD_POCKET_ITEMS].items[0].id);
+      }
+      shot(getenv("PC_HANDOFF_CANCEL")?"handoff-cancelled":"selected-item-actions");
       fprintf(stderr,"PASS actual companion R2 Bag %s\n",getenv("PC_HANDOFF_CANCEL")?"cancellation":"handoff confirmed");
     }
+    if(frame==131 && getenv("PC_ITEM_ACTION")) {
+      const char *action=getenv("PC_ITEM_ACTION");
+      int row=!strcmp(action,"give")?1:!strcmp(action,"toss")?2:0;
+      for(int i=0;i<row;i++){drive(c,128,3);drive(c,0,8);}
+      drive(c,1,3);drive(c,0,120);
+    }
+    if(frame==133 && getenv("PC_ITEM_ACTION")) {
+      const char *action=getenv("PC_ITEM_ACTION");
+      shot(!strcmp(action,"give")?"give-native-prompt":!strcmp(action,"toss")?"toss-native-prompt":getenv("PC_HEAL")?"heal-native-prompt":"fullhp-native-prompt");
+    }
+    if(frame==135 && getenv("PC_ITEM_ACTION")) {
+      for(int i=0;i<3;i++){drive(c,1,3);drive(c,0,120);}
+      drive(c,2,3);drive(c,0,60);
+    }
+    if(frame==140 && getenv("PC_ITEM_ACTION")) {
+      struct pd_snapshot after;assert(pc_read(&after,read_memory,c));
+      unsigned qty=0;for(int p=0;p<PD_POCKET_COUNT;p++)for(int i=0;i<after.bag[p].count;i++)
+        if(after.bag[p].items[i].id==chosenItem)qty+=after.bag[p].items[i].quantity;
+      const char *action=getenv("PC_ITEM_ACTION");
+      fprintf(stderr,"ITEM %s HP %d -> %d, quantity %u -> %u, held %d\n",action,beforeItem.party[0].hp,after.party[0].hp,chosenQty,qty,after.party[0].heldItem);
+      if(!strcmp(action,"use")) {
+        if(getenv("PC_HEAL")){assert(after.party[0].hp>beforeItem.party[0].hp && qty+1==chosenQty);}
+        else assert(after.party[0].hp==beforeItem.party[0].hp && qty==chosenQty);
+      } else if(!strcmp(action,"give"))assert(after.party[0].heldItem==(int)chosenItem && qty+1==chosenQty);
+      else assert(qty+1==chosenQty && after.party[0].heldItem==beforeItem.party[0].heldItem);
+      shot(!strcmp(action,"give")?"give-native-result":!strcmp(action,"toss")?"toss-native-result":getenv("PC_HEAL")?"heal-native-result":"fullhp-native-result");fprintf(stderr,"PASS native item action result\n");
+    }
+    if(frame==141 && getenv("PC_HEAL"))tap(SDLK_TAB);
+    if(frame==143 && getenv("PC_HEAL"))tap(SDLK_q);
+    if(frame==147 && getenv("PC_HEAL")){assert(companion && s->party[0].hp==s->party[0].maxHp);shot("heal-companion-after");}
     return;
   }
   if (getenv("PC_PROBE")) {

@@ -70,4 +70,5 @@ void pc_ui_draw(struct pc_ui *, struct pd_canvas *, const struct pd_snapshot *,
 int pc_lz(const unsigned char *, size_t, size_t, unsigned char *, size_t);
 
 void pc_hud_icon(struct pd_canvas *, int, int, int, const unsigned char *, size_t, int);
+int pc_bag_selected_item(struct pc_ui *, const struct pd_snapshot *);
 #endif

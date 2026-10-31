@@ -341,3 +341,9 @@ void pc_bag_draw(struct pd_canvas *c, const struct pd_snapshot *s, int pocket,
 void pc_hud_icon(struct pd_canvas *c, int species, int x, int y, const unsigned char *rom, size_t n, int build) {
     icon(c, x, y, species==PD_SPECIES_EGG?255:species, rom, n, build);
 }
+
+int pc_bag_selected_item(struct pc_ui *u,const struct pd_snapshot *s) {
+  struct pocket_item_ref rows[640];bag_init(u,s);
+  int n=bag_entries(s,u->pocket,u->bagSort,u->bagBuild,&u->favorites,rows);
+  return u->item>=0 && u->item<n ? rows[u->item].id : 0;
+}

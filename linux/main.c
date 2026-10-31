@@ -1354,7 +1354,10 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       }
       if (down(R2)) {
         if (polished >= 0 && !pcSettings && pcUi.section == PC_BAG) {
-          if (pocket_action_begin(&pcBagAction,pcSha,read_memory,c)) {
+          int item=pc_bag_selected_item(&pcUi,&snap);
+          bool begun=item>0 && item<255 ? pocket_action_begin_item(&pcBagAction,pcSha,(unsigned)item,read_memory,c)
+                          : pocket_action_begin(&pcBagAction,pcSha,read_memory,c);
+          if (begun) {
             companion=false;
             held &= ~1023u;
           }

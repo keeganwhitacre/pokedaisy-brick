@@ -105,6 +105,6 @@ static void pc_bag_pages(struct pc_ui *u, struct pd_canvas *c,
   } else
     snprintf(b, sizeof b, "Up/Down:Item Left/Right:Pocket");
   pd_text_fit(c, 12, 346, 488, b, 0x181818, PD_NO_SHADOW);
-  pd_text_fit(c, 12, 366, 488, "A:Info Y:Sort R2:Game Bag B:Back",
+  pd_text_fit(c, 12, 366, 488, "A:Info Y:Sort R2:Actions B:Back",
               0x181818, PD_NO_SHADOW);
 }

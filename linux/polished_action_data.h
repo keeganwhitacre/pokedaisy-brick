@@ -10,6 +10,16 @@
 #define PD_PC_LIST 0x1d03eu /* wMenuItemsList */
 #define PD_PC_POINTER 0xce61u /* wMenuDataPointer */
 #define PD_PC_CURSOR 0xce84u /* wMenuCursorY */
+#define PD_PC_POCKET 0xce48u /* wCurPocket */
+#define PD_PC_SCROLL 0x1d0ecu /* wMenuScrollPosition */
+#define PD_PC_ITEM 0x1d109u /* wCurItem */
 #define PD_PC_START_MENU 0x6160u
 static const unsigned pd_pc_pack_menus[]={0x4791,0x47a9,0x47c1,0x47d9,0x47f1};
+static const unsigned pd_pc_item_submenus[]={0x41c9,0x422e,0x41ec};
+static const struct {unsigned addr, max, pocket, menu;} pd_pc_item_pockets[]={
+{0x1d827,75,0,0},
+{0x1d8bf,37,1,1},
+{0x1d90b,25,2,2},
+{0x1d93f,31,4,3},
+};
 #endif
