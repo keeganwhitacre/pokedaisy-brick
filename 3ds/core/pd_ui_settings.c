@@ -107,6 +107,10 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
         }
     }
     if (host && host->hasHud) setting(ui, c, ix, &y, iw, SETTING_HUD, "HUD", ui->settings->hud ? "ON" : "OFF");
+    if (host && host->hasResume) {
+        setting(ui,c,ix,&y,iw,SETTING_RESUME,"QUICK RESUME",ui->settings->quickResume ? "ON" : "OFF");
+        setting(ui,c,ix,&y,iw,SETTING_AUTOSAVE,"SAVE ON QUIT",ui->settings->saveOnQuit ? "ON" : "OFF");
+    }
     if (host && host->hasDisplayFilter)
         setting(ui, c, ix, &y, iw, SETTING_FILTER, "FILTER", ui->settings->lcdFilter ? "LCD" : "OFF");
     if (host && host->hasQuickMenu)

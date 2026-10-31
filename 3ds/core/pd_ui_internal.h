@@ -62,6 +62,8 @@ enum setting_row {
     SETTING_AUTO_ZOOM,
     SETTING_TAB_BAR,   // opens its page
     SETTING_HUD,       // hosts with hasHud: opens its page
+    SETTING_RESUME,
+    SETTING_AUTOSAVE,
     SETTING_FILTER, // optional host LCD display mask
     SETTING_QUICK_MENU, // hosts with hasQuickMenu: two styles, flips in place
 };

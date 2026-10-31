@@ -354,6 +354,14 @@ static void act(struct pd_ui* ui, int id) {
         ui->bagScroll = 0;
     } else if (id >= HIT_BAG_ROW && id < HIT_SETTING && id < HIT_BAG_ROW + PD_POCKET_SLOTS) {
         ui->bagSelected = id - HIT_BAG_ROW;
+    } else if (id == HIT_SETTING + SETTING_RESUME) {
+        ui->settings->quickResume = !ui->settings->quickResume;
+        if(ui->settings->quickResume)ui->settings->saveOnQuit=true;
+        ui->action = PD_ACTION_SETTINGS_CHANGED;
+    } else if (id == HIT_SETTING + SETTING_AUTOSAVE) {
+        ui->settings->saveOnQuit = !ui->settings->saveOnQuit;
+        if(!ui->settings->saveOnQuit)ui->settings->quickResume=false;
+        ui->action = PD_ACTION_SETTINGS_CHANGED;
     } else if (id == HIT_SETTING + SETTING_FILTER) {
         ui->settings->lcdFilter = !ui->settings->lcdFilter;
         ui->action = PD_ACTION_SETTINGS_CHANGED;
