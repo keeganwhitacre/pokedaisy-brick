@@ -217,3 +217,12 @@ New last-game records contain absolute ROM paths, allowing a different launch
 working directory. Older relative records still depend on the original directory.
 Gameplay now displays the same timed status notices as the companion. Polished
 Settings location labels use its existing generated map tables.
+
+
+## Optional DS backend
+
+Build with `-DPOCKET_DSPERATE=ON` to add DSperate emulation and a limited,
+read-only Platinum USA rev1 companion. DS is disabled in normal builds.
+See [dsperate/README.md](dsperate/README.md) for builds, controls, save paths,
+architecture and current limits. This backend does not include DS expansion
+or custom battle controls. DSperate is an additional opt-in dependency.
