@@ -15,6 +15,7 @@ void pd_settings_defaults(struct pd_settings* s) {
     s->hud = true;
     s->hudHidden = 0;
     s->quickGrid = false;
+    s->lcdFilter = false;
 }
 
 static bool int_in(const char* v, int lo, int hi, int* out) {
@@ -52,6 +53,9 @@ bool pd_settings_load(struct pd_settings* s, const char* path) {
         } else if (!strcmp(key, "hud")) {
             int on;
             if (int_in(value, 0, 1, &on)) s->hud = on;
+        } else if (!strcmp(key, "lcd")) {
+            int on;
+            if (int_in(value, 0, 1, &on)) s->lcdFilter = on;
         } else if (!strcmp(key, "quickgrid")) {
             int on;
             if (int_in(value, 0, 1, &on)) s->quickGrid = on;
@@ -67,8 +71,8 @@ bool pd_settings_load(struct pd_settings* s, const char* path) {
 bool pd_settings_save(const struct pd_settings* s, const char* path) {
     FILE* f = fopen(path, "w");
     if (!f) return false;
-    fprintf(f, "screen=%d\nff=%d\nguide=%d\naspect=%d\nautozoom=%d\nwildoff=%d\ntabs=%d\nhud=%d\nhudhide=%d\nquickgrid=%d\n",
+    fprintf(f, "screen=%d\nff=%d\nguide=%d\naspect=%d\nautozoom=%d\nwildoff=%d\ntabs=%d\nhud=%d\nhudhide=%d\nquickgrid=%d\nlcd=%d\n",
             s->screenMode, s->ffSpeed, s->guideNotice, s->aspect, s->autoZoom ? 1 : 0, s->wildOff ? 1 : 0, s->tabBar,
-            s->hud ? 1 : 0, s->hudHidden, s->quickGrid ? 1 : 0);
+            s->hud ? 1 : 0, s->hudHidden, s->quickGrid ? 1 : 0, s->lcdFilter ? 1 : 0);
     return fclose(f) == 0;
 }

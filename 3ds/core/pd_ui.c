@@ -354,6 +354,9 @@ static void act(struct pd_ui* ui, int id) {
         ui->bagScroll = 0;
     } else if (id >= HIT_BAG_ROW && id < HIT_SETTING && id < HIT_BAG_ROW + PD_POCKET_SLOTS) {
         ui->bagSelected = id - HIT_BAG_ROW;
+    } else if (id == HIT_SETTING + SETTING_FILTER) {
+        ui->settings->lcdFilter = !ui->settings->lcdFilter;
+        ui->action = PD_ACTION_SETTINGS_CHANGED;
     } else if (id == HIT_SETTING + SETTING_QUICK_MENU) {
         ui->settings->quickGrid = !ui->settings->quickGrid;
         ui->action = PD_ACTION_SETTINGS_CHANGED;
