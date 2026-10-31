@@ -201,6 +201,10 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
     shot("11-hud");
     char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);
     uint32_t before=c->frameCounter(c);
+    char legacy[1024];snprintf(legacy,sizeof legacy,"%s/states/legacy.ss",root);
+    struct VFile *old=VFileOpen(legacy,O_CREAT|O_TRUNC|O_RDWR);assert(old);
+    assert(mCoreSaveStateNamed(c,old,SAVESTATE_RTC));assert(old->close(old));
+    assert(!state(c,legacy,false) && c->frameCounter(c)==before);
     assert(state(c,path,true));drive(c,0,90);assert(state(c,path,false));
     assert(c->frameCounter(c)==before);
     snprintf(path,sizeof path,"%s/settings.ini",root);

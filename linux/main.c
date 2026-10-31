@@ -672,8 +672,26 @@ static bool state(struct mCore *c, const char *path, bool save) {
                               save ? O_CREAT | O_TRUNC | O_RDWR : O_RDONLY);
   if (!f)
     return false;
-  bool ok = save ? mCoreSaveStateNamed(c, f, SAVESTATE_RTC)
-                 : mCoreLoadStateNamed(c, f, SAVESTATE_RTC);
+  /* Polished checks an access counter in WRAM against SRAM on every bank
+   * switch. Restore them together, including boxed Pokemon, or PC access
+   * after loading a state can crash. Reject legacy RAM-only states before
+   * changing the running core. Other games retain their existing policy. */
+  int flags=SAVESTATE_RTC | (polishedCanvas ? SAVESTATE_SAVEDATA : 0);
+  bool compatible=true;
+  if(!save && polishedCanvas) {
+    struct mStateExtdata ext;struct mStateExtdataItem item;
+    void *currentSave=NULL;
+    size_t saveSize=c->savedataClone(c,&currentSave);free(currentSave);
+    mStateExtdataInit(&ext);
+    compatible=mCoreExtractExtdata(c,f,&ext) &&
+        mStateExtdataGet(&ext,EXTDATA_SAVEDATA,&item) && item.data &&
+        item.size>0 && (size_t)item.size==saveSize;
+    mStateExtdataDeinit(&ext);
+    if(f->seek(f,0,SEEK_SET)<0)compatible=false;
+    if(!compatible)fprintf(stderr,"Polished state needs matching SRAM; resume from an in-game save and create a new state.\n");
+  }
+  bool ok = compatible && (save ? mCoreSaveStateNamed(c, f, flags)
+                                : mCoreLoadStateNamed(c, f, flags));
   if(!f->close(f))ok=false;
   if (ok && !save) {
     pk_wide_reset(); // EXPAND's RAM history is from before the jump

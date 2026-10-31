@@ -27,8 +27,12 @@ linux/build/pokedaisy-linux --data /your/test-directory /your/game.gba
 Without a ROM argument, choose a `.gb`, `.gbc` or `.gba` from DATA/roms.
 The host creates DATA/saves and DATA/states. It backs up an existing battery
 save before opening the game and stops emulation on a latched save I/O failure.
-State writes use a temporary file and rename. States include RTC, not battery
-save restoration. These are not guarantees against sudden power loss.
+State writes use a temporary file and rename. States include RTC. Polished
+Crystal states also include battery memory: loading one rewinds boxed Pokemon,
+in-game save progress and SRAM counters together with working RAM. Legacy
+Polished states without battery memory are refused before loading; resume from
+an in-game save and make a new state. Other games retain RTC-only states.
+These are not guarantees against sudden power loss.
 No existing emulator save is discovered or imported automatically. Copy only
 a backed-up raw battery save to DATA/saves/COMPLETE-ROM-FILENAME.sav when needed.
 Two ROMs with the same filename share this path; keep such games in separate
