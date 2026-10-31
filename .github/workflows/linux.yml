@@ -21,6 +21,10 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y cmake libsdl2-dev
       - name: Shared host capability and legacy previews
         run: make -C 3ds test-host-display test-configs-gen preview
+      - name: Verify Polished Bag observations from pinned release symbols
+        run: |
+          curl --fail --location --retry 3 https://github.com/Rangi42/polishedcrystal/releases/download/v3.2.3/polishedcrystal-3.2.3.sym -o "$RUNNER_TEMP/polished.sym"
+          python3 linux/gen_polished_actions.py "$RUNNER_TEMP/polished.sym" --check
       - name: Build native host and tests
         run: |
           cmake -S linux -B linux/build -DCMAKE_BUILD_TYPE=Release -DBUILD_LTO=OFF

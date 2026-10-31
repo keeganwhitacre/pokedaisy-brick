@@ -985,6 +985,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   int polished = c->platform(c) == mPLATFORM_GB ? pc_identify(romdata, (size_t)len) : -1;
   polishedCanvas = polished >= 0;
   struct pc_ui pcUi = {0};
+  struct pocket_action pcBagAction = {0};
   char pcSha[41] = "";
   bool pcFavoritesUnsaved = false;
   if (polished >= 0) {
@@ -1067,6 +1068,13 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     events();
     audio_check();
     repeat_directions();
+    if (pcBagAction.result == PA_RUNNING &&
+        (pressed & ((1u<<B)|(1u<<X)|(1u<<Y)|(1u<<MENU)|
+                    (1u<<UP)|(1u<<DOWN)|(1u<<LEFT)|(1u<<RIGHT)))) {
+      pocket_action_cancel(&pcBagAction);
+      c->setKeys(c,0);
+      notice(pocket_action_message(&pcBagAction));
+    }
     if (down(X) && (polished < 0 || !companion)) {
       pressed &= ~(1u << X);
       menuOpen = 0;
@@ -1345,17 +1353,33 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
         confirmMenu.selected = 0;
       }
       if (down(R2)) {
-        menuOpen = 2;
-        confirmMenu.title = "Load state? Current progress will rewind.";
-        confirmMenu.selected = 0;
+        if (polished >= 0 && !pcSettings && pcUi.section == PC_BAG) {
+          if (pocket_action_begin(&pcBagAction,pcSha,read_memory,c)) {
+            companion=false;
+            held &= ~1023u;
+          }
+          notice(pocket_action_message(&pcBagAction));
+        } else {
+          menuOpen = 2;
+          confirmMenu.title = "Load state? Current progress will rewind.";
+          confirmMenu.selected = 0;
+        }
       }
     } else {
       muted = ff;
       c->setKeys(c, (quickOpen ? 0 : held & 1023) | (gameKeyFrames > 0 ? gameKeys : 0));
-      int count = ff ? settings.ffSpeed : 1;
+      int count = ff && pcBagAction.result != PA_RUNNING ? settings.ffSpeed : 1;
       audio_rate(c, hz);
       for (int i = 0; i < count; i++) {
         uint64_t t = SDL_GetPerformanceCounter();
+        if (pcBagAction.result == PA_RUNNING) {
+          unsigned keys=pocket_action_tick(&pcBagAction,read_memory,c);
+          c->setKeys(c,keys);
+          if (pcBagAction.result != PA_RUNNING) {
+            notice(pocket_action_message(&pcBagAction));
+            if (pcBagAction.result != PA_DONE) companion=true;
+          }
+        }
         c->runFrame(c);
         if (gameKeyFrames > 0 && --gameKeyFrames == 0)
           c->setKeys(c, quickOpen ? 0 : held & 1023);

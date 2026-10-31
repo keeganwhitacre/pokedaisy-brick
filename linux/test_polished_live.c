@@ -4,6 +4,7 @@
 #include "main.c"
 #undef main
 #include <assert.h>
+#include "polished_action_data.h"
 static void drive(struct mCore *c,unsigned keys,int n) {
   c->setKeys(c,keys); while(n-->0)c->runFrame(c); c->setKeys(c,0);
 }
@@ -17,6 +18,23 @@ static void shot(const char *name) {
 }
 static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui,struct pd_snapshot *s) {
   (void)ui;
+  if (getenv("PC_HANDOFF")) {
+    if(frame==0){char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));}
+    if(frame==2)tap(SDLK_TAB);
+    if(frame==5)tap(SDLK_e);
+    if(frame==8)tap(SDLK_2);
+    if(frame==10 && getenv("PC_HANDOFF_CANCEL"))tap(SDLK_x);
+    if(frame==130) {
+      unsigned char raw[2];assert(read_memory(c,PD_PC_POINTER,raw,2));
+      unsigned menu=raw[0]|(raw[1]<<8);bool pack=false;
+      for(unsigned i=0;i<sizeof pd_pc_pack_menus/sizeof *pd_pc_pack_menus;i++)pack=pack||menu==pd_pc_pack_menus[i];
+      assert(!companion);
+      if(getenv("PC_HANDOFF_CANCEL"))assert(!pack);else assert(pack);
+      shot(getenv("PC_HANDOFF_CANCEL")?"handoff-cancelled":"handoff-original-bag");
+      fprintf(stderr,"PASS actual companion R2 Bag %s\n",getenv("PC_HANDOFF_CANCEL")?"cancellation":"handoff confirmed");
+    }
+    return;
+  }
   if (getenv("PC_PROBE")) {
     if(frame==0){char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));}
     if(frame%30==20){char name[64];snprintf(name,sizeof name,"probe-%03d",frame);shot(name);fprintf(stderr,"probe%d scene%d\n",frame,pk_wide_scene());}
