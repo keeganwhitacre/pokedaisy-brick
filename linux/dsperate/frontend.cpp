@@ -28,6 +28,8 @@ extern "C" {
 #include "pd_tables.h"
 #include "../quick_menu.h"
 #include "../hud.h"
+#include "pd_settings.h"
+#include "../display_filter.h"
 bool pocket_save_backup(const char*,time_t);
 }
 namespace {
@@ -45,7 +47,7 @@ bool atomic_file(const std::string& path,const uint8_t* data,size_t size){
 }
 struct DsPrefs {
   bool bottom=false, resume=false, hud=true;
-  int battle=0;
+  int battle=1;
   bool operator!=(const DsPrefs& other)const{return bottom!=other.bottom || resume!=other.resume || battle!=other.battle || hud!=other.hud;}
 };
 DsPrefs load_prefs(const std::string& path){
@@ -82,7 +84,7 @@ void blit(SDL_Renderer* r,SDL_Texture* t,const uint32_t* px,int w,int h,int ow,i
   SDL_UpdateTexture(t,nullptr,px,w*4);int scale=std::max(1,std::min(ow/w,oh/h));
   SDL_Rect dst{(ow-w*scale)/2,(oh-h*scale)/2,w*scale,h*scale};SDL_RenderCopy(r,t,nullptr,&dst);
 }
-void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int selected,bool summary,int scroll,int page,const DsPrefs& prefs,int setting,const DsMapArt& art,int mapX,int mapY){
+void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int selected,bool summary,int scroll,int page,const DsPrefs& prefs,const pd_settings& settings,int setting,const DsMapArt& art,int mapX,int mapY){
   pd_fill(&c,0,0,c.w,c.h,0x50a8a8);pd_title_box(&c,5,5,c.w-10,25,0xffffff);
   pd_text(&c,12,10,"PokeDaisy DS",0x303030,PD_NO_SHADOW);
   const char* tabs[]={"PARTY","BAG","DEX","STATUS","SET","MAP"};
@@ -90,9 +92,16 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
   pd_list_box(&c,5,61,c.w-10,c.h-86);int y=68;
   auto line=[&](const std::string& t){pd_text_fit(&c,13,y,c.w-26,t.c_str(),0x303030,PD_NO_SHADOW);y+=20;};
   if(tab==4){
-    const std::string rows[]={std::string("SCREEN: ")+(prefs.bottom?"BOTTOM":"TOP"),std::string("AUTO-RESUME: ")+(prefs.resume?"ON":"OFF"),std::string("BATTLES: ")+(prefs.battle?"AUTO":"OFF"),std::string("HUD: ")+(prefs.hud?"ON":"OFF")};
-    for(int i=0;i<4;i++){if(i==setting)pd_fill(&c,10,y-2,c.w-20,20,0xffe4a0);line(rows[i]);}
-    line("Resume saves on clean exit");line("Separate from manual states");
+    const std::string rows[]={std::string("SCREEN: ")+(prefs.bottom?"BOTTOM":"TOP"),
+      std::string("BATTLES: ")+(prefs.battle?"AUTO":"OFF"),
+      std::string("QUICK RESUME: ")+(settings.quickResume?"ON":"OFF"),
+      std::string("SAVE ON QUIT: ")+(settings.saveOnQuit?"ON":"OFF"),
+      std::string("HUD: ")+(settings.hud?"ON":"OFF"),
+      std::string("QUICK MENU: ")+(settings.quickGrid?"GRID":"RING"),
+      std::string("FILTER: ")+(settings.lcdFilter?"LCD":"OFF")};
+    int first=std::max(0,setting-5);
+    for(int i=first;i<7 && i<first+6;i++){if(i==setting)pd_fill(&c,10,y-2,c.w-20,20,0xffe4a0);line(rows[i]);}
+
   }
   else if(!supported)line("Companion: Platinum USA Rev 1 only");
   else if(!s.valid){line("Waiting for the game's save data");line("Return to the game to finish booting");}
@@ -147,7 +156,7 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
   pd_text_fit(&c,9,c.h-20,c.w-18,tab==5?"D-pad move  A player  L/R tabs":tab==4?"Up/Down select  A change  L/R tabs":tab==0 && summary?"Left/Right info/moves  Up/Down Pokemon":tab==1 || tab==2?"Up/Down scroll  Left/Right page  L/R tabs":"L/R tabs  A summary  B back  L2 game",0xffffff,PD_NO_SHADOW);
 }
 }
-extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* shot,SDL_Renderer* renderer,bool (*keepRunning)()) {
+extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* shot,SDL_Renderer* renderer,bool (*keepRunning)(),void (*hostEvent)(const SDL_Event*),bool noResume) {
   auto bytes=read_file(rom);if(bytes.size()<512 || bytes.size()>512u*1024*1024){std::fprintf(stderr,"DS: invalid ROM size\n");return 1;}
   uint8_t digest[20];ds::crypto::sha1(bytes.data(),bytes.size(),digest);char hex[41];for(int i=0;i<20;i++)std::sprintf(hex+2*i,"%02x",digest[i]);
   bool supported=!std::strcmp(hex,pd_ds_data::sha1);char code[5]={};std::memcpy(code,bytes.data()+12,4);int revision=bytes[30];
@@ -165,7 +174,23 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
   if(std::filesystem::exists(save)) {auto data=read_file(save);if(data.empty() || !nds->cart->load_save(data.data(),data.size()).fitted){std::fprintf(stderr,"DS: save size mismatch; refusing to overwrite it\n");return 1;}}
   std::string config=(dir/"ds-settings.ini").string(),resume=(dir/"states"/(filename+".dsperate.resume.ss")).string();
   DsPrefs prefs=load_prefs(config);
-  if(auto value=std::getenv("POCKET_DS_RESUME"))prefs.resume=std::strcmp(value,"0")!=0;
+  // Share host preferences without maintaining another copy of their defaults.
+  std::string sharedConfig=(dir/"settings.ini").string();pd_settings settings{};
+  bool sharedExists=pd_settings_load(&settings,sharedConfig.c_str());
+  if(!sharedExists && prefs.resume)settings.quickResume=settings.saveOnQuit=true;
+  auto saveSettings=[&](){
+    std::string temp=sharedConfig+".ds-tmp";
+    if(!pd_settings_save(&settings,temp.c_str()))return false;
+    auto data=read_file(temp);std::remove(temp.c_str());
+    return !data.empty() && atomic_file(sharedConfig,data.data(),data.size());
+  };
+  bool resumeAllowed=!noResume;
+  if(auto value=std::getenv("POCKET_DS_RESUME")){
+    resumeAllowed=resumeAllowed && std::strcmp(value,"0")!=0;
+    if(std::strcmp(value,"0"))settings.quickResume=settings.saveOnQuit=true;
+  }
+  prefs.resume=settings.quickResume && resumeAllowed;
+
   if(auto value=std::getenv("POCKET_DS_BATTLE"))prefs.battle=std::clamp(std::atoi(value),0,1);
   bool autoResumed=false;
   if(prefs.resume && std::filesystem::exists(resume)){
@@ -192,6 +217,7 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
   Audio audio;SDL_AudioSpec want{},got{};want.freq=32768;want.format=AUDIO_S16SYS;want.channels=2;want.samples=512;
   audio.id=SDL_OpenAudioDevice(nullptr,0,&want,&got,SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
   if(audio.id){audio.stream=SDL_NewAudioStream(AUDIO_S16SYS,2,int(std::lround(nds->spu.output_rate_hz())),got.format,got.channels,got.freq);SDL_PauseAudioDevice(audio.id,0);}
+  Texture lcd{nullptr};int lcdW=0,lcdH=0;
   Texture top{SDL_CreateTexture(renderer,SDL_PIXELFORMAT_ARGB8888,SDL_TEXTUREACCESS_STREAMING,256,192)};
   Texture overlay{SDL_CreateTexture(renderer,SDL_PIXELFORMAT_ARGB8888,SDL_TEXTUREACCESS_STREAMING,341,256)};
   Texture ui{SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGB888,SDL_TEXTUREACCESS_STREAMING,341,256)};
@@ -201,6 +227,28 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
   const auto* field=supported?pk_nds_field_game(code,revision):nullptr;
   bool& bottom=prefs.bottom;
   bool done=false,showCompanion=false,showQuick=false,paused=false,summary=false,failed=false;
+  int confirmation=0;bool confirmYes=false;
+  std::string status;unsigned statusUntil=0;
+  auto notice=[&](const std::string& text){status=text;statusUntil=SDL_GetTicks()+2500;std::fprintf(stderr,"%s\n",text.c_str());};
+  auto restore=[&](const std::string& path){
+    auto data=read_file(path);auto candidate=std::make_unique<ds::NDS>();std::string problem;
+    bool ok=data.size()>=8 && candidate->load_bios("","","",{},&problem) && candidate->load_rom(rom);
+    if(ok){candidate->setup_direct_boot();ds::state::Reader reader(data.data(),data.size());ok=candidate->load_state(reader,problem);}
+    if(!ok){notice("DS state ignored; current game retained");return false;}
+#if DSPERATE_JIT
+    // DSperate's JIT runtime is global: detach before binding another console.
+    ds::jit::detach(*nds);
+    if(!ds::jit::attach(*candidate,true,true)){
+      ds::jit::detach(*candidate);ds::jit::attach(*nds,true,true);
+      notice("DS state JIT setup failed");return false;
+    }
+#endif
+    nds=std::move(candidate);active=nds.get();
+    if(audio.id)SDL_ClearQueuedAudio(audio.id);
+    if(audio.stream)SDL_AudioStreamClear(audio.stream);
+    nds->io.set_buttons(0);nds->io.set_touch(0,0,false);
+    return true;
+  };
   int quickSelected=0;uint32_t blocked=0;
   int mapX=-1,mapY=-1,setting=0,page=0,tab=0,selected=0,scroll=0,touchX=128,touchY=96;uint32_t keys=0;unsigned repeat[8]={};int frame=0,lastPhase=-1,overrideScreen=-1;
   const int raw[]={1,0,11,10,9,8,2,3,15,-1,12,13};
@@ -208,13 +256,20 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
   if(auto s=std::getenv("POCKET_DS_KEYS")){std::string text=s;size_t pos=0;while(pos<text.size()){Press p{};int used=0;if(std::sscanf(text.c_str()+pos,"%d:%u:%d%n",&p.at,&p.mask,&p.n,&used)!=3)break;script.push_back(p);pos+=used+1;}}
   if(auto s=std::getenv("POCKET_DS_HOST_KEYS")){std::string text=s;size_t pos=0;while(pos<text.size()){Press p{};int used=0;if(std::sscanf(text.c_str()+pos,"%d:%u:%d%n",&p.at,&p.mask,&p.n,&used)!=3)break;hostScript.push_back(p);pos+=used+1;}}
   int companionAt=std::getenv("POCKET_DS_COMPANION_AT")?std::atoi(std::getenv("POCKET_DS_COMPANION_AT")):-1;
+  DsCompanion snap;bool refreshSnapshot=true;
+  double deadline=double(SDL_GetPerformanceCounter());
   uint64_t started=SDL_GetPerformanceCounter();uint32_t lastWrites=nds->cart->sram_writes();int quiet=autoResumed?60:0;
   while(!done && keepRunning() && (!limit || frame<limit)) {
     DsPrefs previous=prefs;
-    uint64_t tick=SDL_GetPerformanceCounter();uint32_t pressed=0;SDL_Event e;
+    uint32_t pressed=0;SDL_Event e;
     auto key=[&](int k,bool down){if(k<0)return;uint32_t bit=1u<<k;if(down){if(!(keys&bit))pressed|=bit;keys|=bit;}else keys&=~bit;};
     while(SDL_PollEvent(&e)){
+      hostEvent(&e);
       if(e.type==SDL_QUIT)done=true;
+      if(e.type==SDL_CONTROLLERDEVICEREMOVED || e.type==SDL_JOYDEVICEREMOVED){keys=0;pressed=0;paused=true;}
+      if(e.type==SDL_WINDOWEVENT && (e.window.event==SDL_WINDOWEVENT_MINIMIZED)){
+        keys=0;pressed=0;paused=true;
+      }
       int k=-1;bool down=false;
       if(e.type==SDL_KEYDOWN || e.type==SDL_KEYUP){if(e.key.repeat)continue;k=keyboard(e.key.keysym.sym);down=e.type==SDL_KEYDOWN;}
       if(e.type==SDL_CONTROLLERBUTTONDOWN || e.type==SDL_CONTROLLERBUTTONUP){k=pad(e.cbutton.button);down=e.type==SDL_CONTROLLERBUTTONDOWN;}
@@ -236,11 +291,11 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
       if(frame==p.at)key(k,true);else if(frame==p.at+p.n)key(k,false);
     }
     unsigned now=SDL_GetTicks();for(int k=4;k<8;k++){if(pressed&(1u<<k))repeat[k]=now+400;else if((keys&(1u<<k)) && int(now-repeat[k])>=0){pressed|=1u<<k;repeat[k]=now+90;}}
-    if(companionAt>=0 && frame==companionAt)showCompanion=true;
+    if(companionAt>=0 && frame==companionAt){showCompanion=true;refreshSnapshot=true;}
     blocked &= keys;
-    if(pressed&(1u<<12)){
+    if(pressed&(1u<<12) && !confirmation){
       if(showCompanion)showCompanion=false;else showQuick=!showQuick;
-      paused=false;blocked|=keys&4095u;nds->io.set_buttons(0);nds->io.set_touch(0,0,false);
+      paused=false;refreshSnapshot=true;blocked|=keys&4095u;nds->io.set_buttons(0);nds->io.set_touch(0,0,false);
     }
     if(auto value=std::getenv("POCKET_DS_QUICK_AT"))if(frame==std::atoi(value))showQuick=true;
     int fieldBits=field?pk_nds_field_state(field,read32,write32,0):0;
@@ -249,15 +304,17 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
     int phase=inBattle?(choosing?2:1):0;
     if(phase!=lastPhase){overrideScreen=-1;lastPhase=phase;std::fprintf(stderr,"DS battle phase %d at core frame %llu\n",phase,(unsigned long long)nds->frame_count);}
     auto view=ds_battle_view(prefs.battle,inBattle,choosing,bottom,overrideScreen);
-    if(pressed&(1u<<13)){
+    if((pressed&(1u<<13)) && !paused && !showQuick && !showCompanion && !confirmation){
       if(prefs.battle && inBattle){
         overrideScreen=overrideScreen<0?(view.bottom?0:1):-1;
       }else bottom=!bottom;
     }
     view=ds_battle_view(prefs.battle,inBattle,choosing,bottom,overrideScreen);
     if(choosing && std::getenv("POCKET_DS_STOP_ON_BATTLE_INPUT"))limit=frame+1;
-    if(pressed&(1u<<15)){paused=!paused;showQuick=false;blocked|=keys&4095u;}
-    DsCompanion snap=supported?ds_read_companion(nds->bus.main_ram.get(),nds->bus.main_ram_size()):DsCompanion{};
+    if((pressed&(1u<<15)) && !confirmation){paused=!paused;showQuick=false;blocked|=keys&4095u;}
+    if(supported && (showCompanion || settings.hud) && (refreshSnapshot || frame%12==0)){
+      snap=ds_read_companion(nds->bus.main_ram.get(),nds->bus.main_ram_size());refreshSnapshot=false;
+    }
     quick_item quickItems[4]{};
     quickItems[0].action=QUICK_COMPANION;
     quickItems[1].action=QUICK_SAVE_STATE;
@@ -268,20 +325,39 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
       blocked|=keys&4095u;
       int dx=(pressed&(1u<<4)?1:0)-(pressed&(1u<<5)?1:0);
       int dy=(pressed&(1u<<7)?1:0)-(pressed&(1u<<6)?1:0);
-      if(dx || dy)quickSelected=quick_step(4,quickSelected,dx,dy,341,256);
+      if(dx || dy)quickSelected=quick_step_layout(4,quickSelected,dx,dy,341,256,settings.quickGrid);
       if(pressed&(1u<<1))showQuick=false;
       else if((pressed&1) && !quickItems[quickSelected].why){
         showQuick=false;
-        if(quickSelected==0)showCompanion=true;
-        else if(quickSelected==3)done=true;
-        else {paused=true;pressed=quickSelected==1?1u:1u<<10;}
+        if(quickSelected==0){showCompanion=true;refreshSnapshot=true;}
+        else {confirmation=quickSelected==3?3:quickSelected;confirmYes=false;pressed=0;}
       }
       // Never forward the key which opened, navigated or closed the overlay.
       if(showQuick || showCompanion || done)pressed=0;
     }
-    if(paused){if(pressed&(1u<<1))paused=false;if(pressed&(1u<<3))done=true;
-      if(pressed&1){ds::state::Writer w;if(!nds->save_state(w,err) || !atomic_file(state,w.data().data(),w.data().size())){std::fprintf(stderr,"DS state save failed: %s\n",err.c_str());failed=true;done=true;}paused=false;}
-      if(pressed&(1u<<10)){auto data=read_file(state);if(!data.empty()){ds::state::Reader r(data.data(),data.size());if(!nds->load_state(r,err)){failed=true;done=true;std::fprintf(stderr,"DS state load failed: %s\n",err.c_str());}else std::fprintf(stderr,"DS manual state loaded at core frame %llu\n",(unsigned long long)nds->frame_count);}paused=false;}
+    if(confirmation){
+      nds->io.set_buttons(0);nds->io.set_touch(0,0,false);
+      blocked|=keys&4095u;
+      if(pressed&((1u<<4)|(1u<<5)))confirmYes=!confirmYes;
+      if(pressed&(1u<<1))confirmation=0;
+      else if(pressed&1){
+        if(confirmYes){
+          if(confirmation==3)done=true;
+          else if(confirmation==1){
+            ds::state::Writer w;err.clear();
+            if(!nds->save_state(w,err) || !atomic_file(state,w.data().data(),w.data().size()))notice("DS state save failed; previous slot retained");
+            else notice("DS state saved");
+          }else if(restore(state)){
+            lastWrites=nds->cart->sram_writes();quiet=0;refreshSnapshot=true;lastPhase=-1;overrideScreen=-1;
+            notice("DS manual state loaded at core frame "+std::to_string(nds->frame_count));
+          }
+        }
+        confirmation=0;paused=false;
+      }
+    }else if(paused){
+      blocked|=keys&4095u;
+      if(pressed&(1u<<1))paused=false;
+      if(pressed&((1u<<3)|1u|(1u<<10))){confirmation=pressed&(1u<<3)?3:pressed&1?1:2;confirmYes=false;}
     }else if(showQuick){
       nds->io.set_buttons(0);nds->io.set_touch(0,0,false);
     }else if(showCompanion){
@@ -300,9 +376,19 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
         mapX=std::clamp(mapX,0,29);mapY=std::clamp(mapY,minY,maxY);
       }
       if(tab==4){
-        if(pressed&(1u<<6))setting=(setting+3)%4;
-        if(pressed&(1u<<7))setting=(setting+1)%4;
-        if(pressed&1){if(setting==0)bottom=!bottom;else if(setting==1)prefs.resume=!prefs.resume;else if(setting==2)prefs.battle=1-prefs.battle;else prefs.hud=!prefs.hud;}
+        if(pressed&(1u<<6))setting=(setting+6)%7;
+        if(pressed&(1u<<7))setting=(setting+1)%7;
+        if(pressed&1){
+          switch(setting){
+            case 0:bottom=!bottom;break;case 1:prefs.battle=1-prefs.battle;break;
+            case 2:settings.quickResume=!settings.quickResume;break;
+            case 3:settings.saveOnQuit=!settings.saveOnQuit;break;
+            case 4:settings.hud=!settings.hud;break;
+            case 5:settings.quickGrid=!settings.quickGrid;break;
+            case 6:settings.lcdFilter=!settings.lcdFilter;break;
+          }
+          if(!saveSettings())notice("DS shared settings save failed");
+        }
       }
       if(tab!=4 && tab!=5 && (pressed&(1u<<6))){if(tab==1 || tab==2)scroll=std::max(0,scroll-1);else selected=std::max(0,selected-1);}
       if(tab!=4 && tab!=5 && (pressed&(1u<<7))){if(tab==1 || tab==2)scroll=std::min(std::max(0,(tab==1?int(snap.bag.size()):int(snap.dexSeen.size())-1)-1),scroll+1);else selected=std::min(std::max(0,int(snap.party.size())-1),selected+1);}
@@ -327,15 +413,15 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
       if(audio.stream){int available=SDL_AudioStreamAvailable(audio.stream);std::vector<uint8_t> out(std::max(0,available));if(available>0){SDL_AudioStreamGet(audio.stream,out.data(),available);if(SDL_GetQueuedAudioSize(audio.id)>unsigned(got.freq*2))SDL_ClearQueuedAudio(audio.id);SDL_QueueAudio(audio.id,out.data(),available);}}
     }
     if(prefs!=previous && !save_prefs(config,prefs))std::fprintf(stderr,"DS settings write failed\n");
-    if((paused || showCompanion || showQuick) && audio.id)SDL_ClearQueuedAudio(audio.id);
+    if((paused || showCompanion || showQuick || confirmation) && audio.id)SDL_ClearQueuedAudio(audio.id);
     int ow=1024,oh=768;
     if(!ds_display_pixels(renderer,ow,oh)){std::fprintf(stderr,"DS display setup failed: %s\n",SDL_GetError());failed=true;break;}
     SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
-    if(showCompanion){companion(canvas,snap,supported,tab,selected,summary,scroll,page,prefs,setting,mapArt,mapX,mapY);blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);}
+    if(showCompanion){companion(canvas,snap,supported,tab,selected,summary,scroll,page,prefs,settings,setting,mapArt,mapX,mapY);blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);}
     else blit(renderer,top.p,nds->gpu.framebuffer(view.bottom?1:0),256,192,ow,oh);
-    if(!showCompanion && !paused && (showQuick || (prefs.hud && snap.valid && !view.bottom && !inBattle && (fieldBits&PK_NDS_FIELD_SCREEN) && !(fieldBits&(PK_NDS_FIELD_LOCKED|PK_NDS_FIELD_MENU))))){
+    if(!showCompanion && !paused && !confirmation && (showQuick || (settings.hud && !(settings.hudHidden & (1<<PD_HUD_PARTY)) && snap.valid && !view.bottom && !inBattle && (fieldBits&PK_NDS_FIELD_SCREEN) && !(fieldBits&(PK_NDS_FIELD_LOCKED|PK_NDS_FIELD_MENU))))){
       for(auto& p:uiPixels)p=QUICK_CLEAR;
-      if(showQuick)quick_draw(&canvas,nullptr,quickItems,4,quickSelected,-1,false);
+      if(showQuick)quick_draw(&canvas,nullptr,quickItems,4,quickSelected,-1,settings.quickGrid);
       else {
         pd_snapshot hs{};hs.valid=true;hs.partyCount=std::min(6,int(snap.party.size()));
         for(int i=0;i<hs.partyCount;i++){
@@ -367,10 +453,37 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
       SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_Rect outline{x-5,y-5,11,11};SDL_RenderDrawRect(renderer,&outline);
       SDL_SetRenderDrawColor(renderer,255,255,255,255);SDL_RenderDrawLine(renderer,x-4,y,x+4,y);SDL_RenderDrawLine(renderer,x,y-4,x,y+4);
     }
-    if(paused){pd_fill(&canvas,0,0,341,256,0x303838);pd_title_box(&canvas,15,40,311,170,0xffffff);pd_text(&canvas,28,55,"PokeDaisy DS / PAUSED",0x303030,PD_NO_SHADOW);pd_text(&canvas,28,90,"B resume   A save state",0x303030,PD_NO_SHADOW);pd_text(&canvas,28,120,"X load state   START quit",0x303030,PD_NO_SHADOW);blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);}
+    if(confirmation){
+      pd_fill(&canvas,0,0,341,256,0x303838);pd_title_box(&canvas,15,55,311,150,0xffffff);
+      pd_text(&canvas,28,72,confirmation==1?"SAVE / REPLACE STATE?":confirmation==2?"LOAD STATE?":"LEAVE GAME?",0x303030,PD_NO_SHADOW);
+      pd_text(&canvas,28,110,"Left/Right choose  A confirm",0x303030,PD_NO_SHADOW);
+      pd_text(&canvas,28,145,confirmYes?"NO       > YES":" > NO       YES",0x303030,PD_NO_SHADOW);
+      blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);
+    }
+    else if(paused){pd_fill(&canvas,0,0,341,256,0x303838);pd_title_box(&canvas,15,40,311,170,0xffffff);pd_text(&canvas,28,55,"PokeDaisy DS / PAUSED",0x303030,PD_NO_SHADOW);pd_text(&canvas,28,90,"B resume   A save state",0x303030,PD_NO_SHADOW);pd_text(&canvas,28,120,"X load state   START quit",0x303030,PD_NO_SHADOW);blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);}
+    if(!status.empty() && int(statusUntil-SDL_GetTicks())>0){
+      for(auto& p:uiPixels)p=QUICK_CLEAR;
+      pd_fill(&canvas,5,5,331,24,0x303838);pd_text_fit(&canvas,12,8,317,status.c_str(),0xffffff,PD_NO_SHADOW);
+      quick_finish(&canvas);blit(renderer,overlay.p,uiPixels.data(),341,256,ow,oh);
+    }
+    if(settings.lcdFilter){
+      if(!lcd.p || lcdW!=ow || lcdH!=oh){
+        SDL_DestroyTexture(lcd.p);lcd.p=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_ARGB8888,SDL_TEXTUREACCESS_STATIC,ow,oh);
+        std::vector<uint32_t> mask(size_t(ow)*oh);
+        for(int y=0;y<oh;y++)for(int x=0;x<ow;x++)mask[y*ow+x]=pocket_lcd_pixel(x,y);
+        if(lcd.p){SDL_UpdateTexture(lcd.p,nullptr,mask.data(),ow*4);SDL_SetTextureBlendMode(lcd.p,SDL_BLENDMODE_MOD);}
+        lcdW=ow;lcdH=oh;
+      }
+      if(lcd.p)SDL_RenderCopy(renderer,lcd.p,nullptr,nullptr);
+    }
     if(shot && limit && frame==limit-1){std::vector<uint32_t> pixels(size_t(ow)*oh);if(!SDL_RenderReadPixels(renderer,nullptr,SDL_PIXELFORMAT_ARGB8888,pixels.data(),ow*4))pd_png_write(shot,ow,oh,pixels.data());}
     SDL_RenderPresent(renderer);frame++;
-    if(!limit){double ms=1000.0*(SDL_GetPerformanceCounter()-tick)/SDL_GetPerformanceFrequency();if(ms<1000.0/59.8261)SDL_Delay(unsigned(1000.0/59.8261-ms));}
+    if(!limit){
+      double now=double(SDL_GetPerformanceCounter()),hz=double(SDL_GetPerformanceFrequency());
+      deadline+=hz/59.8261;
+      if(deadline<now-hz/10)deadline=now;
+      double ms=1000.0*(deadline-now)/hz;if(ms>=1)SDL_Delay(unsigned(ms));
+    }
   }
   nds->io.set_buttons(0);nds->io.set_touch(0,0,false);
   // Let an in-progress battery write finish before replacing the disk copy.
@@ -383,11 +496,15 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
     if(quiet<60){std::fprintf(stderr,"DS: save never settled; preserving disk save\n");failed=true;}
   }
   if(!failed && nds->cart->sram_dirty()){auto& s=nds->cart->sram();if(!s.empty() && !atomic_file(save,s.data(),s.size()))failed=true;}
-  if(!failed && prefs.resume){
+  if(!failed && settings.saveOnQuit && resumeAllowed){
     ds::state::Writer writer;err.clear();
     if(!nds->save_state(writer,err) || !atomic_file(resume,writer.data().data(),writer.data().size())){
       std::fprintf(stderr,"DS resume capture failed: %s\n",err.c_str());failed=true;
     }else std::fprintf(stderr,"DS resume captured at core frame %llu\n",(unsigned long long)nds->frame_count);
+  }
+  if(!failed && !noResume){
+    auto absolute=std::filesystem::absolute(rom).string()+"\n";
+    if(!atomic_file((dir/"last-rom.txt").string(),reinterpret_cast<const uint8_t*>(absolute.data()),absolute.size()))notice("DS last-game record failed");
   }
   double seconds=double(SDL_GetPerformanceCounter()-started)/SDL_GetPerformanceFrequency();
   std::fprintf(stderr,"DS: %d host iterations in %.2fs, core frames %llu\n",frame,seconds,(unsigned long long)nds->frame_count);

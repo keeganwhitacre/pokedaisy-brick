@@ -992,15 +992,19 @@ static void test_frame(struct mCore *, bool, int, struct pd_ui *,
                        struct pd_snapshot *, struct pc_ui *, struct pocket_battle_action *, struct pocket_action *);
 #endif
 #ifdef POCKET_DSPERATE
-extern int pd_ds_run(const char*, const char*, int, const char*, SDL_Renderer*, bool (*)(void));
+extern int pd_ds_run(const char*, const char*, int, const char*, SDL_Renderer*, bool (*)(void), void (*)(const SDL_Event*), bool);
 static bool ds_running(void) { return running != 0; }
+static void ds_host_event(const SDL_Event *event) {
+  if(event->type==SDL_CONTROLLERDEVICEADDED)controller_added(event->cdevice.which);
+  if(event->type==SDL_CONTROLLERDEVICEREMOVED)controller_removed(event->cdevice.which);
+}
 #endif
 static void run_game(const char *path, int maxFrames, const char *shot) {
 #ifdef POCKET_DSPERATE
   const char *ext = strrchr(path, '.');
   if (ext && !strcasecmp(ext, ".nds")) {
     if (audio) { SDL_CloseAudioDevice(audio); audio = 0; }
-    appError = pd_ds_run(path, root, maxFrames, shot, renderer, ds_running);
+    appError = pd_ds_run(path, root, maxFrames, shot, renderer, ds_running, ds_host_event, noResume);
     // The DS backend owns its device while running. Restore the normal host's
     // device for the next GB/GBA game selected without restarting the app.
     audio_open();
