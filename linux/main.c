@@ -623,7 +623,7 @@ static void present_action(const struct pocket_action *a,unsigned gw,unsigned gh
 /* The QUICK MENU over the running game: a light dim, the ring at the companion's canvas scale. */
 static void present_quick(const struct pd_game *g, const struct quick_item *items, int n, int sel,
                           const char *title, const char *const *rows, int rowCount, int rowSel, unsigned gw,
-                          unsigned gh, int polishedBuild) {
+                          unsigned gh, int polishedBuild, bool grid) {
   if (!render_game(gw, gh) || !overlay_texture())
     return;
   int ow, oh;
@@ -635,7 +635,7 @@ static void present_quick(const struct pd_game *g, const struct quick_item *item
   pd_canvas_init(&qc, canvasW, canvasH, menuPixels);
   if (rows)
     quick_list_draw(&qc, title, rows, rowCount, rowSel);
-  else if (!quick_draw(&qc, g, items, n, sel,polishedBuild))
+  else if (!quick_draw(&qc, g, items, n, sel,polishedBuild,grid))
     return;
   quick_finish(&qc);
   SDL_UpdateTexture(menuTexture, &(SDL_Rect){0, 0, canvasW, canvasH}, menuPixels, canvasW * 4);
@@ -1098,7 +1098,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   struct pd_ui ui;
   pd_ui_init(&ui, &settings);
   struct pd_snapshot snap = {0};
-  struct pd_host_info host = {.hideScreenMode = true, .hasExpand = true, .hasHud = c->platform(c) == mPLATFORM_GBA || polished >= 0,
+  struct pd_host_info host = {.hasQuickMenu = true, .hideScreenMode = true, .hasExpand = true, .hasHud = c->platform(c) == mPLATFORM_GBA || polished >= 0,
                               .expandGame = wideSupported, .count = 1, .labels = {"HOST"}};
   snprintf(host.values[0], 40, "PokeDaisy Linux");
   const char *opts[] = {"Resume game",
@@ -1260,7 +1260,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     } else if (quickOpen) {
       int dx = down(RIGHT) - down(LEFT), dy = down(DOWN) - down(UP);
       if (dx || dy)
-        quickSel = quick_step(quickN, quickSel, dx, dy, canvasW, canvasH);
+        quickSel = quick_step_layout(quickN, quickSel, dx, dy, canvasW, canvasH, settings.quickGrid);
       if (down(A) && !quick[quickSel].why && quick[quickSel].action == QUICK_FLY) {
         if(pcField) {
           quickOpen=false;
@@ -1674,7 +1674,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       const char *const *rows = flyList ? flyNames : repelList ? repelNames : NULL;
       present_quick(&game, quick, quickN, quickSel, flyList ? "FLY" : "REPEL", rows,
                     flyList ? flyT.count : repelKindCount,
-                    flyList ? flySel : repelSel, gw, gh,polished);
+                    flyList ? flySel : repelSel, gw, gh,polished,settings.quickGrid);
     } else if (companion && menuOpen && menuOpen != 4) {
       present_menu(menuOpen == 1 ? &gameMenu : &confirmMenu, gw, gh);
     } else if (companion) {

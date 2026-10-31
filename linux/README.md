@@ -170,3 +170,15 @@ or extracted artwork is included in commits or install artifacts.
 
 GPL-3.0, preserving Lidor Itzhari's attribution. Existing dependency/font notices
 are in NOTICE and the packaged licenses. No new third-party library is added.
+
+## Quick-menu layout
+
+In the companion SETTINGS, select QUICK MENU and press A to toggle RING / GRID.
+On Polished Crystal, open the companion with X, then press Start for SETTINGS.
+The choice is saved as quickgrid=0/1 in settings.ini; older configurations
+default to RING. Both layouts use the same actions and availability checks.
+GRID follows Android's balanced, centred rows (nine tiles are five plus four
+at 512x384); left/right stays in its row and up/down selects the nearest tile
+in the adjacent row. The selection explanation stays below the grid.
+This adds layout selection only: Android's action-visibility, appearance and
+shortcut customization pages are not yet implemented on Linux.

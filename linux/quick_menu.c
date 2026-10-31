@@ -126,16 +126,35 @@ static void place(int n, int i, int w, int h, int *x, int *y) {
   *y = (int)lround(h / 2.0 + ry * sin(a)) - TILE_H / 2;
 }
 
-int quick_step(int n, int sel, int dx, int dy, int w, int h) {
+/* Android TileGrid: fit the width, balance rows, centre the short final row.
+ * Keep room below the tiles for the selected action's explanation. */
+static void grid_shape(int n,int w,int *cols,int *rows) {
+  int fit=(w-24+6)/(TILE_W+6);if(fit<1)fit=1;if(fit>n)fit=n;
+  *rows=(n+fit-1)/fit;*cols=(n+*rows-1)/ *rows;
+}
+static void layout_place(int n,int i,int w,int h,int *x,int *y,bool grid) {
+  if(!grid){place(n,i,w,h,x,y);return;}
+  int cols,rows;grid_shape(n,w,&cols,&rows);
+  int row=i/cols,count=n-row*cols;if(count>cols)count=cols;
+  *x=(w-(count*TILE_W+(count-1)*6))/2+(i%cols)*(TILE_W+6);
+  *y=(h-(rows*TILE_H+(rows-1)*6+52))/2+row*(TILE_H+6);
+}
+
+int quick_step_layout(int n, int sel, int dx, int dy, int w, int h, bool grid) {
   if (n <= 0)
     return 0;
   int sx, sy, best = sel, score = 1 << 30;
-  place(n, sel, w, h, &sx, &sy);
+  if(sel<0 || sel>=n)sel=best=0;
+  layout_place(n, sel, w, h, &sx, &sy, grid);
+  int cols=0,rows;
+  if(grid)grid_shape(n,w,&cols,&rows);
   for (int i = 0; i < n; i++) {
     if (i == sel)
       continue;
+    if(grid && (dx ? i/cols!=sel/cols : i/cols!=sel/cols+(dy>0 ? 1 : -1)))
+      continue;
     int x, y;
-    place(n, i, w, h, &x, &y);
+    layout_place(n, i, w, h, &x, &y, grid);
     int along = (x - sx) * dx + (y - sy) * dy, across = dx ? abs(y - sy) : abs(x - sx);
     if (along > 0 && along + 2 * across < score)
       best = i, score = along + 2 * across;
@@ -143,15 +162,19 @@ int quick_step(int n, int sel, int dx, int dy, int w, int h) {
   return best;
 }
 
+int quick_step(int n,int sel,int dx,int dy,int w,int h) {
+  return quick_step_layout(n,sel,dx,dy,w,h,false);
+}
+
 bool quick_draw(struct pd_canvas *c, const struct pd_game *g, const struct quick_item *items, int n, int sel,
-                int polishedBuild) {
-  if (c->w < 3 * TILE_W || c->h < 3 * TILE_H)
+                int polishedBuild, bool grid) {
+  if (n<1 || n>QUICK_COUNT || c->w < 3 * TILE_W || c->h < 3 * TILE_H)
     return false;
   for (int i = 0; i < c->w * c->h; i++)
     c->px[i] = QUICK_CLEAR;
   for (int i = 0; i < n; i++) {
     int x, y;
-    place(n, i, c->w, c->h, &x, &y);
+    layout_place(n, i, c->w, c->h, &x, &y, grid);
     if (i == sel)
       pd_round_rect(c, x - 2, y - 2, TILE_W + 4, TILE_H + 4, 5, FOCUS);
     glass(c, x, y, TILE_W, TILE_H);
@@ -189,6 +212,8 @@ bool quick_draw(struct pd_canvas *c, const struct pd_game *g, const struct quick
     int nw = pd_text_width(name), ow = note ? pd_text_width(note) : 0;
     int w = (nw > ow ? nw : ow) + 16, h = note ? 40 : 24;
     int x = (c->w - w) / 2, y = (c->h - h) / 2;
+    if(grid) {int cols,rows;grid_shape(n,c->w,&cols,&rows);
+      y=(c->h-(rows*TILE_H+(rows-1)*6+52))/2+rows*(TILE_H+6)+6;}
     glass(c, x, y, w, h);
     pd_text(c, x + (w - nw) / 2, y + 4, name, INK, INK_SHADOW);
     if (note)

@@ -394,3 +394,31 @@ General item target/quantity choices, TM/HM teaching, naturally acquired items,
 special dismount restrictions and physical Brick testing remain outstanding.
 The next companion action should use the same pattern: explicit player choices,
 normal game-owned execution and observed outcome, rather than only opening Bag.
+
+
+## Linux Settings and selectable quick-menu layout
+
+The fork is based on upstream dev 173c277 (verified still the upstream dev head
+on 2026-10-31). The shared Settings renderer and persistence were unchanged
+from that upstream before this feature; the existing bag-hit range fix is
+separate. The Polished companion retains its recovered layout and is not the
+new Android companion. Polished's Settings PLACE metadata is still missing.
+
+SETTINGS > QUICK MENU now toggles RING / GRID with A and persists the choice.
+This is an optional shared-core setting: hosts advertise hasQuickMenu to show
+the row, and older/missing settings default to RING. The shared setting changes
+are committed separately from Linux rendering, navigation and tests, allowing
+a small upstream prerequisite if this feature is proposed. Grid placement
+reuses Android TileGrid's balanced/centred-row rule; existing icons, disabled
+reasons and action dispatch remain in use. D-pad movement stays within a row
+horizontally and selects the nearest tile in an adjacent row vertically.
+
+14 native / 13 ARM-QEMU CTest checks pass, including GB/GBA diagnostics, layout
+reachability/edge behavior, optional Settings visibility and persisted defaults.
+The actual supplied Polished 3.2.3 ROM with a normally earned outdoor state
+passed Settings D-pad/A selection, grid rendering/navigation and persistence
+across a second process. Captures are actual application output with no added
+inventory or party fixtures. Physical Brick readability/control testing is
+still required; Android's other quick-menu customization remains missing.
+Reproduce using PC_QUICK_GRID=1 with --frames 65; restart the same disposable
+data with PC_GRID_RELOAD=1 to verify persistence (PC_BOOT / PC_SHOTS as above).
