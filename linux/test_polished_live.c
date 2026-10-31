@@ -5,8 +5,17 @@
 #undef main
 #include <assert.h>
 #include "polished_action_data.h"
+static const struct pd_settings *liveSettings;
 static void drive(struct mCore *c,unsigned keys,int n) {
-  c->setKeys(c,keys); while(n-->0)c->runFrame(c); c->setKeys(c,0);
+  c->setKeys(c,keys);
+  while(n-->0) {
+    /* Accelerated guest input uses the same per-frame production hold as
+     * the host, not fixture RAM or a synthetic encounter result. */
+    if(liveSettings && liveSettings->wildOff)
+      assert(polished_wild_hold(c,PD_PC_ACTION_SHA,read_memory,c));
+    c->runFrame(c);
+  }
+  c->setKeys(c,0);
 }
 static void tap(SDL_Keycode key) {
   SDL_Event e={.type=SDL_KEYDOWN};e.key.keysym.sym=key;assert(SDL_PushEvent(&e)==1);
@@ -16,8 +25,8 @@ static void shot(const char *name) {
   char path[1024];snprintf(path,sizeof path,"%s/%s.png",getenv("PC_SHOTS"),name);
   assert(capture_frame(path,NULL));
 }
-/* Earn damage through normal wild-battle inputs; never patch HP or inventory. */
-static void earn_injury(struct mCore *c) {
+/* Normal movement from the earned New Bark state to Route 29 grass. */
+static void reach_grass(struct mCore *c) {
   struct pd_snapshot s;
   pc_read(&s,read_memory,c);
   for(int i=0;i<30 && s.y<7;i++){drive(c,128,1);drive(c,0,17);pc_read(&s,read_memory,c);}
@@ -34,6 +43,11 @@ static void earn_injury(struct mCore *c) {
   pc_read(&s,read_memory,c);
   for(int i=0;i<40 && s.x>53;i++){drive(c,32,3);drive(c,0,17);pc_read(&s,read_memory,c);}
   for(int i=0;i<40 && s.y<12;i++){drive(c,128,3);drive(c,0,17);pc_read(&s,read_memory,c);if(s.inBattle)break;}
+}
+/* Earn damage through normal wild-battle inputs; never patch HP or inventory. */
+static void earn_injury(struct mCore *c) {
+  reach_grass(c);
+  struct pd_snapshot s;pc_read(&s,read_memory,c);
   for(int i=0;i<120 && !s.inBattle;i++) {
     drive(c,i%2?16:32,16);drive(c,0,8);pc_read(&s,read_memory,c);
   }
@@ -59,6 +73,51 @@ static void earn_injury(struct mCore *c) {
 }
 static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui,struct pd_snapshot *s) {
   (void)ui;
+  if(getenv("PC_WILD")) {
+    bool reload=getenv("PC_WILD_RELOAD")!=NULL;
+    if(frame==0) {
+      char path[1024];snprintf(path,sizeof path,"%s/states/%s",root,reload?"wild-grass.ss":"live-test.ss");
+      assert(state(c,path,false));liveSettings=ui->settings;
+      assert(ui->settings->wildOff==reload);
+      if(reload)fprintf(stderr,"PASS WILD OFF survives process restart\n");
+      tap(SDLK_f);
+    }
+    if(frame==3){shot(reload?"wild-off-reloaded":"wild-before-toggle");tap(SDLK_RIGHT);}
+    if(frame==5)tap(SDLK_z);
+    if(frame==8) {
+      assert(!companion && ui->settings->wildOff==!reload);
+      char path[1024];snprintf(path,sizeof path,"%s/settings.ini",root);
+      struct pd_settings disk;pd_settings_load(&disk,path);assert(disk.wildOff==!reload);
+      if(!reload)reach_grass(c);
+      struct pd_snapshot before,now;pc_read(&before,read_memory,c);now=before;
+      unsigned steps=0;
+      for(int i=0;i<200 && !now.inBattle;i++) {
+        drive(c,i%2?16:32,16);drive(c,0,8);pc_read(&now,read_memory,c);
+        steps+=abs(now.x-before.x)+abs(now.y-before.y);
+        assert(now.mapGroup==before.mapGroup && now.mapNum==before.mapNum);
+        before=now;
+      }
+      if(!reload) {
+        assert(!now.inBattle && steps>=100);
+        snprintf(path,sizeof path,"%s/states/wild-grass.ss",root);assert(state(c,path,true));
+        fprintf(stderr,"PASS WILD OFF: %u actual grass steps with no random battle\n",steps);
+      } else {
+        assert(now.inBattle && !now.isTrainer);
+        for(int i=0;i<1500;i++) {
+          struct pocket_battle_menu menu;assert(pocket_battle_read(read_memory,c,&menu));
+          if(menu.state==PB_ACTION)break;
+          drive(c,i%120<3?1:0,1);
+        }
+        struct pocket_battle_menu menu;assert(pocket_battle_read(read_memory,c,&menu) && menu.state==PB_ACTION);
+        snprintf(path,sizeof path,"%s/states/wild-battle.ss",root);assert(state(c,path,true));
+        fprintf(stderr,"PASS WILD ON: random encounter resumes after %u grass steps\n",steps);
+      }
+    }
+    if(frame==10)shot(reload?"wild-on-encounter":"wild-off-grass");
+    if(frame==12 && !reload)tap(SDLK_f);
+    if(frame==15 && !reload)shot("wild-off-quick-menu");
+    return;
+  }
   if(getenv("PC_STORAGE")) {
     static unsigned char originalBox;
     if(frame==0) {

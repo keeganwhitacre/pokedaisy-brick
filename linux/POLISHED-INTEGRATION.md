@@ -7,7 +7,7 @@ verified old profile for normal 3.2.3 (CRC32 f98367e4).
 
 ## Controls
 
-- Y while playing: current Linux quick-menu ring (PC on normal 3.2.3, save/load
+- Y while playing: current Linux quick-menu ring (PC and WILD on normal 3.2.3, save/load
   state, fast-forward and companion; other unavailable actions stay disabled).
 - In the companion: L/R sections, D-pad navigation, A select, B back.
 - X: return to game, except BAG where it toggles a favorite.
@@ -81,7 +81,7 @@ special/unloaded-palette sprites are still omitted, so NPC pop-in is possible.
 The Polished field adapter now reuses Android's Crystal queued-script mechanism
 and the unmodified shared pk_gb_field.c writer. Its PC entry and observations
 are generated from the pinned official 3.2.3 symbols, with the ROM identity
-still owned by the app. Fly, Repel, Bike and Wild need their own verified adapters;
+still owned by the app. Fly, Repel and Bike need their own verified adapters;
 the retail Crystal addresses are not used for Polished.
 Original item actions are now accessible through the selected-item handoff below;
 companion-driven target/quantity confirmation and battle commands remain disabled. Persistent favorites
@@ -181,3 +181,26 @@ set PC_STORAGE=1, PC_BOOT and PC_SHOTS, then run linux-polished-live-test with
 normal guest inputs. Only the actual feature writes the verified script queue;
 the test does not inject Pokemon, items or fixture memory. Do not distribute
 its ROM, battery saves or states.
+
+
+## Wild encounters (normal 3.2.3)
+
+Y -> WILD toggles random walking encounters on/off using the existing host
+wildoff setting. OFF holds the game's five-step wild encounter cooldown before
+each emulated frame, including every fast-forward frame, through the shared GB
+writer. It skips title/non-field states, native menus and battles. Scripted and
+trainer battles are not disabled. ON stops holding; the remaining short cooldown
+expires normally. No encounter-rate, map or inventory tables are changed.
+
+Native and AArch64/QEMU supplied-ROM tests each walked 200 actual Route 29 grass
+steps without random battles while OFF, restarted and verified the setting was
+still OFF, then enabled WILD and entered a normal wild battle after three steps.
+A normal input-earned battle state is retained privately for subsequent tests.
+The accelerated guest-input helper calls the same production hold once per frame;
+quick-menu activation and persisted settings are exercised through the real host.
+These are emulator tests, not physical Brick validation. Trainer/scripted battles
+and long playthroughs with WILD OFF still need integration coverage.
+
+Reproduce after PC_OUTDOOR's earned state: PC_WILD=1 with --frames 18, then a
+second process with PC_WILD=1 PC_WILD_RELOAD=1 and the same disposable data.
+PC_BOOT and PC_SHOTS are required as for the other personal-ROM checks.

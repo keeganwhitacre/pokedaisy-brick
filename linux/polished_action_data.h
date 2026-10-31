@@ -26,6 +26,7 @@
 #define PD_PC_BOX 0x1db7au /* wCurBox */
 #define PD_PC_BOX_CURSOR 0xc7e8u /* wBillsPC_CursorPos */
 #define PD_PC_BOX_MODE 0xc7edu /* wBillsPC_CursorMode */
+#define PD_PC_WILD_COOLDOWN 0x1d464u /* wWildEncounterCooldown */
 #define PD_PC_PC_SCRIPT 0x2f41e2u
 #define PD_PC_PC_MENU 0x50d2u
 #define PD_PC_START_MENU 0x6160u

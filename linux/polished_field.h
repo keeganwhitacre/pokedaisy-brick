@@ -11,4 +11,10 @@ const char *polished_pc_reason(const char *sha, pocket_action_read, void *ctx);
 bool polished_pc_open(struct mCore *, const char *sha, pocket_action_read, void *ctx);
 /* Tracks a requested PC session until the script and original menus finish. */
 bool polished_pc_busy(pocket_action_read, void *ctx);
+/* Generic field readiness, without PC's party / facing requirements. */
+const char *polished_field_reason(const char *sha, pocket_action_read, void *ctx);
+/* Once before every emulated frame while WILD is OFF. Stops random walking
+ * encounters through the game's cooldown; does not block scripted battles.
+ * Stop calling to restore encounters; the short cooldown expires naturally. */
+bool polished_wild_hold(struct mCore *, const char *sha, pocket_action_read, void *ctx);
 #endif

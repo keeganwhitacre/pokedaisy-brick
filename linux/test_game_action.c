@@ -79,4 +79,12 @@ int main(void) {
   fail=true;assert(polished_pc_reason(PD_PC_ACTION_SHA,read_mem,NULL));fail=false;
   assert(!polished_pc_open(NULL,PD_PC_ACTION_SHA,read_mem,NULL) && !ram[PD_PC_QUEUE]);
   puts("PASS PC rejects wrong ROM, busy field/menu/queue, no party, wrong facing and failed reads/writes");
+  assert(!polished_wild_hold(NULL,"wrong ROM",read_mem,NULL));
+  fail=true;assert(!polished_wild_hold(NULL,PD_PC_ACTION_SHA,read_mem,NULL));fail=false;
+  ram[PD_PC_BATTLE]=1;assert(polished_wild_hold(NULL,PD_PC_ACTION_SHA,read_mem,NULL));ram[PD_PC_BATTLE]=0;
+  ram[PD_PC_IN_MENU]=1;assert(polished_wild_hold(NULL,PD_PC_ACTION_SHA,read_mem,NULL));ram[PD_PC_IN_MENU]=0;
+  ram[PD_PC_MAP]=0;assert(polished_wild_hold(NULL,PD_PC_ACTION_SHA,read_mem,NULL));ram[PD_PC_MAP]=2;
+  ram[PD_PC_WILD_COOLDOWN]=5;assert(polished_wild_hold(NULL,PD_PC_ACTION_SHA,read_mem,NULL));
+  ram[PD_PC_WILD_COOLDOWN]=2;assert(!polished_wild_hold(NULL,PD_PC_ACTION_SHA,read_mem,NULL));
+  puts("PASS WILD rejects unsupported ROM/read/write failures and skips menu/battle/title or an adequate cooldown");
 }

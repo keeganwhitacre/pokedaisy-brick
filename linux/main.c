@@ -1146,7 +1146,8 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                                             bike ? bike : 360, riding ? "GET OFF" : NULL};
     }
     quick[quickN++] = (struct quick_item){QUICK_WILD, settings.wildOff, false,
-                                          wildSwitch ? NULL : "Not in this game", 0, 0, NULL};
+          polished_field_supported(pcSha) ? polished_field_reason(pcSha,read_memory,c)
+                                         : wildSwitch ? NULL : "Not in this game", 0, 0, NULL};
     quick[quickN++] = (struct quick_item){QUICK_SAVE_STATE, false, false, NULL, 0, 0, NULL};
     quick[quickN++] = (struct quick_item){QUICK_LOAD_STATE, false, false,
                                           access(ss, F_OK) == 0 ? NULL : "No state saved yet", 0, 0, NULL};
@@ -1408,6 +1409,12 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
             notice(pocket_action_message(&pcBagAction));
             if (pcBagAction.result != PA_DONE) companion=true;
           }
+        }
+        if(settings.wildOff && polished_field_supported(pcSha) &&
+           !polished_wild_hold(c,pcSha,read_memory,c)) {
+          settings.wildOff=false;
+          pd_settings_save(&settings,config);
+          notice("Wild encounter shortcut failed; encounters restored");
         }
         c->runFrame(c);
         if (gameKeyFrames > 0 && --gameKeyFrames == 0)
