@@ -351,3 +351,7 @@ int pc_bag_selected_item(struct pc_ui *u,const struct pd_snapshot *s) {
 const char *pc_species_name(int species) {
   return species==255 ? "Egg" : species>0 && species<512 && names[species] ? names[species] : "Unknown";
 }
+
+const char *pc_place_name(int area) {
+  return area>0 && area<(int)(sizeof places/sizeof *places) ? places[area].name : "";
+}

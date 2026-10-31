@@ -63,7 +63,7 @@ static bool wideSupported, wideReady;
 static unsigned wideW, wideH;
 static SDL_AudioDeviceID audio;
 static volatile sig_atomic_t running = 1;
-static bool minimized;
+static bool minimized, noResume;
 static bool muted;
 static int appError;
 #ifdef POCKET_TEST
@@ -425,7 +425,24 @@ static void render_lcd(void) {
   SDL_RenderCopy(renderer,lcdTexture,NULL,NULL);
   SDL_RenderSetLogicalSize(renderer,lw,lh);SDL_RenderSetIntegerScale(renderer,integer);
 }
+static SDL_Texture *noticeTexture;
+static void render_notice(void) {
+  if(!*message || SDL_GetTicks()>=messageUntil)return;
+  static uint32_t data[512*28];struct pd_canvas nc;pd_canvas_init(&nc,512,28,data);
+  pd_fill(&nc,0,0,512,28,0x181818);
+  pd_text_fit(&nc,8,6,496,message,0xffffff,PD_NO_SHADOW);
+  if(!noticeTexture)noticeTexture=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGB888,SDL_TEXTUREACCESS_STREAMING,512,28);
+  if(!noticeTexture || SDL_UpdateTexture(noticeTexture,NULL,data,512*4)<0)return;
+  int w,h,lw,lh;SDL_GetRendererOutputSize(renderer,&w,&h);SDL_RenderGetLogicalSize(renderer,&lw,&lh);
+  SDL_bool integer=SDL_RenderGetIntegerScale(renderer);
+  SDL_RenderSetLogicalSize(renderer,w,h);SDL_RenderSetIntegerScale(renderer,SDL_FALSE);
+  int scale=w/512;if(h/384<scale)scale=h/384;if(scale<1)scale=1;
+  SDL_Rect at={(w-512*scale)/2,h-56*scale,512*scale,28*scale};
+  SDL_RenderCopy(renderer,noticeTexture,NULL,&at);
+  SDL_RenderSetLogicalSize(renderer,lw,lh);SDL_RenderSetIntegerScale(renderer,integer);
+}
 static void timed_present(void) {
+  render_notice();
   render_lcd();
   uint64_t t = SDL_GetPerformanceCounter();
   SDL_RenderPresent(renderer);
@@ -434,10 +451,6 @@ static void timed_present(void) {
 static void present(void) {
   SDL_RenderSetLogicalSize(renderer, canvasW, canvasH);
   SDL_RenderSetIntegerScale(renderer, SDL_TRUE);
-  if (SDL_GetTicks() < messageUntil) {
-    pd_fill(&canvas, 4, canvasH - 50, canvasW - 8, 24, 0x181818);
-    pd_text_fit(&canvas, 10, canvasH - 46, canvasW - 20, message, 0xffffff, PD_NO_SHADOW);
-  }
   if (SDL_UpdateTexture(texture, NULL, pixels, canvasW * 4) < 0) {
     notice(SDL_GetError());
     return;
@@ -630,8 +643,7 @@ static void action_capture(unsigned gw,unsigned gh) {
                                   SDL_TEXTUREACCESS_STATIC,actionW,actionH);
   if(actionTexture && SDL_UpdateTexture(actionTexture,NULL,wideReady ? wideFrame : video,
                                         (wideReady ? actionW : 256)*4)<0) {
-    SDL_DestroyTexture(lcdTexture);lcdTexture=NULL;lcdW=lcdH=0;lcdEnabled=false;
-  SDL_DestroyTexture(actionTexture);actionTexture=NULL;
+    SDL_DestroyTexture(actionTexture);actionTexture=NULL;
   }
 }
 static void present_action(const struct pocket_action *a,unsigned gw,unsigned gh) {
@@ -1102,7 +1114,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   char autoState[1200],lastRom[1200],romSha[41];pocket_rom_sha1(romdata,(size_t)len,romSha);
   snprintf(autoState,sizeof autoState,"%s/states/%s.auto.ss",root,romSha);
   snprintf(lastRom,sizeof lastRom,"%s/last-rom.txt",root);
-  if(settings.quickResume && access(autoState,F_OK)==0) {
+  if(!noResume && settings.quickResume && access(autoState,F_OK)==0) {
     bool restored=state(c,autoState,false);
     notice(restored ? "Quick resume loaded" : "Quick resume unavailable; using in-game save");
     if(restored)fprintf(stderr,"Quick resume frame %u\n",c->frameCounter(c));
@@ -1765,6 +1777,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
         ui.focusId = focusId;
         host.ffOn = ff;
         host.hasState = access(ss, F_OK) == 0;
+        host.placeName = polished>=0 ? pc_place_name(snap.mapsec) : NULL;
         pd_ui_draw(&ui, &canvas, &game, &snap, &host);
         focus_draw(&ui, focus_resolve(&ui));
       }
@@ -1822,12 +1835,14 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     else if (now - due > SDL_GetPerformanceFrequency() / 5)
       due = now;
   }
-  if(settings.saveOnQuit && !saveStatus.failed) {
+  if(!noResume && settings.saveOnQuit && !saveStatus.failed) {
     if(!state(c,autoState,true)) {appError=1;notice("Automatic resume state failed; previous state retained");}
     else if(!strchr(path,'\n')) {
       char temp[1250];snprintf(temp,sizeof temp,"%s.tmp",lastRom);
-      FILE *last=fopen(temp,"w");bool ok=false;
-      if(last){bool written=fprintf(last,"%s\n",path)>0;ok=fclose(last)==0 && written;}
+      char *absolute=realpath(path,NULL);
+      FILE *last=absolute ? fopen(temp,"w") : NULL;bool ok=false;
+      if(last){bool written=fprintf(last,"%s\n",absolute)>0;ok=fclose(last)==0 && written;}
+      free(absolute);
       if(ok)ok=rename(temp,lastRom)==0;
       if(!ok){unlink(temp);appError=1;notice("Last-game record failed");}
     }
@@ -1851,11 +1866,14 @@ static int cmp(const void *a, const void *b) {
   return strcasecmp(*(char *const *)a, *(char *const *)b);
 }
 int main(int argc, char **argv) {
+  noResume=false;
   const char *rom = NULL, *shot = NULL;
   int frames = 0;
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--data") && i + 1 < argc)
       root = argv[++i];
+    else if (!strcmp(argv[i], "--no-resume"))
+      noResume=true;
     else if (!strcmp(argv[i], "--frames") && i + 1 < argc)
       frames = atoi(argv[++i]);
     else if (!strcmp(argv[i], "--shot") && i + 1 < argc)
@@ -1933,7 +1951,7 @@ int main(int argc, char **argv) {
   if(!rom) {
     char cfg[1200];struct pd_settings pref;snprintf(cfg,sizeof cfg,"%s/settings.ini",root);
     pd_settings_load(&pref,cfg);
-    if(pref.quickResume) {
+    if(!noResume && pref.quickResume) {
       snprintf(cfg,sizeof cfg,"%s/last-rom.txt",root);FILE *last=fopen(cfg,"r");
       if(last){if(fgets(resumeRom,sizeof resumeRom,last)){resumeRom[strcspn(resumeRom,"\r\n")]=0;if(access(resumeRom,R_OK)==0)rom=resumeRom;}fclose(last);}
     }
@@ -1994,6 +2012,7 @@ int main(int argc, char **argv) {
   texture = NULL;
   SDL_DestroyTexture(gameTexture);
   SDL_DestroyTexture(wideTexture);
+  SDL_DestroyTexture(noticeTexture);noticeTexture=NULL;
   SDL_DestroyTexture(lcdTexture);lcdTexture=NULL;lcdW=lcdH=0;lcdEnabled=false;
   SDL_DestroyTexture(actionTexture);actionTexture=NULL;
   if (menuTexture)

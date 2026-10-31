@@ -460,3 +460,18 @@ Native actual-ROM exit/reopen without a ROM argument restored the saved frame.
 Native synthetic SDL minimize/restore events verified no emulation advance
 while minimized. No clock/voltage redesign was made; no physical battery-life,
 NextUI sleep-button or forced-power-loss guarantees are claimed.
+
+## Playtest-candidate reliability fixes
+
+Gameplay status notices are composited before the LCD filter across all views.
+Polished Settings PLACE uses its existing generated names (New Bark confirmed).
+Quick Resume records absolute ROM paths. --no-resume bypasses both automatic
+loading and replacement of the existing automatic state for that launch.
+A failed action-background upload no longer resets the unrelated LCD preference.
+Shared host place-label support is committed separately from Linux changes.
+14 native / 13 ARM-QEMU tests pass. Native actual-ROM checks verified restart
+from a different working directory, absolute-path recording, bypass without auto
+state replacement, Settings/grid navigation and actual screenshot rendering.
+These are emulator checks; Brick sleep/power, long saves/PC transactions and
+battery life remain unverified. More item families and TM/HM targeting remain
+incomplete; this is a Brick playtest candidate, not full Android parity.

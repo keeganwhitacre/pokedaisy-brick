@@ -208,3 +208,12 @@ events; this is not a NextUI sleep-button integration. Existing frame pacing
 and CrossMix ondemand clock policy remain unchanged. POCKET_CPU=keep in the
 launcher environment opts out of CrossMix's existing performance boost; its
 frame rate and battery impact require device measurement, not assumptions.
+
+Recovery launch: --no-resume bypasses automatic last-game selection and automatic
+state loading. Supply a ROM to boot its in-game save, or omit it for the game
+list. This launch also suppresses automatic state replacement on exit, keeping
+the old automatic snapshot available for recovery. Manual states remain usable.
+New last-game records contain absolute ROM paths, allowing a different launch
+working directory. Older relative records still depend on the original directory.
+Gameplay now displays the same timed status notices as the companion. Polished
+Settings location labels use its existing generated map tables.

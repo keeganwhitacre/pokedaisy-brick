@@ -1,6 +1,7 @@
 /* GPL-3.0: layout reachability, actual settings hit and persistence. */
 #include "quick_menu.h"
 #include "display_filter.h"
+#include "polished.h"
 #include "pd_settings.h"
 #include "pd_ui_internal.h"
 #include <assert.h>
@@ -9,6 +10,7 @@
 #include <unistd.h>
 static uint32_t px[512*384];
 int main(void) {
+  assert(!*pc_place_name(0) && !*pc_place_name(9999) && *pc_place_name(1));
   for(int n=1;n<=QUICK_COUNT;n++)for(int width=384;width<=1024;width+=128) {
     bool seen[QUICK_COUNT]={true};int queue[QUICK_COUNT]={0},head=0,tail=1;
     const int dx[]={-1,1,0,0},dy[]={0,0,-1,1};
