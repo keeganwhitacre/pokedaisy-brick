@@ -21,11 +21,11 @@ struct pocket_action {
   unsigned item, quantity, pocket, slot;
 };
 /* Supported only for verified normal Polished Crystal 3.2.3.
- * Opens the original Bag (target 2), or locates a unique ordinary item and
- * hands off at its verified game-owned action menu. Never chooses Use/Give/Toss. */
+ * Opens the original Bag (target 2), or locates a unique ordinary/key item and
+ * hands off at its verified game-owned action menu. Never chooses Use/Register/Give/Toss. */
 bool pocket_action_begin(struct pocket_action *, const char *sha,
                          pocket_action_read, void *ctx);
-/* Find a unique ordinary item and open its original Use/Give/Toss menu.
+/* Find a unique ordinary or key item and open its original action menu.
  * No selection is made inside that menu; the game owns legality and targeting. */
 bool pocket_action_begin_item(struct pocket_action *, const char *sha, unsigned item,
                               pocket_action_read, void *ctx);

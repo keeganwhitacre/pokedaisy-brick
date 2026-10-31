@@ -7,13 +7,13 @@ verified old profile for normal 3.2.3 (CRC32 f98367e4).
 
 ## Controls
 
-- Y while playing: current Linux quick-menu ring (PC and WILD on normal 3.2.3, save/load
+- Y while playing: current Linux quick-menu ring (PC, REPEL, BIKE and WILD on normal 3.2.3, save/load
   state, fast-forward and companion; other unavailable actions stay disabled).
 - In the companion: L/R sections, D-pad navigation, A select, B back.
 - X: return to game, except BAG where it toggles a favorite.
 - Start: current Linux SETTINGS, including aspect, auto zoom and optional HUD.
   B or L/R returns from SETTINGS to the Polished companion.
-- R2 on the companion BAG: open the selected ordinary item’s original actions (normal 3.2.3 only).
+- R2 on the companion BAG: open the selected ordinary or key item’s original actions (normal 3.2.3 only).
   Elsewhere R2 retains the load-state confirmation.
 - HUD: party icons decoded from the identified ROM, levels, HP and status.
   GBA minimap/balls/repel HUD panels are hidden for Polished pending adapters.
@@ -55,8 +55,9 @@ the supplied save did not resume one. Physical Brick testing remains outstanding
 Optional runner: build with -DPOCKET_LIVE_TESTS=ON; set PC_BOOT to
 linux/boot-polished-newgame.txt and PC_SHOTS to an existing capture directory.
 Run linux-polished-live-test --data DISPOSABLE_DATA --frames 90 ROM.
-Preload DISPOSABLE_DATA/settings.ini with aspect=1 and hud=1. All guest input is
-normal controller input; no fixture RAM or synthetic party is injected.
+Preload DISPOSABLE_DATA/settings.ini with aspect=1 and hud=1. The default boot/outdoor route uses normal guest input without fixture RAM
+or synthetic party data. The separate field-item fixture mode below adds
+explicitly labelled disposable inventory for its positive tests.
 Do not replace a known-good installation without backing it up and its saves.
 
 NPC audit: optional linux-polished-objects-test ROM STATE checks original PPU
@@ -81,7 +82,7 @@ special/unloaded-palette sprites are still omitted, so NPC pop-in is possible.
 The Polished field adapter now reuses Android's Crystal queued-script mechanism
 and the unmodified shared pk_gb_field.c writer. Its PC entry and observations
 are generated from the pinned official 3.2.3 symbols, with the ROM identity
-still owned by the app. Fly, Repel and Bike need their own verified adapters;
+still owned by the app. Fly still needs its own verified adapter;
 the retail Crystal addresses are not used for Polished.
 Original item actions are now accessible through the selected-item handoff below;
 companion-driven item target/quantity confirmation remains unimplemented. Persistent favorites
@@ -116,7 +117,7 @@ the held-item slot; Toss consumed it after the game’s own confirmation. No ROM
 HP, inventory or event-flag injection was used. Damage was earned in a wild
 battle using normal controller inputs. Wider item/party/version coverage and
 physical Brick testing remain outstanding. Held-item replacement when already
-holding an item, multi-count tossing, key items and TMs are not claimed tested.
+holding an item, multi-count tossing, TMs are not claimed tested. Key-item fixture tests are described below.
 
 Optional runner: PC_HANDOFF=1 loads earned live-test.ss, opens the real companion,
 navigates to BAG and presses R2; it verifies item identity and submenu. Add
@@ -202,7 +203,7 @@ quick-menu activation and persisted settings are exercised through the real host
 These are emulator tests, not physical Brick validation. Trainer/scripted battles
 and long playthroughs with WILD OFF still need integration coverage.
 
-Reproduce after PC_OUTDOOR's earned state: PC_WILD=1 with --frames 18, then a
+Reproduce after PC_OUTDOOR's earned state: PC_WILD=1 with --frames 22, then a
 second process with PC_WILD=1 PC_WILD_RELOAD=1 and the same disposable data.
 PC_BOOT and PC_SHOTS are required as for the other personal-ROM checks.
 
@@ -250,3 +251,58 @@ Reproduce after PC_WILD_RELOAD earns wild-battle.ss: PC_BATTLE_CONTROLS=1 with
 Add PC_BATTLE_BAG=1 for native Bag handoff, or PC_BATTLE_CANCEL=1 with
 --frames 22 for cancellation. Tests observe the real UI / dispatcher state;
 they do not set its selection, synthesize Pokemon or patch battle memory.
+
+
+## Key items, Bike and Repel handoffs (normal 3.2.3)
+
+R2 on the companion BAG now finds the highlighted key item as well as ordinary
+items. The native key list is zero-terminated, not a quantity-pair pocket; it
+has separate list and submenu validation. The controller finds its native slot,
+scrolls normally and stops at the original Use / Sel / Quit menu (or Use / Quit
+for non-registerable keys). It refuses unknown IDs, duplicate/malformed key
+lists, changed slots and missing items. No key, cursor or registered-slot writes.
+TM/HM selection still opens the whole native Bag; targeted teaching is unfinished.
+
+Y -> BIKE opens the owned Bicycle's action menu. A confirms Use in the game;
+this mounts or dismounts where the original game permits it. The tile says GET
+OFF when riding. It does not borrow or replace a registered shortcut.
+Y -> REPEL lists the owned kinds when there is more than one, then opens the
+selected kind's original action menu. A confirms Use. While a Repel is active,
+the tile shows its remaining steps and is disabled. No extra item is consumed
+by reopening or trying the disabled shortcut. Both tiles are disabled without
+the relevant owned item, or away from a free overworld. The game's own item
+code owns environment restrictions and effects. These are handoffs, not automatic
+item use. The app's existing BAG_ICON supplies a fallback satchel when item art
+is unavailable to the quick menu; GBA item-art behavior is preserved.
+
+Item IDs and Repel names come from ItemNamesPolishedCrystal.kt. Key capacity
+and memory layout are app data cross-checked against pinned release symbols;
+key submenu identity, player state and active Repel steps come from those
+symbols. No handwritten address or item-ID table was introduced. No shared-core
+files changed. Existing WILD tests now navigate the enlarged ring by real
+D-pad inputs through quick_step rather than assuming WILD is the second tile.
+
+Validation: 13/13 native and 12/12 ARM/QEMU CTest checks. Actual ROM/host tests
+on both architectures used an explicitly labelled DISPOSABLE INVENTORY FIXTURE:
+Bicycle placed ninth in a nine-key list, plus two Repels and two Super Repels.
+The fixture changes private emulator WRAM before testing; these items were NOT
+normally earned. After setup, real UI/controller inputs opened the ninth key's
+native action menu, mounted and dismounted through user Use, and preserved all
+four registered shortcuts. Companion R2 also found that scrolled key. The Repel
+picker selected Super Repel; user Use set 200 steps and reduced its quantity
+2 -> 1, leaving the other kind unchanged. An active Repel refused a second use.
+Cancellation passed. These are actual emulation captures with fixture inventory,
+not mockups or evidence of a naturally acquired Bicycle/Repel playthrough.
+
+A separate normally earned new-game state (without added inventory) refused
+both Bike and Repel shortcuts. Native PC, ordinary selected-Potion handoff,
+remembered TM pocket, WILD persistence/grass and companion battle regressions
+passed. Physical Brick operation, real progression inventories, unusual key
+items and game-specific dismount restrictions remain unverified.
+
+Optional reproduction: after PC_OUTDOOR normally earns live-test.ss, use
+PC_FIELD_FIXTURE=bike|repel|key-r2|cancel with --frames 705. Each process needs
+its own disposable --data directory, PC_BOOT and PC_SHOTS. It quits normally
+once its assertions and capture complete. Capture names start with fixture-.
+PC_FIELD_NO_ITEMS=1 with --frames 26 tests the earned no-item state without
+inventory setup. Do not distribute any private game, save or state files.

@@ -109,4 +109,24 @@ int main(void) {
   for(int i=0;i<242;i++)assert(!pocket_battle_tick(&b,read_mem,NULL));
   assert(b.result==PA_TIMEOUT);
   puts("PASS battle controller rejects unsupported ROM, invalid action, empty/zero-PP moves; cancel/timeout release inputs");
+  memset(ram,0,sizeof ram);ram[PD_PC_MAP]=2;
+  ram[PD_PC_KEYS]=2;ram[PD_PC_KEYS+1]=PD_PC_BICYCLE-0x200;
+  assert(pocket_action_begin_item(&a,PD_PC_ACTION_SHA,PD_PC_BICYCLE,read_mem,NULL));
+  assert(a.slot==1 && a.quantity==1 && a.item==PD_PC_BICYCLE);
+  a.phase=3;ram[PD_PC_KEYS+1]=0; /* Removed key: do not confirm another row. */
+  assert(!pocket_action_tick(&a,read_mem,NULL) && a.result==PA_REJECTED);
+  ram[PD_PC_KEYS]=ram[PD_PC_KEYS+1]=PD_PC_BICYCLE-0x200;
+  assert(!pocket_action_begin_item(&a,PD_PC_ACTION_SHA,PD_PC_BICYCLE,read_mem,NULL));
+  memset(ram+PD_PC_KEYS,1,PD_PC_KEY_MAX+1);
+  assert(!pocket_action_begin_item(&a,PD_PC_ACTION_SHA,PD_PC_BICYCLE,read_mem,NULL));
+  memset(ram+PD_PC_KEYS,0,PD_PC_KEY_MAX+1);ram[PD_PC_KEYS]=255;
+  assert(!pocket_action_begin_item(&a,PD_PC_ACTION_SHA,0x2ff,read_mem,NULL));
+  memset(ram+PD_PC_KEYS,0,PD_PC_KEY_MAX+1);ram[PD_PC_KEYS]=PD_PC_BICYCLE-0x200;
+  assert(pocket_action_begin_item(&a,PD_PC_ACTION_SHA,PD_PC_BICYCLE,read_mem,NULL));
+  a.phase=4;ram[PD_PC_STATE]=0x40;ram[PD_PC_SCRIPT]=1;
+  ram[PD_PC_ITEM]=PD_PC_BICYCLE-0x200;
+  ram[PD_PC_POINTER]=PD_PC_KEY_USE_SEL_MENU&255;ram[PD_PC_POINTER+1]=PD_PC_KEY_USE_SEL_MENU>>8;
+  for(int i=0;i<6;i++)assert(!pocket_action_tick(&a,read_mem,NULL));
+  assert(a.result==PA_DONE);
+  puts("PASS key item lookup, changed slot/removal, duplicate/unterminated list refusal and original Use/Sel menu handoff (model)");
 }

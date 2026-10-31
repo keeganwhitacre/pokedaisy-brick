@@ -46,11 +46,36 @@ static bool item_stack(pocket_action_read r,void *c,unsigned p,unsigned slot,
   return n<=max && raw[1+2*n]==255 && slot<n &&
          raw[1+2*slot]==item && raw[2+2*slot]==qty;
 }
+/* Key items are a zero-terminated list, not {id,quantity} pairs. Preserve
+ * their game-owned ordering and reject duplicates / missing terminators. */
+static bool key_slot(pocket_action_read r,void *c,unsigned item,unsigned *slot) {
+  unsigned char keys[PD_PC_KEY_MAX+1];
+  if(item<=0x200 || item>0x200+PD_PC_KEY_ID_MAX || !r(c,PD_PC_KEYS,keys,sizeof keys))return false;
+  bool seen[256]={0},found=false;
+  for(unsigned i=0;i<sizeof keys;i++) {
+    if(!keys[i])return found;
+    if(i==PD_PC_KEY_MAX || keys[i]>PD_PC_KEY_ID_MAX || seen[keys[i]])return false;
+    seen[keys[i]]=true;
+    if(keys[i]==item-0x200){*slot=i;found=true;}
+  }
+  return false;
+}
+static bool selected_stack(const struct pocket_action *a,pocket_action_read r,void *c) {
+  if(a->item>0x200) {
+    unsigned slot=0;
+    return key_slot(r,c,a->item,&slot) && slot==a->slot;
+  }
+  return item_stack(r,c,a->pocket,a->slot,a->item,a->quantity);
+}
 bool pocket_action_begin_item(struct pocket_action *a,const char *sha,unsigned item,
                               pocket_action_read r,void *c) {
   if(!pocket_action_begin(a,sha,r,c))return false;
   a->result=PA_REJECTED;
-  if(!item || item>=255)return false; /* TM/key namespaces need their own adapter. */
+  if(item>0x200 && item<0x300) {
+    if(!key_slot(r,c,item,&a->slot))return false;
+    a->item=item;a->quantity=1;a->result=PA_RUNNING;return true;
+  }
+  if(!item || item>=255)return false; /* TM namespace needs its own adapter. */
   unsigned matches=0;
   for(unsigned p=0;p<sizeof pd_pc_item_pockets/sizeof *pd_pc_item_pockets;p++) {
     unsigned char raw[152];unsigned max=pd_pc_item_pockets[p].max;
@@ -65,7 +90,7 @@ bool pocket_action_begin_item(struct pocket_action *a,const char *sha,unsigned i
 }
 static unsigned select_item(struct pocket_action *a,pocket_action_read r,void *c,
                             unsigned menu,unsigned state,unsigned script) {
-  if(!item_stack(r,c,a->pocket,a->slot,a->item,a->quantity)) {
+  if(!selected_stack(a,r,c)) {
     a->result=PA_REJECTED;return 0;
   }
   if(!(state&0x40) || script!=1)return 0;
@@ -78,15 +103,18 @@ static unsigned select_item(struct pocket_action *a,pocket_action_read r,void *c
     bool submenu=false;
     for(unsigned i=0;i<sizeof pd_pc_item_submenus/sizeof *pd_pc_item_submenus;i++)
       submenu=submenu || menu==pd_pc_item_submenus[i];
-    if(submenu && item==a->item) {if(++a->stable>=6)a->result=PA_DONE;}
+    if(a->item>0x200)submenu=menu==pd_pc_item_submenus[2] || menu==PD_PC_KEY_USE_SEL_MENU;
+    if(submenu && item==(a->item&255)) {if(++a->stable>=6)a->result=PA_DONE;}
     else a->stable=0;
     return 0;
   }
   if(pocket>5){a->result=PA_REJECTED;return 0;}
   if(++a->stable<6)return 0;
   a->stable=0;a->pulse=12;
-  if(pocket!=pd_pc_item_pockets[a->pocket].pocket)return 16; /* normal Right */
-  if(menu!=pd_pc_pack_menus[pd_pc_item_pockets[a->pocket].menu])return 0;
+  unsigned targetPocket=a->item>0x200 ? 5 : pd_pc_item_pockets[a->pocket].pocket;
+  unsigned menuIndex=a->item>0x200 ? 4 : pd_pc_item_pockets[a->pocket].menu;
+  if(pocket!=targetPocket)return 16; /* normal Right */
+  if(menu!=pd_pc_pack_menus[menuIndex])return 0;
   if(cursor<1 || cursor>6){a->result=PA_REJECTED;return 0;}
   unsigned selected=scroll+cursor-1;
   if(selected==a->slot){a->phase=4;return 1;}

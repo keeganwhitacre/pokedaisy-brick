@@ -5,6 +5,7 @@
 #undef main
 #include <assert.h>
 #include "polished_action_data.h"
+#include "../app/src/main/cpp/pk_gb_field.h"
 static const struct pd_settings *liveSettings;
 static void drive(struct mCore *c,unsigned keys,int n) {
   c->setKeys(c,keys);
@@ -20,6 +21,25 @@ static void drive(struct mCore *c,unsigned keys,int n) {
 static void tap(SDL_Keycode key) {
   SDL_Event e={.type=SDL_KEYDOWN};e.key.keysym.sym=key;assert(SDL_PushEvent(&e)==1);
   e.type=SDL_KEYUP;assert(SDL_PushEvent(&e)==1);
+}
+/* Real directional input through the production quick-menu navigation. */
+static void quick_path(int from,int to,int frame,int first) {
+  int prev[8],via[8],queue[8],head=0,tail=0;
+  const int dx[]={0,0,-1,1},dy[]={-1,1,0,0};
+  const SDL_Keycode keys[]={SDLK_UP,SDLK_DOWN,SDLK_LEFT,SDLK_RIGHT};
+  for(int i=0;i<8;i++)prev[i]=-1;
+  prev[from]=from;queue[tail++]=from;
+  while(head<tail && prev[to]<0) {
+    int p=queue[head++];
+    for(int k=0;k<4;k++) {
+      int n=quick_step(8,p,dx[k],dy[k],512,384);
+      if(prev[n]<0){prev[n]=p;via[n]=k;queue[tail++]=n;}
+    }
+  }
+  assert(prev[to]>=0);
+  int path[8],n=0;for(int i=to;i!=from;i=prev[i])path[n++]=via[i];
+  int at=frame-first;
+  if(at>=0 && at<n)tap(keys[path[n-at-1]]);
 }
 static void shot(const char *name) {
   char path[1024];snprintf(path,sizeof path,"%s/%s.png",getenv("PC_SHOTS"),name);
@@ -72,8 +92,105 @@ static void earn_injury(struct mCore *c) {
   char path[1024];snprintf(path,sizeof path,"%s/states/injured.ss",root);assert(state(c,path,true));
 }
 static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui,struct pd_snapshot *s,
-                       struct pc_ui *pc,struct pocket_battle_action *battleJob) {
+                       struct pc_ui *pc,struct pocket_battle_action *battleJob,struct pocket_action *bagJob) {
   (void)ui;
+  if(getenv("PC_FIELD_NO_ITEMS")) {
+    if(frame==0) {
+      char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));
+      pc_read(s,read_memory,c);assert(!bag_count(s,PD_PC_BICYCLE));
+      for(unsigned i=0;i<sizeof pd_pc_repels/sizeof *pd_pc_repels;i++)assert(!bag_count(s,pd_pc_repels[i].id));
+    }
+    if(frame==2)tap(SDLK_f);
+    quick_path(0,2,frame,4);
+    if(frame==8)shot("earned-no-bicycle");
+    if(frame==9)tap(SDLK_z);
+    if(frame==12)assert(bagJob->result==PA_IDLE && !companion);
+    quick_path(2,1,frame,14);
+    if(frame==18)shot("earned-no-repel");
+    if(frame==19)tap(SDLK_z);
+    if(frame==22){assert(bagJob->result==PA_IDLE && !companion);fprintf(stderr,"PASS normally earned no-item state refuses Bike and Repel shortcuts\n");}
+    return;
+  }
+  if(getenv("PC_FIELD_FIXTURE")) {
+    const char *mode=getenv("PC_FIELD_FIXTURE");
+    bool repel=!strcmp(mode,"repel"),r2=!strcmp(mode,"key-r2"),cancel=!strcmp(mode,"cancel");
+    static int phase,at;static unsigned char registered[5];
+    unsigned target=repel ? pd_pc_repels[1].id : PD_PC_BICYCLE;
+    if(frame==0) {
+      char path[1024];snprintf(path,sizeof path,"%s/states/live-test.ss",root);assert(state(c,path,false));
+      assert(!polished_field_reason(PD_PC_ACTION_SHA,read_memory,c));
+      /* Explicit disposable inventory fixture, NOT normally earned items.
+       * The actual ROM, host menus and item effects execute afterwards. */
+      unsigned char keys[PD_PC_KEY_MAX+1]={2,3,4,5,6,7,8,9,PD_PC_BICYCLE-0x200,0};
+      assert(pk_gb_write(c,PD_PC_KEYS,keys,sizeof keys));
+      unsigned char items[152];unsigned addr=pd_pc_item_pockets[0].addr;
+      assert(read_memory(c,addr,items,sizeof items));unsigned n=items[0];assert(n+2<pd_pc_item_pockets[0].max);
+      items[1+2*n]=pd_pc_repels[0].id;items[2+2*n]=2;
+      items[3+2*n]=pd_pc_repels[1].id;items[4+2*n]=2;items[5+2*n]=255;items[0]=n+2;
+      assert(pk_gb_write(c,addr,items,sizeof items));
+      assert(read_memory(c,PD_PC_REGISTERED_FLAGS,registered,sizeof registered));
+      pc_read(s,read_memory,c);
+      fprintf(stderr,"FIXTURE inventory: Bicycle at key slot 9, Repel x2, Super Repel x2; not an earned save\n");
+    }
+    if(frame==2)tap(r2?SDLK_TAB:SDLK_f);
+    if(!r2)quick_path(0,repel?1:2,frame,4);
+    if(frame==5 && r2)tap(SDLK_e);
+    if(frame==8 && !r2)shot("fixture-field-quick-menu");
+    if(frame==9 && !r2){tap(SDLK_z);phase=1;}
+    if(frame==12 && repel)shot("fixture-repel-choice");
+    if(frame==14 && repel)tap(SDLK_z); /* Strongest owned kind is selected. */
+    if(r2 && frame>=8 && frame%2==0 && phase==0) {
+      assert(companion && pc->section==PC_BAG);
+      if(pc_bag_selected_item(pc,s)==(int)PD_PC_BICYCLE){shot("fixture-key-selected");tap(SDLK_2);phase=1;}
+      else tap(SDLK_DOWN);
+    }
+    if(cancel) {
+      if(frame==14){assert(bagJob->result==PA_RUNNING);tap(SDLK_x);}
+      if(frame==18) {
+        assert(bagJob->result==PA_CANCELLED);
+        shot("fixture-key-cancelled");fprintf(stderr,"PASS fixture key shortcut cancellation\n");phase=9;at=frame;
+      }
+    } else if(phase==1 && bagJob->result==PA_DONE) {
+      unsigned char item;assert(read_memory(c,PD_PC_ITEM,&item,1) && item==(target&255));
+      assert(!companion && bagJob->item==target);
+      if(!repel)assert(bagJob->slot==8);
+      shot(repel?"fixture-repel-actions":"fixture-key-actions");
+      if(r2){fprintf(stderr,"PASS actual companion R2 selected key actions with scrolled key pocket (inventory fixture)\n");phase=9;}
+      else phase=2;
+      at=frame;
+    } else if(phase==2 && frame==at+2) {
+      drive(c,1,3);drive(c,0,180); /* User confirms Use, never the product dispatcher. */
+      for(int i=0;i<6;i++){drive(c,2,3);drive(c,0,80);}
+      unsigned char value;
+      assert(read_memory(c,repel?PD_PC_REPEL_STEPS:PD_PC_PLAYER_STATE,&value,1));
+      if(repel) {
+        assert(value==200);
+        struct pd_snapshot now;pc_read(&now,read_memory,c);
+        assert(bag_count(&now,target)==1 && bag_count(&now,pd_pc_repels[0].id)==2);
+        fprintf(stderr,"PASS fixture Super Repel: user Use sets 200 steps, quantity 2 -> 1\n");
+      } else assert(value==1);
+      assert(!polished_field_reason(PD_PC_ACTION_SHA,read_memory,c));
+      phase=3;at=frame;
+    } else if(phase==3 && frame==at+2) {shot(repel?"fixture-repel-used":"fixture-bike-mounted");tap(SDLK_f);}
+    else if(phase==3 && frame==at+5) {
+      shot(repel?"fixture-repel-active":"fixture-bike-get-off");tap(SDLK_z);phase=4;at=frame;
+    } else if(phase==4 && repel && frame==at+4) {
+      struct pd_snapshot now;pc_read(&now,read_memory,c);
+      assert(bagJob->result==PA_DONE && bag_count(&now,target)==1);
+      fprintf(stderr,"PASS active Repel shortcut does not consume another item (inventory fixture)\n");phase=9;at=frame;
+    } else if(phase==4 && !repel && bagJob->result==PA_DONE && frame>at+1) {
+      drive(c,1,3);drive(c,0,180);
+      for(int i=0;i<6;i++){drive(c,2,3);drive(c,0,80);}
+      unsigned char value,after[5];assert(read_memory(c,PD_PC_PLAYER_STATE,&value,1) && value==0);
+      assert(read_memory(c,PD_PC_REGISTERED_FLAGS,after,sizeof after) && !memcmp(after,registered,sizeof after));
+      fprintf(stderr,"PASS fixture Bike Use: mount and dismount; registered shortcuts unchanged\n");phase=9;at=frame;
+    }
+    if(phase==9 && frame==at+2) {
+      shot("fixture-field-complete");SDL_Event quit={.type=SDL_QUIT};assert(SDL_PushEvent(&quit)==1);
+    }
+    if(frame==700)assert(phase==9);
+    return;
+  }
   if(getenv("PC_BATTLE_CONTROLS")) {
     static int phase,beforePP,beforeFoeHP,at;
     if(frame==0) {
@@ -150,9 +267,10 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
       if(reload)fprintf(stderr,"PASS WILD OFF survives process restart\n");
       tap(SDLK_f);
     }
-    if(frame==3){shot(reload?"wild-off-reloaded":"wild-before-toggle");tap(SDLK_RIGHT);}
-    if(frame==5)tap(SDLK_z);
-    if(frame==8) {
+    if(frame==3)shot(reload?"wild-off-reloaded":"wild-before-toggle");
+    quick_path(0,3,frame,3);
+    if(frame==8)tap(SDLK_z);
+    if(frame==11) {
       assert(!companion && ui->settings->wildOff==!reload);
       char path[1024];snprintf(path,sizeof path,"%s/settings.ini",root);
       struct pd_settings disk;pd_settings_load(&disk,path);assert(disk.wildOff==!reload);
@@ -181,9 +299,9 @@ static void test_frame(struct mCore *c,bool companion,int frame,struct pd_ui *ui
         fprintf(stderr,"PASS WILD ON: random encounter resumes after %u grass steps\n",steps);
       }
     }
-    if(frame==10)shot(reload?"wild-on-encounter":"wild-off-grass");
-    if(frame==12 && !reload)tap(SDLK_f);
-    if(frame==15 && !reload)shot("wild-off-quick-menu");
+    if(frame==13)shot(reload?"wild-on-encounter":"wild-off-grass");
+    if(frame==15 && !reload)tap(SDLK_f);
+    if(frame==18 && !reload)shot("wild-off-quick-menu");
     return;
   }
   if(getenv("PC_STORAGE")) {

@@ -1,5 +1,6 @@
 #include "polished.h"
 #include "polished_field.h"
+#include "polished_action_data.h"
 #include "rom_identity.h"
 #include <mgba/internal/gb/gb.h>
 #include "../app/src/main/cpp/pk_wide_gb_profile.h"
@@ -909,7 +910,7 @@ static void perf_frame(uint64_t start, double hz) {
 }
 #ifdef POCKET_TEST
 static void test_frame(struct mCore *, bool, int, struct pd_ui *,
-                       struct pd_snapshot *, struct pc_ui *, struct pocket_battle_action *);
+                       struct pd_snapshot *, struct pc_ui *, struct pocket_battle_action *, struct pocket_action *);
 #endif
 static void run_game(const char *path, int maxFrames, const char *shot) {
   FILE *f = fopen(path, "rb");
@@ -1129,6 +1130,12 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
     struct quick_item quick[QUICK_COUNT];
     int quickN = 0;
     char repelWhy[32] = "";
+    bool pcField=polished_field_supported(pcSha);
+    unsigned char pcRepelSteps=0,pcPlayerState=0;
+    if(pcField) {
+      read_memory(c,PD_PC_REPEL_STEPS,&pcRepelSteps,1);
+      read_memory(c,PD_PC_PLAYER_STATE,&pcPlayerState,1);
+    }
     if (pcOk || polished_field_supported(pcSha))
       quick[quickN++] = (struct quick_item){QUICK_PC, false, false,
           polished_field_supported(pcSha) ? polished_pc_reason(pcSha,read_memory,c) : NULL, 0, 0, NULL};
@@ -1138,24 +1145,27 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
                                             flyer < 0 ? "No one in your party knows FLY" : NULL,
                                             flyer < 0 ? 0 : snap.party[flyer].species, 0, NULL};
     }
-    if (itemsOk) {
+    if (itemsOk || pcField) {
       // The strongest kind held for the icon; dimmed while one works (the steps left).
       repelKindCount = 0;
       for (int k = 0; k < REPEL_KINDS; k++)
-        if (bag_count(&snap, repel_kinds[k][0]) > 0)
-          repelKinds[repelKindCount++] = repel_kinds[k][0];
-      int left = repel_steps(c, game.cfg);
+        if (bag_count(&snap, pcField ? (int)pd_pc_repels[k].id : repel_kinds[k][0]) > 0)
+          repelKinds[repelKindCount++] = pcField ? (int)pd_pc_repels[k].id : repel_kinds[k][0];
+      int left = pcField ? pcRepelSteps : repel_steps(c, game.cfg);
       if (left)
         snprintf(repelWhy, sizeof repelWhy, "%d steps left", left);
       quick[quickN++] = (struct quick_item){QUICK_REPEL, false, false,
+                                            pcField && polished_field_reason(pcSha,read_memory,c) ? "Return to the overworld first" :
                                             left ? repelWhy : repelKindCount ? NULL : "No REPEL in your bag", 0,
-                                            repelKindCount ? repelKinds[repelKindCount - 1] : repel_kinds[0][0], NULL};
+                                            repelKindCount ? repelKinds[repelKindCount - 1] : pcField ? (int)pd_pc_repels[0].id : repel_kinds[0][0], NULL};
     }
-    if (bikeOk) {
-      int bike = bag_bike(&snap);
-      bool riding = (fieldFlags & PK_FIELD_AVATAR) && (fieldFlags & PK_FIELD_BIKE);
-      quick[quickN++] = (struct quick_item){QUICK_BIKE, false, false, bike ? NULL : "No bike in your bag", 0,
-                                            bike ? bike : 360, riding ? "GET OFF" : NULL};
+    if (bikeOk || pcField) {
+      int bike = pcField ? (bag_count(&snap,PD_PC_BICYCLE)>0 ? (int)PD_PC_BICYCLE : 0) : bag_bike(&snap);
+      bool riding = pcField ? pcPlayerState==1 : (fieldFlags & PK_FIELD_AVATAR) && (fieldFlags & PK_FIELD_BIKE);
+      quick[quickN++] = (struct quick_item){QUICK_BIKE, false, false,
+                                            pcField && polished_field_reason(pcSha,read_memory,c) ? "Return to the overworld first" :
+                                            bike ? NULL : "No bike in your bag", 0,
+                                            bike ? bike : pcField ? (int)PD_PC_BICYCLE : 360, riding ? "GET OFF" : NULL};
     }
     quick[quickN++] = (struct quick_item){QUICK_WILD, settings.wildOff, false,
           polished_field_supported(pcSha) ? polished_field_reason(pcSha,read_memory,c)
@@ -1184,9 +1194,15 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
         quickOpen = repelList = false;
       else if (down(A)) {
         quickOpen = repelList = false;
-        job = JOB_REPEL;
-        jobItem = repelKinds[repelSel];
-        jobFrames = 0;
+        if(pcField) {
+          pocket_action_begin_item(&pcBagAction,pcSha,repelKinds[repelSel],read_memory,c);
+          held &= ~1023u;
+          notice(pocket_action_message(&pcBagAction));
+        } else {
+          job = JOB_REPEL;
+          jobItem = repelKinds[repelSel];
+          jobFrames = 0;
+        }
       }
     } else if (quickOpen && flyList) {
       // FLY's places: UP / DOWN, A flies, B back to the ring.
@@ -1219,8 +1235,12 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           for (int r = 0; r < REPEL_KINDS; r++)
             if (repel_kinds[r][0] == repelKinds[k])
               steps = repel_kinds[r][1];
-          snprintf(repelRows[k], sizeof repelRows[k], "%s x%d  %d steps", pd_item_name(&game, repelKinds[k]),
-                   bag_count(&snap, repelKinds[k]), steps);
+          const char *pcName="Repel";
+          if(pcField)for(unsigned r=0;r<sizeof pd_pc_repels/sizeof *pd_pc_repels;r++)
+            if(pd_pc_repels[r].id==(unsigned)repelKinds[k])pcName=pd_pc_repels[r].name;
+          if(pcField)snprintf(repelRows[k],sizeof repelRows[k],"%s x%d",pcName,bag_count(&snap,repelKinds[k]));
+          else snprintf(repelRows[k], sizeof repelRows[k], "%s x%d  %d steps", pd_item_name(&game, repelKinds[k]),
+                        bag_count(&snap, repelKinds[k]), steps);
           repelNames[k] = repelRows[k];
         }
         repelList = true;
@@ -1238,11 +1258,23 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
           jobFrames = 0;
           break;
         case QUICK_REPEL:
+          if(pcField) {
+            pocket_action_begin_item(&pcBagAction,pcSha,repelKinds[0],read_memory,c);
+            held &= ~1023u;
+            notice(pocket_action_message(&pcBagAction));
+            break;
+          }
           job = JOB_REPEL;
           jobItem = repelKinds[0];
           jobFrames = 0;
           break;
         case QUICK_BIKE:
+          if(pcField) {
+            pocket_action_begin_item(&pcBagAction,pcSha,PD_PC_BICYCLE,read_memory,c);
+            held &= ~1023u;
+            notice(pocket_action_message(&pcBagAction));
+            break;
+          }
           job = JOB_BIKE;
           jobItem = bag_bike(&snap);
           jobFrames = 0;
@@ -1411,7 +1443,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       if (down(R2)) {
         if (polished >= 0 && !pcSettings && pcUi.section == PC_BAG) {
           int item=pc_bag_selected_item(&pcUi,&snap);
-          bool begun=item>0 && item<255 ? pocket_action_begin_item(&pcBagAction,pcSha,(unsigned)item,read_memory,c)
+          bool begun=(item>0 && item<255) || (item>0x200 && item<0x300) ? pocket_action_begin_item(&pcBagAction,pcSha,(unsigned)item,read_memory,c)
                           : pocket_action_begin(&pcBagAction,pcSha,read_memory,c);
           if (begun) {
             companion=false;
@@ -1646,7 +1678,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
       }
     }
 #ifdef POCKET_TEST
-    test_frame(c, companion, frames, &ui, &snap, &pcUi, &pcBattleAction);
+    test_frame(c, companion, frames, &ui, &snap, &pcUi, &pcBattleAction, &pcBagAction);
 #endif
     frames++;
     if (maxFrames && frames >= maxFrames) {

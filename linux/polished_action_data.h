@@ -32,12 +32,22 @@
 #define PD_PC_PARTY_MENU 0x1d113u /* wPartyMenuActionText */
 #define PD_PC_ACTIVE_MON 0x1d0dau /* wCurBattleMon */
 #define PD_PC_MOVE_MENU 0x1d239u /* wMoveSelectionMenuType */
+#define PD_PC_KEYS 0x1d800u /* wKeyItems */
+#define PD_PC_PLAYER_STATE 0x1d9ddu /* wPlayerState */
+#define PD_PC_REPEL_STEPS 0x1dc99u /* wRepelEffect */
+#define PD_PC_REGISTERED_FLAGS 0x1dfeeu /* wRegisteredItemFlags */
+#define PD_PC_REGISTERED_ITEMS 0x1dfefu /* wRegisteredItems */
 #define PD_PC_PARTY_SIZE 48u
 #define PD_PC_BATTLE_SIZE 35u
 #define PD_PC_MOVES_OFFSET 2u
 #define PD_PC_PP_OFFSET 11u
 #define PD_PC_PC_SCRIPT 0x2f41e2u
 #define PD_PC_PC_MENU 0x50d2u
+#define PD_PC_KEY_MAX 38u
+#define PD_PC_KEY_USE_SEL_MENU 0x4213u
+#define PD_PC_KEY_ID_MAX 38u
+#define PD_PC_BICYCLE 0x201u
+static const struct {unsigned id;const char *name;} pd_pc_repels[]={{93,"Repel"},{94,"Super Repel"},{95,"Max Repel"}};
 #define PD_PC_START_MENU 0x6160u
 static const unsigned pd_pc_pack_menus[]={0x4791,0x47a9,0x47c1,0x47d9,0x47f1};
 static const unsigned pd_pc_item_submenus[]={0x41c9,0x422e,0x41ec};

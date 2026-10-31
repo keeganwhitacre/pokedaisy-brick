@@ -49,6 +49,14 @@ static const char *const COMPANION[] = {
     "......11", ".....11.", "....11..", "...11...", "..11....", ".11.....", "11......",
     ".11.....", "..11....", "...11...", "....11..", ".....11.", "......11", NULL,
 };
+/* FieldHud.kt's BAG_ICON. The native Bag handoffs use the app's satchel
+ * when this game's item art is unavailable. */
+static const char *const BAG[] = {
+    ".....KKKKKK.....", "....KK....KK....", "....K......K....", "..KKKKKKKKKKKK..",
+    ".KBLLLLLLLLLLBK.", ".KBBBBBBBBBBBBK.", ".KBBBBBBBBBBBBK.", ".KKKKKKYYKKKKKK.",
+    ".KBBBBKYYKBBBBK.", ".KBBBBBKKBBBBBK.", ".KBBBBBBBBBBBBK.", ".KBBBBBBBBBBBBK.",
+    ".KLBBBBBBBBBBLK.", ".KLLBBBBBBBBLLK.", "..KKKKKKKKKKKK..", "................", NULL,
+};
 
 const char *quick_label(enum quick_action a) {
   switch (a) {
@@ -66,6 +74,8 @@ const char *quick_label(enum quick_action a) {
 }
 
 static uint32_t icon_color(enum quick_action a, char ch) {
+  if(a==QUICK_BIKE || a==QUICK_REPEL)
+    return ch=='K' ? 0x3A2414 : ch=='B' ? 0xC0783A : ch=='L' ? 0xE8A868 : 0xF8D030;
   if (a == QUICK_WILD)
     return ch == 'K' ? 0x183818 : ch == 'G' ? 0x389838 : 0x78D058;
   if (a == QUICK_PC)
@@ -78,7 +88,7 @@ static uint32_t icon_color(enum quick_action a, char ch) {
 
 // An icon centred at (cx, cy), `scale` canvas pixels a pixel; dim: at half strength over the glass.
 static void icon(struct pd_canvas *c, enum quick_action a, int cx, int cy, int scale, bool dim) {
-  const char *const *rows = a == QUICK_PC ? PC : a == QUICK_WILD ? GRASS : a == QUICK_SAVE_STATE ? SAVE_STATE
+  const char *const *rows = a == QUICK_BIKE || a == QUICK_REPEL ? BAG : a == QUICK_PC ? PC : a == QUICK_WILD ? GRASS : a == QUICK_SAVE_STATE ? SAVE_STATE
                           : a == QUICK_LOAD_STATE ? LOAD_STATE : a == QUICK_FF ? FF : COMPANION;
   int h = 0, w = (int)strlen(rows[0]);
   while (rows[h])
