@@ -105,3 +105,11 @@ save round trips remain hardware validation items. Platinum companion is
 read-only and restricted to the exact app-identified USA rev1 ROM. Other DS games,
 including Black 2, are not validated Linux support merely because loading exists.
 No ROM, private save/state, BIOS or extracted art is committed or packaged.
+
+Additional private live battle check: normal walking from Jubilife reached a
+wild Shinx encounter. Native and ARM/QEMU both resumed at core frame 8130,
+reported animation phase 1, and changed to selection phase 2 at frame 8844.
+Their native bottom-screen battle menu captures at frame 8935 are pixel-identical.
+Native button input then entered FIGHT/moves and returned to animation phase 1
+at frame 9257, displaying the top screen. This is a narrow real Platinum battle
+check, not exhaustive validation of doubles, all submenus or every battle phase.
