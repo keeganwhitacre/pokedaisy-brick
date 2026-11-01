@@ -216,6 +216,7 @@ def kotlin_class_fields(kt_file, cls):
     if not m:
         raise GameDataError(f"no `data class {cls}(` in {kt_file}")
     body = src[m.end():match_paren(src, m.end() - 1) - 1]
+    body = re.sub(r",[ \t]*val ", ",\nval ", body)  # one line, several fields (data class TrainerMonLayout(...))
     fields, comments, in_doc = [], [], False
     for line in body.split("\n"):
         t = line.strip()

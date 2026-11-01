@@ -151,6 +151,9 @@ def to_toml(field, rhs, f):
                 lits = [" ".join(a.split()).strip("() ") for a in cv.split_args(m.group(1)) if a.strip()]
                 return "[" + ", ".join(cv.toml_int(l) if re.fullmatch(r"-?(0x[0-9A-Fa-f_]+|\d+)L?", l)
                                        else str(i) for l, i in zip(lits, items)) + "]", None
+    plain = " ".join(rhs.split())
+    if ftype == "ref" and re.fullmatch(r"[A-Za-z_]\w*\.[A-Z_][A-Z0-9_]*", plain):  # an enum value: CardStyle.LEGACY
+        return cv.toml_str(plain), None
     return cv.to_toml(field, rhs, ftype, {})
 
 
@@ -176,6 +179,14 @@ def main():
             f = schema["fields"].get(e[0])
             if f and "record" in f:
                 need(str(e[1]), gg.load_schema(f["record"]))
+
+    # ... and what the 3DS / Linux target names itself: a config's `records = { items = 'FIELD_ITEMS_...' }` (the app
+    # picks those by game in code, FieldItems.kt fieldItemsFor, not through the config).
+    target = gg.read_toml(os.path.join(ROOT, "gamedata/targets/3ds.toml"))
+    for tab in target:
+        for e in tab["entries"]:
+            if e[0] == "records" and isinstance(e[1], dict) and isinstance(e[1].get("items"), str):
+                need(e[1]["items"], gg.load_schema("gen3_field_items"))
 
     done, problems, records = set(), [], []
     inline = set()  # (record, field) written inline: its own record, checked on its own
@@ -210,10 +221,18 @@ def main():
                 continue
             head, body = ex
         base = None
+        head = head.replace("!!", "")
         if head.endswith(".copy"):
             base = head[:-5]
             fm = re.fullmatch(r"([A-Z][A-Z0-9_]*)\.(\w+)", base)  # POKEDEX_QUETZAL.flags.copy(...): that record's own
-            if fm:  # its inline record gets this name when fm's record is ported
+            known = existing.get(fm.group(1)) if fm else None
+            if known:  # FLY_EMERALD.healWarp: the record that field of a gamedata record names
+                ref = next((str(e[1]) for e in known["entries"] if e[0] == fm.group(2)), None)
+                if not ref:
+                    problems.append(f"{name}: {base} isn't set in {fm.group(1)}")
+                    continue
+                base = ref
+            elif fm:  # its inline record gets this name when fm's record is ported
                 base = fm.group(1) + "_" + re.sub(r"(?<!^)([A-Z])", r"_\1", fm.group(2)).upper()
             else:
                 need(base, s)
@@ -240,7 +259,7 @@ def main():
             v = " ".join(val.split())
             if "record" in f:
                 rs = gg.load_schema(f["record"])
-                im = re.fullmatch(r"([\w.]+)\((.*)\)", v, re.S)
+                im = re.fullmatch(r"([\w.!]+)\((.*)\)", v, re.S)
                 if im:  # written inline: a record of its own, NAME_FIELD
                     sub = name + "_" + re.sub(r"(?<!^)([A-Z])", r"_\1", field).upper()
                     queue.append((sub, rs, im.group(1), im.group(2), path, []))

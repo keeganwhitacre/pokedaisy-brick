@@ -23,6 +23,7 @@ enum pd_guide_id {
     PD_GUIDE_EMERALD,
     PD_GUIDE_RUBY,
     PD_GUIDE_SAPPHIRE,
+    PD_GUIDE_EMERALD_LEGACY,
 };
 
 struct pd_config {
@@ -82,6 +83,8 @@ struct pd_config {
     uint32_t learnsets;   // gLevelUpLearnsets, a pointer per species
     uint32_t wildHeaders; // gWildMonHeaders, 20 bytes each
     uint32_t flagsOff, varsOff, flagBytes; // in SaveBlock1
+    // A hack's own struct TrainerMon (GuideTables.trainerMon), every field at a fixed offset; stride 0 = retail's.
+    int trainerMonStride, trainerMonMovesOff, trainerMonSpeciesOff, trainerMonItemOff, trainerMonLevelOff;
     int probeTrainer;     // checks the tables match the ROM ...
     const char* probeName; // ... by this trainer's name
 
@@ -96,6 +99,7 @@ struct pd_config {
     int nationalVar, nationalVarValue, nationalFlag;
     int stickerVar;
     int frontierSymbolFlag;
+    int extraStarFlag; // a flag worth one more star (Legacy's FLAG_CAUGHT_MEW); 0 = none
     uint32_t museumWinnersOff, frontierBpOff; // in SaveBlock1 / SaveBlock2
 
     // FLY (the app's FlyFns / HealWarp, Fly.kt): the game's own functions, called between frames (the Linux host's
@@ -130,7 +134,8 @@ struct pd_config {
     uint32_t pcSpecials, pcFn, pcCrcs[2], pcScript;
 };
 
-enum pd_card_style { PD_CARD_NONE, PD_CARD_KANTO, PD_CARD_HOENN };
+// LEGACY: Emerald Legacy's - HOENN's card, a fifth star (extraStarFlag) on a black one, Hoenn's dex and eight more.
+enum pd_card_style { PD_CARD_NONE, PD_CARD_KANTO, PD_CARD_HOENN, PD_CARD_LEGACY };
 
 // The bag's pockets, in a fixed order of our own (the app's POCKET_* ids).
 enum pd_pocket {

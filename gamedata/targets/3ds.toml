@@ -17,6 +17,7 @@ POCKET_KEY_ITEMS = 'PD_POCKET_KEY'
 [names.CardStyle]
 KANTO = 'PD_CARD_KANTO'
 HOENN = 'PD_CARD_HOENN'
+LEGACY = 'PD_CARD_LEGACY'
 
 # Each part is a set of pd_config fields = a path into the config: a field, then (through a record
 # the field names) that record's field, a list's index. A record a config doesn't have counts as its
@@ -81,6 +82,11 @@ regionName = 'pokedex.regionName'
 
 # GUIDE's live pages.
 [part.guide]
+trainerMonStride = 'guideTables.trainerMon.stride'
+trainerMonMovesOff = 'guideTables.trainerMon.movesOff'
+trainerMonSpeciesOff = 'guideTables.trainerMon.speciesOff'
+trainerMonItemOff = 'guideTables.trainerMon.itemOff'
+trainerMonLevelOff = 'guideTables.trainerMon.levelOff'
 trainers = 'guideTables.trainers'
 learnsets = 'guideTables.learnsets'
 wildHeaders = 'guideTables.wildHeaders'
@@ -98,6 +104,7 @@ nationalVarValue = 'trainerCard.nationalVarValue'
 nationalFlag = 'trainerCard.nationalFlag'
 stickerVar = { path = 'trainerCard.stickerVar', none = -1 }
 frontierSymbolFlag = { path = 'trainerCard.frontierSymbolFlag', none = -1 }
+extraStarFlag = { path = 'trainerCard.extraStarFlag', none = -1 }
 museumWinnersOff = { path = 'trainerCard.museumWinnersOff', none = -1 }
 frontierBpOff = { path = 'trainerCard.frontierBpOff', none = -1 }
 
@@ -179,10 +186,11 @@ parts = ['ram', 'foes', 'icons', 'dex', 'guide', 'card', 'fly', 'field']
 records = { items = 'FIELD_ITEMS_EMERALD' }
 
 # plorpOS's Linux port: the hacks, as their records reach gen3/records/c_hacks.toml. Emerald Legacy v1.1.4: retail's
-# structs with its own addresses (its guide's trainer parties and its card style need C first).
+# structs with its own addresses, its own TrainerMon (guideTables.trainerMon).
 [config.emerald_legacy]
 name = 'EMERALD_LEGACY'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide', 'card', 'fly', 'field']
+records = { items = 'FIELD_ITEMS_EMERALD_LEGACY' }
 
 # Ruby / Sapphire (USA): rev 1 and 2 share every address (the app's NATIVE_RUBY / _SAPPHIRE), rev 0 is its own
 # (RETAIL_PORTS' AXVE0 / AXPE0). Read like Emerald (the same species / item / map-section ids); no trainer card.
