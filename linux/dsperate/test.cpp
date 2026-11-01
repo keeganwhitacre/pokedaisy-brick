@@ -5,6 +5,7 @@
 #include "browser.h"
 #include "party_view.h"
 #include "bag_view.h"
+#include "dex_view.h"
 #include "battle_view.h"
 #include "pk_nds_field.h"
 #include <filesystem>
@@ -97,6 +98,15 @@ int main(int argc,char** argv){
   legacyGame.cfg=&bagConfig;legacySnapshot.bagOk=true;legacy.bagSelected=-1;
   pd_ui_bag_view(&legacy,&body,&legacyGame,&legacySnapshot);
   assert(legacy.bagSource==nullptr && legacy.hitCount>0);
+  DsCompanion dex;dex.valid=dex.dexValid=true;dex.dexSeen.resize(494);dex.dexCaught.resize(494);
+  dex.dexSeen[493]=dex.dexCaught[493]=1;dex.seenCount=dex.caughtCount=1;
+  ds_dex_view(&body,dex,0,492); // Gen 4 ID beyond shared GBA arrays
+  ds_dex_view(&body,dex,1,999);ds_dex_view(&body,dex,2,-1);
+  dex.dexCaught[493]=0;ds_dex_view(&body,dex,2,0);
+  pd_ui nav{};nav.pressedId=-1;const char* tabs[]={"PARTY","BAG","DEX","STATUS","SET","MAP"};
+  pd_ui_navigation(&nav,&body,tabs,6,2);assert(nav.hitCount==6);
+  pd_ui_navigation(&nav,&body,tabs,0,0);assert(nav.hitCount==0);
+  std::puts("PASS shared dex national 493, filter bounds, empty list and navigation chips");
   std::puts("PASS shared bag rendering past row 99, details, empty pockets and trailing tabs");
   std::puts("PASS shared party/summary renderer with DS Burmy and egg identities");
   std::puts("PASS shared party HUD with captured Gen 4 data and backend asset callback");

@@ -9,6 +9,7 @@
 #include "browser.h"
 #include "party_view.h"
 #include "bag_view.h"
+#include "dex_view.h"
 #include "data_gen.h"
 #include "battle_view.h"
 #include "display.h"
@@ -29,6 +30,7 @@ extern "C" {
 #include "pd_style.h"
 #include "pd_png.h"
 #include "pd_tables.h"
+#include "pd_ui.h"
 #include "../quick_menu.h"
 #include "../hud.h"
 #include "pd_settings.h"
@@ -88,10 +90,12 @@ void blit(SDL_Renderer* r,SDL_Texture* t,const uint32_t* px,int w,int h,int ow,i
   SDL_Rect dst{(ow-w*scale)/2,(oh-h*scale)/2,w*scale,h*scale};SDL_RenderCopy(r,t,nullptr,&dst);
 }
 void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int selected,bool summary,int scroll,int page,const DsPrefs& prefs,const pd_settings& settings,int setting,const DsMapArt& art,int mapX,int mapY,int pocket,int dexFilter,bool bagDetails,const std::vector<std::vector<uint32_t>>& icons){
-  pd_fill(&c,0,0,c.w,c.h,0x50a8a8);pd_title_box(&c,5,5,c.w-10,25,0xffffff);
-  pd_text(&c,12,10,"PokeDaisy DS",0x303030,PD_NO_SHADOW);
+  pd_backdrop(&c);pd_title_box(&c,5,5,c.w-10,25,0xffffff);
+  pd_text(&c,12,10,"PokeDaisy DS",PD_TITLE_TEXT,PD_TITLE_SHADOW);
   const char* tabs[]={"PARTY","BAG","DEX","STATUS","SET","MAP"};
-  for(int i=0;i<6;i++){int x=5+i*(c.w-10)/6;pd_title_box(&c,x,34,(c.w-10)/6-2,23,i==tab?0xffefbc:0xffffff);pd_text(&c,x+8,38,tabs[i],0x303030,PD_NO_SHADOW);}
+  pd_canvas nav;pd_canvas_init(&nav,c.w,26,c.px+32*c.w);
+  pd_ui navigation{};navigation.pressedId=-1;
+  pd_ui_navigation(&navigation,&nav,tabs,6,tab);
   pd_list_box(&c,5,61,c.w-10,c.h-86);int y=68;
   auto line=[&](const std::string& t){pd_text_fit(&c,13,y,c.w-26,t.c_str(),0x303030,PD_NO_SHADOW);y+=20;};
   if(tab==4){
@@ -139,18 +143,7 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
   }
   else if(tab==2){
     if(!s.dexValid)line("Pokedex data unavailable");
-    else {
-      line(std::string(dexFilter==0?"ALL":dexFilter==1?"SEEN":"CAUGHT")+"  SEEN "+std::to_string(s.seenCount)+" OWN "+std::to_string(s.caughtCount));
-      int rows=(c.h-120)/20;
-      int eligible=0,shown=0;
-      for(int n=1;n<int(s.dexSeen.size());n++){
-        if(!ds_dex_visible(s,n,dexFilter))continue;
-        if(eligible++<scroll)continue;
-        if(shown++>=rows)break;
-        char number[16];std::snprintf(number,sizeof number,"%03d ",n);
-        line(std::string(number)+(s.dexSeen[n]?ds_species(n):"???")+(s.dexCaught[n]?"  OWN":s.dexSeen[n]?"  SEEN":""));
-      }
-    }
+    else {pd_canvas body;pd_canvas_init(&body,c.w,c.h-81,c.px+61*c.w);ds_dex_view(&body,s,dexFilter,scroll);}
   }
   else {line("TRAINER: "+s.trainer);line("MONEY: "+std::to_string(s.money));line(std::string("PLACE: ")+ds_place(s.map));line("MAP: "+std::to_string(s.map));line(s.dexValid?(s.nationalDex?"NATIONAL DEX: UNLOCKED":"NATIONAL DEX: LOCKED"):"DEX: UNAVAILABLE");}
   pd_text_fit(&c,9,c.h-20,c.w-18,tab==5?"D-pad move  A player  L/R tabs":tab==4?"Up/Down select  A change  L/R tabs":tab==0 && summary?"Left/Right info/moves  Up/Down Pokemon":tab==1?"Up/Down item  Left/Right pocket  A details":tab==2?"SELECT filter  Left/Right page  L/R tabs":"D-pad cards  A summary  B back  L2 game",0xffffff,PD_NO_SHADOW);

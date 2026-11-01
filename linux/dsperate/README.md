@@ -251,3 +251,21 @@ The default GBA gather/name/quantity/description path stays unchanged. Tests
 exercise DS lists past row 99, details, empty pockets and the last pocket tab.
 Tab strip, dex, map and settings are still the earlier frontend. This is another
 migration step, not a claim that every screen matches Android or GBA already.
+
+## Shared navigation chips and Pokédex list
+
+The DS tab strip now calls `pd_ui_navigation`, using the established companion's
+chip frame and active/inactive text styles. DS retains its six supported tabs
+and top-strip placement; this is not the full Android bottom-bar/MORE layout.
+
+DEX now calls the shared `pd_ui_dex.c` list renderer for the title/counts, filter
+button, seen/caught Poke Ball markers, framed rows, selected row and scrollbar.
+A list-only optional source supplies filtered national IDs and seen/caught flags.
+It never copies Gen 4 into the GBA's 386-entry arrays. All 493 IDs are supported
+by the list adapter; unidentified entries remain ???. Select still cycles
+ALL/SEEN/CAUGHT, Up/Down selects, Left/Right pages. Empty filters show a message.
+
+This is list parity only: A does not open a full DS dex entry. Species text,
+front sprites, regional ordering and entry statistics/descriptions need their
+own app-owned ROM/data adapters. Map and Settings bodies remain the older DS
+frontend. These changes add no game writes or new memory-offset tables.
