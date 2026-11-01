@@ -140,6 +140,7 @@ struct pd_game {
     const uint8_t* rom;
     size_t romSize;
     unsigned loadId; // new on every pd_game_detect (see pd_rom_id)
+    char sha1[41];   // the whole ROM's, once pd_game_identify ran ("" before)
 };
 
 // Which ROM the tabs' caches were built from: 0 = none, else new for every
@@ -154,5 +155,11 @@ const uint8_t* pd_rom_at(const struct pd_game* g, uint32_t addr, size_t len);
 
 // Reads the ROM header (the first 0xC0 bytes of the ROM) and its size.
 void pd_game_detect(struct pd_game* g, const uint8_t* header, size_t romSize);
+
+// Once g->rom is set: which FireRed / LeafGreen / Emerald file this is, by its SHA-1, as the app's Poller.detect
+// tells them apart - a hack the companion knows gets its own config, a retail cart (or a collection's dump of one,
+// the app's RetailDumps) keeps detect's, and anything else is an unknown hack: unsupported rather than read with
+// retail's addresses.
+void pd_game_identify(struct pd_game* g);
 
 #endif

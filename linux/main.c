@@ -1138,6 +1138,9 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   pd_game_detect(&game, romdata, (size_t)len);
   game.rom = romdata;
   game.romSize = (size_t)len;
+  pd_game_identify(&game);
+  fprintf(stderr, "pokedaisy: %s, sha1 %s%s%s\n", game.title ? game.title : "?", game.sha1[0] ? game.sha1 : "-",
+          game.unsupported ? " - " : "", game.unsupported ? game.unsupported : "");
   if (c->platform(c) == mPLATFORM_GBA)
     pd_romart_scan(&game);
   char config[1024];
