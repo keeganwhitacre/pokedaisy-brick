@@ -39,11 +39,30 @@ void pd_game_detect(struct pd_game* g, const uint8_t* header, size_t romSize) {
         g->kind = PD_GAME_FIRERED;
         g->title = g->code[2] == 'R' ? "Pokémon FireRed" : "Pokémon LeafGreen";
         bool rev1 = g->revision == 1;
+        g->guide = g->code[2] == 'R' ? PD_GUIDE_FIRERED : PD_GUIDE_LEAFGREEN;
         if (g->code[2] == 'R') g->cfg = rev1 ? &PD_CONFIG_FIRERED_REV1 : &PD_CONFIG_FIRERED_REV0;
         else g->cfg = rev1 ? &PD_CONFIG_LEAFGREEN_REV1 : &PD_CONFIG_LEAFGREEN_REV0;
+    } else if (!strcmp(g->code, "AXVE") || !strcmp(g->code, "AXPE")) {
+        // Ruby / Sapphire (USA), read like Emerald (Poller.otherRetailConfig): rev 0 has its own addresses.
+        bool ruby = g->code[2] == 'V';
+        g->kind = PD_GAME_EMERALD;
+        g->title = ruby ? "Pokémon Ruby" : "Pokémon Sapphire";
+        g->guide = ruby ? PD_GUIDE_RUBY : PD_GUIDE_SAPPHIRE;
+        if (g->revision == 0) g->cfg = ruby ? &PD_CONFIG_RUBY_REV0 : &PD_CONFIG_SAPPHIRE_REV0;
+        else g->cfg = ruby ? &PD_CONFIG_RUBY : &PD_CONFIG_SAPPHIRE;
+        if (g->revision > 2) {
+            g->cfg = NULL;
+            g->unsupported = "This revision isn't supported yet";
+        } else if (romSize > 0x1000000) {
+            g->cfg = NULL;
+            g->title = ruby ? "Ruby ROM hack" : "Sapphire ROM hack";
+            g->unsupported = "Not a version the companion knows";
+        }
+        return;
     } else if (!strcmp(g->code, "BPEE")) {
         g->kind = PD_GAME_EMERALD;
         g->title = "Pokémon Emerald";
+        g->guide = PD_GUIDE_EMERALD;
         g->cfg = &PD_CONFIG_EMERALD;
     } else {
         g->title = "Unknown game";
@@ -99,10 +118,12 @@ struct known_rom {
     const struct pd_config* cfg;
     enum pd_game_kind kind;
     const char* title;
+    enum pd_guide_id guide;
 };
 static const struct known_rom KNOWN_ROMS[] = {
-    {"cbd71af65ee3dcd53280a6a12014bfb11e8f626a", &PD_CONFIG_EMERALD_LEGACY, PD_GAME_EMERALD, "Pokémon Emerald Legacy"},
-    {NULL, NULL, PD_GAME_NONE, NULL},
+    {"cbd71af65ee3dcd53280a6a12014bfb11e8f626a", &PD_CONFIG_EMERALD_LEGACY, PD_GAME_EMERALD, "Pokémon Emerald Legacy",
+     PD_GUIDE_NONE},
+    {NULL, NULL, PD_GAME_NONE, NULL, PD_GUIDE_NONE},
 };
 
 static bool retail_dump(const struct pd_game* g) {
@@ -141,14 +162,19 @@ void pd_game_identify(struct pd_game* g) {
         g->cfg = k->cfg;
         g->kind = k->kind;
         g->title = k->title;
+        g->guide = k->guide;
         g->unsupported = NULL;
         return;
     }
     if (!g->cfg) return; // detect's verdict (a revision past 1, a big hack) stands
+    // LeafGreen, Ruby and Sapphire are read by code and revision alone, like the app (OTHER_RETAIL_CODES):
+    // only FireRed and Emerald, which most hacks build on, need a retail hash.
+    if (strcmp(g->code, "BPRE") && strcmp(g->code, "BPEE")) return;
     for (size_t i = 0; i < sizeof RETAIL_SHA1S / sizeof *RETAIL_SHA1S; i++)
         if (!strcmp(RETAIL_SHA1S[i], g->sha1)) return;
     if (retail_dump(g)) return;
     g->cfg = NULL;
+    g->guide = PD_GUIDE_NONE;
     g->title = g->kind == PD_GAME_FIRERED ? "FireRed ROM hack" : "Emerald ROM hack";
     g->unsupported = "Not a version the companion knows";
 }

@@ -19,23 +19,25 @@ static uint32_t u32(const uint8_t* p) {
 }
 
 const struct pd_guide* pd_guide_for(const struct pd_game* g) {
-    if (g->kind == PD_GAME_EMERALD) return &pd_guide_emerald;
-    if (g->kind == PD_GAME_FIRERED) return !strcmp(g->code, "BPGE") ? &pd_guide_leafgreen : &pd_guide_firered;
-    return NULL;
+    switch (g->guide) {
+    case PD_GUIDE_FIRERED: return &pd_guide_firered;
+    case PD_GUIDE_LEAFGREEN: return &pd_guide_leafgreen;
+    case PD_GUIDE_EMERALD: return &pd_guide_emerald;
+    case PD_GUIDE_RUBY: return &pd_guide_ruby;
+    case PD_GUIDE_SAPPHIRE: return &pd_guide_sapphire;
+    default: return NULL;
+    }
 }
 
 const struct pd_area_thing* pd_areas_for(const struct pd_game* g, int* count) {
-    if (g->kind == PD_GAME_EMERALD) {
-        *count = pd_areas_emerald_count;
-        return pd_areas_emerald;
+    switch (g->guide) {
+    case PD_GUIDE_FIRERED: *count = pd_areas_firered_count; return pd_areas_firered;
+    case PD_GUIDE_LEAFGREEN: *count = pd_areas_leafgreen_count; return pd_areas_leafgreen;
+    case PD_GUIDE_EMERALD: *count = pd_areas_emerald_count; return pd_areas_emerald;
+    case PD_GUIDE_RUBY:
+    case PD_GUIDE_SAPPHIRE: *count = pd_areas_ruby_sapphire_count; return pd_areas_ruby_sapphire;
+    default: *count = 0; return NULL;
     }
-    if (g->kind == PD_GAME_FIRERED) {
-        bool lg = !strcmp(g->code, "BPGE");
-        *count = lg ? pd_areas_leafgreen_count : pd_areas_firered_count;
-        return lg ? pd_areas_leafgreen : pd_areas_firered;
-    }
-    *count = 0;
-    return NULL;
 }
 
 static bool caught_species(const struct pd_game* g, const struct pd_snapshot* s, int species) {

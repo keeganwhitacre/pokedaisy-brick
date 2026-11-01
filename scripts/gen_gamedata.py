@@ -629,12 +629,12 @@ def load_records():
             if name in records:
                 fail(where, f"{name} is also in {records[name]['file']}")
             # `of` / `items` are a list's own keys; a record's `items` is a field (FieldItemFns.items).
-            keys = ("schema", "base", "of", "items") if kind == "list" else ("schema", "base", "c_only")
+            keys = ("schema", "base", "of", "items") if kind == "list" else ("schema", "base", "kotlin")
             meta = {e[0]: e[1] for e in tab["entries"] if e[0] in keys}
             entries = [e for e in tab["entries"] if e[0] not in keys]
             r = {"name": name, "kind": kind, "file": rel, "where": where, "rank": (rel, i),
                  "lead": tab["lead"], "end": tab["end"], "entries": entries, "base": meta.get("base"),
-                 "c_only": meta.get("c_only", False)}
+                 "kotlin": meta.get("kotlin", True)}
             if kind == "list":
                 if entries or meta.get("of") not in LIST_TYPES or not isinstance(meta.get("items"), list):
                     fail(where, "a list has `of` (Int or Long) and `items`, nothing else")
@@ -678,9 +678,9 @@ def record_kotlin(records):
     ]
     last_file = None
     for r in sorted(records.values(), key=lambda r: r["rank"]):
-        # A C-only record (plorpOS's Linux port: `c_only = true`) holds just the fields the 3DS / Linux target
-        # reads, for a game whose full record is still a Kotlin val - the app keeps that val.
-        if r.get("c_only"):
+        # `kotlin = false` (plorpOS's Linux port, scripts/port_records.py): a record whose Kotlin val the app
+        # still keeps itself, here for the 3DS / Linux target only.
+        if r.get("kotlin") is False:
             continue
         if r["file"] != last_file:
             out += ["", f"// ---- {r['file']} ----"]

@@ -386,7 +386,8 @@ void ui_guide_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g
         return;
     }
     // The first visit per game: the notice first.
-    lastKindBit = 1 << g->kind;
+    // (A bit per game kind, as saved settings have it; the guides past Emerald's get their own.)
+    lastKindBit = g->guide >= PD_GUIDE_RUBY ? 1 << (8 + g->guide) : 1 << g->kind;
     if (!(ui->settings->guideNotice & lastKindBit) && ui->overlay == PD_OVERLAY_NONE) {
         ui->overlay = PD_OVERLAY_GUIDE_NOTICE;
     }

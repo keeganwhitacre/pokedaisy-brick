@@ -15,6 +15,16 @@ enum pd_game_kind {
     PD_GAME_EMERALD,
 };
 
+// Which GUIDE a game gets (pd_guide_for): its own, or none until it's ported.
+enum pd_guide_id {
+    PD_GUIDE_NONE = 0,
+    PD_GUIDE_FIRERED,
+    PD_GUIDE_LEAFGREEN,
+    PD_GUIDE_EMERALD,
+    PD_GUIDE_RUBY,
+    PD_GUIDE_SAPPHIRE,
+};
+
 struct pd_config {
     uint32_t playerParty;
     uint32_t playerPartyCount;
@@ -26,7 +36,9 @@ struct pd_config {
     uint32_t saveBlock1Ptr;
     uint32_t saveBlock2Ptr;
     uint32_t mapHeader;
-    uint32_t encryptionKeyOff; // in SaveBlock2
+    int32_t encryptionKeyOff;  // in SaveBlock2; -1 = no key (Ruby / Sapphire: money and bag counts plain)
+    // Ruby / Sapphire: saveBlock1Ptr / saveBlock2Ptr are the blocks themselves, gBattleStruct a fixed block.
+    bool staticSaveBlocks, battleStructStatic;
     uint32_t moneyOff;         // in SaveBlock1
     // The battle's FOE TEAM: gEnemyParty (6 struct Pokemon), gBattlerPartyIndexes
     // (u16 per battler: which one is out) and gBattleStruct (a pointer) ->
@@ -135,6 +147,7 @@ struct pd_game {
     char code[5];       // ROM header game code, e.g. "BPRE"
     int revision;       // ROM header 0xBC
     const char* title;  // "Pokémon FireRed"
+    enum pd_guide_id guide;
     const struct pd_config* cfg; // NULL = detected but not supported
     const char* unsupported;     // why, when cfg is NULL
     // The ROM's bytes (0x08000000 on the bus), for the tabs that read its

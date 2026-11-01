@@ -37,6 +37,7 @@ saveBlock2Ptr = 'saveBlock2Ptr'
 mapHeader = 'mapHeader'
 encryptionKeyOff = 'encryptionKeyOff'
 moneyOff = 'moneyOff'
+staticSaveBlocks = 'staticSaveBlocks'
 bagPockets = 'bagPockets'
 bagOrder = 'bagPocketOrder'
 dexSeenCopy1 = 'pokedex.flags.seenCopies.0'
@@ -52,6 +53,7 @@ flagBytes = 'guideTables.flagBytes'
 enemyParty = 'enemyParty'
 battlerPartyIndexes = 'battlerPartyIndexes'
 battleStructPtr = 'battleStructPtr'
+battleStructStatic = 'battleStructStatic'
 monToSwitchIntoOff = 'monToSwitchIntoOff'
 
 # The party menu's icons and the bag's.
@@ -181,3 +183,21 @@ records = { items = 'FIELD_ITEMS_EMERALD' }
 [config.emerald_legacy]
 name = 'EMERALD_LEGACY'
 parts = ['ram', 'foes', 'icons', 'dex']
+
+# Ruby / Sapphire (USA): rev 1 and 2 share every address (the app's NATIVE_RUBY / _SAPPHIRE), rev 0 is its own
+# (RETAIL_PORTS' AXVE0 / AXPE0). Read like Emerald (the same species / item / map-section ids); no trainer card.
+[config.ruby]
+name = 'RUBY'
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
+
+[config.sapphire]
+name = 'SAPPHIRE'
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
+
+[config.port_axve0]
+name = 'RUBY_REV0'
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
+
+[config.port_axpe0]
+name = 'SAPPHIRE_REV0'
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
