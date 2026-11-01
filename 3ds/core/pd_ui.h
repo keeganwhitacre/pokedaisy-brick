@@ -147,7 +147,18 @@ struct pd_bag_source {
     bool (*item)(void*, int, int, struct pd_item*, bool* quantity);
     const char* (*name)(void*, int);
 };
+// A list-only dex source: no ROM entry/sprite data is implied by a name.
+struct pd_dex_source {
+    void* ctx;
+    int count, seenCount, caughtCount;
+    const char* filterLabel;
+    int (*national)(void*, int);
+    bool (*seen)(void*, int);
+    bool (*caught)(void*, int);
+    const char* (*name)(void*, int);
+};
 struct pd_ui {
+    const struct pd_dex_source* dexSource;
     const struct pd_bag_source* bagSource;
     bool bagDetails;
     const struct pd_party_source* partySource;
@@ -202,6 +213,8 @@ struct pd_ui {
 };
 
 // Shared party body, including its original frames, HP bars, status and summary.
+void pd_ui_navigation(struct pd_ui*,struct pd_canvas*,const char* const*,int,int);
+void pd_ui_dex_view(struct pd_ui*,struct pd_canvas*,const struct pd_game*,const struct pd_snapshot*,int selected);
 void pd_ui_bag_view(struct pd_ui*, struct pd_canvas*, const struct pd_game*, const struct pd_snapshot*);
 void pd_ui_party_view(struct pd_ui*, struct pd_canvas*, const struct pd_game*,
                       const struct pd_snapshot*, int selected);

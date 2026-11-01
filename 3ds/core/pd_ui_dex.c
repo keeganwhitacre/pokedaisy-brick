@@ -49,8 +49,8 @@ static void title(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g
     int f = pd_title_box(c, x, CONTENT_Y, w, TITLE_H, PD_TITLE_FILL);
     int ty = pd_text_y(CONTENT_Y, TITLE_H);
     pd_text(c, x + f + 6, ty, "POKéDEX", PD_TITLE_TEXT, PD_TITLE_SHADOW);
-    int seen = 0, caught = 0;
-    for (int i = 0; i < n; i++) {
+    int seen = ui->dexSource?ui->dexSource->seenCount:0, caught = ui->dexSource?ui->dexSource->caughtCount:0;
+    for (int i = 0; !ui->dexSource && i < n; i++) {
         seen += pd_dex_seen(s, list[i]);
         caught += pd_dex_caught(s, list[i]);
     }
@@ -59,7 +59,7 @@ static void title(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g
     pd_text_right(c, x + w - f - 6, ty, counts, PD_VALUE, PD_VALUE_SHADOW);
     // Which dex: tap for the other one.
     char other[24];
-    snprintf(other, sizeof(other), "%s", national ? g->cfg->regionName : "NATIONAL");
+    snprintf(other, sizeof(other), "%s", ui->dexSource ? ui->dexSource->filterLabel : national ? g->cfg->regionName : "NATIONAL");
     ui_button(ui, c, x + w + 4, CONTENT_Y, TOGGLE_W, TITLE_H, other, HIT_DEX_TOGGLE);
 }
 
@@ -70,8 +70,8 @@ static bool lastNational;
 
 static void list_view(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s) {
     const int* list = lastList;
-    int n = lastCount;
-    bool national = lastNational;
+    int n = ui->dexSource?ui->dexSource->count:lastCount;
+    bool national = ui->dexSource?true:lastNational;
     title(ui, c, g, s, list, n, national);
 
     int x = MARGIN, w = c->w - 2 * MARGIN;
@@ -79,23 +79,25 @@ static void list_view(struct pd_ui* ui, struct pd_canvas* c, const struct pd_gam
     int ix = x + f, iy = LIST_Y + f + 1, iw = w - 2 * f, ih = c->h - LIST_Y - MARGIN - 2 * f - 2;
     ui_add_scroll_hit(ui, ix, iy, iw, ih, HIT_DEX_LIST);
     ui->dexScroll = ui_clamp_scroll(ui->dexScroll, n * DEX_ROW, ih);
+    if(ui->dexSource && n==0)pd_text(c,ix+12,iy+4,"No matching entries.",PD_MUTED,PD_MUTED_SHADOW);
     pd_clip(c, ix, iy, iw, ih);
     char buf[40], num[16];
     for (int i = ui->dexScroll / DEX_ROW; i < n; i++) {
         int ry = iy + i * DEX_ROW - ui->dexScroll;
         if (ry >= iy + ih) break;
-        int nat = list[i];
-        bool seen = pd_dex_seen(s, nat), caught = pd_dex_caught(s, nat);
+        int nat = ui->dexSource?ui->dexSource->national(ui->dexSource->ctx,i):list[i];
+        bool seen = ui->dexSource?ui->dexSource->seen(ui->dexSource->ctx,nat):pd_dex_seen(s,nat);
+        bool caught = ui->dexSource?ui->dexSource->caught(ui->dexSource->ctx,nat):pd_dex_caught(s,nat);
         if (ui->pressedId == HIT_DEX_ROW + nat) pd_fill(c, ix, ry, iw, DEX_ROW, PD_ROW_SELECTED);
         if (seen) ui_ball(c, ix + 6, ry + 4, caught);
         snprintf(num, sizeof(num), "No.%03d", shown_number(g, national, nat));
         int ty = pd_text_y(ry, DEX_ROW);
         pd_text(c, ix + 22, ty, num, PD_MUTED, PD_MUTED_SHADOW);
-        const char* name = pd_species_name(pd_dex_species(g, nat), buf, sizeof(buf));
+        const char* name = ui->dexSource ? (seen?ui->dexSource->name(ui->dexSource->ctx,nat):"???") : pd_species_name(pd_dex_species(g,nat),buf,sizeof(buf));
         pd_text(c, ix + 74, ty, name, seen ? PD_LABEL : PD_MUTED, seen ? PD_LABEL_SHADOW : PD_MUTED_SHADOW);
         int top = ry < iy ? iy : ry;
         int bottom = ry + DEX_ROW > iy + ih ? iy + ih : ry + DEX_ROW;
-        ui_add_scroll_hit(ui, ix, top, iw, bottom - top, HIT_DEX_ROW + nat);
+        if(!ui->dexSource)ui_add_scroll_hit(ui, ix, top, iw, bottom-top,HIT_DEX_ROW+nat);
     }
     pd_unclip(c);
     ui_scroll_bar(c, ix + iw - 4, iy, ih, ui->dexScroll, n * DEX_ROW, PD_MUTED);
@@ -122,7 +124,7 @@ static void entry_view(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
         loaded = ui->dexOpen;
         loadedRom = pd_rom_id(g);
     }
-    bool national = lastNational;
+    bool national = ui->dexSource?true:lastNational;
     char buf[64], buf2[40];
     int x = MARGIN, y = CONTENT_Y, w = c->w - 2 * MARGIN, h = c->h - CONTENT_Y - MARGIN;
     int f = pd_title_box(c, x, y, w, h, PD_TITLE_FILL);
@@ -222,4 +224,14 @@ bool ui_dex_act(struct pd_ui* ui, int id) {
         return true;
     }
     return false;
+}
+
+void pd_ui_dex_view(struct pd_ui* ui,struct pd_canvas* c,const struct pd_game* g,const struct pd_snapshot* s,int selected){
+    ui->hitCount=0;pd_backdrop(c);
+    if(!ui->dexSource){ui_dex_tab(ui,c,g,s);return;}
+    int n=ui->dexSource->count;
+    if(selected<0)selected=0;
+    if(n>0 && selected>=n)selected=n-1;
+    ui->dexScroll=selected*DEX_ROW;ui->pressedId=n>0?HIT_DEX_ROW+ui->dexSource->national(ui->dexSource->ctx,selected):-1;
+    list_view(ui,c,g,s);
 }

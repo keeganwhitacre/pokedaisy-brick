@@ -494,3 +494,17 @@ enum pd_action pd_ui_take_action(struct pd_ui* ui) {
     ui->action = PD_ACTION_NONE;
     return a;
 }
+
+// Hosts can reuse the same chips for their supported tab set.
+void pd_ui_navigation(struct pd_ui* ui,struct pd_canvas* c,const char* const* labels,int count,int selected){
+    ui->hitCount=0;
+    if(count<1 || count>8)return;
+    for(int i=0;i<count;i++){
+        int x=MARGIN+(c->w-2*MARGIN)*i/count;
+        int right=MARGIN+(c->w-2*MARGIN)*(i+1)/count-MARGIN;
+        bool open=i==selected;chip(ui,c,x,right-x,open,HIT_TAB+i);
+        int tw=pd_text_width(labels[i]);
+        pd_text(c,x+(right-x-tw)/2,pd_text_y(BAR_Y(c),CHIP_H),labels[i],
+                open?PD_VALUE:PD_TITLE_TEXT,open?PD_VALUE_SHADOW:PD_TITLE_SHADOW);
+    }
+}
