@@ -56,6 +56,8 @@ monToSwitchIntoOff = 'monToSwitchIntoOff'
 
 # The party menu's icons and the bag's.
 [part.icons]
+eggSpecies = 'eggSpecies'
+speciesCount = 'pokedex.speciesCount'
 monIconTable = 'monIconTable'
 monIconPaletteIndices = 'monIconPaletteIndices'
 monIconPaletteTable = 'monIconPaletteTable'
@@ -173,3 +175,9 @@ records = { items = 'FIELD_ITEMS_LEAFGREEN_REV1' }
 name = 'EMERALD'
 parts = ['ram', 'foes', 'icons', 'dex', 'guide', 'card', 'fly', 'field']
 records = { items = 'FIELD_ITEMS_EMERALD' }
+
+# plorpOS's Linux port: the hacks, as their records reach gen3/records/c_hacks.toml. Emerald Legacy v1.1.4: retail's
+# structs with its own addresses (its guide's trainer parties and its card style need C first).
+[config.emerald_legacy]
+name = 'EMERALD_LEGACY'
+parts = ['ram', 'foes', 'icons', 'dex']

@@ -101,6 +101,7 @@ struct known_rom {
     const char* title;
 };
 static const struct known_rom KNOWN_ROMS[] = {
+    {"cbd71af65ee3dcd53280a6a12014bfb11e8f626a", &PD_CONFIG_EMERALD_LEGACY, PD_GAME_EMERALD, "Pokémon Emerald Legacy"},
     {NULL, NULL, PD_GAME_NONE, NULL},
 };
 

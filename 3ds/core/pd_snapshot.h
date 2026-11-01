@@ -46,7 +46,7 @@ struct pd_battle_mon {
 #define PD_POS_OPPONENT_LEFT 1
 
 // A pocket's slots: every pocket of FireRed's and Emerald's bag holds at most 64.
-#define PD_POCKET_SLOTS 64
+#define PD_POCKET_SLOTS 256 // Emerald Legacy's ITEMS pocket holds 120
 #define PD_NATIONAL_COUNT 386
 #define PD_DEX_BYTES 52
 #define PD_FLAG_BYTES 0x12C // Emerald's; FireRed's 0x120 fit

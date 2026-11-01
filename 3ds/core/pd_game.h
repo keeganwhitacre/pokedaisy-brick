@@ -42,6 +42,8 @@ struct pd_config {
     // The bag's icons: sItemIconTable, {tiles, palette} (both LZ77) every itemIconStride bytes. 0 = none.
     uint32_t itemIconTable;
     int itemIconStride;
+    // The game's own egg species (0 = retail's 412) and how many species its tables hold (with the egg).
+    int eggSpecies, speciesCount;
     // gBagPockets: five {slots pointer, capacity} pairs, 8 bytes apart;
     // bagOrder[i] is the pocket (PD_POCKET_*) the game keeps at index i.
     uint32_t bagPockets;
