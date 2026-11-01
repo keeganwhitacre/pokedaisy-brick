@@ -15,6 +15,7 @@
 #include "battle_view.h"
 #include "display.h"
 #include "map_art.h"
+#include "map_view.h"
 #include "pk_nds_field.h"
 #include <SDL.h>
 #include <filesystem>
@@ -107,26 +108,8 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
   else if(!supported)line("Companion: Platinum USA Rev 1 only");
   else if(!s.valid){line("Waiting for the game's save data");line("Return to the game to finish booting");}
   else if(tab==5){
-    if(art.background.empty())line("Map art unavailable");
-    else {
-      int ox=(c.w-art.width)/2,oy=61;
-      for(int y=0;y<art.height;y++)for(int x=0;x<art.width;x++)c.px[(oy+y)*c.w+ox+x]=art.background[y*art.width+x]&0xffffff;
-      auto sprite=[&](const std::vector<uint32_t>& img,int cx,int cy){for(int y=0;y<16;y++)for(int x=0;x<16;x++){
-        int dx=cx-8+x,dy=cy-8+y;if(dx>=0 && dx<art.width && dy>=0 && dy<art.height && (img[y*16+x]>>24))c.px[(oy+dy)*c.w+ox+dx]=img[y*16+x]&0xffffff;
-      }};
-      for(auto mark:pd_ds_data::mapMarks){
-        bool visited=mark.arrival<56 && ((s.arrivals>>mark.arrival)&1);
-        if(mark.hidden && !visited)continue;
-        int variant=visited?1+mark.palette:0,index=mark.shape*3+variant;
-        if(index<int(art.blocks.size()))sprite(art.blocks[index],mark.x-pd_ds_data::mapLeft,mark.y-pd_ds_data::mapTop);
-      }
-      if(s.mapX>=0 && s.mapY>=0 && !art.heads.empty())sprite(art.heads[s.playerGender==1?1:0],pd_ds_data::mapOriginX+s.mapX*pd_ds_data::mapTile+3,pd_ds_data::mapOriginY+s.mapY*pd_ds_data::mapTile+3);
-      int cx=ox+pd_ds_data::mapOriginX+mapX*pd_ds_data::mapTile,cy=oy+pd_ds_data::mapOriginY+mapY*pd_ds_data::mapTile;
-      pd_clip(&c,ox,oy,art.width,art.height);
-      pd_fill(&c,cx,cy,7,1,0xe84840);pd_fill(&c,cx,cy+6,7,1,0xe84840);pd_fill(&c,cx,cy,1,7,0xe84840);pd_fill(&c,cx+6,cy,1,7,0xe84840);pd_unclip(&c);
-      pd_fill(&c,10,9,c.w-20,17,0xffffff);
-      const char* name=ds_map_name(ds_map_section(mapX,mapY));pd_text_fit(&c,12,10,c.w-24,*name?name:"No location",0x303030,PD_NO_SHADOW);
-    }
+    pd_canvas body;pd_canvas_init(&body,c.w,c.h-81,c.px+61*c.w);
+    ds_map_view(&body,s,art,mapX,mapY);
   }
   else if(tab==0){
     pd_canvas body;pd_canvas_init(&body,c.w,c.h-81,c.px+61*c.w);

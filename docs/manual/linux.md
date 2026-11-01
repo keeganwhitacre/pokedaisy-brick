@@ -59,3 +59,7 @@ AUTO mode shows the bottom screen while choosing and the top for animations.
 DS expansion and custom battle controls are not included. The Linux companion
 and data bridge remain an initial implementation for upstream review; see
 `linux/dsperate/README.md` for scope, builds, controls and remaining testing.
+
+The DS map uses the shared map frame, place label and corner cursor around
+art read from your own cartridge. The D-pad moves across the full map grid;
+A returns the cursor to your player. It is read-only and does not fly.

@@ -285,3 +285,18 @@ state from the existing DS snapshot using those shared rows. It is not a full
 trainer-card implementation. It has no selected action or party-navigation hint.
 Map is still the older DS body. Full dex entries, bottom-bar/MORE layout, item
 use and device sleep integration remain outside this UI migration step.
+
+## Shared Town Map presentation and projection research
+
+MAP now uses `pd_ui_map_view` for the same map frame, bounded stretch,
+nearest-neighbour scaling, white corner cursor and place label as the shared
+map renderer. The DS adapter composes the existing ROM-derived Town Map,
+visited/hidden markers and player head into a temporary page; it does not
+change its assets or maintain another map/offset registry. D-pad full-grid
+movement and A recenter are retained. No Fly or PLACES list is implied.
+Missing art gets the shared NO MAP message.
+
+The source also includes an isolated single-pass projection experiment:
+`research/EXPANSION.md`. It demonstrably reveals extra scenery in the tested
+Platinum field without eight extra views. It is not part of the packaged
+binary or a supported setting. All shipping game rendering remains native.

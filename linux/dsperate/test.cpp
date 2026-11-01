@@ -11,6 +11,7 @@
 #include "pk_nds_field.h"
 #include <filesystem>
 #include "map_art.h"
+#include "map_view.h"
 #include <cassert>
 #include <fstream>
 #include <cstdio>
@@ -137,6 +138,24 @@ int main(int argc,char** argv){
   assert(ds_map_section(s.mapX,s.mapY)==1);
   assert(std::strcmp(ds_map_name(1),"Twinleaf Town")==0);
   assert(ds_map_section(0,0)==-1 && ds_map_section(-1,0)==-1 && ds_map_section(30,0)==-1);
+  // Guard the exact body bounds while drawing all cursor corners and invalid art.
+  std::vector<uint32_t> guarded(341*171+32,0xabcdef);
+  pd_canvas mapCanvas;pd_canvas_init(&mapCanvas,341,171,guarded.data()+16);
+  DsMapArt sampleMap;sampleMap.width=216;sampleMap.height=168;
+  sampleMap.background.assign(216*168,0x2468ac);
+  sampleMap.heads={std::vector<uint32_t>(256,0xffaabbcc),std::vector<uint32_t>(256,0xffaabbcc)};
+  auto original=sampleMap.background;
+  for(int x:{0,29,-1,999})for(int y:{0,29,-1,999})ds_map_view(&mapCanvas,s,sampleMap,x,y);
+  assert(sampleMap.background==original);
+  for(int i=0;i<16;i++)assert(guarded[i]==0xabcdef && guarded[guarded.size()-1-i]==0xabcdef);
+  bool mapDrawn=false;for(auto pixel:guarded)mapDrawn|=pixel==0x2468ac;assert(mapDrawn);
+  ds_map_view(&mapCanvas,s,DsMapArt{},0,0);
+  // A second source size must reset the shared layout (no DS dimensions leaking).
+  std::vector<uint32_t> gbaMap(240*160,0xabcdef);
+  pd_map_source mapSource{gbaMap.data(),240,160,"REGION",232,152,8,8};
+  pd_ui_map_view(&mapCanvas,&mapSource);
+  for(int i=0;i<16;i++)assert(guarded[i]==0xabcdef && guarded[guarded.size()-1-i]==0xabcdef);
+  std::puts("PASS shared map art immutability, source resizing, corner bounds and missing art");
   assert(ds_map_art({}).background.empty());
   assert(ds_party_icons({}).empty());
   if(argc==4){
@@ -149,6 +168,7 @@ int main(int argc,char** argv){
     std::puts("PASS real ROM party icons including Gen 4 species, Burmy and egg");
     auto art=ds_map_art(bytes);assert(art.width==216 && art.height==168);
     assert(art.background.size()==216*168 && art.blocks.size()==21 && art.heads.size()==2);
+    ds_map_view(&mapCanvas,s,art,s.mapX,s.mapY);
     bool varied=false;for(auto px:art.background)varied|=px!=art.background[0];assert(varied);
     std::puts("PASS real ROM Town Map tiles/palettes/cells and player heads decoded");
   }
