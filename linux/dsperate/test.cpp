@@ -4,6 +4,7 @@
 #include "companion.h"
 #include "browser.h"
 #include "party_view.h"
+#include "bag_view.h"
 #include "battle_view.h"
 #include "pk_nds_field.h"
 #include <filesystem>
@@ -85,6 +86,18 @@ int main(int argc,char** argv){
   legacySnapshot.party[1].species=PD_SPECIES_EGG;
   pd_ui_party_view(&legacy,&body,&legacyGame,&legacySnapshot,0);
   assert(legacy.hitCount>0 && legacy.partySource==nullptr);
+  DsCompanion inventory;inventory.valid=true;
+  for(int i=0;i<150;i++)inventory.bag.push_back({17,1,4});
+  inventory.bag.push_back({4,5,6});inventory.bag.push_back({1,1,1});
+  ds_bag_view(&body,inventory,0,149,false); // beyond GBA's 99-row view
+  ds_bag_view(&body,inventory,5,149,true);
+  ds_bag_view(&body,inventory,8,0,false); // empty last pocket, scrolled tabs
+  inventory.bag.clear();ds_bag_view(&body,inventory,0,0,true);
+  pd_config bagConfig{};for(int i=0;i<PD_POCKET_COUNT;i++)bagConfig.bagOrder[i]=i;
+  legacyGame.cfg=&bagConfig;legacySnapshot.bagOk=true;legacy.bagSelected=-1;
+  pd_ui_bag_view(&legacy,&body,&legacyGame,&legacySnapshot);
+  assert(legacy.bagSource==nullptr && legacy.hitCount>0);
+  std::puts("PASS shared bag rendering past row 99, details, empty pockets and trailing tabs");
   std::puts("PASS shared party/summary renderer with DS Burmy and egg identities");
   std::puts("PASS shared party HUD with captured Gen 4 data and backend asset callback");
   assert(s.dexValid && s.seenCount==2 && s.caughtCount==1);

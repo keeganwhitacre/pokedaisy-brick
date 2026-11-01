@@ -8,6 +8,7 @@
 #include "companion.h"
 #include "browser.h"
 #include "party_view.h"
+#include "bag_view.h"
 #include "data_gen.h"
 #include "battle_view.h"
 #include "display.h"
@@ -86,7 +87,7 @@ void blit(SDL_Renderer* r,SDL_Texture* t,const uint32_t* px,int w,int h,int ow,i
   SDL_UpdateTexture(t,nullptr,px,w*4);int scale=std::max(1,std::min(ow/w,oh/h));
   SDL_Rect dst{(ow-w*scale)/2,(oh-h*scale)/2,w*scale,h*scale};SDL_RenderCopy(r,t,nullptr,&dst);
 }
-void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int selected,bool summary,int scroll,int page,const DsPrefs& prefs,const pd_settings& settings,int setting,const DsMapArt& art,int mapX,int mapY,int pocket,int dexFilter,const std::vector<std::vector<uint32_t>>& icons){
+void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int selected,bool summary,int scroll,int page,const DsPrefs& prefs,const pd_settings& settings,int setting,const DsMapArt& art,int mapX,int mapY,int pocket,int dexFilter,bool bagDetails,const std::vector<std::vector<uint32_t>>& icons){
   pd_fill(&c,0,0,c.w,c.h,0x50a8a8);pd_title_box(&c,5,5,c.w-10,25,0xffffff);
   pd_text(&c,12,10,"PokeDaisy DS",0x303030,PD_NO_SHADOW);
   const char* tabs[]={"PARTY","BAG","DEX","STATUS","SET","MAP"};
@@ -133,15 +134,8 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
     pd_canvas body;pd_canvas_init(&body,c.w,c.h-81,c.px+61*c.w);
     ds_party_view(&body,s,icons,selected,summary,page);
   }else if(tab==1){
-    const char* names[]={"ALL","ITEMS","KEY ITEMS","TMs/HMs","MAIL","MEDICINE","BERRIES","BALLS","BATTLE"};
-    line(std::string("< ")+names[pocket]+" >");
-    int n=0,shown=0,rows=(c.h-120)/20;
-    for(const auto& item:s.bag)if(ds_in_pocket(item,pocket)){
-      if(n++<scroll)continue;
-      if(shown++>=rows)break;
-      line(std::string(ds_item(item.id))+" x"+std::to_string(item.count));
-    }
-    if(!n)line("This pocket is empty");
+    pd_canvas body;pd_canvas_init(&body,c.w,c.h-81,c.px+61*c.w);
+    ds_bag_view(&body,s,pocket,scroll,bagDetails);
   }
   else if(tab==2){
     if(!s.dexValid)line("Pokedex data unavailable");
@@ -159,7 +153,7 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
     }
   }
   else {line("TRAINER: "+s.trainer);line("MONEY: "+std::to_string(s.money));line(std::string("PLACE: ")+ds_place(s.map));line("MAP: "+std::to_string(s.map));line(s.dexValid?(s.nationalDex?"NATIONAL DEX: UNLOCKED":"NATIONAL DEX: LOCKED"):"DEX: UNAVAILABLE");}
-  pd_text_fit(&c,9,c.h-20,c.w-18,tab==5?"D-pad move  A player  L/R tabs":tab==4?"Up/Down select  A change  L/R tabs":tab==0 && summary?"Left/Right info/moves  Up/Down Pokemon":tab==1?"Up/Down scroll  Left/Right pocket  L/R tabs":tab==2?"SELECT filter  Left/Right page  L/R tabs":"D-pad cards  A summary  B back  L2 game",0xffffff,PD_NO_SHADOW);
+  pd_text_fit(&c,9,c.h-20,c.w-18,tab==5?"D-pad move  A player  L/R tabs":tab==4?"Up/Down select  A change  L/R tabs":tab==0 && summary?"Left/Right info/moves  Up/Down Pokemon":tab==1?"Up/Down item  Left/Right pocket  A details":tab==2?"SELECT filter  Left/Right page  L/R tabs":"D-pad cards  A summary  B back  L2 game",0xffffff,PD_NO_SHADOW);
 }
 }
 extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* shot,SDL_Renderer* renderer,bool (*keepRunning)(),void (*hostEvent)(const SDL_Event*),bool noResume) {
@@ -256,7 +250,7 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
     return true;
   };
   int quickSelected=0;uint32_t blocked=0;
-  int pocket=0,dexFilter=0;
+  int pocket=0,dexFilter=0;bool bagDetails=false;
   int mapX=-1,mapY=-1,setting=0,page=0,tab=0,selected=0,scroll=0,touchX=128,touchY=96;uint32_t keys=0;unsigned repeat[8]={};int frame=0,lastPhase=-1,overrideScreen=-1;
   const int raw[]={1,0,11,10,9,8,2,3,15,-1,12,13};
   struct Press{int at,n;uint32_t mask;};std::vector<Press> script,hostScript;
@@ -400,7 +394,7 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
       if(tab!=4 && tab!=5 && (pressed&(1u<<6))){if(tab==1 || tab==2)scroll=std::max(0,scroll-1);else selected=std::max(0,selected-(tab==0 && !summary?2:1));}
       if(tab!=4 && tab!=5 && (pressed&(1u<<7))){if(tab==1 || tab==2)scroll=std::min(std::max(0,(tab==1?int(snap.bag.size()):int(snap.dexSeen.size())-1)-1),scroll+1);else selected=std::min(std::max(0,int(snap.party.size())-1),selected+(tab==0 && !summary?2:1));}
       if(tab==1 && (pressed&((1u<<4)|(1u<<5)))){
-        pocket=(pocket+(pressed&(1u<<4)?1:8))%9;scroll=0;
+        pocket=(pocket+(pressed&(1u<<4)?1:8))%9;scroll=0;bagDetails=false;
       }
       if(tab==2 && (pressed&(1u<<2))){dexFilter=(dexFilter+1)%3;scroll=0;}
       int listCount=0;
@@ -417,8 +411,9 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
         if(pressed&(1u<<5))selected=std::max(0,selected-1);
         selected=std::max(0,selected);
       }
+      if(tab==1 && (pressed&1))bagDetails=!bagDetails;
       if(tab==0 && (pressed&1))summary=true;
-      if(pressed&(1u<<1)){if(summary)summary=false;else showCompanion=false;}
+      if(pressed&(1u<<1)){if(summary)summary=false;else if(tab==1 && bagDetails)bagDetails=false;else showCompanion=false;}
     }else if(!done){
       uint32_t gameKeys=keys&~blocked;
       bool touchMode=view.bottom && (gameKeys&(1u<<2));
@@ -437,7 +432,7 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
     int ow=1024,oh=768;
     if(!ds_display_pixels(renderer,ow,oh)){std::fprintf(stderr,"DS display setup failed: %s\n",SDL_GetError());failed=true;break;}
     SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
-    if(showCompanion){companion(canvas,snap,supported,tab,selected,summary,scroll,page,prefs,settings,setting,mapArt,mapX,mapY,pocket,dexFilter,partyArt);blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);}
+    if(showCompanion){companion(canvas,snap,supported,tab,selected,summary,scroll,page,prefs,settings,setting,mapArt,mapX,mapY,pocket,dexFilter,bagDetails,partyArt);blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);}
     else blit(renderer,top.p,nds->gpu.framebuffer(view.bottom?1:0),256,192,ow,oh);
     if(!showCompanion && !paused && !confirmation && (showQuick || (settings.hud && !(settings.hudHidden & (1<<PD_HUD_PARTY)) && snap.valid && !view.bottom && !inBattle && (fieldBits&PK_NDS_FIELD_SCREEN) && !(fieldBits&(PK_NDS_FIELD_LOCKED|PK_NDS_FIELD_MENU))))){
       for(auto& p:uiPixels)p=QUICK_CLEAR;

@@ -230,3 +230,24 @@ This is the first UI integration step. The DS header/tab strip, bag, dex, map
 and settings remain the earlier DS frontend and are not claimed visually aligned.
 Regression checks exercise DS Burmy/egg artwork, party/summary rendering and
 provider-free GBA fallback. Captures are actual app output, not design mockups.
+
+## Shared bag UI integration
+
+BAG now calls `pd_ui_bag_view` in the established `pd_ui_bag.c` ItemsScreen
+renderer. Pocket panels, list frame, selected cursor, scrollbar, colours and
+detail window come from that implementation. The DS adapter provides native
+item IDs/names and all eight pockets in the app-owned save order; it does not
+create a fake GBA game config or squeeze DS inventory into five GBA pockets.
+
+Left/Right selects a pocket; Up/Down selects an item and the shared list keeps
+it visible. A toggles the shared detail window; B closes it before leaving the
+companion. Item descriptions are not yet decoded: the detail window currently
+falls back to the item name. Item use is not implemented. The pocket rail scrolls
+to the active tab when nine tabs cannot fit. DS lists are not truncated at the
+legacy GBA view's 99 rows; the optional source retrieves visible rows on demand.
+Key-item quantities are hidden, using the DS pocket identity rather than GBA IDs.
+
+The default GBA gather/name/quantity/description path stays unchanged. Tests
+exercise DS lists past row 99, details, empty pockets and the last pocket tab.
+Tab strip, dex, map and settings are still the earlier frontend. This is another
+migration step, not a claim that every screen matches Android or GBA already.
