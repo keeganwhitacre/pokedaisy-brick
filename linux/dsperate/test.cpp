@@ -3,6 +3,7 @@
 #include "core/state/state.h"
 #include "companion.h"
 #include "browser.h"
+#include "party_view.h"
 #include "battle_view.h"
 #include "pk_nds_field.h"
 #include <filesystem>
@@ -13,6 +14,8 @@
 #include <cstring>
 extern "C" {
 #include "../hud.h"
+#include "pd_ui.h"
+#include "pd_tables.h"
 #include "../quick_menu.h"
 }
 static std::vector<uint8_t> battleRam;
@@ -63,6 +66,26 @@ int main(int argc,char** argv){
   });
   assert(icons==1);quick_finish(&hc);
   bool drawn=false;for(auto p:hpixels)drawn|=p!=0;assert(drawn);
+  // National 412 is Burmy on DS, not the GBA renderer's egg sentinel.
+  DsCompanion presentation;presentation.valid=true;
+  DsMon burmy;burmy.species=412;burmy.nickname="BURMY";burmy.level=5;burmy.hp=burmy.maxHp=20;
+  DsMon egg=burmy;egg.egg=true;egg.nickname="PRIVATE EGG NAME";
+  presentation.party={burmy,egg};
+  std::vector<std::vector<uint32_t>> art(495);
+  art[412].assign(1024,0xffff0000);art[494].assign(1024,0xff0000ff);
+  std::vector<uint32_t> pixels(341*171);pd_canvas body;pd_canvas_init(&body,341,171,pixels.data());
+  ds_party_view(&body,presentation,art,0,false,0);
+  bool red=false,blue=false;for(auto px:pixels){red|=px==0xff0000;blue|=px==0x0000ff;}
+  assert(red && blue);
+  ds_party_view(&body,presentation,art,0,true,0);
+  ds_party_view(&body,presentation,art,1,true,1);
+  pd_ui legacy{};legacy.summarySlot=-1;legacy.pressedId=-1;pd_game legacyGame{};
+  pd_snapshot legacySnapshot{};legacySnapshot.valid=true;legacySnapshot.partyCount=2;
+  legacySnapshot.party[0].species=1;legacySnapshot.party[0].hp=legacySnapshot.party[0].maxHp=20;
+  legacySnapshot.party[1].species=PD_SPECIES_EGG;
+  pd_ui_party_view(&legacy,&body,&legacyGame,&legacySnapshot,0);
+  assert(legacy.hitCount>0 && legacy.partySource==nullptr);
+  std::puts("PASS shared party/summary renderer with DS Burmy and egg identities");
   std::puts("PASS shared party HUD with captured Gen 4 data and backend asset callback");
   assert(s.dexValid && s.seenCount==2 && s.caughtCount==1);
   assert(s.dexSeen[387] && s.dexSeen[390] && s.dexCaught[387] && !s.dexCaught[390]);

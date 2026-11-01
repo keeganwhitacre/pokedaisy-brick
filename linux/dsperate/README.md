@@ -205,3 +205,28 @@ The existing DS generator now derives species types and move type/power from
 Gen4TablesPlatinum.kt; --check detects stale generated data. Invalid IDs return
 unavailable metadata. This does not add abilities, IVs/EVs, calculated stats,
 max PP or item-use actions. Physical Brick verification remains outstanding.
+
+## Shared companion UI integration: party and summaries
+
+The DS PARTY body and summary now call `pd_ui_party_view` in the existing
+`3ds/core/pd_ui_party.c`. Their FireRed slot frames, Poke Ball decoration, HP
+bars/counts, gender/status widgets, empty slots, summary frame and Back button
+are the same implementation as the established GBA companion, whose source
+follows Android PartyScreen.kt. The temporary DS card/summary drawing is removed.
+
+A small optional pd_party_source supplies names, move types, cartridge artwork,
+egg identity and three information rows. With no provider the original GBA
+metadata/icon path is used. National DS species IDs are never treated as GBA
+IDs: the explicit egg callback distinguishes Burmy 412 from the GBA egg sentinel.
+No new game offsets, game writes or duplicated slot/theme implementation.
+
+The existing DS L/R tab navigation and A/B/D-pad controls remain; Left/Right
+changes Info/Moves in summary. The shared Moves view currently shows type and
+current PP, matching GBA; generated move power remains available in the reader
+but is not displayed in this shared view. Info retains species typing, held
+item, nature and experience, with gender/HP/status in shared widgets.
+
+This is the first UI integration step. The DS header/tab strip, bag, dex, map
+and settings remain the earlier DS frontend and are not claimed visually aligned.
+Regression checks exercise DS Burmy/egg artwork, party/summary rendering and
+provider-free GBA fallback. Captures are actual app output, not design mockups.

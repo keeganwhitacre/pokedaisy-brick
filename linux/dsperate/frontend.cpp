@@ -7,6 +7,7 @@
 #endif
 #include "companion.h"
 #include "browser.h"
+#include "party_view.h"
 #include "data_gen.h"
 #include "battle_view.h"
 #include "display.h"
@@ -92,13 +93,6 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
   for(int i=0;i<6;i++){int x=5+i*(c.w-10)/6;pd_title_box(&c,x,34,(c.w-10)/6-2,23,i==tab?0xffefbc:0xffffff);pd_text(&c,x+8,38,tabs[i],0x303030,PD_NO_SHADOW);}
   pd_list_box(&c,5,61,c.w-10,c.h-86);int y=68;
   auto line=[&](const std::string& t){pd_text_fit(&c,13,y,c.w-26,t.c_str(),0x303030,PD_NO_SHADOW);y+=20;};
-  auto icon=[&](const DsMon& m,int x,int y){
-    int id=m.egg?pd_ds_data::iconEgg:m.species;
-    if(id<1 || size_t(id)>=icons.size())return;
-    const auto& pixels=icons[id];if(pixels.size()!=1024)return;
-    for(int yy=0;yy<32;yy++)for(int xx=0;xx<32;xx++)if(pixels[yy*32+xx]>>24)
-      pd_fill(&c,x+xx,y+yy,1,1,pixels[yy*32+xx]&0xffffff);
-  };
   if(tab==4){
     const std::string rows[]={std::string("SCREEN: ")+(prefs.bottom?"BOTTOM":"TOP"),
       std::string("BATTLES: ")+(prefs.battle?"AUTO":"OFF"),
@@ -135,42 +129,9 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
       const char* name=ds_map_name(ds_map_section(mapX,mapY));pd_text_fit(&c,12,10,c.w-24,*name?name:"No location",0x303030,PD_NO_SHADOW);
     }
   }
-  else if(tab==0 && summary && selected<int(s.party.size())){
-    const auto& m=s.party[selected];
-    line(m.egg?"EGG":m.nickname+"  Lv"+std::to_string(m.level)+(page?"  MOVES":"  INFO"));
-    if(m.egg){line("EGG");line("Waiting to hatch");}
-    else if(!page){
-      int t1=ds_species_type(m.species,0),t2=ds_species_type(m.species,1);
-      line(std::string(ds_species(m.species))+"  "+pd_type_name(t1)+(t2!=t1?std::string("/")+pd_type_name(t2):""));
-      line("HP "+std::to_string(m.hp)+"/"+std::to_string(m.maxHp)+"  "+ds_status(m));
-      line(std::string("ITEM: ")+(m.heldItem?ds_item(m.heldItem):"NONE"));
-      line(std::string(ds_nature(m.nature))+"  "+(m.gender==1?"MALE":m.gender==2?"FEMALE":"NONE"));
-      line("EXP: "+std::to_string(m.experience)+(m.level==100?"  MAX LEVEL":""));
-    }else for(int i=0;i<4;i++){
-      int move=m.moves[i];
-      pd_text_fit(&c,13,y,c.w-26,move?ds_move(move):"-",0x303030,PD_NO_SHADOW);
-      if(move){
-        int power=ds_move_power(move);
-        std::string detail=std::string(pd_type_name(ds_move_type(move)))+"  PP "+std::to_string(m.pp[i])+"  POWER "+(power>1?std::to_string(power):"--");
-        pd_text_fit(&c,13,y+15,c.w-26,detail.c_str(),0x606868,PD_NO_SHADOW);
-      }
-      y+=34;
-    }
-  }else if(tab==0){
-    if(s.party.empty())line("No Pokemon in party");
-    for(size_t i=0;i<s.party.size();i++){
-      const auto& m=s.party[i];int x=10+int(i%2)*162,cy=65+int(i/2)*51;
-      pd_fill(&c,x,cy,158,47,int(i)==selected?0xffe4a0:0xffffff);
-      icon(m,x+2,cy+3);
-      pd_text_fit(&c,x+37,cy+2,117,m.egg?"EGG":m.nickname.c_str(),0x303030,PD_NO_SHADOW);
-      std::string label="Lv"+std::to_string(m.level)+" "+(m.hp?ds_status(m):"FNT");
-      pd_text_fit(&c,x+37,cy+16,117,label.c_str(),0x303030,PD_NO_SHADOW);
-      if(!m.egg){
-        pd_fill(&c,x+37,cy+33,114,5,0x707878);
-        int hp=m.maxHp?std::clamp(m.hp*114/m.maxHp,0,114):0;
-        pd_fill(&c,x+37,cy+33,hp,5,m.hp*4<=m.maxHp?0xe05050:m.hp*2<=m.maxHp?0xe0b840:0x48b878);
-      }
-    }
+  else if(tab==0){
+    pd_canvas body;pd_canvas_init(&body,c.w,c.h-81,c.px+61*c.w);
+    ds_party_view(&body,s,icons,selected,summary,page);
   }else if(tab==1){
     const char* names[]={"ALL","ITEMS","KEY ITEMS","TMs/HMs","MAIL","MEDICINE","BERRIES","BALLS","BATTLE"};
     line(std::string("< ")+names[pocket]+" >");
