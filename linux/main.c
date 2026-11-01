@@ -902,10 +902,17 @@ static void focus_move(struct pd_ui *u, int direction) {
                 : direction == RIGHT ? dx
                 : direction == UP    ? -dy
                                      : dy;
-    int across = direction == LEFT || direction == RIGHT ? abs(dy) : abs(dx);
-    if (along > 0 && along + across * 4 < score) {
+    // Across: the gap between the two along the other axis, 0 where they overlap (a full-width row right
+    // under a button beats a chip far off to the side).
+    int across = direction == LEFT || direction == RIGHT
+                     ? (t->y + t->h <= h->y ? h->y - (t->y + t->h) : t->y >= h->y + h->h ? t->y - (h->y + h->h) : 0)
+                     : (t->x + t->w <= h->x ? h->x - (t->x + t->w) : t->x >= h->x + h->w ? t->x - (h->x + h->w) : 0);
+    // What lines up with the cursor on the other axis comes first (the next chip in a tab bar, not the slot
+    // just above it); an item off to the side is only reached where nothing lines up.
+    int cost = along + across * 4 + (across > 0 ? 100000 : 0);
+    if (along > 0 && cost < score) {
       best = i;
-      score = along + across * 4;
+      score = cost;
     }
   }
   if (best >= 0) {
