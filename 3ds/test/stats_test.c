@@ -59,6 +59,39 @@ static bool read_ram(void* ctx,uint32_t addr,void* out,size_t n) {
     }
     return false;
 }
+// A CFRU-style plaintext box (Unbound, Radical Red): no checksum, substructs in G-A-E-M order at +0x20.
+static void check_plain_mon(void) {
+    uint8_t raw[100]={0};
+    put32(raw,0x12345678);put32(raw+4,0xCAFE0001);
+    uint8_t* box=raw+0x20;
+    put16(box,6);put16(box+2,13);put32(box+4,9000);            // growth: species, item, exp
+    put16(box+0x0C,33);box[0x0C+8]=35;                          // attacks
+    for(int i=0;i<6;i++)box[0x18+i]=i*9;                        // EVs
+    uint32_t iv=0;for(int i=0;i<6;i++)iv|=(uint32_t)(i+10)<<(i*5);
+    put32(box+0x28,iv);
+    raw[0x54]=42;put16(raw+0x56,70);put16(raw+0x58,90);
+    for(int i=0;i<6;i++)put16(raw+0x58+i*2,90+i*7);
+    struct pd_mon mon;
+    assert(pd_decode_party_mon(raw,&mon));
+    assert(mon.species==6 && mon.heldItem==13 && mon.moves[0]==33 && mon.pp[0]==35);
+    assert(mon.level==42 && mon.hp==70 && mon.maxHp==90 && !mon.hasExperience);
+    assert(mon.stats.valid && mon.stats.nature==(int)(0x12345678u%25));
+    for(int i=0;i<6;i++){assert(mon.stats.ivs[i]==i+10&&mon.stats.evs[i]==i*9&&mon.stats.values[i]==90+i*7);}
+    raw[0x12]=3<<3;                                             // Mint: nature XOR 3 (kept when < 25)
+    assert(pd_decode_party_mon(raw,&mon));
+    int expect=(int)(0x12345678u%25)^3;assert(mon.stats.nature==(expect<25?expect:(int)(0x12345678u%25)));
+    memset(box,0,48);                                           // an empty slot
+    assert(!pd_decode_party_mon(raw,&mon));
+    // A layout with its own box offset and plain experience (Quetzal-like) and the egg bit in the IV word.
+    struct pd_party_layout l=pd_party_layout_vanilla;
+    l.size=104;l.plainBox=0x28;l.plainExp=true;l.eggInIvWord=true;l.maxHp=0x5A;l.level=0x58;l.hp=0x5A-2;
+    uint8_t big[104]={0};put32(big,1);box=big+0x28;
+    put16(box,25);put32(box+4,777);put32(box+0x28,1u<<30);
+    big[0x58]=7;put16(big+0x5A,31);
+    assert(pd_decode_party_mon_l(big,&l,&mon));
+    assert(mon.species==PD_SPECIES_EGG && mon.experience==777 && mon.hasExperience && mon.level==7);
+}
+
 static void load(const char* dir,const char* file,void* out,size_t n) {
     char path[1024];snprintf(path,sizeof path,"%s/%s",dir,file);
     FILE* f=fopen(path,"rb");assert(f);assert(fread(out,1,n,f)==n);fclose(f);
@@ -82,6 +115,7 @@ int main(int argc,char** argv) {
         int order[]={a,b,c,d};check_mon(order,permutation++);
     }
     assert(permutation==24);
+    check_plain_mon();
     assert(pd_nature_raises(0)==-1 && pd_nature_lowers(24)==-1);
     assert(pd_nature_raises(3)==1 && pd_nature_lowers(3)==4); // Adamant
     assert(pd_nature_raises(-1)==-1 && pd_nature_lowers(25)==-1);

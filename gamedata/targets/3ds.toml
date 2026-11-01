@@ -13,6 +13,7 @@ POCKET_POKE_BALLS = 'PD_POCKET_BALLS'
 POCKET_TM_HM = 'PD_POCKET_TMHM'
 POCKET_BERRIES = 'PD_POCKET_BERRIES'
 POCKET_KEY_ITEMS = 'PD_POCKET_KEY'
+VANILLA_PARTY_MON = '&pd_party_layout_vanilla'
 
 [names.CardStyle]
 KANTO = 'PD_CARD_KANTO'
@@ -27,6 +28,7 @@ LEGACY = 'PD_CARD_LEGACY'
 # The RAM globals and the save offsets every tab reads.
 [part.ram]
 playerParty = 'playerParty'
+partyLayout = 'partyMonLayout'
 playerPartyCount = 'playerPartyCount'
 battleMons = 'battleMons'
 battlerPositions = 'battlerPositions'

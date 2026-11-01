@@ -26,7 +26,29 @@ enum pd_guide_id {
     PD_GUIDE_EMERALD_LEGACY,
 };
 
+// struct Pokemon's party fields (the app's PartyMonLayout): the party-only fields after the
+// BoxPokemon, and where a plaintext (unencrypted) box keeps its substructs. A config without
+// one (partyLayout NULL) is retail's: pd_party_layout_vanilla.
+struct pd_party_layout {
+    int size;               // the whole struct (the party's stride)
+    int status, level, hp, maxHp; // maxHp is followed by the five other stats
+    int flags;              // the box's flags byte (isEgg: eggMask)
+    int eggMask;
+    int plainBox;           // a plaintext box's growth substruct (attacks +0xC, EVs +0x18, misc +0x28)
+    unsigned plainSpeciesMask, plainItemMask;
+    bool plainExp;          // a plaintext box's experience (growth +4) is read
+    int hpBits;             // HP's bits in the u16 at hp (16 = all)
+    int statusShift;
+    uint32_t statusMask;
+    bool eggInIvWord;       // the egg flag is the IV word's bit 30
+    bool hasStats;          // IVs / EVs / nature / stats come out right from these offsets
+    bool natureModifier;    // expansion's Mints: +0x12's bits above the language are XORed into the nature
+    int nicknameOff, nicknameLen;
+};
+extern const struct pd_party_layout pd_party_layout_vanilla;
+
 struct pd_config {
+    const struct pd_party_layout* partyLayout; // NULL = pd_party_layout_vanilla
     uint32_t playerParty;
     uint32_t playerPartyCount;
     uint32_t battleMons;

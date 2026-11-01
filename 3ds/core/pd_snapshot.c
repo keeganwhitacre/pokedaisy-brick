@@ -5,7 +5,7 @@
 
 #include "pd_tables.h"
 
-#define MON_SIZE 100
+#define MON_SIZE_MAX 128
 #define BATTLE_MON_SIZE 0x58
 #define MAP_HEADER_MAPSEC_OFF 0x14
 #define MAP_HEADER_MAP_TYPE_OFF 0x17
@@ -114,6 +114,12 @@ static enum pd_gender gender_of(const struct pd_mon* m, uint32_t personality) {
 }
 
 bool pd_decode_party_mon(const uint8_t* raw, struct pd_mon* m) {
+    return pd_decode_party_mon_l(raw, &pd_party_layout_vanilla, m);
+}
+
+// Android Gen3Mon.kt decodePartyMon: retail's encrypted, checksummed substructs first, else a
+// plaintext box (CFRU's: Unbound, Radical Red) at the layout's plainBox.
+bool pd_decode_party_mon_l(const uint8_t* raw, const struct pd_party_layout* l, struct pd_mon* m) {
     memset(m, 0, sizeof(*m));
     uint32_t personality = u32(raw);
     uint32_t key = personality ^ u32(raw + 4);
@@ -129,42 +135,64 @@ bool pd_decode_party_mon(const uint8_t* raw, struct pd_mon* m) {
         block[i * 4 + 3] = (uint8_t) (w >> 24);
         sum = (uint16_t) (sum + (w & 0xFFFF) + (w >> 16));
     }
-    // Retail boxes are encrypted and checksummed; an empty slot fails here.
-    if (sum != stored || stored == 0) return false;
-
-    int off[4] = {0};
-    for (int slot = 0; slot < 4; slot++) off[SUBSTRUCT_ORDER[personality % 24][slot]] = slot * 12;
-    m->species = u16(block + off[0]);
-    if (m->species == 0) return false;
-    // Android Gen3Mon.kt decryptGen3Substructs / monStats, retail layout.
-    m->heldItem = u16(block + off[0] + 2);
-    m->experience = u32(block + off[0] + 4);
-    m->hasExperience = m->hasHeldItem = true;
-    uint32_t ivWord = u32(block + off[3] + 4);
-    for (int i = 0; i < 6; i++) {
-        m->stats.ivs[i] = (ivWord >> (5 * i)) & 31;
-        m->stats.evs[i] = block[off[2] + i];
-        m->stats.values[i] = u16(raw + 0x58 + 2 * i);
+    const uint8_t *growth, *attacks, *evs;
+    uint32_t ivWord;
+    if (sum == stored && stored != 0) {
+        int off[4] = {0};
+        for (int slot = 0; slot < 4; slot++) off[SUBSTRUCT_ORDER[personality % 24][slot]] = slot * 12;
+        growth = block + off[0];
+        attacks = block + off[1];
+        evs = block + off[2];
+        ivWord = u32(block + off[3] + 4);
+        m->experience = u32(growth + 4);
+        m->hasExperience = true;
+    } else {
+        // An empty slot is all zeros (species 0); anything else without a checksum is a plaintext box.
+        const uint8_t* box = raw + l->plainBox;
+        growth = box;
+        attacks = box + 0x0C;
+        evs = box + 0x18;
+        ivWord = u32(box + 0x28);
+        if (l->plainExp) {
+            m->experience = u32(growth + 4);
+            m->hasExperience = true;
+        }
     }
-    m->stats.nature = personality % 25;
-    m->stats.valid = true;
-    m->stats.hasIvs = m->stats.hasEvs = m->stats.hasNature = true;
-    m->stats.hasHiddenPower = true;
-    m->stats.hiddenPowerType = pd_hidden_power_type(&m->stats);
-    m->stats.hiddenPowerPower = pd_hidden_power_power(&m->stats);
+    int species = u16(growth) & (sum == stored && stored != 0 ? 0xFFFF : l->plainSpeciesMask);
+    if (species == 0 || species > 4000) return false;
+    m->species = (uint16_t) species;
+    m->heldItem = u16(growth + 2) & (sum == stored && stored != 0 ? 0xFFFF : l->plainItemMask);
+    m->hasHeldItem = true;
+    if (l->hasStats) {
+        int nature = (int) (personality % 25);
+        if (l->natureModifier) {
+            int n = nature ^ (raw[0x12] >> 3);
+            if (n < 25) nature = n;
+        }
+        for (int i = 0; i < 6; i++) {
+            m->stats.ivs[i] = (ivWord >> (5 * i)) & 31;
+            m->stats.evs[i] = evs[i];
+            m->stats.values[i] = u16(raw + l->maxHp + 2 * i);
+        }
+        m->stats.nature = nature;
+        m->stats.valid = true;
+        m->stats.hasIvs = m->stats.hasEvs = m->stats.hasNature = true;
+        m->stats.hasHiddenPower = true;
+        m->stats.hiddenPowerType = pd_hidden_power_type(&m->stats);
+        m->stats.hiddenPowerPower = pd_hidden_power_power(&m->stats);
+    }
     for (int i = 0; i < PD_NUM_MOVES; i++) {
-        m->moves[i] = u16(block + off[1] + i * 2);
-        m->pp[i] = block[off[1] + 8 + i];
+        m->moves[i] = u16(attacks + i * 2);
+        m->pp[i] = attacks[8 + i];
     }
     m->personality = personality;
-    m->level = raw[0x54];
-    m->hp = u16(raw + 0x56);
-    m->maxHp = u16(raw + 0x58);
-    m->status = u32(raw + 0x50);
-    // BoxPokemon +0x13 flags (isBadEgg, hasSpecies, isEgg): an egg shows as
-    // SPECIES_EGG, like the party menu.
-    if (raw[0x13] & 0x04) m->species = PD_SPECIES_EGG;
-    decode_name(raw + 0x08, 10, m->nickname, sizeof(m->nickname));
+    m->level = raw[l->level];
+    m->hp = u16(raw + l->hp) & ((1u << l->hpBits) - 1);
+    m->maxHp = u16(raw + l->maxHp);
+    m->status = (u32(raw + l->status) >> l->statusShift) & l->statusMask;
+    // The flags byte (isBadEgg, hasSpecies, isEgg): an egg shows as SPECIES_EGG, like the party menu.
+    if (l->eggInIvWord ? (ivWord >> 30) & 1 : (raw[l->flags] & l->eggMask) != 0) m->species = PD_SPECIES_EGG;
+    decode_name(raw + l->nicknameOff, l->nicknameLen, m->nickname, sizeof(m->nickname));
     m->gender = gender_of(m, personality);
     return true;
 }
@@ -222,10 +250,11 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
     uint8_t count = 0;
     read(ctx, cfg->playerPartyCount, &count, 1);
     if (count > PD_PARTY_SIZE) count = PD_PARTY_SIZE;
-    uint8_t raw[PD_PARTY_SIZE * MON_SIZE];
-    if (count && read(ctx, cfg->playerParty, raw, count * MON_SIZE)) {
+    const struct pd_party_layout* lay = cfg->partyLayout ? cfg->partyLayout : &pd_party_layout_vanilla;
+    uint8_t raw[PD_PARTY_SIZE * MON_SIZE_MAX];
+    if (count && read(ctx, cfg->playerParty, raw, count * lay->size)) {
         for (int i = 0; i < count; i++) {
-            if (pd_decode_party_mon(raw + i * MON_SIZE, &s->party[s->partyCount])) s->partyCount++;
+            if (pd_decode_party_mon_l(raw + i * lay->size, lay, &s->party[s->partyCount])) s->partyCount++;
         }
     }
 
@@ -456,10 +485,11 @@ const char* pd_status_label(uint32_t status) {
 // The trainer's party and which of it is out / next (readNativeTelemetry's
 // enemyParty / enemyActive / enemyNext, then SnapshotView's rule for next).
 static void read_foes(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx, int foeBattler) {
-    uint8_t raw[PD_PARTY_SIZE * MON_SIZE];
-    if (!read(ctx, cfg->enemyParty, raw, sizeof(raw))) return;
+    const struct pd_party_layout* lay = cfg->partyLayout ? cfg->partyLayout : &pd_party_layout_vanilla;
+    uint8_t raw[PD_PARTY_SIZE * MON_SIZE_MAX];
+    if (!read(ctx, cfg->enemyParty, raw, PD_PARTY_SIZE * lay->size)) return;
     for (int i = 0; i < PD_PARTY_SIZE; i++) {
-        if (pd_decode_party_mon(raw + i * MON_SIZE, &s->foes[s->foeCount])) s->foeCount++;
+        if (pd_decode_party_mon_l(raw + i * lay->size, lay, &s->foes[s->foeCount])) s->foeCount++;
     }
     if (!s->foeCount || foeBattler < 0 || !cfg->battlerPartyIndexes) return;
     uint8_t idx[2];

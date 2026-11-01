@@ -14,6 +14,7 @@
 // gamedata/gen3/retail/firered.toml: firered_rev1 (ram, foes, icons, dex, guide, card, fly, field)
 static const struct pd_config PD_CONFIG_FIRERED_REV1 = {
     .playerParty = 0x02024284,
+    .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
     .battleMons = 0x02023BE4,
     .battlerPositions = 0x02023BD6,
@@ -126,6 +127,7 @@ static const struct pd_config PD_CONFIG_FIRERED_REV1 = {
 // gamedata/gen3/retail/firered.toml: firered_rev0 (ram, icons, card, fly, field)
 static const struct pd_config PD_CONFIG_FIRERED_REV0 = {
     .playerParty = 0x02024284,
+    .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
     .battleMons = 0x02023BE4,
     .battlerPositions = 0x02023BD6,
@@ -213,6 +215,7 @@ static const struct pd_config PD_CONFIG_FIRERED_REV0 = {
 // gamedata/gen3/retail/leafgreen.toml: leafgreen_rev0 (ram, icons, dex, guide, card, fly, field)
 static const struct pd_config PD_CONFIG_LEAFGREEN_REV0 = {
     .playerParty = 0x02024284,
+    .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
     .battleMons = 0x02023BE4,
     .battlerPositions = 0x02023BD6,
@@ -320,6 +323,7 @@ static const struct pd_config PD_CONFIG_LEAFGREEN_REV0 = {
 // gamedata/gen3/retail/leafgreen.toml: leafgreen_rev1 (ram, foes, icons, dex, guide, card, fly, field)
 static const struct pd_config PD_CONFIG_LEAFGREEN_REV1 = {
     .playerParty = 0x02024284,
+    .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
     .battleMons = 0x02023BE4,
     .battlerPositions = 0x02023BD6,
@@ -432,6 +436,7 @@ static const struct pd_config PD_CONFIG_LEAFGREEN_REV1 = {
 // gamedata/gen3/retail/emerald.toml: emerald_retail (ram, foes, icons, dex, guide, card, fly, field)
 static const struct pd_config PD_CONFIG_EMERALD = {
     .playerParty = 0x020244EC,
+    .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020244E9,
     .battleMons = 0x02024084,
     .battlerPositions = 0x02024076,
@@ -546,6 +551,7 @@ static const struct pd_config PD_CONFIG_EMERALD = {
 // gamedata/gen3/hacks/emerald_legacy.toml: emerald_legacy (ram, foes, icons, dex, guide, card, fly, field)
 static const struct pd_config PD_CONFIG_EMERALD_LEGACY = {
     .playerParty = 0x020244EC,
+    .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020244E9,
     .battleMons = 0x02024084,
     .battlerPositions = 0x02024076,
@@ -660,6 +666,7 @@ static const struct pd_config PD_CONFIG_EMERALD_LEGACY = {
 // gamedata/gen3/retail/ruby_sapphire.toml: ruby (ram, foes, icons, dex, guide, fly, field)
 static const struct pd_config PD_CONFIG_RUBY = {
     .playerParty = 0x03004360,
+    .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004350,
     .battleMons = 0x02024A80,
     .battlerPositions = 0x02024A72,
@@ -760,6 +767,7 @@ static const struct pd_config PD_CONFIG_RUBY = {
 // gamedata/gen3/retail/ruby_sapphire.toml: sapphire (ram, foes, icons, dex, guide, fly, field)
 static const struct pd_config PD_CONFIG_SAPPHIRE = {
     .playerParty = 0x03004360,
+    .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004350,
     .battleMons = 0x02024A80,
     .battlerPositions = 0x02024A72,
@@ -860,6 +868,7 @@ static const struct pd_config PD_CONFIG_SAPPHIRE = {
 // gamedata/gen3/ports/ruby.toml: port_axve0 (ram, foes, icons, dex, guide, fly, field)
 static const struct pd_config PD_CONFIG_RUBY_REV0 = {
     .playerParty = 0x03004360,
+    .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004350,
     .battleMons = 0x02024A80,
     .battlerPositions = 0x02024A72,
@@ -960,6 +969,7 @@ static const struct pd_config PD_CONFIG_RUBY_REV0 = {
 // gamedata/gen3/ports/sapphire.toml: port_axpe0 (ram, foes, icons, dex, guide, fly, field)
 static const struct pd_config PD_CONFIG_SAPPHIRE_REV0 = {
     .playerParty = 0x03004360,
+    .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004350,
     .battleMons = 0x02024A80,
     .battlerPositions = 0x02024A72,

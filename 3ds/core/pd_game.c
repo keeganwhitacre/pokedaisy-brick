@@ -7,6 +7,11 @@
 
 // The configs come from gamedata/ (gamedata/targets/3ds.toml picks the fields
 // this port reads), generated with the app's: `make gamedata`.
+const struct pd_party_layout pd_party_layout_vanilla = {
+    .size = 100, .status = 0x50, .level = 0x54, .hp = 0x56, .maxHp = 0x58, .flags = 0x13, .eggMask = 0x04,
+    .plainBox = 0x20, .plainSpeciesMask = 0xFFFF, .plainItemMask = 0xFFFF, .hpBits = 16, .statusMask = 0xFFFFFFFFu,
+    .hasStats = true, .natureModifier = true, .nicknameOff = 0x08, .nicknameLen = 10,
+};
 #include "pd_configs_gen.h"
 
 const uint8_t* pd_rom_at(const struct pd_game* g, uint32_t addr, size_t len) {
