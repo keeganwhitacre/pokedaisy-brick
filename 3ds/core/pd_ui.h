@@ -138,7 +138,18 @@ struct pd_party_source {
     const char* (*info)(void*, const struct pd_mon*, int);
 };
 
+// Optional read-only bag presentation; item IDs remain backend-owned.
+struct pd_bag_source {
+    void* ctx;
+    int tabs;
+    const char* (*pocketName)(void*, int);
+    int (*count)(void*, int);
+    bool (*item)(void*, int, int, struct pd_item*, bool* quantity);
+    const char* (*name)(void*, int);
+};
 struct pd_ui {
+    const struct pd_bag_source* bagSource;
+    bool bagDetails;
     const struct pd_party_source* partySource;
     int summaryPage;
     enum pd_tab tab;
@@ -191,6 +202,7 @@ struct pd_ui {
 };
 
 // Shared party body, including its original frames, HP bars, status and summary.
+void pd_ui_bag_view(struct pd_ui*, struct pd_canvas*, const struct pd_game*, const struct pd_snapshot*);
 void pd_ui_party_view(struct pd_ui*, struct pd_canvas*, const struct pd_game*,
                       const struct pd_snapshot*, int selected);
 void pd_ui_init(struct pd_ui* ui, struct pd_settings* settings);
