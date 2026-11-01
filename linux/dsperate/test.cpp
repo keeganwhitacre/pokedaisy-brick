@@ -6,6 +6,7 @@
 #include "party_view.h"
 #include "bag_view.h"
 #include "dex_view.h"
+#include "options_view.h"
 #include "battle_view.h"
 #include "pk_nds_field.h"
 #include <filesystem>
@@ -106,6 +107,17 @@ int main(int argc,char** argv){
   pd_ui nav{};nav.pressedId=-1;const char* tabs[]={"PARTY","BAG","DEX","STATUS","SET","MAP"};
   pd_ui_navigation(&nav,&body,tabs,6,2);assert(nav.hitCount==6);
   pd_ui_navigation(&nav,&body,tabs,0,0);assert(nav.hitCount==0);
+  pd_settings preferences{};preferences.quickResume=true;preferences.saveOnQuit=false;
+  ds_settings_view(&body,preferences,false,1,0);ds_settings_view(&body,preferences,true,0,6);
+  ds_status_view(&body,s);
+  pd_option_row rows[24];for(auto& row:rows)row={"SETTING","VALUE"};
+  pd_option_source options{"OPTIONS",rows,24};pd_ui optionsUi{};optionsUi.optionSource=&options;
+  optionsUi.optionSelected=23;pd_game optionsGame{};pd_snapshot optionsSnapshot{};
+  pd_ui_options_view(&optionsUi,&body,&optionsGame,&optionsSnapshot);
+  assert(optionsUi.settingsScroll>0);
+  options.count=0;optionsUi.optionSelected=0;
+  pd_ui_options_view(&optionsUi,&body,&optionsGame,&optionsSnapshot);assert(optionsUi.settingsScroll==0);
+  std::puts("PASS shared options/status rows, final selection, long-list scrolling and empty source");
   std::puts("PASS shared dex national 493, filter bounds, empty list and navigation chips");
   std::puts("PASS shared bag rendering past row 99, details, empty pockets and trailing tabs");
   std::puts("PASS shared party/summary renderer with DS Burmy and egg identities");

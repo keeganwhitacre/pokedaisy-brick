@@ -269,3 +269,19 @@ This is list parity only: A does not open a full DS dex entry. Species text,
 front sprites, regional ordering and entry statistics/descriptions need their
 own app-owned ROM/data adapters. Map and Settings bodies remain the older DS
 frontend. These changes add no game writes or new memory-offset tables.
+
+## Shared Settings and Status presentation
+
+SET and STATUS now call `pd_ui_options_view`, a host-row mode of the established
+Settings renderer. It supplies the title/list frames, option rows, selection
+highlight, clipping and scroll bar. The old DS text-list drawing is removed.
+Only rows the DS host implements are supplied: SCREEN, BATTLES, QUICK RESUME,
+SAVE ON QUIT, HUD, QUICK MENU and FILTER. Existing DS controls, independent
+resume/save policies and preference persistence remain unchanged. No speculative
+GBA options, fast-forward actions or data writes are added.
+
+STATUS displays trainer, money, place, badge count and seen/caught/National Dex
+state from the existing DS snapshot using those shared rows. It is not a full
+trainer-card implementation. It has no selected action or party-navigation hint.
+Map is still the older DS body. Full dex entries, bottom-bar/MORE layout, item
+use and device sleep integration remain outside this UI migration step.

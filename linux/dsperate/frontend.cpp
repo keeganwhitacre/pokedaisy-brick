@@ -10,6 +10,7 @@
 #include "party_view.h"
 #include "bag_view.h"
 #include "dex_view.h"
+#include "options_view.h"
 #include "data_gen.h"
 #include "battle_view.h"
 #include "display.h"
@@ -99,15 +100,8 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
   pd_list_box(&c,5,61,c.w-10,c.h-86);int y=68;
   auto line=[&](const std::string& t){pd_text_fit(&c,13,y,c.w-26,t.c_str(),0x303030,PD_NO_SHADOW);y+=20;};
   if(tab==4){
-    const std::string rows[]={std::string("SCREEN: ")+(prefs.bottom?"BOTTOM":"TOP"),
-      std::string("BATTLES: ")+(prefs.battle?"AUTO":"OFF"),
-      std::string("QUICK RESUME: ")+(settings.quickResume?"ON":"OFF"),
-      std::string("SAVE ON QUIT: ")+(settings.saveOnQuit?"ON":"OFF"),
-      std::string("HUD: ")+(settings.hud?"ON":"OFF"),
-      std::string("QUICK MENU: ")+(settings.quickGrid?"GRID":"RING"),
-      std::string("FILTER: ")+(settings.lcdFilter?"LCD":"OFF")};
-    int first=std::max(0,setting-5);
-    for(int i=first;i<7 && i<first+6;i++){if(i==setting)pd_fill(&c,10,y-2,c.w-20,20,0xffe4a0);line(rows[i]);}
+    pd_canvas body;pd_canvas_init(&body,c.w,c.h-81,c.px+61*c.w);
+    ds_settings_view(&body,settings,prefs.bottom,prefs.battle,setting);
 
   }
   else if(!supported)line("Companion: Platinum USA Rev 1 only");
@@ -145,8 +139,8 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
     if(!s.dexValid)line("Pokedex data unavailable");
     else {pd_canvas body;pd_canvas_init(&body,c.w,c.h-81,c.px+61*c.w);ds_dex_view(&body,s,dexFilter,scroll);}
   }
-  else {line("TRAINER: "+s.trainer);line("MONEY: "+std::to_string(s.money));line(std::string("PLACE: ")+ds_place(s.map));line("MAP: "+std::to_string(s.map));line(s.dexValid?(s.nationalDex?"NATIONAL DEX: UNLOCKED":"NATIONAL DEX: LOCKED"):"DEX: UNAVAILABLE");}
-  pd_text_fit(&c,9,c.h-20,c.w-18,tab==5?"D-pad move  A player  L/R tabs":tab==4?"Up/Down select  A change  L/R tabs":tab==0 && summary?"Left/Right info/moves  Up/Down Pokemon":tab==1?"Up/Down item  Left/Right pocket  A details":tab==2?"SELECT filter  Left/Right page  L/R tabs":"D-pad cards  A summary  B back  L2 game",0xffffff,PD_NO_SHADOW);
+  else {pd_canvas body;pd_canvas_init(&body,c.w,c.h-81,c.px+61*c.w);ds_status_view(&body,s);}
+  pd_text_fit(&c,9,c.h-20,c.w-18,tab==3?"L/R tabs  B back  L2 game":tab==5?"D-pad move  A player  L/R tabs":tab==4?"Up/Down select  A change  L/R tabs":tab==0 && summary?"Left/Right info/moves  Up/Down Pokemon":tab==1?"Up/Down item  Left/Right pocket  A details":tab==2?"SELECT filter  Left/Right page  L/R tabs":"D-pad cards  A summary  B back  L2 game",0xffffff,PD_NO_SHADOW);
 }
 }
 extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* shot,SDL_Renderer* renderer,bool (*keepRunning)(),void (*hostEvent)(const SDL_Event*),bool noResume) {
