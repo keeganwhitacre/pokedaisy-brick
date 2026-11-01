@@ -6,6 +6,7 @@
 #include "core/cpu/jit/jit.h"
 #endif
 #include "companion.h"
+#include "browser.h"
 #include "data_gen.h"
 #include "battle_view.h"
 #include "display.h"
@@ -84,13 +85,20 @@ void blit(SDL_Renderer* r,SDL_Texture* t,const uint32_t* px,int w,int h,int ow,i
   SDL_UpdateTexture(t,nullptr,px,w*4);int scale=std::max(1,std::min(ow/w,oh/h));
   SDL_Rect dst{(ow-w*scale)/2,(oh-h*scale)/2,w*scale,h*scale};SDL_RenderCopy(r,t,nullptr,&dst);
 }
-void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int selected,bool summary,int scroll,int page,const DsPrefs& prefs,const pd_settings& settings,int setting,const DsMapArt& art,int mapX,int mapY){
+void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int selected,bool summary,int scroll,int page,const DsPrefs& prefs,const pd_settings& settings,int setting,const DsMapArt& art,int mapX,int mapY,int pocket,int dexFilter,const std::vector<std::vector<uint32_t>>& icons){
   pd_fill(&c,0,0,c.w,c.h,0x50a8a8);pd_title_box(&c,5,5,c.w-10,25,0xffffff);
   pd_text(&c,12,10,"PokeDaisy DS",0x303030,PD_NO_SHADOW);
   const char* tabs[]={"PARTY","BAG","DEX","STATUS","SET","MAP"};
   for(int i=0;i<6;i++){int x=5+i*(c.w-10)/6;pd_title_box(&c,x,34,(c.w-10)/6-2,23,i==tab?0xffefbc:0xffffff);pd_text(&c,x+8,38,tabs[i],0x303030,PD_NO_SHADOW);}
   pd_list_box(&c,5,61,c.w-10,c.h-86);int y=68;
   auto line=[&](const std::string& t){pd_text_fit(&c,13,y,c.w-26,t.c_str(),0x303030,PD_NO_SHADOW);y+=20;};
+  auto icon=[&](const DsMon& m,int x,int y){
+    int id=m.egg?pd_ds_data::iconEgg:m.species;
+    if(id<1 || size_t(id)>=icons.size())return;
+    const auto& pixels=icons[id];if(pixels.size()!=1024)return;
+    for(int yy=0;yy<32;yy++)for(int xx=0;xx<32;xx++)if(pixels[yy*32+xx]>>24)
+      pd_fill(&c,x+xx,y+yy,1,1,pixels[yy*32+xx]&0xffffff);
+  };
   if(tab==4){
     const std::string rows[]={std::string("SCREEN: ")+(prefs.bottom?"BOTTOM":"TOP"),
       std::string("BATTLES: ")+(prefs.battle?"AUTO":"OFF"),
@@ -137,23 +145,49 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
       line(std::string("STATUS: ")+ds_status(m));
       line(std::string(m.egg?"EGG  ":"")+"GENDER: "+(m.gender==1?"MALE":m.gender==2?"FEMALE":"NONE"));
     }else for(int i=0;i<4;i++)if(m.moves[i])line(std::string(ds_move(m.moves[i]))+"  PP "+std::to_string(m.pp[i]));
-  }else if(tab==0){for(size_t i=0;i<s.party.size();i++){
-    auto& m=s.party[i];if(int(i)==selected)pd_fill(&c,10,y-2,c.w-20,20,0xffe4a0);
-    line(m.nickname+" Lv"+std::to_string(m.level)+"  "+std::to_string(m.hp)+"/"+std::to_string(m.maxHp));
-  }}else if(tab==1){int rows=(c.h-100)/20;for(int i=scroll;i<int(s.bag.size()) && i<scroll+rows;i++)line(std::string(ds_item(s.bag[i].id))+" x"+std::to_string(s.bag[i].count));}
+  }else if(tab==0){
+    if(s.party.empty())line("No Pokemon in party");
+    for(size_t i=0;i<s.party.size();i++){
+      const auto& m=s.party[i];int x=10+int(i%2)*162,cy=65+int(i/2)*51;
+      pd_fill(&c,x,cy,158,47,int(i)==selected?0xffe4a0:0xffffff);
+      icon(m,x+2,cy+3);
+      pd_text_fit(&c,x+37,cy+2,117,m.egg?"EGG":m.nickname.c_str(),0x303030,PD_NO_SHADOW);
+      std::string label="Lv"+std::to_string(m.level)+" "+(m.hp?ds_status(m):"FNT");
+      pd_text_fit(&c,x+37,cy+16,117,label.c_str(),0x303030,PD_NO_SHADOW);
+      if(!m.egg){
+        pd_fill(&c,x+37,cy+33,114,5,0x707878);
+        int hp=m.maxHp?std::clamp(m.hp*114/m.maxHp,0,114):0;
+        pd_fill(&c,x+37,cy+33,hp,5,m.hp*4<=m.maxHp?0xe05050:m.hp*2<=m.maxHp?0xe0b840:0x48b878);
+      }
+    }
+  }else if(tab==1){
+    const char* names[]={"ALL","ITEMS","KEY ITEMS","TMs/HMs","MAIL","MEDICINE","BERRIES","BALLS","BATTLE"};
+    line(std::string("< ")+names[pocket]+" >");
+    int n=0,shown=0,rows=(c.h-120)/20;
+    for(const auto& item:s.bag)if(ds_in_pocket(item,pocket)){
+      if(n++<scroll)continue;
+      if(shown++>=rows)break;
+      line(std::string(ds_item(item.id))+" x"+std::to_string(item.count));
+    }
+    if(!n)line("This pocket is empty");
+  }
   else if(tab==2){
     if(!s.dexValid)line("Pokedex data unavailable");
     else {
-      line("SEEN "+std::to_string(s.seenCount)+"  OWN "+std::to_string(s.caughtCount));
+      line(std::string(dexFilter==0?"ALL":dexFilter==1?"SEEN":"CAUGHT")+"  SEEN "+std::to_string(s.seenCount)+" OWN "+std::to_string(s.caughtCount));
       int rows=(c.h-120)/20;
-      for(int n=scroll+1;n<int(s.dexSeen.size()) && n<scroll+1+rows;n++){
+      int eligible=0,shown=0;
+      for(int n=1;n<int(s.dexSeen.size());n++){
+        if(!ds_dex_visible(s,n,dexFilter))continue;
+        if(eligible++<scroll)continue;
+        if(shown++>=rows)break;
         char number[16];std::snprintf(number,sizeof number,"%03d ",n);
         line(std::string(number)+(s.dexSeen[n]?ds_species(n):"???")+(s.dexCaught[n]?"  OWN":s.dexSeen[n]?"  SEEN":""));
       }
     }
   }
   else {line("TRAINER: "+s.trainer);line("MONEY: "+std::to_string(s.money));line(std::string("PLACE: ")+ds_place(s.map));line("MAP: "+std::to_string(s.map));line(s.dexValid?(s.nationalDex?"NATIONAL DEX: UNLOCKED":"NATIONAL DEX: LOCKED"):"DEX: UNAVAILABLE");}
-  pd_text_fit(&c,9,c.h-20,c.w-18,tab==5?"D-pad move  A player  L/R tabs":tab==4?"Up/Down select  A change  L/R tabs":tab==0 && summary?"Left/Right info/moves  Up/Down Pokemon":tab==1 || tab==2?"Up/Down scroll  Left/Right page  L/R tabs":"L/R tabs  A summary  B back  L2 game",0xffffff,PD_NO_SHADOW);
+  pd_text_fit(&c,9,c.h-20,c.w-18,tab==5?"D-pad move  A player  L/R tabs":tab==4?"Up/Down select  A change  L/R tabs":tab==0 && summary?"Left/Right info/moves  Up/Down Pokemon":tab==1?"Up/Down scroll  Left/Right pocket  L/R tabs":tab==2?"SELECT filter  Left/Right page  L/R tabs":"D-pad cards  A summary  B back  L2 game",0xffffff,PD_NO_SHADOW);
 }
 }
 extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* shot,SDL_Renderer* renderer,bool (*keepRunning)(),void (*hostEvent)(const SDL_Event*),bool noResume) {
@@ -250,6 +284,7 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
     return true;
   };
   int quickSelected=0;uint32_t blocked=0;
+  int pocket=0,dexFilter=0;
   int mapX=-1,mapY=-1,setting=0,page=0,tab=0,selected=0,scroll=0,touchX=128,touchY=96;uint32_t keys=0;unsigned repeat[8]={};int frame=0,lastPhase=-1,overrideScreen=-1;
   const int raw[]={1,0,11,10,9,8,2,3,15,-1,12,13};
   struct Press{int at,n;uint32_t mask;};std::vector<Press> script,hostScript;
@@ -390,12 +425,25 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
           if(!saveSettings())notice("DS shared settings save failed");
         }
       }
-      if(tab!=4 && tab!=5 && (pressed&(1u<<6))){if(tab==1 || tab==2)scroll=std::max(0,scroll-1);else selected=std::max(0,selected-1);}
-      if(tab!=4 && tab!=5 && (pressed&(1u<<7))){if(tab==1 || tab==2)scroll=std::min(std::max(0,(tab==1?int(snap.bag.size()):int(snap.dexSeen.size())-1)-1),scroll+1);else selected=std::min(std::max(0,int(snap.party.size())-1),selected+1);}
-      if(tab==1 || tab==2){
-        int last=std::max(0,(tab==1?int(snap.bag.size()):int(snap.dexSeen.size())-1)-1);
+      if(tab!=4 && tab!=5 && (pressed&(1u<<6))){if(tab==1 || tab==2)scroll=std::max(0,scroll-1);else selected=std::max(0,selected-(tab==0 && !summary?2:1));}
+      if(tab!=4 && tab!=5 && (pressed&(1u<<7))){if(tab==1 || tab==2)scroll=std::min(std::max(0,(tab==1?int(snap.bag.size()):int(snap.dexSeen.size())-1)-1),scroll+1);else selected=std::min(std::max(0,int(snap.party.size())-1),selected+(tab==0 && !summary?2:1));}
+      if(tab==1 && (pressed&((1u<<4)|(1u<<5)))){
+        pocket=(pocket+(pressed&(1u<<4)?1:8))%9;scroll=0;
+      }
+      if(tab==2 && (pressed&(1u<<2))){dexFilter=(dexFilter+1)%3;scroll=0;}
+      int listCount=0;
+      if(tab==1)listCount=ds_bag_count(snap,pocket);
+      if(tab==2)listCount=ds_dex_count(snap,dexFilter);
+      if(tab==1 || tab==2)scroll=std::clamp(scroll,0,std::max(0,listCount-1));
+      if(tab==2){
+        int last=std::max(0,listCount-1);
         if(pressed&(1u<<4))scroll=std::min(last,scroll+7);
         if(pressed&(1u<<5))scroll=std::max(0,scroll-7);
+      }
+      if(tab==0 && !summary){
+        if(pressed&(1u<<4))selected=std::min(int(snap.party.size())-1,selected+1);
+        if(pressed&(1u<<5))selected=std::max(0,selected-1);
+        selected=std::max(0,selected);
       }
       if(tab==0 && (pressed&1))summary=true;
       if(pressed&(1u<<1)){if(summary)summary=false;else showCompanion=false;}
@@ -417,7 +465,7 @@ extern "C" int pd_ds_run(const char* rom,const char* root,int limit,const char* 
     int ow=1024,oh=768;
     if(!ds_display_pixels(renderer,ow,oh)){std::fprintf(stderr,"DS display setup failed: %s\n",SDL_GetError());failed=true;break;}
     SDL_SetRenderDrawColor(renderer,0,0,0,255);SDL_RenderClear(renderer);
-    if(showCompanion){companion(canvas,snap,supported,tab,selected,summary,scroll,page,prefs,settings,setting,mapArt,mapX,mapY);blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);}
+    if(showCompanion){companion(canvas,snap,supported,tab,selected,summary,scroll,page,prefs,settings,setting,mapArt,mapX,mapY,pocket,dexFilter,partyArt);blit(renderer,ui.p,uiPixels.data(),341,256,ow,oh);}
     else blit(renderer,top.p,nds->gpu.framebuffer(view.bottom?1:0),256,192,ow,oh);
     if(!showCompanion && !paused && !confirmation && (showQuick || (settings.hud && !(settings.hudHidden & (1<<PD_HUD_PARTY)) && snap.valid && !view.bottom && !inBattle && (fieldBits&PK_NDS_FIELD_SCREEN) && !(fieldBits&(PK_NDS_FIELD_LOCKED|PK_NDS_FIELD_MENU))))){
       for(auto& p:uiPixels)p=QUICK_CLEAR;

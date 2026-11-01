@@ -2,6 +2,7 @@
 #include "core/nds.h"
 #include "core/state/state.h"
 #include "companion.h"
+#include "browser.h"
 #include "battle_view.h"
 #include "pk_nds_field.h"
 #include <filesystem>
@@ -61,6 +62,13 @@ int main(int argc,char** argv){
   assert(s.dexValid && s.seenCount==2 && s.caughtCount==1);
   assert(s.dexSeen[387] && s.dexSeen[390] && s.dexCaught[387] && !s.dexCaught[390]);
   assert(s.dexSeen.size()==494);
+  assert(ds_dex_count(s,0)==493 && ds_dex_count(s,1)==2 && ds_dex_count(s,2)==1);
+  assert(!ds_dex_visible(s,0,0) && !ds_dex_visible(s,494,0));
+  assert(ds_dex_visible(s,390,1) && !ds_dex_visible(s,390,2));
+  int total=0;for(int pocket=1;pocket<=8;pocket++)total+=ds_bag_count(s,pocket);
+  assert(total==int(s.bag.size()) && ds_bag_count(s,0)==total);
+  DsCompanion empty;assert(ds_dex_count(empty,2)==0 && ds_bag_count(empty,8)==0);
+  std::puts("PASS bag pocket partition and seen/caught dex bounds on upstream RAM fixture");
 
   assert(s.mapX==3 && s.mapY==27); // Player's house: use its outside exit block.
   assert(ds_map_section(s.mapX,s.mapY)==1);

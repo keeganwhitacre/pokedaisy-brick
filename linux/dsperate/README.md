@@ -169,3 +169,25 @@ with an immediate refresh on companion entry, reducing repeated decoding work.
 These choices are not a measurement of physical Brick speed or battery life.
 
 Current validation and audit details are in `BASELINE-VALIDATION.md`.
+
+## Platinum companion browsing parity
+
+PARTY now uses a two-column, six-card layout with ROM-derived party icons,
+status labels and HP bars. Up/Down moves between rows; Left/Right moves one
+slot. A opens the existing summary and B returns to the cards. Summary controls
+are unchanged. Icons use the existing DS ROM decoder, not GBA species tables.
+
+BAG: Left/Right cycles ALL and the eight save pockets in the app's Gen4Reader
+order (items, key items, TMs/HMs, mail, medicine, berries, balls, battle items).
+Up/Down scrolls within the selected pocket; changing pocket resets the scroll.
+Empty pockets have an explicit message. This is browsing only, not item use.
+
+DEX: Select cycles ALL / SEEN / CAUGHT. Up/Down scrolls and Left/Right pages
+within the filtered list. The original national number is retained. Changing
+filter resets the scroll; empty and boundary selections remain bounded.
+
+Regression checks partition the upstream Platinum RAM fixture's bag into all
+pockets, verify its seen/caught sets and reject out-of-range dex indices. Private
+captures additionally exercise the attached retail ROM/save's party, card focus,
+summary, Medicine pocket and Caught filter. No new address tables or gameplay
+writes are introduced. These additions do not establish physical Brick results.
