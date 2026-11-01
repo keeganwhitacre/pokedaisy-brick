@@ -9,6 +9,8 @@
 #include "field_items.h"
 #include "fly.h"
 #include "hud.h"
+#include "pd_dex.h"
+#include "pd_guide.h"
 #include "../app/src/main/cpp/pk_call.h"
 #include "quick_menu.h"
 #include "wild.h"
@@ -649,6 +651,26 @@ static void present_game(unsigned gw, unsigned gh) {
   if (render_game(gw, gh))
     timed_present();
 }
+/* WILD's badge: this map's wild species not caught yet (FieldHud's hudWild); -1 = the game has no wild tables. */
+static int hud_wild_uncaught(const struct pd_game *g, const struct pd_snapshot *s) {
+  struct pd_wild_set w;
+  if (!g->cfg || !g->cfg->wildHeaders)
+    return -1;
+  if (!pd_wild_here(g, s, &w))
+    return 0;
+  int seen[PD_WILD_METHODS * PD_WILD_MAX], n = 0, left = 0;
+  for (int m = 0; m < PD_WILD_METHODS; m++)
+    for (int i = 0; i < w.count[m]; i++) {
+      int sp = w.mons[m][i].species, k = 0;
+      while (k < n && seen[k] != sp)
+        k++;
+      if (k < n)
+        continue;
+      seen[n++] = sp;
+      left += !pd_dex_caught(s, pd_dex_national(g, sp));
+    }
+  return left;
+}
 /* The HUD over the overworld (hud.c): the screen with EXPAND (its corners), else the game's own picture, at the
  * companion's canvas scale. Its texture is redrawn only when what it shows changed (hud_key). */
 static uint32_t hudPixels[CANVAS_MAX_W * CANVAS_MAX_H];
@@ -656,15 +678,20 @@ static SDL_Texture *hudTexture;
 static uint32_t hudDrawnKey;
 static int hudW, hudH;
 static bool hudShown;
+static struct hud_hits hudHits; // where hud_draw put each target, in HUD canvas pixels
+static int hudScale = 1;
 static void present_hud_game(const struct pd_game *g, const struct pd_snapshot *s, const struct hud_state *h,
-                             int hidden, unsigned gw, unsigned gh) {
+                             const struct pd_settings *st, unsigned gw, unsigned gh) {
   if (!render_game(gw, gh))
     return;
   int ow, oh;
   SDL_GetRendererOutputSize(renderer, &ow, &oh);
   int scale = ow / canvasW < oh / canvasH ? ow / canvasW : oh / canvasH;
+  // SIZE: the companion's scale a whole pixel smaller or bigger (FieldHudSize's step).
+  scale += st->hudSize - PD_HUD_NORMAL;
   if (scale < 1)
     scale = 1;
+  hudScale = scale;
   SDL_Rect area = wideReady ? (SDL_Rect){0, 0, ow, oh} : lastGameRect;
   int w = area.w / scale, hh = area.h / scale;
   if (w > CANVAS_MAX_W)
@@ -677,11 +704,11 @@ static void present_hud_game(const struct pd_game *g, const struct pd_snapshot *
     if (hudTexture)
       SDL_SetTextureBlendMode(hudTexture, SDL_BLENDMODE_BLEND);
   }
-  uint32_t key = hud_key(s, h, hidden) ^ (uint32_t)(w * 65599 + hh);
+  uint32_t key = hud_key(s, h, st) ^ (uint32_t)(w * 65599 + hh);
   if (hudTexture && (key != hudDrawnKey || w != hudW || hh != hudH)) {
     struct pd_canvas hc;
     pd_canvas_init(&hc, w, hh, hudPixels);
-    hudShown = hud_draw(&hc, g, s, h, hidden);
+    hudShown = hud_draw(&hc, g, s, h, st, &hudHits);
     quick_finish(&hc);
     SDL_UpdateTexture(hudTexture, &(SDL_Rect){0, 0, w, hh}, hudPixels, w * 4);
     hudDrawnKey = key;
@@ -1193,7 +1220,7 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
   unsigned gameKeys = 0;
   int gameKeyFrames = 0;
   // The HUD: on after 20 frames of the plain field (FieldHud's rule), off at once.
-  struct hud_state hudState = {0, 0};
+  struct hud_state hudState = {0, 0, false, -1, -1};
   int hudFieldFrames = 0;
   hudDrawnKey = 0;
   char repelRows[REPEL_KINDS][48];
@@ -1694,8 +1721,10 @@ static void run_game(const char *path, int maxFrames, const char *shot) {
         else if (!hudState.repelFull || steps > hudState.repelFull)
           hudState.repelFull = hud_repel_full(steps);
         hudState.repel = steps > 0 ? steps : 0;
+        hudState.pc = pcOk;
+        hudState.wild = hud_wild_uncaught(&game, &snap);
         companion_canvas();
-        present_hud_game(&game, &snap, &hudState, settings.hudHidden, gw, gh);
+        present_hud_game(&game, &snap, &hudState, &settings, gw, gh);
       } else {
         present_game(gw, gh);
       }
