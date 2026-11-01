@@ -127,7 +127,20 @@ enum pd_overlay {
     PD_OVERLAY_MORE,    // the tabs off the bar
 };
 
+// Optional presentation data for another emulator; IDs stay native to that backend.
+struct pd_party_source {
+    void* ctx;
+    bool (*egg)(void*, const struct pd_mon*);
+    const char* (*species)(void*, int);
+    const char* (*move)(void*, int);
+    int (*moveType)(void*, int);
+    bool (*icon)(void*, struct pd_canvas*, const struct pd_mon*, int, int, int, bool);
+    const char* (*info)(void*, const struct pd_mon*, int);
+};
+
 struct pd_ui {
+    const struct pd_party_source* partySource;
+    int summaryPage;
     enum pd_tab tab;
     enum pd_tab tabBeforeBattle; // the tab a battle took over from
     int battleSlot;              // the bar slot BATTLE shows in, -1 = none
@@ -177,6 +190,9 @@ struct pd_ui {
     int hitCount;
 };
 
+// Shared party body, including its original frames, HP bars, status and summary.
+void pd_ui_party_view(struct pd_ui*, struct pd_canvas*, const struct pd_game*,
+                      const struct pd_snapshot*, int selected);
 void pd_ui_init(struct pd_ui* ui, struct pd_settings* settings);
 // Follows the game: a battle opens BATTLE, its end goes back.
 void pd_ui_update(struct pd_ui* ui, const struct pd_snapshot* s);

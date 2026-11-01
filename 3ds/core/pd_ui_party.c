@@ -7,6 +7,17 @@
 #include "pd_tables.h"
 #include "pd_ui_internal.h"
 
+static bool party_egg(const struct pd_ui* ui, const struct pd_mon* m) {
+    return ui->partySource && ui->partySource->egg ? ui->partySource->egg(ui->partySource->ctx,m) : m->species==PD_SPECIES_EGG;
+}
+static const char* party_species(const struct pd_ui* ui,int id,char* buf,size_t n) {
+    return ui->partySource && ui->partySource->species ? ui->partySource->species(ui->partySource->ctx,id) : pd_species_name(id,buf,n);
+}
+static bool party_icon(const struct pd_ui* ui,struct pd_canvas* c,const struct pd_game* g,
+                       const struct pd_mon* m,int x,int y,int scale,bool faded) {
+    return ui->partySource && ui->partySource->icon ? ui->partySource->icon(ui->partySource->ctx,c,m,x,y,scale,faded)
+        : pd_draw_mon_icon_scaled(c,g,m->species,x,y,scale,faded);
+}
 // FireRedPartyPalette (PartyScreen.kt): a state's frame (outline, light inner edge,
 // upper fill, bottom shade; the HP band below the divider is the light edge's colour).
 struct slot_colors {
@@ -63,10 +74,10 @@ static void char_bitmap(struct pd_canvas* c, const char* const* rows, int n, int
     }
 }
 
-static const char* mon_display_name(const struct pd_mon* m, char* buf, size_t len) {
-    if (m->species == PD_SPECIES_EGG) return "EGG";
+static const char* mon_display_name(const struct pd_ui* ui, const struct pd_mon* m, char* buf, size_t len) {
+    if (party_egg(ui,m)) return "EGG";
     if (m->nickname[0]) return m->nickname;
-    return pd_species_name(m->species, buf, len);
+    return party_species(ui,m->species,buf,len);
 }
 
 // The summary's ♂ / ♀ after the name, in their own colours.
@@ -188,7 +199,7 @@ static void party_slot(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
         return;
     }
     char buf[40];
-    bool egg = m->species == PD_SPECIES_EGG;
+    bool egg = party_egg(ui,m);
     bool fainted = !egg && m->hp == 0;
     const struct slot_colors* col = fainted ? (selected ? &SLOT_SELECTED_FAINTED : &SLOT_FAINTED)
         : selected ? &SLOT_SELECTED : &SLOT_NORMAL;
@@ -198,10 +209,10 @@ static void party_slot(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
     // The Poke Ball, then the icon over it, resting 4 px up.
     static const uint32_t BALL_COLORS[4] = { 0x4A4A63, 0xB54200, 0xC65200, 0xB5BDCE };
     char_bitmap(c, BALL, 20, x + geo.fx - 6 * u, y + geo.fy - 4 * u, u, "KRHW", BALL_COLORS);
-    pd_draw_mon_icon_scaled(c, g, m->species, x + geo.fx - 8 * u, y + geo.fy - 4 * u, u, false);
+    party_icon(ui,c,g,m,x + geo.fx - 8*u,y + geo.fy - 4*u,u,false);
 
     int textW = geo.fx + geo.fw - 4 * u - geo.textX;
-    pd_text_fit(c, x + geo.textX, y + geo.nameMid - 8, textW, mon_display_name(m, buf, sizeof(buf)), SLOT_TEXT,
+    pd_text_fit(c, x + geo.textX, y + geo.nameMid - 8, textW, mon_display_name(ui, m, buf, sizeof(buf)), SLOT_TEXT,
                 SLOT_TEXT_SHADOW);
     if (!egg) {
         const char* status = fainted ? "FNT" : pd_status_label(m->status);
@@ -234,22 +245,22 @@ static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game*
     int ix = x + f + 6, iw = w - 2 * (f + 6);
     int ty = y + f + 2;
     // The icon left of the first two lines (name, HP).
-    if (pd_draw_mon_icon(c, g, m->species, ix - 2, ty + 2, m->species != PD_SPECIES_EGG && m->hp == 0)) {
+    if (party_icon(ui,c,g,m,ix-2,ty+2,1,!party_egg(ui,m) && m->hp==0)) {
         ix += PD_ICON + 2;
         iw -= PD_ICON + 2;
     }
     int ix0 = x + f + 6, iw0 = w - 2 * (f + 6);
 
-    bool egg = m->species == PD_SPECIES_EGG;
-    const char* name = mon_display_name(m, buf, sizeof(buf));
+    bool egg = party_egg(ui,m);
+    const char* name = mon_display_name(ui, m, buf, sizeof(buf));
     int nameW = pd_text(c, ix, ty, name, PD_LABEL, PD_LABEL_SHADOW);
     if (!egg) {
         gender_mark(c, ix + nameW + 3, ty, m->gender);
         char lv[12];
         snprintf(lv, sizeof(lv), "Lv%d", m->level);
         pd_text_right(c, ix + iw, ty, lv, PD_VALUE, PD_VALUE_SHADOW);
-        const char* species = pd_species_name(m->species, buf2, sizeof(buf2));
-        if (strcmp(species, name)) pd_text(c, ix + nameW + 14, ty, species, PD_MUTED, PD_MUTED_SHADOW);
+        const char* species = party_species(ui,m->species,buf2,sizeof(buf2));
+        if (strcmp(species,name) && !ui->partySource) pd_text(c,ix+nameW+14,ty,species,PD_MUTED,PD_MUTED_SHADOW);
     }
     ty += 20;
     if (!egg) {
@@ -263,10 +274,15 @@ static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game*
         iw = iw0;
         pd_fill(c, ix, ty, iw, 1, PD_DIVIDER);
         ty += 4;
-        for (int i = 0; i < PD_NUM_MOVES; i++) {
+        if(ui->partySource && ui->partySource->info && ui->summaryPage==0) {
+            for(int i=0;i<3;i++) {
+                const char* text=ui->partySource->info(ui->partySource->ctx,m,i);
+                pd_text_fit(c,ix,ty,iw,text?text:"",PD_LABEL,PD_LABEL_SHADOW);ty+=20;
+            }
+        } else for (int i = 0; i < PD_NUM_MOVES; i++) {
             if (!m->moves[i]) continue;
-            pd_text_fit(c, ix, ty, iw - 120, pd_move_name(m->moves[i], buf, sizeof(buf)), PD_LABEL, PD_LABEL_SHADOW);
-            pd_text(c, ix + iw - 116, ty, pd_type_name(pd_move_type(m->moves[i])), PD_MUTED, PD_MUTED_SHADOW);
+            pd_text_fit(c, ix, ty, iw - 120, ui->partySource && ui->partySource->move ? ui->partySource->move(ui->partySource->ctx,m->moves[i]) : pd_move_name(m->moves[i],buf,sizeof(buf)), PD_LABEL, PD_LABEL_SHADOW);
+            pd_text(c, ix + iw - 116, ty, pd_type_name(ui->partySource && ui->partySource->moveType ? ui->partySource->moveType(ui->partySource->ctx,m->moves[i]) : pd_move_type(m->moves[i])), PD_MUTED, PD_MUTED_SHADOW);
             char pp[12];
             snprintf(pp, sizeof(pp), "PP %d", m->pp[i]);
             pd_text_right(c, ix + iw, ty, pp, PD_VALUE, PD_VALUE_SHADOW);
@@ -299,4 +315,10 @@ void ui_party_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g
         const struct pd_mon* m = i < s->partyCount ? &s->party[i] : NULL;
         party_slot(ui, c, g, x, y, cw, ch, m, i, m && i == selected);
     }
+}
+
+void pd_ui_party_view(struct pd_ui* ui,struct pd_canvas* c,const struct pd_game* g,
+                      const struct pd_snapshot* s,int selected) {
+    ui->hitCount=0;ui->focusId=HIT_SLOT+selected;
+    pd_backdrop(c);ui_party_tab(ui,c,g,s);
 }
