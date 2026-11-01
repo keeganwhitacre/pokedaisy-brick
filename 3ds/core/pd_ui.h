@@ -157,6 +157,14 @@ struct pd_dex_source {
     bool (*caught)(void*, int);
     const char* (*name)(void*, int);
 };
+// Backend-composited map art in native pixels. Cursor coordinates use those same pixels.
+// No game config, ROM offsets or ownership of the supplied buffer is implied.
+struct pd_map_source {
+    const uint32_t* pixels;
+    int width, height;
+    const char* name;
+    int cursorX, cursorY, cursorW, cursorH;
+};
 // Host-owned option rows use the established Settings frame and row widgets.
 struct pd_option_row { const char* label; const char* value; };
 struct pd_option_source { const char* title; const struct pd_option_row* rows; int count; };
@@ -218,6 +226,7 @@ struct pd_ui {
 };
 
 // Shared party body, including its original frames, HP bars, status and summary.
+void pd_ui_map_view(struct pd_canvas*, const struct pd_map_source*);
 void pd_ui_options_view(struct pd_ui*,struct pd_canvas*,const struct pd_game*,const struct pd_snapshot*);
 void pd_ui_navigation(struct pd_ui*,struct pd_canvas*,const char* const*,int,int);
 void pd_ui_dex_view(struct pd_ui*,struct pd_canvas*,const struct pd_game*,const struct pd_snapshot*,int selected);
