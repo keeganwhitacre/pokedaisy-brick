@@ -191,3 +191,17 @@ pockets, verify its seen/caught sets and reject out-of-range dex indices. Privat
 captures additionally exercise the attached retail ROM/save's party, card focus,
 summary, Medicine pocket and Caught filter. No new address tables or gameplay
 writes are introduced. These additions do not establish physical Brick results.
+
+### Platinum summary information and move metadata
+
+A on a party card opens INFO: species typing, current/max HP, status, held item,
+nature, gender and experience. Left/Right switches to MOVES: four slots with
+current PP, type and base power from the app-owned Platinum MoveInfo table.
+Power 0/1 sentinels display -- (not a damage prediction). Empty move slots show
+an explicit dash; eggs hide species/move information. Up/Down switches party
+members and B returns to the cards. No game writes are performed.
+
+The existing DS generator now derives species types and move type/power from
+Gen4TablesPlatinum.kt; --check detects stale generated data. Invalid IDs return
+unavailable metadata. This does not add abilities, IVs/EVs, calculated stats,
+max PP or item-use actions. Physical Brick verification remains outstanding.

@@ -35,3 +35,7 @@ const char* ds_place(int id);
 
 const char* ds_nature(int id);
 const char* ds_status(const DsMon& mon);
+
+int ds_move_type(int id);
+int ds_move_power(int id);
+int ds_species_type(int id,int slot);

@@ -99,6 +99,12 @@ out += ['inline constexpr char mapPath[] = '+json.dumps(map_path)+';',
         'inline constexpr MapMark mapMarks[] = {'+', '.join('{'+','.join(m)+'}' for m in marks)+'};']
 out += ['struct Char { uint16_t code; const char* text; };',
         'inline constexpr Char chars[] = {'+', '.join('{'+str(k)+', '+json.dumps(v)+'}' for k,v in chars.items())+'};', '}']
+# Summary metadata comes from the same app-owned Platinum tables as names.
+move_meta = {int(i):(int(t),int(p)) for i,t,p in re.findall(r'(\d+) to MoveInfo\("(?:\\.|[^"\\])*", (\d+), (\d+)\)', tables)}
+type_meta = {int(i):(int(a),int(b)) for i,a,b in re.findall(r'(\d+) to SpeciesTypes\((\d+), (\d+)\)', tables)}
+assert len(move_meta)==467 and len(type_meta)==493
+out.insert(-1, 'inline constexpr int moveMeta[][2] = {'+', '.join('{'+str(move_meta.get(i,(-1,0))[0])+','+str(move_meta.get(i,(-1,0))[1])+'}' for i in range(max(move_meta)+1))+'};')
+out.insert(-1, 'inline constexpr int speciesTypes[][2] = {'+', '.join('{'+str(type_meta.get(i,(-1,-1))[0])+','+str(type_meta.get(i,(-1,-1))[1])+'}' for i in range(max(type_meta)+1))+'};')
 generated = '\n'.join(out)+'\n'
 parser = argparse.ArgumentParser(); parser.add_argument('--check', action='store_true'); args=parser.parse_args()
 dest = Path(__file__).with_name('data_gen.h')

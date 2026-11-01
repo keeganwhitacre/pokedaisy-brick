@@ -136,15 +136,26 @@ void companion(pd_canvas& c,const DsCompanion& s,bool supported,int tab,int sele
     }
   }
   else if(tab==0 && summary && selected<int(s.party.size())){
-    auto& m=s.party[selected];line(m.nickname+"  Lv"+std::to_string(m.level));
-    line(std::string(ds_species(m.species))+"  HP "+std::to_string(m.hp)+"/"+std::to_string(m.maxHp));
-    line(std::string("ITEM: ")+ds_item(m.heldItem));
-    if(page){
-      line(std::string("NATURE: ")+ds_nature(m.nature));
+    const auto& m=s.party[selected];
+    line(m.egg?"EGG":m.nickname+"  Lv"+std::to_string(m.level)+(page?"  MOVES":"  INFO"));
+    if(m.egg){line("EGG");line("Waiting to hatch");}
+    else if(!page){
+      int t1=ds_species_type(m.species,0),t2=ds_species_type(m.species,1);
+      line(std::string(ds_species(m.species))+"  "+pd_type_name(t1)+(t2!=t1?std::string("/")+pd_type_name(t2):""));
+      line("HP "+std::to_string(m.hp)+"/"+std::to_string(m.maxHp)+"  "+ds_status(m));
+      line(std::string("ITEM: ")+(m.heldItem?ds_item(m.heldItem):"NONE"));
+      line(std::string(ds_nature(m.nature))+"  "+(m.gender==1?"MALE":m.gender==2?"FEMALE":"NONE"));
       line("EXP: "+std::to_string(m.experience)+(m.level==100?"  MAX LEVEL":""));
-      line(std::string("STATUS: ")+ds_status(m));
-      line(std::string(m.egg?"EGG  ":"")+"GENDER: "+(m.gender==1?"MALE":m.gender==2?"FEMALE":"NONE"));
-    }else for(int i=0;i<4;i++)if(m.moves[i])line(std::string(ds_move(m.moves[i]))+"  PP "+std::to_string(m.pp[i]));
+    }else for(int i=0;i<4;i++){
+      int move=m.moves[i];
+      pd_text_fit(&c,13,y,c.w-26,move?ds_move(move):"-",0x303030,PD_NO_SHADOW);
+      if(move){
+        int power=ds_move_power(move);
+        std::string detail=std::string(pd_type_name(ds_move_type(move)))+"  PP "+std::to_string(m.pp[i])+"  POWER "+(power>1?std::to_string(power):"--");
+        pd_text_fit(&c,13,y+15,c.w-26,detail.c_str(),0x606868,PD_NO_SHADOW);
+      }
+      y+=34;
+    }
   }else if(tab==0){
     if(s.party.empty())line("No Pokemon in party");
     for(size_t i=0;i<s.party.size();i++){

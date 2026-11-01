@@ -105,3 +105,7 @@ const char* ds_status(const DsMon& m){
   if(m.status&0x40)return "PARALYSIS";
   return "OK";
 }
+
+int ds_move_type(int id){return id>0 && size_t(id)<std::size(pd_ds_data::moveMeta)?pd_ds_data::moveMeta[id][0]:-1;}
+int ds_move_power(int id){return id>0 && size_t(id)<std::size(pd_ds_data::moveMeta)?pd_ds_data::moveMeta[id][1]:0;}
+int ds_species_type(int id,int slot){return id>0 && size_t(id)<std::size(pd_ds_data::speciesTypes) && slot>=0 && slot<2?pd_ds_data::speciesTypes[id][slot]:-1;}

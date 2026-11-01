@@ -21,6 +21,11 @@ static uint32_t battle_read32(uint32_t addr){
   uint32_t value;std::memcpy(&value,battleRam.data()+addr-0x02000000,4);return value;
 }
 int main(int argc,char** argv){
+  assert(ds_move_type(53)==10 && ds_move_power(53)==95); // app's Platinum Flamethrower
+  assert(ds_species_type(387,0)==12 && ds_species_type(387,1)==12);
+  assert(ds_species_type(392,0)==10 && ds_species_type(392,1)==1);
+  assert(ds_move_type(-1)==-1 && ds_move_power(99999)==0);
+  assert(ds_species_type(0,0)==-1 && ds_species_type(1,2)==-1);
   assert(!ds_battle_view(0,true,true,false).bottom);
   assert(ds_battle_view(1,true,true,false).bottom);
   assert(!ds_battle_view(1,true,false,true).bottom);
