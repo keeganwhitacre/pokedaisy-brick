@@ -157,7 +157,12 @@ struct pd_dex_source {
     bool (*caught)(void*, int);
     const char* (*name)(void*, int);
 };
+// Host-owned option rows use the established Settings frame and row widgets.
+struct pd_option_row { const char* label; const char* value; };
+struct pd_option_source { const char* title; const struct pd_option_row* rows; int count; };
 struct pd_ui {
+    const struct pd_option_source* optionSource;
+    int optionSelected;
     const struct pd_dex_source* dexSource;
     const struct pd_bag_source* bagSource;
     bool bagDetails;
@@ -213,6 +218,7 @@ struct pd_ui {
 };
 
 // Shared party body, including its original frames, HP bars, status and summary.
+void pd_ui_options_view(struct pd_ui*,struct pd_canvas*,const struct pd_game*,const struct pd_snapshot*);
 void pd_ui_navigation(struct pd_ui*,struct pd_canvas*,const char* const*,int,int);
 void pd_ui_dex_view(struct pd_ui*,struct pd_canvas*,const struct pd_game*,const struct pd_snapshot*,int selected);
 void pd_ui_bag_view(struct pd_ui*, struct pd_canvas*, const struct pd_game*, const struct pd_snapshot*);
