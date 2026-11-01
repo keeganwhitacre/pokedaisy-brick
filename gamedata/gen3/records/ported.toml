@@ -387,7 +387,7 @@ caughtRegions = [0x3850, 0x304C, 0x3254]
 schema = 'gen3_dexflags'
 base = 'POKEDEX_QUETZAL_FLAGS'
 kotlin = false
-caughtRegions = { kotlin = 'emptyList()' }
+caughtRegions = []
 caughtFromLevel = true
 
 # From app/src/main/kotlin/com/pokedaisy/app/companion/data/Pokedex.kt.
@@ -544,6 +544,175 @@ party = 'FIELD_ITEMS_EMERALD_LEGACY_PARTY'
 fly = 'FLY_EMERALD_LEGACY'
 pc = 'PC_EMERALD_LEGACY'
 
+# Pokemon - Sapphire Version (USA, Europe).gba (SHA1 3ccbbd45...), from AXPE0.
+#
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_AXPE0]
+schema = 'gen3_field_items'
+kotlin = false
+varGet = 0x08069258
+varSet = 0x08069274
+checkBagHasItem = 0x080A92D4
+removeBagItem = 0x080A9538
+fieldControlsLocked = 0x0806554C
+repelVar = 0x4021
+items = 0x083C55BC
+codeCrcs = [0x98EFB2B6, 0x82AA042B, 0x87E0CA93, 0xD7C65886, 0xA306873D]
+itemNameLen = 14
+party = 'FIELD_ITEMS_PORTS_AXPE0_PARTY'
+pc = 'FIELD_ITEMS_PORTS_AXPE0_PC'
+fly = 'FIELD_ITEMS_PORTS_AXPE0_FLY'
+
+# Pokemon - Ruby Version (USA, Europe).gba (SHA1 f28b6ffc...), from AXVE0.
+#
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_AXVE0]
+schema = 'gen3_field_items'
+kotlin = false
+varGet = 0x08069254
+varSet = 0x08069270
+checkBagHasItem = 0x080A92D4
+removeBagItem = 0x080A9538
+fieldControlsLocked = 0x08065548
+repelVar = 0x4021
+items = 0x083C5564
+codeCrcs = [0x98EFB2B6, 0x82AA042B, 0x87E0CA93, 0xD7C65886, 0xA306873D]
+itemNameLen = 14
+party = 'FIELD_ITEMS_PORTS_AXVE0_PARTY'
+pc = 'FIELD_ITEMS_PORTS_AXVE0_PC'
+fly = 'FIELD_ITEMS_PORTS_AXVE0_FLY'
+
+# Pokemon - FireRed Version (USA, Europe).gba (SHA1 41cb23d8...), from BPRE0.
+#
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_BPRE0]
+schema = 'gen3_field_items'
+kotlin = false
+varGet = 0x0806E568
+varSet = 0x0806E584
+checkBagHasItem = 0x08099F40
+removeBagItem = 0x0809A1D8
+fieldControlsLocked = 0x08069958
+repelVar = 0x4020
+items = 0x083DB028
+codeCrcs = [0xE6DE47BA, 0x6E7CC2BE, 0xD30D656E, 0xC40BF208, 0x9C26CCA4]
+itemNameLen = 14
+party = 'FIELD_ITEMS_PORTS_BPRE0_PARTY'
+pc = 'FIELD_ITEMS_PORTS_BPRE0_PC'
+fly = 'FIELD_ITEMS_PORTS_BPRE0_FLY'
+
+# Retail Ruby rev 1 / rev 2 (AXVE; SHA1 610b96a9... / 5b64eacf...).
+#
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItems.kt.
+[record.FIELD_ITEMS_RUBY]
+schema = 'gen3_field_items'
+kotlin = false
+varGet = 0x08069274
+varSet = 0x08069290
+checkBagHasItem = 0x080A92F4
+removeBagItem = 0x080A9558
+fieldControlsLocked = 0x08065568
+repelVar = 0x4021
+items = 0x083C5580
+codeCrcs = [0x98EFB2B6, 0x82AA042B, 0x87E0CA93, 0xD7C65886, 0xA306873D]
+party = 'RUBY_SAPPHIRE_PARTY'
+pc = 'PC_RUBY'
+fly = 'FLY_RUBY'
+
+# Retail Sapphire rev 1 / rev 2 (AXPE; SHA1 4722efb8... / 89b45fb1...): Ruby's code a few bytes on.
+#
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItems.kt.
+[record.FIELD_ITEMS_SAPPHIRE]
+schema = 'gen3_field_items'
+base = 'FIELD_ITEMS_RUBY'
+kotlin = false
+varGet = 0x08069278
+varSet = 0x08069294
+fieldControlsLocked = 0x0806556C
+items = 0x083C55DC
+pc = 'PC_SAPPHIRE'
+fly = 'FLY_SAPPHIRE'
+
+#
+# Retail Ruby rev 1 / rev 2 (pret's pokeruby built clean as ruby_rev1, byte for byte retail): Emerald's way - the heal
+# location (sub_8053538) or map warp (warp1_set_2), then sub_80865BC (CB2_ReturnToField + the Fly landing) - with its
+# own Fly map type per section (static sub_80FB758, 0x080FB778: VISITED towns 2, the Battle Tower 4), the cut-in's
+# Pokémon in gLastFieldPokeMenuOpened and gSaveBlock2 in place. FLAG_BADGE06_GET, its sMapHealLocations as Emerald's.
+#
+#
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/Fly.kt.
+[record.FLY_RUBY]
+schema = 'gen3_fly'
+kotlin = false
+flagGet = 0x08069360
+badgeFlag = 0x80C
+setUpFieldMoveFly = 0x08054244
+getMapsecType = 0x080FB778
+fadeScreen = 0x0807D664
+lockControls = 0x08065550
+unlockControls = 0x0806555C
+setFlyWarpDestination = 0
+partyMenuSlotId = 0x03005CE0
+destinations = 0x083E793C
+firstMapsec = 0
+count = 50
+codeCrcs = [0xAC4D17B2, 0x6F375BAA, 0x0190971B, 0xF9959006, 0xA003C21A, 0x9807B468, 0x5BF43808, 0x2F1D18CA, 0xB2A1E0F7]
+flyTypes = [2, 4]
+extraMapsecs = [58]
+mapHeader = 0x0202E828
+# MAPSEC_EVER_GRANDE_CITY, MAPSEC_BATTLE_TOWER (HEAL_LOCATION_EVER_GRANDE_CITY, _BATTLE_TOWER_OUTSIDE)
+healWarp = 'FLY_RUBY_HEAL_WARP'
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_AXPE0_FLY]
+schema = 'gen3_fly'
+base = 'FLY_RUBY'
+kotlin = false
+flagGet = 0x08069344
+setUpFieldMoveFly = 0x08054228
+getMapsecType = 0x080FB758
+fadeScreen = 0x0807D644
+lockControls = 0x08065534
+unlockControls = 0x08065540
+partyMenuSlotId = 0x03005CE0
+destinations = 0x083E7978
+mapHeader = 0x0202E828
+codeCrcs = [0xAC4D17B2, 0x6F375BAA, 0x22721D44, 0xF9959006, 0xA003C21A, 0x9807B468, 0x5BF43808, 0x2F1D18CA, 0xD0FDB342]
+healWarp = 'FIELD_ITEMS_PORTS_AXPE0_FLY_HEAL_WARP'
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_AXVE0_FLY]
+schema = 'gen3_fly'
+base = 'FLY_RUBY'
+kotlin = false
+flagGet = 0x08069340
+setUpFieldMoveFly = 0x08054224
+getMapsecType = 0x080FB758
+fadeScreen = 0x0807D644
+lockControls = 0x08065530
+unlockControls = 0x0806553C
+partyMenuSlotId = 0x03005CE0
+destinations = 0x083E7920
+mapHeader = 0x0202E828
+codeCrcs = [0xAC4D17B2, 0x6F375BAA, 0x22721D44, 0xF9959006, 0xA003C21A, 0x9807B468, 0x5BF43808, 0x2F1D18CA, 0xD5F7FEC3]
+healWarp = 'FIELD_ITEMS_PORTS_AXVE0_FLY_HEAL_WARP'
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_BPRE0_FLY]
+schema = 'gen3_fly'
+base = 'FLY_FIRERED_REV1'
+kotlin = false
+flagGet = 0x0806E6D0
+setUpFieldMoveFly = 0x08124A8C
+getMapsecType = 0x080C35DC
+fadeScreen = 0x0807A818
+lockControls = 0x08069940
+unlockControls = 0x0806994C
+partyMenuSlotId = 0x0203B0A9
+destinations = 0x083F2EE0
+setFlyWarpDestination = 0x080C527C
+codeCrcs = [0x07BEBC3A, 0x950F2C97, 0x9A186C79, 0xF9959006, 0x0111A86E, 0xBAB654BA, 0x70EA1DFC]
+
 # FLY_FIRERED_REV1, FLY_LEAFGREEN_REV0 / _REV1 and FLY_EMERALD (+ HEAL_WARP_EMERALD) are records in
 # gamedata/gen3/records/ (GameDataRecordsGen.kt), shared with the 3DS / Linux companion.
 #
@@ -570,6 +739,20 @@ partyMenuSlotId = 0x0203D1F9
 destinations = 0x085D46F0
 codeCrcs = [0xBCF97BF3, 0x26C08427, 0x4B625BC4, 0xF9959006, 0xB9FB85A7, 0xB037C8AF, 0xE35529C1, 0x2F1D18CA, 0x404426C9]
 healWarp = 'FLY_EMERALD_LEGACY_HEAL_WARP'
+
+# Retail Sapphire rev 1 / rev 2: Ruby's code a few bytes on (mapped from Ruby's by scripts/port_field_items.py).
+#
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/Fly.kt.
+[record.FLY_SAPPHIRE]
+schema = 'gen3_fly'
+base = 'FLY_RUBY'
+kotlin = false
+flagGet = 0x08069364
+setUpFieldMoveFly = 0x08054248
+lockControls = 0x08065554
+unlockControls = 0x08065560
+destinations = 0x083E7998
+codeCrcs = [0xAC4D17B2, 0x6F375BAA, 0x0190971B, 0xF9959006, 0xA003C21A, 0x9807B468, 0x5BF43808, 0x2F1D18CA, 0xB7ABAD76]
 
 #
 # Amethyst v1.3.0: its trainer loader (0x088B3A98) picks one of four tables by
@@ -1651,6 +1834,40 @@ mapGroups = 0x08F90738
 trainerIdVar = true
 
 # From app/src/main/kotlin/com/pokedaisy/app/companion/data/Fly.kt.
+[record.FLY_RUBY_HEAL_WARP]
+schema = 'gen3_heal_warp'
+kotlin = false
+toHealLocation = 0x08053558
+toMapWarp = 0x080534B0
+returnToField = 0x080865DC
+saveBlock2Ptr = 0x02024EA4
+special = [[15, 11], [58, 21]]
+genderMapsec = 0
+maleHeal = 12
+femaleHeal = 13
+saveBlock2Static = true
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_AXPE0_FLY_HEAL_WARP]
+schema = 'gen3_heal_warp'
+base = 'FLY_RUBY_HEAL_WARP'
+kotlin = false
+toHealLocation = 0x08053538
+toMapWarp = 0x08053490
+returnToField = 0x080865BC
+saveBlock2Ptr = 0x02024EA4
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_AXVE0_FLY_HEAL_WARP]
+schema = 'gen3_heal_warp'
+base = 'FLY_RUBY_HEAL_WARP'
+kotlin = false
+toHealLocation = 0x08053538
+toMapWarp = 0x08053490
+returnToField = 0x080865BC
+saveBlock2Ptr = 0x02024EA4
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/Fly.kt.
 [record.FLY_EMERALD_LEGACY_HEAL_WARP]
 schema = 'gen3_heal_warp'
 base = 'HEAL_WARP_EMERALD'
@@ -1670,7 +1887,109 @@ setMonData = 0x0806B9B4
 itemEffect = 0x0806CA48
 addBagItem = 0x080DA0BC
 codeCrcs = [0xA0496642, 0xC8B48F7B, 0xEADAC6C9, 0x3510B884]
-useFuncs = { kotlin = 'setOf(0x08101740L, 0x08101794L, 0x081017B0L, 0x0810195CL)' }
+useFuncs = [135272256, 135272340, 135272368, 135272796]
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_AXPE0_PARTY]
+schema = 'gen3_party_items'
+kotlin = false
+getMonData = 0x0803CB60
+setMonData = 0x0803D1FC
+itemNoEffect = 'none'
+itemEffect = 0x0803E18C
+addBagItem = 0x080A9424
+party = 0x03004360
+partyCount = 0x03004350
+scratch = 0x0203FFF0
+itemCount = 349
+unholdablePockets = [5, 3]
+codeCrcs = [0x7D459654, 0x59B8ECA4, 0xEADAC6C9, 0x891E35D5]
+useFuncs = [135044528, 135044668, 135044696, 135045140]
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_AXVE0_PARTY]
+schema = 'gen3_party_items'
+kotlin = false
+getMonData = 0x0803CB60
+setMonData = 0x0803D1FC
+itemNoEffect = 'none'
+itemEffect = 0x0803E18C
+addBagItem = 0x080A9424
+party = 0x03004360
+partyCount = 0x03004350
+scratch = 0x0203FFF0
+itemCount = 349
+unholdablePockets = [5, 3]
+codeCrcs = [0x7D459654, 0x59B8ECA4, 0xEADAC6C9, 0x891E35D5]
+useFuncs = [135044528, 135044668, 135044696, 135045140]
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_BPRE0_PARTY]
+schema = 'gen3_party_items'
+kotlin = false
+getMonData = 0x0803FBE8
+setMonData = 0x0804037C
+itemNoEffect = 0x08042414
+itemEffect = 0x080413C0
+addBagItem = 0x0809A084
+party = 0x02024284
+partyCount = 0x02024029
+scratch = 0x0203FFF0
+itemCount = 375
+unholdablePockets = [2, 4]
+codeCrcs = [0x7841F205, 0x9B11B0A6, 0x788AB547, 0xEADAC6C9, 0xC316CD20]
+useFuncs = [134878944, 134878972, 134879000, 134879640]
+
+# Ruby / Sapphire's party side, revs 1 and 2 alike (pret's pokeruby built clean as each, byte for byte retail): the
+# party in IWRAM, 349 items, no PokemonItemUseNoEffect (its party menu runs the effect, like Emerald's). EWRAM's
+# last symbol ends at 0x0203A3D5 and gSharedMem's offsets stop at 0x1FFF0, so the scratch word is free here too.
+#
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItems.kt.
+[record.RUBY_SAPPHIRE_PARTY]
+schema = 'gen3_party_items'
+kotlin = false
+getMonData = 0x0803CB60
+setMonData = 0x0803D1FC
+itemNoEffect = 'none'
+itemEffect = 0x0803E18C
+addBagItem = 0x080A9444
+party = 0x03004360
+partyCount = 0x03004350
+scratch = 0x0203FFF0
+itemCount = 349
+unholdablePockets = [5, 3]  # POCKET_KEY_ITEMS, POCKET_TM_HM
+codeCrcs = [0x7D459654, 0x59B8ECA4, 0xEADAC6C9, 0x891E35D5]
+useFuncs = [135044560, 135044700, 135044728, 135045172]  # the same in both, revs 1 and 2
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_AXPE0_PC]
+schema = 'gen3_pc'
+kotlin = false
+setupScript = 0x080655BC
+special = 60
+specials = 0x0814B194
+pcFn = 0x08096101
+codeCrcs = [0xBC36478C, 0xA79046B8]
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_AXVE0_PC]
+schema = 'gen3_pc'
+kotlin = false
+setupScript = 0x080655B8
+special = 60
+specials = 0x0814B194
+pcFn = 0x08096101
+codeCrcs = [0xBC36478C, 0x62C153A4]
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/FieldItemsPortsGen.kt.
+[record.FIELD_ITEMS_PORTS_BPRE0_PC]
+schema = 'gen3_pc'
+kotlin = false
+setupScript = 0x08069AE4
+special = 60
+specials = 0x0815FD60
+pcFn = 0x0808C6A9
+codeCrcs = [0xAAC00946, 0x9662F022]
 
 # Emerald Legacy v1.1.4 (its own build's ELF): ShowPokemonStorageSystemPC is still special 63 in its gSpecials.
 #
@@ -1683,6 +2002,31 @@ special = 63
 specials = 0x081E1168
 pcFn = 0x080CACA1
 codeCrcs = [0xEF3698BA, 0x3BE7A304]
+
+# PC_FIRERED_REV1 / _LEAFGREEN_REV0 / _REV1 / _EMERALD are records in gamedata/gen3/records/ (GameDataRecordsGen.kt).
+#
+# Ruby / Sapphire rev 1 and 2 (the same in both revisions): ShowPokemonStorageSystem, special 60, the same five
+# commands (pokeruby's opcodes are Emerald's). The other languages' come with FieldItemsPortsGen.kt.
+#
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/Pc.kt.
+[record.PC_RUBY]
+schema = 'gen3_pc'
+kotlin = false
+setupScript = 0x080655D8
+special = 60
+specials = 0x0814B1B4
+pcFn = 0x08096121
+codeCrcs = [0xBC36478C, 0x62C153A4]
+
+# From app/src/main/kotlin/com/pokedaisy/app/companion/data/Pc.kt.
+[record.PC_SAPPHIRE]
+schema = 'gen3_pc'
+kotlin = false
+setupScript = 0x080655DC
+special = 60
+specials = 0x0814B1B4
+pcFn = 0x08096121
+codeCrcs = [0xBC36478C, 0xA79046B8]
 
 #
 # Pokémon Amethyst v1.3.0 (CFRU): numbers its dex its own way - No. 1-390 is

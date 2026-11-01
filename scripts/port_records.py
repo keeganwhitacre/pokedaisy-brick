@@ -81,9 +81,14 @@ VAL = r"^(?:(?:private|internal)\s+)?val\s+{name}\b(?:\s*:\s*[\w<>?, ]+)?\s*(?:=
 
 
 def find_val(name, sources):
-    """(file, rhs code, the comment lines above it) of `val NAME = ...`, or None."""
+    """(file, rhs code, the comment lines above it) of `val NAME = ...`, or None. FIELD_ITEMS_PORTS_<KEY>: the
+    `"<KEY>" to FieldItemFns(...)` entry of the app's FIELD_ITEMS_PORTS map (English FireRed / Ruby / Sapphire rev 0)."""
+    pm = re.fullmatch(r"FIELD_ITEMS_PORTS_([A-Z0-9]{5})", name)
+    pat = (r'^\s*"%s"\s+to\s+' % pm.group(1)) if pm else VAL.format(name=re.escape(name))
     for path, src in sources.items():
-        m = re.search(VAL.format(name=re.escape(name)), src, re.M)
+        if pm and "val FIELD_ITEMS_PORTS" not in src:
+            continue
+        m = re.search(pat, src, re.M)
         if not m:
             continue
         start = m.end()
@@ -152,6 +157,21 @@ def to_toml(field, rhs, f):
                 return "[" + ", ".join(cv.toml_int(l) if re.fullmatch(r"-?(0x[0-9A-Fa-f_]+|\d+)L?", l)
                                        else str(i) for l, i in zip(lits, items)) + "]", None
     plain = " ".join(rhs.split())
+    # setOf(2, 4) / mapOf(15 to 11) / emptyList(): TOML lists (as the hand-written records have them) - left as
+    # Kotlin, the C target would get { 0 } for them.
+    if ftype in ("int_set", "long_set", "int_list", "long_list") and re.fullmatch(r"empty(List|Set)\(\)", plain):
+        return "[]", None
+    m = re.fullmatch(r"setOf\((.*)\)", plain)
+    if m and ftype in ("int_set", "long_set"):
+        items = [num(a) for a in cv.split_args(m.group(1)) if a.strip()]
+        if all(i is not None for i in items):
+            return "[" + ", ".join(str(i) for i in items) + "]", None
+    m = re.fullmatch(r"mapOf\((.*)\)", plain)
+    if m and ftype == "int_map":
+        pairs = [re.fullmatch(r"\s*(.+?)\s+to\s+(.+?)\s*", a) for a in cv.split_args(m.group(1)) if a.strip()]
+        kv = [(num(p.group(1)), num(p.group(2))) if p else (None, None) for p in pairs]
+        if all(k is not None and v is not None for k, v in kv):
+            return "[" + ", ".join(f"[{k}, {v}]" for k, v in kv) + "]", None
     if ftype == "ref" and re.fullmatch(r"[A-Za-z_]\w*\.[A-Z_][A-Z0-9_]*", plain):  # an enum value: CardStyle.LEGACY
         return cv.toml_str(plain), None
     return cv.to_toml(field, rhs, ftype, {})
