@@ -211,6 +211,10 @@ static int gen2_gender(const struct pd_gb_config* g, int species, const uint8_t*
     return r < ((dv[0] & 0xF0) | (dv[1] >> 4)) ? PD_GENDER_MALE : PD_GENDER_FEMALE;
 }
 
+// A wrong guess at a game's addresses reads bytes that are not a monster: a hit-point count above its maximum, or a
+// maximum no Game Boy monster has (999 at most), shows nothing rather than garbage.
+static bool hp_sane(int hp, int maxHp) { return maxHp >= 1 && maxHp <= 999 && hp <= maxHp; }
+
 static bool decode_mon(const struct pd_gb_config* g, const uint8_t* raw, bool egg, struct pd_mon* m) {
     memset(m, 0, sizeof *m);
     if (g->gen == 1) {
@@ -222,6 +226,7 @@ static bool decode_mon(const struct pd_gb_config* g, const uint8_t* raw, bool eg
         m->level = level;
         m->hp = be16(raw + 1);
         m->maxHp = be16(raw + 34);
+        if (!hp_sane(m->hp, m->maxHp)) return false;
         m->status = raw[4];
         for (int i = 0; i < 4; i++) {
             m->moves[i] = raw[8 + i];
@@ -257,6 +262,7 @@ static bool decode_mon(const struct pd_gb_config* g, const uint8_t* raw, bool eg
     m->level = level;
     m->hp = be16(raw + 34);
     m->maxHp = be16(raw + 36);
+    if (!hp_sane(m->hp, m->maxHp)) return false;
     m->status = raw[32];
     for (int i = 0; i < 4; i++) m->moves[i] = raw[2 + i];
     m->experience = ((uint32_t) raw[8] << 16) | (raw[9] << 8) | raw[10];
@@ -284,6 +290,7 @@ static void decode_battle(const struct pd_gb_config* g, const uint8_t* raw, stru
     } else if (g->polished) {
         if (raw[0] == 0 || raw[0] == 0xFF) return;
         species = polished_species(raw[0], raw[10]);
+        if (species < 1 || species >= g->genderCount) return;
         level = raw[16];
         t1 = raw[33];
         t2 = raw[34];
@@ -306,7 +313,7 @@ static void decode_battle(const struct pd_gb_config* g, const uint8_t* raw, stru
         pp = 8;
         b->heldItem = raw[1];
     }
-    if (!species || level < 1 || level > 100) return;
+    if (!species || level < 1 || level > 100 || !hp_sane(hp, maxHp)) return;
     b->species = species;
     b->level = level;
     b->type1 = t1;
