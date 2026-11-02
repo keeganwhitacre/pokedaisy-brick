@@ -465,6 +465,7 @@ const char* pd_pocket_name(int pocket) {
 }
 
 const char* pd_mapsec_name(const struct pd_game* g, int mapsec) {
+    if (g->hackMaps) return "";
     // Emerald's map sections start at 0 (Littleroot); FireRed's Kanto ones at 88.
     const char* const* t = g->kind == PD_GAME_EMERALD ? pd_mapsec_emerald : pd_mapsec_firered;
     int n = g->kind == PD_GAME_EMERALD ? pd_mapsec_emerald_count : pd_mapsec_firered_count;

@@ -185,6 +185,8 @@ struct pd_game {
     size_t romSize;
     unsigned loadId; // new on every pd_game_detect (see pd_rom_id)
     char sha1[41];   // the whole ROM's, once pd_game_identify ran ("" before)
+    // A hack with its own map sections: retail's names would be wrong, so none are given (until its ROM's sMapNames is read).
+    bool hackMaps;
 };
 
 // Which ROM the tabs' caches were built from: 0 = none, else new for every

@@ -146,6 +146,30 @@ static const struct known_rom KNOWN_ROMS[] = {
      PD_GUIDE_NONE},
     {"92ed82145c013069472153391c7aab1cfbf37b75", &PD_CONFIG_ASH_GRAY, PD_GAME_FIRERED, "Pokémon Ash Gray Fork Bug Fix",
      PD_GUIDE_NONE},
+    {"d5b1e77975fcda831e0e9a7b527906bf3f40ecd0", &PD_CONFIG_GAIA, PD_GAME_FIRERED, "Pokémon Gaia",
+     PD_GUIDE_NONE},
+    {"8745ddbdbfadf6abaf66de4e9055923b62eb4668", &PD_CONFIG_ODYSSEY, PD_GAME_FIRERED, "Pokémon Odyssey",
+     PD_GUIDE_NONE},
+    {"00e70c0384a5f1698588034201fd5b849d3542e2", &PD_CONFIG_AMETHYST, PD_GAME_FIRERED, "Pokémon Amethyst",
+     PD_GUIDE_NONE},
+    {"91291aade04b4b111cd03ae7b6e2ff460e1edd8a", &PD_CONFIG_AMETHYST_V1_4_1, PD_GAME_FIRERED, "Pokémon Amethyst",
+     PD_GUIDE_NONE},
+    {"25f8840ecb58e584edf18ffde35f845e94f3f17c", &PD_CONFIG_GS_CHRONICLES, PD_GAME_FIRERED, "Pokémon GS Chronicles",
+     PD_GUIDE_NONE},
+    {"20dfaea1d5317cf95fe0b493208edce7d50b865f", &PD_CONFIG_GHOST_GREY, PD_GAME_FIRERED, "Pokémon Ghost Grey",
+     PD_GUIDE_NONE},
+    {"74337272566a74625d6dedefe47d2d153eb48ec1", &PD_CONFIG_GHOST_GREY, PD_GAME_FIRERED, "Pokémon Ghost Grey",
+     PD_GUIDE_NONE},
+    {"0dafc0116b74406a2df491e26ccb40dd362fb0b7", &PD_CONFIG_GHOST_GREY, PD_GAME_FIRERED, "Pokémon Ghost Grey",
+     PD_GUIDE_NONE},
+    {"afe4c8e0f9c7186860fcea5f25d8318f5d7929b9", &PD_CONFIG_SWORD_SHIELD, PD_GAME_FIRERED, "Pokémon Sword and Shield Ultimate Plus",
+     PD_GUIDE_NONE},
+    {"daa2f89934d2c0447d5271dabeba86bfba04e1fd", &PD_CONFIG_SWORD_SHIELD, PD_GAME_FIRERED, "Pokémon Sword and Shield Ultimate Plus",
+     PD_GUIDE_NONE},
+    {"4858cc3d7b335bb5eed553861d7a4a17bad9ce2c", &PD_CONFIG_SWORD_SHIELD, PD_GAME_FIRERED, "Pokémon Sword and Shield Ultimate Plus",
+     PD_GUIDE_NONE},
+    {"932323d1fa3732d8673d1319fa86ed4df41087b9", &PD_CONFIG_SWORD_SHIELD, PD_GAME_FIRERED, "Pokémon Sword and Shield Ultimate Plus",
+     PD_GUIDE_NONE},
     {NULL, NULL, PD_GAME_NONE, NULL, PD_GUIDE_NONE},
 };
 
@@ -186,6 +210,7 @@ void pd_game_identify(struct pd_game* g) {
         g->kind = k->kind;
         g->title = k->title;
         g->guide = k->guide;
+        g->hackMaps = k->cfg != &PD_CONFIG_EMERALD_LEGACY; // Legacy keeps Emerald's names (+ its own three)
         g->unsupported = NULL;
         return;
     }

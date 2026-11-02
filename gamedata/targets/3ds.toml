@@ -250,3 +250,33 @@ parts = ['ram', 'foes']
 [config.ash_gray]
 name = 'ASH_GRAY'
 parts = ['ram', 'foes']
+
+# Retail-like (CFRU) hacks: PARTY / BATTLE from RAM; Gaia and Sword and Shield (ROMs to hand) also party icons and the POKéDEX.
+
+[config.gaia_v3_2]
+name = 'GAIA'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.sword_shield]
+name = 'SWORD_SHIELD'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.odyssey]
+name = 'ODYSSEY'
+parts = ['ram', 'foes']
+
+[config.amethyst]
+name = 'AMETHYST'
+parts = ['ram', 'foes']
+
+[config.amethyst_v1_4_1]
+name = 'AMETHYST_V1_4_1'
+parts = ['ram', 'foes']
+
+[config.gs_chronicles]
+name = 'GS_CHRONICLES'
+parts = ['ram', 'foes']
+
+[config.ghost_grey]
+name = 'GHOST_GREY'
+parts = ['ram', 'foes']
