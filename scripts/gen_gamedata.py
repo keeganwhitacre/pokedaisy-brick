@@ -798,6 +798,15 @@ def c_value(v, f, names, lists, where, none):
             fields = ["size", "species", "moves", "type1", "type2", "pp", "hp", "level", "maxHp", "status1", "speciesMask"]
             return "&(const struct pd_battle_layout){ " + ", ".join(
                 f".{'status' if k == 'status1' else k} = {kv[k]}" for k in fields) + " }"
+        if expr.startswith("BaseStatsLayout("):  # a hack's gBaseStats shape, spelled out
+            kv = dict(re.findall(r"(\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+|true|false)", expr))
+            known = {"stride", "genderOff", "eggGroupsOff", "abilitiesOff", "abilityU16", "statsU16", "typesOff", "catchRateOff"}
+            if not set(kv) <= known or expr.count("=") != len(kv):
+                fail(where, f"{expr} has a part the C can't read")
+            kv.setdefault("stride", "28"); kv.setdefault("abilitiesOff", "0x16"); kv.setdefault("typesOff", "6")
+            kv.setdefault("abilityU16", "false"); kv.setdefault("statsU16", "false")
+            return "&(const struct pd_base_stats){ " + ", ".join(
+                f".{k} = {kv[k]}" for k in ("stride", "abilitiesOff", "typesOff", "abilityU16", "statsU16")) + " }"
         n = kotlin_const_expr(v.get("ref") or expr)
         if n is None:
             fail(where, f"{v} is Kotlin; the C needs the value in gamedata/")

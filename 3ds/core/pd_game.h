@@ -67,6 +67,12 @@ struct pd_gb_config;
 
 enum { PD_DEX_SB1 = 1, PD_DEX_SB2, PD_DEX_FIXED };
 
+// gBaseStats / gSpeciesInfo's shape (the app's BaseStatsLayout): what the dex page reads of it.
+struct pd_base_stats {
+    int stride, abilitiesOff, typesOff;
+    bool abilityU16, statsU16; // ability ids are u16; base stats are u16
+};
+
 struct pd_config {
     const struct pd_text* text; // the hack's own species / item / move names; NULL = retail's
     const struct pd_party_layout* partyLayout; // NULL = pd_party_layout_vanilla
@@ -124,6 +130,19 @@ struct pd_config {
     uint32_t frontPics;        // {LZ77 pointer, size, tag} per species
     uint32_t palettes;         // {LZ77 pointer, tag} per species
     uint32_t regionalOrder;    // u16 national numbers; 0 = national 1..regionalCount
+    int regionalOrderStride;   // 2, or 4 (u32 per entry)
+    bool regionalOrderIsSpecies; // the entries are species ids, not national numbers
+    // The dex page's layout where a game differs from retail's (the app's PokedexTables).
+    uint32_t nationalToSpecies; // u16 species per national number from 0 (Celia); 0 = invert speciesToNational
+    bool entriesBySpecies;     // gPokedexEntries is indexed by species, not national number
+    int entryCategoryLen;      // bytes of category text at the start of an entry
+    bool entryCategoryPtr;     // the entry starts with a pointer to its category text
+    int entryHeightOff, entryDescOff, descriptionPage2Off; // -1 = one page
+    int abilityNameLength, abilityNameStride; // 0 stride = the length
+    bool abilityNamePtr;       // each ability record starts with a pointer to the name
+    const struct pd_base_stats* baseStats;
+    const char *probeCategory; // entry 1's category in this game's own language, and its height / weight
+    int probeHeight, probeWeight, probeSpecies;
     int regionalCount;
     const char* regionName;
     // ... and the save: SaveBlock2's owned / seen flags, SaveBlock1's two

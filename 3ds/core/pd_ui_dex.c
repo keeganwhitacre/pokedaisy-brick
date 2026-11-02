@@ -22,7 +22,7 @@ static bool national_view(const struct pd_ui* ui, const struct pd_snapshot* s) {
 static int dex_list(const struct pd_game* g, bool national, int* out) {
     int n = 0;
     if (national) {
-        for (int i = 1; i <= PD_NATIONAL_COUNT; i++) {
+        for (int i = 1; i <= g->cfg->nationalCount; i++) {
             if (pd_dex_species(g, i)) out[n++] = i;
         }
     } else {
@@ -65,7 +65,7 @@ static void title(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g
 
 // The list shown (rebuilt each draw), kept for the tap handler, which has no
 // game at hand: the toggle flips what shows, up / down step through it.
-static int lastList[PD_NATIONAL_COUNT], lastCount;
+static int lastList[PD_DEX_BYTES * 8], lastCount;
 static bool lastNational;
 
 static void list_view(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s) {
@@ -208,7 +208,7 @@ bool ui_dex_act(struct pd_ui* ui, int id) {
         ui->dexScroll = 0;
         return true;
     }
-    if (id >= HIT_DEX_ROW && id <= HIT_DEX_ROW + PD_NATIONAL_COUNT) {
+    if (id >= HIT_DEX_ROW && id <= HIT_DEX_ROW + PD_DEX_BYTES * 8) {
         ui->dexOpen = id - HIT_DEX_ROW;
         return true;
     }
