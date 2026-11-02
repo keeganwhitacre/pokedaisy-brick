@@ -300,6 +300,17 @@ static const struct known_rom KNOWN_ROMS[] = {
      PD_GUIDE_NONE},
     {"ae5d88bb823a8f9d0d07e8784da2376ff7c1ae43", &PD_CONFIG_MOEMON_QUETZAL_V0_8_4_ES, PD_GAME_EMERALD, "Moemon Quetzal",
      PD_GUIDE_NONE},
+    {"67f44fb4cdbb16c0d1a495ac219f2979b1e3005f", &PD_CONFIG_RECHARGED_EMERALD_V2_2_5, PD_GAME_EMERALD, "Pokémon Recharged Emerald",
+     PD_GUIDE_NONE},
+    {"56c9777215f5be627f7c3099e68985aefc10f2b7", &PD_CONFIG_RECHARGED_EMERALD_V2_2_8, PD_GAME_EMERALD, "Pokémon Recharged Emerald",
+     PD_GUIDE_NONE},
+    {"08b9c7903ae4c4e26d80ef945a90c004ae1e0ebb", &PD_CONFIG_RECHARGED_EMERALD_REBALANCED_V2_2_8, PD_GAME_EMERALD, "Pokémon Recharged Emerald Rebalanced",
+     PD_GUIDE_NONE},
+    // Guessed: builds the app doesn't list, matched to the neighbour whose addresses they most plausibly share.
+    {"411e9023cefae108e6cc28be493e3fd91e9aba6e", &PD_CONFIG_AMETHYST_V1_4_1, PD_GAME_FIRERED,
+     "Pokémon Amethyst 1.4.3 (unverified)", PD_GUIDE_NONE},
+    {"5b93702f0e464df37b01500d4716d59f05c0425e", &PD_CONFIG_QUETZAL_V9_1, PD_GAME_EMERALD,
+     "Moemon Quetzal 0.9.1 (unverified)", PD_GUIDE_NONE},
     {NULL, NULL, PD_GAME_NONE, NULL, PD_GUIDE_NONE},
 };
 

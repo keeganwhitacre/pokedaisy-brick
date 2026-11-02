@@ -438,6 +438,19 @@ parts = ['ram', 'foes', 'icons']
 name = 'MOEMON_QUETZAL_V0_8_4_ES'
 parts = ['ram', 'foes', 'icons']
 
+# pokeemerald-expansion family (and Recharged Yellow): PARTY / BAG / BATTLE from RAM, party and bag icons from the ROM.
+[config.recharged_emerald_v2_2_5]
+name = 'RECHARGED_EMERALD_V2_2_5'
+parts = ['ram', 'foes', 'icons']
+
+[config.recharged_emerald_v2_2_8]
+name = 'RECHARGED_EMERALD_V2_2_8'
+parts = ['ram', 'foes', 'icons']
+
+[config.recharged_emerald_rebalanced_v2_2_8]
+name = 'RECHARGED_EMERALD_REBALANCED_V2_2_8'
+parts = ['ram', 'foes', 'icons']
+
 # A hack's own species / item / move names (the Kotlin val of the app's data/), as ActiveTables.kt picks them; a config
 # without a [text.*] reads retail's. Not here yet: Odyssey and the in-place FireRed hacks (Ultra Violet, Rocket Edition,
 # Ash Gray, Ghost Grey) - their names are retail's with a few runtime-merged renames.
