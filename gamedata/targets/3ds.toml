@@ -40,6 +40,7 @@ FIXED = 'PD_DEX_FIXED'
 KANTO = 'PD_CARD_KANTO'
 HOENN = 'PD_CARD_HOENN'
 LEGACY = 'PD_CARD_LEGACY'
+UNBOUND = 'PD_CARD_UNBOUND'
 
 # Each part is a set of pd_config fields = a path into the config: a field, then (through a record
 # the field names) that record's field, a list's index. A record a config doesn't have counts as its
@@ -346,11 +347,11 @@ parts = ['ram', 'foes', 'icons', 'dex']
 
 [config.unbound_with_dex]
 name = 'UNBOUND'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'card']
 
 [config.unbound_fr]
 name = 'UNBOUND_FR'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'card']
 
 # pokeemerald-expansion family (and Recharged Yellow): PARTY / BAG / BATTLE from RAM, party and bag icons from the ROM.
 [config.imperium]

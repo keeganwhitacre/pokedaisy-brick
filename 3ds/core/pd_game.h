@@ -223,8 +223,9 @@ struct pd_config {
     uint32_t pcSpecials, pcFn, pcCrcs[2], pcScript;
 };
 
+// UNBOUND: FireRed's card in Unbound's purple, with its own player pics.
 // LEGACY: Emerald Legacy's - HOENN's card, a fifth star (extraStarFlag) on a black one, Hoenn's dex and eight more.
-enum pd_card_style { PD_CARD_NONE, PD_CARD_KANTO, PD_CARD_HOENN, PD_CARD_LEGACY };
+enum pd_card_style { PD_CARD_NONE, PD_CARD_KANTO, PD_CARD_HOENN, PD_CARD_LEGACY, PD_CARD_UNBOUND };
 
 // The bag's pockets, in a fixed order of our own (the app's POCKET_* ids).
 enum pd_pocket {

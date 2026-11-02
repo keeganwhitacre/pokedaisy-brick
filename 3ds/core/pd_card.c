@@ -1,6 +1,7 @@
 #include "pd_card.h"
 
 #include <stdio.h>
+#include <math.h>
 #include <string.h>
 
 #include "pd_romart.h"
@@ -57,8 +58,8 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
     c->minutes = s->playMinutes < 59 ? s->playMinutes : 59;
     c->money = s->money >= 0 ? s->money : 0;
 
-    bool national = s->dexNational && pd_var(s, cfg->nationalVar) == cfg->nationalVarValue &&
-        pd_flag(s, cfg->nationalFlag);
+    bool national = s->dexNational && (cfg->nationalMagicOff < 0 ||
+        (pd_var(s, cfg->nationalVar) == cfg->nationalVarValue && pd_flag(s, cfg->nationalFlag)));
     int caught = 0;
     if (national) {
         for (int n = 1; n <= s->dexCount; n++) caught += pd_dex_caught(s, n);
@@ -138,6 +139,17 @@ static const struct blobs HOENN = {
     { -1, -1, -1, -1, -1 },
 };
 
+// Unbound (TrainerCardArt.kt UNBOUND): FireRed's frame in its purple; its ROM dropped the 0-star palette (every star
+// count starts from the 1-star one) and its badges aren't FireRed's (none drawn, no girl's palette).
+static const struct blobs UNBOUND = {
+    PD_FR_CARD_GFX, PD_FR_CARD_FRONT, PD_FR_CARD_BACK, PD_FR_CARD_BG,
+    { PD_FR_CARD_PAL1, PD_FR_CARD_PAL1, PD_FR_CARD_PAL1, PD_FR_CARD_PAL1, PD_FR_CARD_PAL1, -1 },
+    -1, -1, -1,
+    PD_UB_PIC_MALE, PD_UB_PIC_MALE_PAL, PD_UB_PIC_FEMALE, PD_UB_PIC_FEMALE_PAL,
+    PD_FR_FONT_NORMAL, PD_FR_FONT_NORMAL_WIDTHS,
+    { -1, -1, -1, -1, -1 },
+};
+
 // Emerald Legacy (TrainerCardArt.kt LEGACY): HOENN's, the fifth star on LeafGreen's black palette.
 static const struct blobs LEGACY = {
     PD_EM_CARD_GFX, PD_EM_CARD_FRONT, PD_EM_CARD_BACK, PD_EM_CARD_BG,
@@ -152,6 +164,45 @@ static const struct blobs LEGACY = {
 // rows, Emerald 16; RenderText adds letter spacing only to Japanese text, so
 // none here), the digits' pad (FireRed a space, Emerald CHAR_SPACER), the
 // stars' / badges' tile rows and the trainer pic's offset in its window.
+// FireRed's colour turned to Unbound's card (TrainerCardArt.unboundPurple, float for float): hue 266, the pale greens
+// and teals onto its lavender ramp; greys and the gold accents (hue 25-65) stay.
+static uint32_t unbound_purple(uint32_t argb) {
+    float r = (float) (argb >> 16 & 0xFF) / 255.0f, g = (float) (argb >> 8 & 0xFF) / 255.0f;
+    float bl = (float) (argb & 0xFF) / 255.0f;
+    float max = r > g ? (r > bl ? r : bl) : (g > bl ? g : bl);
+    float min = r < g ? (r < bl ? r : bl) : (g < bl ? g : bl);
+    float d = max - min;
+    float s = max == 0.0f ? 0.0f : d / max;
+    if (s < 0.08f) return argb;
+    float hue;
+    if (max == r) hue = 60.0f * fmodf((g - bl) / d, 6.0f);
+    else if (max == g) hue = 60.0f * ((bl - r) / d + 2.0f);
+    else hue = 60.0f * ((r - g) / d + 4.0f);
+    if (hue < 0.0f) hue += 360.0f;
+    if (hue >= 25.0f && hue <= 65.0f) return argb;
+    float sat = s * 1.8f < 0.6f ? s * 1.8f : 0.6f;
+    float val = max * 1.15f + 0.05f < 1.0f ? max * 1.15f + 0.05f : 1.0f;
+    float h = 266.0f / 60.0f, c = val * sat;
+    float x = c * (1.0f - fabsf(fmodf(h, 2.0f) - 1.0f));
+    float r1, g1, b1;
+    switch ((int) h) {
+    case 0: r1 = c; g1 = x; b1 = 0; break;
+    case 1: r1 = x; g1 = c; b1 = 0; break;
+    case 2: r1 = 0; g1 = c; b1 = x; break;
+    case 3: r1 = 0; g1 = x; b1 = c; break;
+    case 4: r1 = x; g1 = 0; b1 = c; break;
+    default: r1 = c; g1 = 0; b1 = x; break;
+    }
+    float m = val - c;
+#define CH(f) ((uint32_t) (((f) + m) * 255.0f + 0.5f) > 255 ? 255u : (uint32_t) (((f) + m) * 255.0f + 0.5f))
+    return (argb & 0xFF000000u) | CH(r1) << 16 | CH(g1) << 8 | CH(b1);
+#undef CH
+}
+
+static bool is_kanto(int style) {
+    return style == PD_CARD_KANTO || style == PD_CARD_UNBOUND;
+}
+
 struct layout {
     int textW, glyphH, pad, starY, badgeY, picX, picY;
 };
@@ -508,10 +559,11 @@ static void hoenn_text(const struct art* a, const struct blobs* b, const struct 
 
 bool pd_card_render(const struct pd_game* g, const struct pd_card_info* c, bool back, bool colon, bool backdrop,
                     uint32_t* img) {
-    bool kanto = c->style == PD_CARD_KANTO;
-    const struct blobs* b = kanto ? &KANTO : c->style == PD_CARD_LEGACY ? &LEGACY : &HOENN;
+    bool kanto = is_kanto(c->style);
+    const struct blobs* b = c->style == PD_CARD_UNBOUND ? &UNBOUND : kanto ? &KANTO :
+        c->style == PD_CARD_LEGACY ? &LEGACY : &HOENN;
     struct art a = { .img = img, .lay = kanto ? &KANTO_LAYOUT : &HOENN_LAYOUT };
-    if (c->style != PD_CARD_KANTO && c->style != PD_CARD_HOENN && c->style != PD_CARD_LEGACY) return false;
+    if (c->style != PD_CARD_KANTO && c->style != PD_CARD_HOENN && c->style != PD_CARD_LEGACY && c->style != PD_CARD_UNBOUND) return false;
     // Every blob the card needs, or no card.
     const int need[] = {
         b->gfx, b->front, b->back, b->bg, b->pals[0], b->pals[1], b->pals[2], b->pals[3], b->pals[4], b->pals[5],
@@ -530,8 +582,11 @@ bool pd_card_render(const struct pd_game* g, const struct pd_card_info* c, bool 
     int most = b->pals[5] >= 0 ? 5 : 4;
     int stars = c->stars < 0 ? 0 : c->stars > most ? most : c->stars;
     palette(a.d[b->pals[stars]], 48, pal);
-    if (c->female) palette(a.d[b->femalePal], 16, pal + 16);
-    palette(a.d[b->badgesPal], 16, pal + 48);
+    if (c->female && b->femalePal >= 0) palette(a.d[b->femalePal], 16, pal + 16);
+    if (c->style == PD_CARD_UNBOUND) {
+        for (int i = 0; i < 48; i++) pal[i] = unbound_purple(pal[i]);
+    }
+    if (b->badgesPal >= 0) palette(a.d[b->badgesPal], 16, pal + 48);
     palette(a.d[PD_CARD_STAR_PAL], 16, pal + 64);
     const uint8_t* tiles = a.d[b->gfx];
     size_t tilesLen = pd_blob_sigs[b->gfx].size;
@@ -549,11 +604,11 @@ bool pd_card_render(const struct pd_game* g, const struct pd_card_info* c, bool 
     static uint8_t bg3[0x1800 + 0x400];
     memset(bg3, 0, sizeof(bg3));
     memcpy(bg3, tiles, tilesLen < 0x1800 ? tilesLen : 0x1800);
-    memcpy(bg3 + 192 * 32, a.d[b->badgesGfx], 0x400);
+    if (b->badgesGfx >= 0) memcpy(bg3 + 192 * 32, a.d[b->badgesGfx], 0x400);
     if (!back) {
         for (int i = 0; i < stars; i++) tile(img, bg3, sizeof(bg3), pal, 4 << 12 | 143, 15 + i, a.lay->starY);
         for (int i = 0; i < 8; i++) {
-            if (!(c->badges >> i & 1)) continue;
+            if (b->badgesGfx < 0 || !(c->badges >> i & 1)) continue;
             int t = 192 + 2 * i, x = 4 + 3 * i, y = a.lay->badgeY;
             tile(img, bg3, sizeof(bg3), pal, 3 << 12 | t, x, y);
             tile(img, bg3, sizeof(bg3), pal, 3 << 12 | (t + 1), x + 1, y);

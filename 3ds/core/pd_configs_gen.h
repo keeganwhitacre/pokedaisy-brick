@@ -2693,7 +2693,7 @@ static const struct pd_config PD_CONFIG_RADICAL_RED = {
     .text = &pd_text_radical_red_v4_1,
 };
 
-// gamedata/gen3/hacks/unbound.toml: unbound_with_dex (ram, foes, dex)
+// gamedata/gen3/hacks/unbound.toml: unbound_with_dex (ram, foes, dex, card)
 static const struct pd_config PD_CONFIG_UNBOUND = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -2766,10 +2766,22 @@ static const struct pd_config PD_CONFIG_UNBOUND = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = "BORRIUS",
+    .cardStyle = PD_CARD_UNBOUND,
+    .gameStatsOff = 0x1200,
+    .badgeFlag = 0x820,
+    .pokedexFlag = 0x829,
+    .nationalVar = 0x404E,
+    .nationalVarValue = 0x6258,
+    .nationalFlag = 0x840,
+    .stickerVar = 0,
+    .frontierSymbolFlag = 0,
+    .extraStarFlag = 0,
+    .museumWinnersOff = 0,
+    .frontierBpOff = 0,
     .text = &pd_text_unbound_with_dex,
 };
 
-// gamedata/gen3/hacks/unbound.toml: unbound_fr (ram, foes, dex)
+// gamedata/gen3/hacks/unbound.toml: unbound_fr (ram, foes, dex, card)
 static const struct pd_config PD_CONFIG_UNBOUND_FR = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -2842,6 +2854,18 @@ static const struct pd_config PD_CONFIG_UNBOUND_FR = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = "BORRIUS",
+    .cardStyle = PD_CARD_UNBOUND,
+    .gameStatsOff = 0x1200,
+    .badgeFlag = 0x820,
+    .pokedexFlag = 0x829,
+    .nationalVar = 0x404E,
+    .nationalVarValue = 0x6258,
+    .nationalFlag = 0x840,
+    .stickerVar = 0,
+    .frontierSymbolFlag = 0,
+    .extraStarFlag = 0,
+    .museumWinnersOff = 0,
+    .frontierBpOff = 0,
     .text = &pd_text_unbound_fr,
 };
 

@@ -36,6 +36,8 @@ BLOBS = [
     "CARD_STAR_PAL",
     # Emerald Legacy's card (TrainerCardArt.kt LEGACY): HOENN's, plus the fifth star's (black) palette.
     "LG_CARD_PAL5",
+    # Unbound's card (TrainerCardArt.kt UNBOUND): FireRed's, recoloured, with its own pics.
+    "UB_PIC_MALE", "UB_PIC_MALE_PAL", "UB_PIC_FEMALE", "UB_PIC_FEMALE_PAL",
 ]
 
 

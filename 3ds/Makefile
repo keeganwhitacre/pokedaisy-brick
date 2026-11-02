@@ -39,6 +39,14 @@ $(BUILD)/pd_dex_test: $(CORE_SRC) $(wildcard core/*.h) test/dex_test.c
 	@mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) -o $@ $(filter-out core/pd_game.c,$(CORE_SRC)) test/dex_test.c -lm
 
+$(BUILD)/pd_card_test: $(CORE_SRC) $(wildcard core/*.h) test/card_test.c
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(filter-out core/pd_game.c,$(CORE_SRC)) test/card_test.c -lm
+
+# make test-card ROMS=<dir with the ROMs>: the cards vs the CRCs of TrainerCardTest.
+test-card: $(BUILD)/pd_card_test
+	$(BUILD)/pd_card_test $(FIXTURES) $(ROMS)
+
 test-dex: $(BUILD)/pd_dex_test
 	$(BUILD)/pd_dex_test $(FIXTURES)
 
