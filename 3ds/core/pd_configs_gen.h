@@ -53,6 +53,9 @@ extern const struct pd_text pd_text_rocket_edition;
 extern const struct pd_text pd_text_ghost_grey;
 extern const struct pd_text pd_text_odyssey;
 extern const struct pd_text pd_text_ultra_violet;
+extern const struct pd_text pd_text_recharged_emerald_v2_2_5;
+extern const struct pd_text pd_text_recharged_emerald_v2_2_8;
+extern const struct pd_text pd_text_recharged_emerald_rebalanced_v2_2_8;
 extern const struct pd_text pd_text_port_axpd0;
 extern const struct pd_text pd_text_port_axpd1;
 extern const struct pd_text pd_text_port_axpf0;
@@ -3512,6 +3515,7 @@ static const struct pd_config PD_CONFIG_RECHARGED_EMERALD_V2_2_5 = {
     .monPalIdxStride = 1,
     .monPalIdxMask = 0xFF,
     .itemPalCompressed = true,
+    .text = &pd_text_recharged_emerald_v2_2_5,
 };
 
 // gamedata/gen3/hacks/recharged_emerald.toml: recharged_emerald_v2_2_8 (ram, foes, icons)
@@ -3561,6 +3565,7 @@ static const struct pd_config PD_CONFIG_RECHARGED_EMERALD_V2_2_8 = {
     .monPalIdxStride = 1,
     .monPalIdxMask = 0xFF,
     .itemPalCompressed = true,
+    .text = &pd_text_recharged_emerald_v2_2_8,
 };
 
 // gamedata/gen3/hacks/recharged_emerald.toml: recharged_emerald_rebalanced_v2_2_8 (ram, foes, icons)
@@ -3610,6 +3615,7 @@ static const struct pd_config PD_CONFIG_RECHARGED_EMERALD_REBALANCED_V2_2_8 = {
     .monPalIdxStride = 1,
     .monPalIdxMask = 0xFF,
     .itemPalCompressed = true,
+    .text = &pd_text_recharged_emerald_rebalanced_v2_2_8,
 };
 
 // Emerald Rogue (v2.2.1 EX): vanilla's party struct grown to 104 bytes, expansion's battle struct, nine bag views.

@@ -956,6 +956,25 @@ typeNames = 'typeNames'
 typeChart = 'typeEffectiveness'
 speciesTypes = 'speciesTypeData + speciesTypesUltraViolet'
 
+# Recharged Emerald lays its renamed species / moves / items and re-typed species over Emerald's (ActiveTables' emeraldHackFor).
+[text.recharged_emerald_v2_2_5]
+species = 'speciesNames + hackTextRechargedEmerald.species'
+items = 'itemNames + hackTextRechargedEmerald.items'
+moves = 'moveData + hackTextRechargedEmerald.moves'
+speciesTypes = 'speciesTypeData + hackTextRechargedEmerald.types'
+
+[text.recharged_emerald_v2_2_8]
+species = 'speciesNames + hackTextRechargedEmerald.species'
+items = 'itemNames + hackTextRechargedEmerald.items'
+moves = 'moveData + hackTextRechargedEmerald.moves'
+speciesTypes = 'speciesTypeData + hackTextRechargedEmerald.types'
+
+[text.recharged_emerald_rebalanced_v2_2_8]
+species = 'speciesNames + hackTextRechargedEmeraldRebalanced.species'
+items = 'itemNames + hackTextRechargedEmeraldRebalanced.items'
+moves = 'moveData + hackTextRechargedEmeraldRebalanced.moves'
+speciesTypes = 'speciesTypeData + hackTextRechargedEmeraldRebalanced.types'
+
 [text.port_axpd0]
 species = 'speciesNamesAxpd'
 items = 'itemNamesAxpd'
