@@ -64,10 +64,10 @@ static void char_bitmap(struct pd_canvas* c, const char* const* rows, int n, int
     }
 }
 
-static const char* mon_display_name(const struct pd_mon* m, char* buf, size_t len) {
+static const char* mon_display_name(const struct pd_game* g, const struct pd_mon* m, char* buf, size_t len) {
     if (m->species == PD_SPECIES_EGG) return "EGG";
     if (m->nickname[0]) return m->nickname;
-    return pd_species_name(m->species, buf, len);
+    return pd_species_name(g, m->species, buf, len);
 }
 
 // The summary's ♂ / ♀ after the name, in their own colours.
@@ -202,7 +202,7 @@ static void party_slot(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
     pd_draw_mon_icon_scaled(c, g, m->species, x + geo.fx - 8 * u, y + geo.fy - 4 * u, u, false);
 
     int textW = geo.fx + geo.fw - 4 * u - geo.textX;
-    pd_text_fit(c, x + geo.textX, y + geo.nameMid - 8, textW, mon_display_name(m, buf, sizeof(buf)), SLOT_TEXT,
+    pd_text_fit(c, x + geo.textX, y + geo.nameMid - 8, textW, mon_display_name(g, m, buf, sizeof(buf)), SLOT_TEXT,
                 SLOT_TEXT_SHADOW);
     if (!egg) {
         const char* status = fainted ? "FNT" : pd_status_label(m->status);
@@ -348,14 +348,14 @@ static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game*
     int ix0 = x + f + 6, iw0 = w - 2 * (f + 6);
 
     bool egg = m->species == PD_SPECIES_EGG;
-    const char* name = mon_display_name(m, buf, sizeof(buf));
+    const char* name = mon_display_name(g, m, buf, sizeof(buf));
     int nameW = pd_text(c, ix, ty, name, PD_LABEL, PD_LABEL_SHADOW);
     if (!egg) {
         gender_mark(c, ix + nameW + 3, ty, m->gender);
         char lv[12];
         snprintf(lv, sizeof(lv), "Lv%d", m->level);
         pd_text_right(c, ix + iw, ty, lv, PD_VALUE, PD_VALUE_SHADOW);
-        const char* species = pd_species_name(m->species, buf2, sizeof(buf2));
+        const char* species = pd_species_name(g, m->species, buf2, sizeof(buf2));
         if (strcmp(species, name)) pd_text(c, ix + nameW + 14, ty, species, PD_MUTED, PD_MUTED_SHADOW);
     }
     ty += 20;
@@ -377,8 +377,8 @@ static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game*
             summary_stats(c, &m->stats, ix, ty, iw, bottom - ty);
         } else for (int i = 0; i < PD_NUM_MOVES; i++) {
             if (!m->moves[i]) continue;
-            pd_text_fit(c, ix, ty, iw - 120, pd_move_name(m->moves[i], buf, sizeof(buf)), PD_LABEL, PD_LABEL_SHADOW);
-            pd_text(c, ix + iw - 116, ty, pd_type_name(pd_move_type(m->moves[i])), PD_MUTED, PD_MUTED_SHADOW);
+            pd_text_fit(c, ix, ty, iw - 120, pd_move_name(g, m->moves[i], buf, sizeof(buf)), PD_LABEL, PD_LABEL_SHADOW);
+            pd_text(c, ix + iw - 116, ty, pd_type_name(pd_move_type(g, m->moves[i])), PD_MUTED, PD_MUTED_SHADOW);
             char pp[12];
             snprintf(pp, sizeof(pp), "PP %d", m->pp[i]);
             pd_text_right(c, ix + iw, ty, pp, PD_VALUE, PD_VALUE_SHADOW);

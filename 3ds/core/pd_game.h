@@ -9,6 +9,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "pd_tables.h"
+
 enum pd_game_kind {
     PD_GAME_NONE = 0,
     PD_GAME_FIRERED,  // FireRed and LeafGreen (LeafGreen runs as FireRed, like the app)
@@ -48,6 +50,7 @@ struct pd_party_layout {
 extern const struct pd_party_layout pd_party_layout_vanilla;
 
 struct pd_config {
+    const struct pd_text* text; // the hack's own species / item / move names; NULL = retail's
     const struct pd_party_layout* partyLayout; // NULL = pd_party_layout_vanilla
     uint32_t playerParty;
     uint32_t playerPartyCount;

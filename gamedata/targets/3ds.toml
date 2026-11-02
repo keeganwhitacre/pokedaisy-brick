@@ -3,6 +3,7 @@
 # to 3ds/core/pd_configs_gen.h; pd_game.c picks one by the ROM header. The format: gamedata/README.md.
 
 output = '3ds/core/pd_configs_gen.h'
+text_output = '3ds/core/pd_text_gen.c'
 struct = 'pd_config'
 prefix = 'PD_CONFIG_'
 
@@ -293,3 +294,60 @@ parts = ['ram', 'foes']
 [config.unbound_fr]
 name = 'UNBOUND_FR'
 parts = ['ram', 'foes']
+
+# A hack's own species / item / move names (the Kotlin val of the app's data/), as ActiveTables.kt picks them; a config
+# without a [text.*] reads retail's. Not here yet: Odyssey and the in-place FireRed hacks (Ultra Violet, Rocket Edition,
+# Ash Gray, Ghost Grey) - their names are retail's with a few runtime-merged renames.
+
+[text.gaia_v3_2]
+species = 'speciesNamesGaia'
+
+[text.sword_shield]
+species = 'speciesNamesSwordShield'
+items = 'itemNamesSwordShield'
+moves = 'moveDataSwordShield'
+
+[text.amethyst]
+species = 'speciesNamesAmethyst'
+items = 'itemNamesAmethyst'
+moves = 'moveDataAmethyst'
+
+[text.amethyst_v1_4_1]
+species = 'speciesNamesAmethystV141'
+items = 'itemNamesAmethystV141'
+moves = 'moveDataAmethyst'
+
+[text.gs_chronicles]
+species = 'speciesNamesGsChronicles'
+items = 'itemNamesGsChronicles'
+moves = 'moveDataGsChronicles'
+
+[text.radical_red_v4_1]
+species = 'speciesNamesRadicalRed'
+items = 'itemNamesRadicalRed'
+moves = 'moveDataRadicalRed'
+
+[text.unbound_with_dex]
+species = 'speciesNamesUnbound'
+items = 'itemNamesUnbound'
+moves = 'moveDataUnbound'
+
+[text.unbound_fr]
+species = 'speciesNamesUnbound'
+items = 'itemNamesUnbound'
+moves = 'moveDataUnbound'
+
+[text.celia]
+species = 'speciesNamesCelia'
+items = 'itemNamesCelia'
+moves = 'moveDataCelia'
+
+[text.glazed]
+species = 'speciesNamesGlazed'
+items = 'itemNamesGlazed'
+moves = 'moveDataGlazed'
+
+[text.orange_islands]
+species = 'speciesNamesOrangeIslands'
+items = 'itemNamesOrangeIslands'
+moves = 'moveDataOrangeIslands'

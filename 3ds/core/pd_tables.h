@@ -11,6 +11,19 @@ struct pd_move_info {
     int power;
 };
 
+// A hack's own names and moves (pd_text_gen.c, from the app's Kotlin tables), dense by id; a NULL table (or an id
+// past its count, or a hole) = the hack has none there. pd_config.text NULL = retail's tables.
+struct pd_text {
+    const char* const* species;
+    int speciesCount;
+    const char* const* items;
+    int itemsCount;
+    const struct pd_move_info* moves;
+    int movesCount;
+};
+
+struct pd_game;
+
 struct pd_type_pair {
     int atk, def, pct;
 };
@@ -51,12 +64,13 @@ extern const unsigned char pd_hidden_power_types[16];
 #define PD_SPECIES_EGG 0x7FFF
 
 // Names in the game's own casing: FireRed / Emerald print species and moves
-// in capitals with a small é (the app's gameCase()). Writes into buf.
-const char* pd_species_name(int species, char* buf, size_t len);
-const char* pd_move_name(int move, char* buf, size_t len);
+// in capitals with a small é (the app's gameCase()); a hack's own tables already carry theirs. Writes into buf.
+// g = the running game (NULL = retail's tables).
+const char* pd_species_name(const struct pd_game* g, int species, char* buf, size_t len);
+const char* pd_move_name(const struct pd_game* g, int move, char* buf, size_t len);
 const char* pd_type_name(int type);
-int pd_move_type(int move);
-int pd_move_power(int move);
+int pd_move_type(const struct pd_game* g, int move);
+int pd_move_power(const struct pd_game* g, int move);
 
 // One attacking type against a (possibly dual-typed) defender, in percent
 // (100 = 1x) - the app's typeMultiplierPct().

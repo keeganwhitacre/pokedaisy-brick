@@ -1,5 +1,7 @@
 #include "pd_tables.h"
 
+#include "pd_game.h"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -20,20 +22,47 @@ static int form_base(int species) {
     return species >= 412 && species <= 414 ? 410 : species;
 }
 
-const char* pd_species_name(int species, char* buf, size_t len) {
+static const struct pd_text* hack_text(const struct pd_game* g) {
+    return g && g->cfg ? g->cfg->text : NULL;
+}
+
+const char* pd_species_name(const struct pd_game* g, int species, char* buf, size_t len) {
     if (species == 0) return "-";
     if (species == PD_SPECIES_EGG) return "EGG";
-    species = form_base(species);
-    if (species > 0 && species < pd_species_names_count && pd_species_names[species]) {
-        return game_case(pd_species_names[species], buf, len);
+    const struct pd_text* t = hack_text(g);
+    if (t && t->species) {
+        if (species > 0 && species < t->speciesCount && t->species[species]) {
+            snprintf(buf, len, "%s", t->species[species]);
+            return buf;
+        }
+    } else {
+        species = form_base(species);
+        if (species > 0 && species < pd_species_names_count && pd_species_names[species]) {
+            return game_case(pd_species_names[species], buf, len);
+        }
     }
     snprintf(buf, len, "#%d", species);
     return buf;
 }
 
-const char* pd_move_name(int move, char* buf, size_t len) {
+// The move a hack's table (when it has one) or retail's names; NULL = none.
+static const struct pd_move_info* move_info(const struct pd_game* g, int move) {
+    const struct pd_text* t = hack_text(g);
+    int count = t && t->moves ? t->movesCount : pd_moves_count;
+    const struct pd_move_info* table = t && t->moves ? t->moves : pd_moves;
+    return move > 0 && move < count && table[move].name ? &table[move] : NULL;
+}
+
+const char* pd_move_name(const struct pd_game* g, int move, char* buf, size_t len) {
     if (move <= 0) return "-";
-    if (move < pd_moves_count && pd_moves[move].name) return game_case(pd_moves[move].name, buf, len);
+    const struct pd_move_info* m = move_info(g, move);
+    if (m) {
+        if (hack_text(g) && hack_text(g)->moves) {
+            snprintf(buf, len, "%s", m->name);
+            return buf;
+        }
+        return game_case(m->name, buf, len);
+    }
     snprintf(buf, len, "MOVE#%d", move);
     return buf;
 }
@@ -43,14 +72,14 @@ const char* pd_type_name(int type) {
     return "";
 }
 
-int pd_move_type(int move) {
-    if (move > 0 && move < pd_moves_count && pd_moves[move].name) return pd_moves[move].type;
-    return PD_TYPE_NONE;
+int pd_move_type(const struct pd_game* g, int move) {
+    const struct pd_move_info* m = move_info(g, move);
+    return m ? m->type : PD_TYPE_NONE;
 }
 
-int pd_move_power(int move) {
-    if (move > 0 && move < pd_moves_count && pd_moves[move].name) return pd_moves[move].power;
-    return 0;
+int pd_move_power(const struct pd_game* g, int move) {
+    const struct pd_move_info* m = move_info(g, move);
+    return m ? m->power : 0;
 }
 
 static int single_pct(int atk, int def) {

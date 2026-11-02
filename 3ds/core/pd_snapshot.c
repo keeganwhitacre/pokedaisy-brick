@@ -444,11 +444,14 @@ static const char* item_entry(const char* const* t, int n, int item) {
 }
 
 const char* pd_item_name(const struct pd_game* g, int item) {
+    if (g->cfg && g->cfg->text && g->cfg->text->items) return item_entry(g->cfg->text->items, g->cfg->text->itemsCount, item);
     if (g->kind == PD_GAME_EMERALD) return item_entry(pd_item_names_emerald, pd_item_names_emerald_count, item);
     return item_entry(pd_item_names_firered, pd_item_names_firered_count, item);
 }
 
 const char* pd_item_description(const struct pd_game* g, int item) {
+    // Retail's texts are by retail's ids: a hack with its own item names has none of its own (none shown, none faked).
+    if (g->cfg && g->cfg->text && g->cfg->text->items) return "";
     if (g->kind == PD_GAME_EMERALD) return item_entry(pd_item_desc_emerald, pd_item_desc_emerald_count, item);
     return item_entry(pd_item_desc_firered, pd_item_desc_firered_count, item);
 }

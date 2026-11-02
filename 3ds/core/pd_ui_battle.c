@@ -86,7 +86,7 @@ static void card(struct pd_canvas* c, const struct pd_game* g, int x, int y, int
     const char* status = pd_status_label(m->status);
     int statusW = *status ? pd_text_width(status) + 6 + 4 : 0;
     int nameEnd = nx + pd_text_fit(c, nx, ty, lvx - 6 - stateW - statusW - nx,
-                                   pd_species_name(m->species, buf, sizeof(buf)), PD_LABEL, PD_LABEL_SHADOW);
+                                   pd_species_name(g, m->species, buf, sizeof(buf)), PD_LABEL, PD_LABEL_SHADOW);
     if (*status) {
         ui_status_badge(c, nameEnd + 4, ty + 1, m->status);
         nameEnd += statusW;
@@ -117,7 +117,7 @@ static void verdict(int pct, const char** text, uint32_t* color, uint32_t* shado
 
 // A move on the window's grey: its name and PP, then its verdict on foe
 // (NULL = no foe: no verdict).
-static void move_cell(struct pd_canvas* c, int x, int y, int w, int h, int move, int pp, const struct mon_view* foe) {
+static void move_cell(struct pd_canvas* c, const struct pd_game* g, int x, int y, int w, int h, int move, int pp, const struct mon_view* foe) {
     char buf[40];
     pd_round_rect(c, x, y, w, h, 3, PD_LIST_FILL);
     if (!move) return;
@@ -126,16 +126,16 @@ static void move_cell(struct pd_canvas* c, int x, int y, int w, int h, int move,
     char ppText[12];
     snprintf(ppText, sizeof(ppText), "PP %d", pp);
     int ppW = pd_text_width(ppText);
-    pd_text_fit(c, ix, ty, iw - ppW - 6, pd_move_name(move, buf, sizeof(buf)), PD_LABEL, PD_LABEL_SHADOW);
+    pd_text_fit(c, ix, ty, iw - ppW - 6, pd_move_name(g, move, buf, sizeof(buf)), PD_LABEL, PD_LABEL_SHADOW);
     pd_text_right(c, ix + iw, ty, ppText, PD_MUTED, PD_MUTED_SHADOW);
     const char* text = "";
     uint32_t color = PD_LABEL, shadow = PD_LABEL_SHADOW;
-    if (pd_move_power(move) == 0) {
+    if (pd_move_power(g, move) == 0) {
         text = "STATUS";
         color = PD_MUTED;
         shadow = PD_MUTED_SHADOW;
     } else if (foe) {
-        verdict(pd_type_multiplier_pct(pd_move_type(move), foe->type1, foe->type2), &text, &color, &shadow);
+        verdict(pd_type_multiplier_pct(pd_move_type(g, move), foe->type1, foe->type2), &text, &color, &shadow);
     }
     pd_text(c, ix, ty + LINE + 1, text, color, shadow);
 }
@@ -226,16 +226,16 @@ static int by_score(const void* a, const void* b) {
 // rankSuggestions: every living party Pokémon with a usable damaging move,
 // by (its best move's power x multiplier on the foe) minus the worst the
 // foe's own types do to it.
-static int rank(const struct pd_snapshot* s, const struct mon_view* foe, struct pick* out) {
+static int rank(const struct pd_game* g, const struct pd_snapshot* s, const struct mon_view* foe, struct pick* out) {
     int n = 0;
     for (int i = 0; i < s->partyCount; i++) {
         const struct pd_mon* m = &s->party[i];
         if (m->hp <= 0 || m->species == PD_SPECIES_EGG) continue;
         int best = -1, bestValue = -1;
         for (int k = 0; k < PD_NUM_MOVES; k++) {
-            int power = m->moves[k] ? pd_move_power(m->moves[k]) : 0;
+            int power = m->moves[k] ? pd_move_power(g, m->moves[k]) : 0;
             if (power <= 0 || m->pp[k] <= 0) continue;
-            int value = power * pd_type_multiplier_pct(pd_move_type(m->moves[k]), foe->type1, foe->type2);
+            int value = power * pd_type_multiplier_pct(pd_move_type(g, m->moves[k]), foe->type1, foe->type2);
             if (value > bestValue) {
                 bestValue = value;
                 best = k;
@@ -252,8 +252,8 @@ static int rank(const struct pd_snapshot* s, const struct mon_view* foe, struct 
                 if (r2 > risk) risk = r2;
             }
         }
-        int pct = pd_type_multiplier_pct(pd_move_type(m->moves[best]), foe->type1, foe->type2);
-        out[n++] = (struct pick) { m, m->moves[best], m->pp[best], pct, pd_move_power(m->moves[best]) * pct / 100 - risk };
+        int pct = pd_type_multiplier_pct(pd_move_type(g, m->moves[best]), foe->type1, foe->type2);
+        out[n++] = (struct pick) { m, m->moves[best], m->pp[best], pct, pd_move_power(g, m->moves[best]) * pct / 100 - risk };
     }
     qsort(out, (size_t) n, sizeof(out[0]), by_score);
     return n;
@@ -270,7 +270,7 @@ static void suggestions(struct pd_canvas* c, const struct pd_game* g, const stru
     rule(c, ix, y, iw);
     y += RULE;
     struct pick picks[PD_PARTY_SIZE];
-    int n = rank(s, foe, picks);
+    int n = rank(g, s, foe, picks);
     if (!n) {
         pd_text_wrap(c, ix, y + 2, iw, LINE, 2, "NO USABLE DAMAGING MOVES IN YOUR PARTY", PD_MUTED, PD_MUTED_SHADOW);
         return;
@@ -290,7 +290,7 @@ static void suggestions(struct pd_canvas* c, const struct pd_game* g, const stru
         icon(c, g, p->mon->species, ix, ry, false);
         int tx = ix + PD_ICON + 8, right = ix + half;
         int nx = tx + pd_text(c, tx, ry + 1, RANKS[i], PD_VALUE, PD_VALUE_SHADOW) + 5;
-        pd_text_fit(c, nx, ry + 1, right - nx, pd_species_name(p->mon->species, buf, sizeof(buf)), PD_LABEL,
+        pd_text_fit(c, nx, ry + 1, right - nx, pd_species_name(g, p->mon->species, buf, sizeof(buf)), PD_LABEL,
                     PD_LABEL_SHADOW);
         int ty = ry + LINE + 1;
         char lv[12];
@@ -303,7 +303,7 @@ static void suggestions(struct pd_canvas* c, const struct pd_game* g, const stru
         if (barW >= 16) ui_hp_bar(c, bx, ty + 5, barW, p->mon->hp, p->mon->maxHp);
         // Its best move against the foe.
         pd_fill(c, ix + half + RULE / 2, y + 2, 1, rowH - 4, PD_DIVIDER);
-        move_cell(c, ix + half + RULE, y + 1, iw - half - RULE, rowH - 2, p->move, p->pp, foe);
+        move_cell(c, g, ix + half + RULE, y + 1, iw - half - RULE, rowH - 2, p->move, p->pp, foe);
         y += rowH;
     }
 }
@@ -326,7 +326,7 @@ static void info(struct pd_canvas* c, const struct pd_game* g, const struct pd_s
     int gap = 4;
     int bw = (iw - gap) / 2, bh = (iy + ih - y - gap) / 2;
     for (int i = 0; i < PD_NUM_MOVES; i++) {
-        move_cell(c, ix + (i % 2) * (bw + gap), y + (i / 2) * (bh + gap), bw, bh, you->moves[i], you->pp[i], foe);
+        move_cell(c, g, ix + (i % 2) * (bw + gap), y + (i / 2) * (bh + gap), bw, bh, you->moves[i], you->pp[i], foe);
     }
 }
 

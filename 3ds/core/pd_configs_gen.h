@@ -4,6 +4,17 @@
 #define PD_CONFIGS_GEN_H
 
 #include "pd_game.h"
+extern const struct pd_text pd_text_gaia_v3_2;
+extern const struct pd_text pd_text_sword_shield;
+extern const struct pd_text pd_text_amethyst;
+extern const struct pd_text pd_text_amethyst_v1_4_1;
+extern const struct pd_text pd_text_gs_chronicles;
+extern const struct pd_text pd_text_radical_red_v4_1;
+extern const struct pd_text pd_text_unbound_with_dex;
+extern const struct pd_text pd_text_unbound_fr;
+extern const struct pd_text pd_text_celia;
+extern const struct pd_text pd_text_glazed;
+extern const struct pd_text pd_text_orange_islands;
 
 // The configs, each with the parts the port reads for it so far (`name` is the C's: PD_CONFIG_<name>) and the
 // records `@name.` paths start from (`records`).
@@ -1131,6 +1142,7 @@ static const struct pd_config PD_CONFIG_GLAZED = {
     .battleStructPtr = 0x0202449C,
     .battleStructStatic = false,
     .monToSwitchIntoOff = 0x5C,
+    .text = &pd_text_glazed,
 };
 
 // gamedata/gen3/hacks/celia.toml: celia (ram)
@@ -1158,6 +1170,7 @@ static const struct pd_config PD_CONFIG_CELIA = {
     .flagsOff = 0xEF0,
     .varsOff = 0x1010,
     .flagBytes = 0x120,
+    .text = &pd_text_celia,
 };
 
 // gamedata/gen3/hacks/orange_islands.toml: orange_islands (ram, foes)
@@ -1190,6 +1203,7 @@ static const struct pd_config PD_CONFIG_ORANGE_ISLANDS = {
     .battleStructPtr = 0x02023FE8,
     .battleStructStatic = false,
     .monToSwitchIntoOff = 0x5C,
+    .text = &pd_text_orange_islands,
 };
 
 // gamedata/gen3/hacks/ultra_violet.toml: ultra_violet (ram, foes)
@@ -1335,6 +1349,7 @@ static const struct pd_config PD_CONFIG_GAIA = {
     .regionalOrder = 0,
     .regionalCount = 721,
     .regionName = 0,
+    .text = &pd_text_gaia_v3_2,
 };
 
 // gamedata/gen3/hacks/sword_shield.toml: sword_shield (ram, foes, icons, dex)
@@ -1384,6 +1399,7 @@ static const struct pd_config PD_CONFIG_SWORD_SHIELD = {
     .regionalOrder = 0,
     .regionalCount = 898,
     .regionName = 0,
+    .text = &pd_text_sword_shield,
 };
 
 // gamedata/gen3/hacks/odyssey.toml: odyssey (ram, foes)
@@ -1448,6 +1464,7 @@ static const struct pd_config PD_CONFIG_AMETHYST = {
     .battleStructPtr = 0x02023FE8,
     .battleStructStatic = false,
     .monToSwitchIntoOff = 0x5C,
+    .text = &pd_text_amethyst,
 };
 
 // gamedata/gen3/hacks/amethyst.toml: amethyst_v1_4_1 (ram, foes)
@@ -1480,6 +1497,7 @@ static const struct pd_config PD_CONFIG_AMETHYST_V1_4_1 = {
     .battleStructPtr = 0x02023FE8,
     .battleStructStatic = false,
     .monToSwitchIntoOff = 0x5C,
+    .text = &pd_text_amethyst_v1_4_1,
 };
 
 // gamedata/gen3/hacks/gs_chronicles.toml: gs_chronicles (ram, foes)
@@ -1512,6 +1530,7 @@ static const struct pd_config PD_CONFIG_GS_CHRONICLES = {
     .battleStructPtr = 0x02023FE8,
     .battleStructStatic = false,
     .monToSwitchIntoOff = 0x5C,
+    .text = &pd_text_gs_chronicles,
 };
 
 // gamedata/gen3/hacks/ghost_grey.toml: ghost_grey (ram, foes)
@@ -1594,6 +1613,7 @@ static const struct pd_config PD_CONFIG_RADICAL_RED = {
     .regionalOrder = 0,
     .regionalCount = 151,
     .regionName = "KANTO",
+    .text = &pd_text_radical_red_v4_1,
 };
 
 // gamedata/gen3/hacks/unbound.toml: unbound_with_dex (ram, foes)
@@ -1626,6 +1646,7 @@ static const struct pd_config PD_CONFIG_UNBOUND = {
     .battleStructPtr = 0,
     .battleStructStatic = false,
     .monToSwitchIntoOff = 0,
+    .text = &pd_text_unbound_with_dex,
 };
 
 // gamedata/gen3/hacks/unbound.toml: unbound_fr (ram, foes)
@@ -1658,6 +1679,7 @@ static const struct pd_config PD_CONFIG_UNBOUND_FR = {
     .battleStructPtr = 0,
     .battleStructStatic = false,
     .monToSwitchIntoOff = 0,
+    .text = &pd_text_unbound_fr,
 };
 
 #endif

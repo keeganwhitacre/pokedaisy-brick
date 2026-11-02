@@ -140,18 +140,18 @@ static void area_entry(const struct pd_game* g, const struct pd_snapshot* s, con
     e->owned = pd_area_done(g, s, t);
     switch (t->kind) {
     case PD_AREA_MON:
-        snprintf(e->title, sizeof(e->title), "%s", pd_species_name(t->id, name, sizeof(name)));
+        snprintf(e->title, sizeof(e->title), "%s", pd_species_name(g, t->id, name, sizeof(name)));
         snprintf(e->answerBuf, sizeof(e->answerBuf), "Someone %s gives you this POKéMON.", at);
         break;
     case PD_AREA_EGG:
         snprintf(e->title, sizeof(e->title), "AN EGG");
         snprintf(e->answerBuf, sizeof(e->answerBuf), "Someone %s gives you an EGG: %s.", at,
-                 pd_species_name(t->id, name, sizeof(name)));
+                 pd_species_name(g, t->id, name, sizeof(name)));
         break;
     case PD_AREA_TRADE:
-        snprintf(e->title, sizeof(e->title), "TRADE FOR %s", pd_species_name(t->id, name, sizeof(name)));
+        snprintf(e->title, sizeof(e->title), "TRADE FOR %s", pd_species_name(g, t->id, name, sizeof(name)));
         snprintf(e->answerBuf, sizeof(e->answerBuf), "Someone %s trades it for your %s.", at,
-                 pd_species_name(t->wants, buf, sizeof(buf)));
+                 pd_species_name(g, t->wants, buf, sizeof(buf)));
         break;
     case PD_AREA_HIDDEN:
         if (!e->owned) {
@@ -217,7 +217,7 @@ static void build_here(const struct pd_game* g, const struct pd_snapshot* s, con
             struct view_entry* e = add_entry();
             if (!e) break;
             char name[40];
-            pd_species_name(w->species, name, sizeof(name));
+            pd_species_name(g, w->species, name, sizeof(name));
             if (w->minLv == w->maxLv) {
                 snprintf(e->detail, sizeof(e->detail), "LV%d  %d%%", w->minLv, w->pct);
             } else {
@@ -281,7 +281,7 @@ static void build_where(const struct pd_game* g, const struct pd_snapshot* s) {
             char name[48], sp[40];
             if (mon) {
                 if (sec != 2) continue;
-                snprintf(name, sizeof(name), "%s%s", pd_species_name(t->id, sp, sizeof(sp)),
+                snprintf(name, sizeof(name), "%s%s", pd_species_name(g, t->id, sp, sizeof(sp)),
                          t->kind == PD_AREA_EGG ? " (egg)" : "");
             } else {
                 if (!gift && t->kind != PD_AREA_ITEM) continue;
@@ -346,12 +346,12 @@ static void build_bosses(const struct pd_game* g, const struct pd_snapshot* s, c
             e->hint = e->hintBuf;
             char name[40], move[32];
             int len = snprintf(e->answerBuf, sizeof(e->answerBuf), "%s:",
-                               pd_species_name(team[i].species, name, sizeof(name)));
+                               pd_species_name(g, team[i].species, name, sizeof(name)));
             bool first = true;
             for (int k = 0; k < 4 && len < (int) sizeof(e->answerBuf); k++) {
                 if (!team[i].moves[k]) continue;
                 len += snprintf(e->answerBuf + len, sizeof(e->answerBuf) - (size_t) len, "%s %s", first ? "" : ",",
-                                pd_move_name(team[i].moves[k], move, sizeof(move)));
+                                pd_move_name(g, team[i].moves[k], move, sizeof(move)));
                 first = false;
             }
             if (team[i].item && len < (int) sizeof(e->answerBuf)) {
