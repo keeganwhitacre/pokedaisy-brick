@@ -126,6 +126,17 @@ bool pd_decode_party_mon(const uint8_t* raw, struct pd_mon* m) {
     return pd_decode_party_mon_l(raw, &pd_party_layout_vanilla, m);
 }
 
+// Shininess per the layout (Gen3Mon.kt: shinyBelow > 0 && (bits set, or shiny value < shinyBelow, flipped by the modifier)).
+static bool mon_shiny(const uint8_t* raw, const struct pd_party_layout* l) {
+    if (l->shinyBelow <= 0) return false;
+    if (l->shinyBitsMask) return (raw[l->shinyBits] & l->shinyBitsMask) != 0;
+    uint32_t pid = u32(raw), ot = u32(raw + 4);
+    unsigned v = ((ot >> 16) ^ (ot & 0xFFFF) ^ (pid >> 16) ^ (pid & 0xFFFF)) & 0xFFFF;
+    bool below = (int) v < l->shinyBelow;
+    bool flip = l->shinyModifier > 0 && (raw[l->shinyModifier] & 0x40) != 0;
+    return below != flip;
+}
+
 // R.O.W.E.'s bit-packed struct (Gen3Mon.kt decodeRoweMon): no held item, no IVs (stats recompute with 0).
 static bool decode_rowe_mon(const uint8_t* raw, const struct pd_party_layout* l, const struct pd_config* cfg, struct pd_mon* m) {
     uint32_t personality = u32(raw), w14 = u32(raw + 0x14), w18 = u32(raw + 0x18);
@@ -156,6 +167,7 @@ static bool decode_rowe_mon(const uint8_t* raw, const struct pd_party_layout* l,
     if (raw[l->flags] & l->eggMask) m->species = PD_SPECIES_EGG;
     decode_name(raw + l->nicknameOff, l->nicknameLen, m->nickname, sizeof(m->nickname));
     m->gender = gender_of(cfg, m, personality);
+    m->shiny = mon_shiny(raw, l);
     return true;
 }
 
@@ -194,6 +206,7 @@ static bool decode_er_mon(const uint8_t* raw, const struct pd_party_layout* l, c
     if ((w14 >> 15) & 1) m->species = PD_SPECIES_EGG;
     decode_name(raw + l->nicknameOff, l->nicknameLen, m->nickname, sizeof(m->nickname));
     m->gender = gender_of(cfg, m, m->personality);
+    m->shiny = mon_shiny(raw, l);
     return true;
 }
 
@@ -289,6 +302,7 @@ bool pd_decode_party_mon_c(const uint8_t* raw, const struct pd_party_layout* l, 
     if (l->eggInIvWord ? (ivWord >> 30) & 1 : (raw[l->flags] & l->eggMask) != 0) m->species = PD_SPECIES_EGG;
     decode_name(raw + l->nicknameOff, l->nicknameLen, m->nickname, sizeof(m->nickname));
     m->gender = gender_of(cfg, m, personality);
+    m->shiny = mon_shiny(raw, l);
     return true;
 }
 

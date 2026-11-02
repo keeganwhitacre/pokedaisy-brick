@@ -64,6 +64,8 @@ static void char_bitmap(struct pd_canvas* c, const char* const* rows, int n, int
     }
 }
 
+#define SHINY_MARK 0xF8C830 // a shiny mon's gold asterisk
+
 static const char* mon_display_name(const struct pd_game* g, const struct pd_mon* m, char* buf, size_t len) {
     if (m->species == PD_SPECIES_EGG) return "EGG";
     if (m->nickname[0]) return m->nickname;
@@ -211,7 +213,8 @@ static void party_slot(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
         } else {
             char lv[12];
             snprintf(lv, sizeof(lv), "Lv%d", m->level);
-            pd_text(c, x + geo.textX + 6 * u, y + geo.levelMid - 8, lv, SLOT_TEXT, SLOT_TEXT_SHADOW);
+            int lw = pd_text(c, x + geo.textX + 6 * u, y + geo.levelMid - 8, lv, SLOT_TEXT, SLOT_TEXT_SHADOW);
+            if (m->shiny) pd_text(c, x + geo.textX + 6 * u + lw + 3, y + geo.levelMid - 8, "*", SHINY_MARK, SLOT_TEXT_SHADOW);
         }
         int gx = x + geo.fx + geo.fw - 14 * u, gy = y + geo.levelMid - 4 * u;
         if (m->gender == PD_GENDER_MALE || m->gender == PD_GENDER_FEMALE) {
@@ -353,6 +356,7 @@ static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game*
     int nameW = pd_text(c, ix, ty, name, PD_LABEL, PD_LABEL_SHADOW);
     if (!egg) {
         gender_mark(c, ix + nameW + 3, ty, m->gender);
+        if (m->shiny) pd_text(c, ix + nameW + 14, ty, "*", SHINY_MARK, PD_LABEL_SHADOW);
         char lv[12];
         snprintf(lv, sizeof(lv), "Lv%d", m->level);
         pd_text_right(c, ix + iw, ty, lv, PD_VALUE, PD_VALUE_SHADOW);

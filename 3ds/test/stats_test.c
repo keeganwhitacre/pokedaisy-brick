@@ -108,7 +108,35 @@ static void tap(struct pd_ui* ui,int id) {
     }
     assert(!"Missing control");
 }
+static void check_shiny(void) {
+    // SoulGold: a plaintext box; shiny value < 256, flipped by bit 6 of the byte at +0x1F.
+    uint8_t raw[96] = {0};
+    struct pd_mon m;
+    raw[0x20] = 25; // species
+    raw[0] = 5;     // personality 5, OT id 0 -> shiny value 5
+    assert(pd_decode_party_mon_l(raw, &pd_party_layout_soulgold, &m) && m.shiny);
+    raw[0] = 0x34; raw[1] = 0x12; // value 0x1234
+    assert(pd_decode_party_mon_l(raw, &pd_party_layout_soulgold, &m) && !m.shiny);
+    raw[0x1F] = 0x40; // the modifier alone = shiny
+    assert(pd_decode_party_mon_l(raw, &pd_party_layout_soulgold, &m) && m.shiny);
+    raw[0] = 5; raw[1] = 0; // ... on a shiny personality = not
+    assert(pd_decode_party_mon_l(raw, &pd_party_layout_soulgold, &m) && !m.shiny);
+    assert(!pd_decode_party_mon(raw, &m) || !m.shiny); // retail layout never marks
+    // R.O.W.E.: +0x29's 0x80; Elite Redux: +0x17's 0x0C.
+    uint8_t r[0x4C] = {0};
+    r[0x1C] = 25;
+    assert(pd_decode_party_mon_l(r, &pd_party_layout_rowe, &m) && !m.shiny);
+    r[0x29] = 0x80;
+    assert(pd_decode_party_mon_l(r, &pd_party_layout_rowe, &m) && m.shiny);
+    memset(r, 0, sizeof r); r[0x10] = 25;
+    assert(pd_decode_party_mon_l(r, &pd_party_layout_elite_redux, &m) && !m.shiny);
+    r[0x17] = 0x04;
+    assert(pd_decode_party_mon_l(r, &pd_party_layout_elite_redux, &m) && m.shiny);
+    puts("PASS shiny marks (SoulGold value + modifier, R.O.W.E., Elite Redux bits, retail never)");
+}
+
 int main(int argc,char** argv) {
+    check_shiny();
     int permutation=0;
     for(int a=0;a<4;a++)for(int b=0;b<4;b++)for(int c=0;c<4;c++)for(int d=0;d<4;d++) {
         if(a==b||a==c||a==d||b==c||b==d||c==d)continue;

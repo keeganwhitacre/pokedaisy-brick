@@ -32,6 +32,7 @@ struct pd_mon {
     int moves[PD_NUM_MOVES];
     int pp[PD_NUM_MOVES];
     uint32_t personality;
+    bool shiny;       // only where the config reads it (pd_party_layout shiny*)
     // Optional live fields used by the native companions.
     bool hasExperience, hasHeldItem; // distinguish unavailable data from zero
     uint32_t experience;

@@ -58,6 +58,7 @@ const struct pd_party_layout pd_party_layout_soulgold = {
     .size = 96, .status = 0x4C, .level = 0x50, .hp = 0x52, .maxHp = 0x54, .flags = 0x15, .eggMask = 0x04,
     .plainBox = 0x20, .plainSpeciesMask = 0x07FF, .plainItemMask = 0x03FF, .hpBits = 16, .statusMask = 0xFFFFFFFFu,
     .hasStats = false, .natureModifier = true, .nicknameOff = 0x08, .nicknameLen = 12,
+    .shinyBelow = 256, .shinyModifier = 0x1F,
 };
 // Team Rocket Edition (Dragonsden): retail's struct, the flags in the language byte, no Mints.
 const struct pd_party_layout pd_party_layout_team_rocket = {
@@ -70,6 +71,7 @@ const struct pd_party_layout pd_party_layout_elite_redux = {
     .size = 0x4C, .status = 0x38, .level = 0x3C, .hp = 0x3E, .maxHp = 0x40, .flags = 0x15, .eggMask = 0x80,
     .plainBox = 0x20, .plainSpeciesMask = 0xFFFF, .plainItemMask = 0xFFFF, .hpBits = 16, .statusMask = 0xFFFFFFFFu,
     .hasStats = true, .nicknameOff = 0x26, .nicknameLen = 12, .eliteRedux = true,
+    .shinyBelow = 1, .shinyBits = 0x17, .shinyBitsMask = 0x0C,
 };
 // Emerald Rogue: vanilla's struct grown to 104 bytes (a RoguePartyMon tail).
 const struct pd_party_layout pd_party_layout_rogue = {
@@ -82,6 +84,7 @@ const struct pd_party_layout pd_party_layout_rowe = {
     .size = 0x4C, .status = 0x38, .level = 0x3C, .hp = 0x3E, .maxHp = 0x40, .flags = 0x27, .eggMask = 0x80,
     .plainBox = 0x20, .plainSpeciesMask = 0xFFFF, .plainItemMask = 0xFFFF, .hpBits = 16, .statusMask = 0xFFFFFFFFu,
     .hasStats = true, .nicknameOff = 0x08, .nicknameLen = 12, .rowe = true,
+    .shinyBelow = 1, .shinyBits = 0x29, .shinyBitsMask = 0x80,
 };
 #include "pd_configs_gen.h"
 
