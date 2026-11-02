@@ -151,6 +151,44 @@ static bool decode_rowe_mon(const uint8_t* raw, const struct pd_party_layout* l,
     return true;
 }
 
+// Elite Redux's bit-packed struct (Gen3Mon.kt decodeEliteReduxMon): species +0x10, moves in 11-bit fields, held item and
+// nature in +0x14; every IV is 31 but a Speed one of 0 where speedDown (+0x32 bit 5) is set.
+static bool decode_er_mon(const uint8_t* raw, const struct pd_party_layout* l, struct pd_mon* m) {
+    uint32_t w08 = u32(raw + 0x08), w0c = u32(raw + 0x0C), w10 = u32(raw + 0x10), w14 = u32(raw + 0x14);
+    int species = (int) (w10 & 0xFFFF);
+    if (species == 0) return false;
+    m->species = (uint16_t) species;
+    m->moves[0] = w08 & 0x7FF;
+    m->moves[1] = w0c & 0x7FF;
+    m->moves[2] = (w0c >> 11) & 0x7FF;
+    m->moves[3] = (w10 >> 16) & 0x7FF;
+    for (int i = 0; i < PD_NUM_MOVES; i++) m->pp[i] = raw[0x34 + i];
+    m->experience = (w08 >> 11) & 0x1FFFFF;
+    m->hasExperience = true;
+    m->heldItem = (int) (w14 & 0x3FF);
+    m->hasHeldItem = true;
+    bool speedDown = (raw[0x32] & 0x20) != 0;
+    for (int i = 0; i < 6; i++) {
+        m->stats.ivs[i] = (i == 3 && speedDown) ? 0 : 31;
+        m->stats.evs[i] = raw[0x18 + i];
+        m->stats.values[i] = u16(raw + l->maxHp + 2 * i);
+    }
+    m->stats.nature = (int) ((w14 >> 10) & 0x1F);
+    m->stats.valid = m->stats.hasIvs = m->stats.hasEvs = m->stats.hasNature = true;
+    m->stats.hasHiddenPower = true;
+    m->stats.hiddenPowerType = pd_hidden_power_type(&m->stats);
+    m->stats.hiddenPowerPower = pd_hidden_power_power(&m->stats);
+    m->personality = u32(raw);
+    m->level = raw[l->level];
+    m->hp = u16(raw + l->hp);
+    m->maxHp = u16(raw + l->maxHp);
+    m->status = u32(raw + l->status);
+    if ((w14 >> 15) & 1) m->species = PD_SPECIES_EGG;
+    decode_name(raw + l->nicknameOff, l->nicknameLen, m->nickname, sizeof(m->nickname));
+    m->gender = gender_of(m, m->personality);
+    return true;
+}
+
 // Android Gen3Mon.kt decodePartyMon: retail's encrypted, checksummed substructs first, else a
 // plaintext box (CFRU's: Unbound, Radical Red) at the layout's plainBox.
 bool pd_decode_party_mon_l(const uint8_t* raw, const struct pd_party_layout* l, struct pd_mon* m) {
@@ -163,6 +201,7 @@ bool pd_decode_party_mon_c(const uint8_t* raw, const struct pd_party_layout* l, 
     memset(m, 0, sizeof(*m));
     uint32_t personality = u32(raw);
     if (l->rowe) return decode_rowe_mon(raw, l, m);
+    if (l->eliteRedux) return decode_er_mon(raw, l, m);
     uint32_t key = personality ^ u32(raw + 4);
     uint16_t stored = u16(raw + 28);
 

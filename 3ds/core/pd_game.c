@@ -65,6 +65,12 @@ const struct pd_party_layout pd_party_layout_team_rocket = {
     .plainBox = 0x20, .plainSpeciesMask = 0xFFFF, .plainItemMask = 0xFFFF, .hpBits = 16, .statusMask = 0xFFFFFFFFu,
     .hasStats = true, .natureModifier = false, .nicknameOff = 0x08, .nicknameLen = 10,
 };
+// Elite Redux 2.65: 0x4C bytes, plaintext and bit-packed in its own order (Gen3Mon.kt decodeEliteReduxMon).
+const struct pd_party_layout pd_party_layout_elite_redux = {
+    .size = 0x4C, .status = 0x38, .level = 0x3C, .hp = 0x3E, .maxHp = 0x40, .flags = 0x15, .eggMask = 0x80,
+    .plainBox = 0x20, .plainSpeciesMask = 0xFFFF, .plainItemMask = 0xFFFF, .hpBits = 16, .statusMask = 0xFFFFFFFFu,
+    .hasStats = true, .nicknameOff = 0x26, .nicknameLen = 12, .eliteRedux = true,
+};
 // Emerald Rogue: vanilla's struct grown to 104 bytes (a RoguePartyMon tail).
 const struct pd_party_layout pd_party_layout_rogue = {
     .size = 104, .status = 0x50, .level = 0x54, .hp = 0x56, .maxHp = 0x58, .flags = 0x13, .eggMask = 0x04,
@@ -386,6 +392,10 @@ static const struct known_rom KNOWN_ROMS[] = {
      PD_GUIDE_NONE},
     {"7600af1fe08444c850c3c1227fd7dfd81336ae8e", &PD_CONFIG_EMERALD_ROGUE, PD_GAME_EMERALD, "Pokémon Emerald Rogue EX",
      PD_GUIDE_NONE},
+    {"2f3e17e55c6afe23da97ec0f96a067eeb142ad15", &PD_CONFIG_ELITE_REDUX_V2_65_4_1B, PD_GAME_FIRERED,
+     "Pokémon Elite Redux", PD_GUIDE_NONE},
+    {"5b38a681b6924ef3e0bb9f6cfbf22426c4c4e523", &PD_CONFIG_ELITE_REDUX_V2_65_3B, PD_GAME_FIRERED,
+     "Pokémon Elite Redux", PD_GUIDE_NONE},
     // Guessed: builds the app doesn't list, matched to the neighbour whose addresses they most plausibly share.
     {"411e9023cefae108e6cc28be493e3fd91e9aba6e", &PD_CONFIG_AMETHYST_V1_4_1, PD_GAME_FIRERED,
      "Pokémon Amethyst 1.4.3 (unverified)", PD_GUIDE_NONE},

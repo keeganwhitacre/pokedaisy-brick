@@ -20,6 +20,7 @@ SOULGOLD_PARTY_MON = '&pd_party_layout_soulgold'
 TEAM_ROCKET_PARTY_MON = '&pd_party_layout_team_rocket'
 ROWE_PARTY_MON = '&pd_party_layout_rowe'
 ROGUE_PARTY_MON = '&pd_party_layout_rogue'
+ELITE_REDUX_PARTY_MON = '&pd_party_layout_elite_redux'
 VANILLA_BATTLE_MON = '&pd_battle_layout_vanilla'
 EXPANSION_BATTLE_MON = '&pd_battle_layout_expansion'
 TMT2_BATTLE_MON = '&pd_battle_layout_tmt2'
@@ -458,6 +459,15 @@ name = 'EMERALD_ROGUE'
 parts = ['ram', 'foes', 'icons']
 set = { partyMonLayout = 'ROGUE_PARTY_MON' }
 
+# Elite Redux 2.65.3b / 2.65.4.1b: PARTY and BATTLE; its bag is a flag per item (not read yet).
+[config.elite_redux_v2_65_4_1b]
+name = 'ELITE_REDUX_V2_65_4_1B'
+parts = ['ram', 'foes', 'icons']
+
+[config.elite_redux_v2_65_3b]
+name = 'ELITE_REDUX_V2_65_3B'
+parts = ['ram', 'foes', 'icons']
+
 # A hack's own species / item / move names (the Kotlin val of the app's data/), as ActiveTables.kt picks them; a config
 # without a [text.*] reads retail's. Not here yet: Odyssey and the in-place FireRed hacks (Ultra Violet, Rocket Edition,
 # Ash Gray, Ghost Grey) - their names are retail's with a few runtime-merged renames.
@@ -750,3 +760,20 @@ moves = 'moveDataRogue'
 typeNames = 'typeNamesRogue'
 typeChart = 'typeEffectivenessRogue'
 speciesTypes = 'speciesTypeDataRogue'
+
+[text.elite_redux_v2_65_4_1b]
+species = 'speciesNamesEliteRedux'
+items = 'itemNamesEliteRedux'
+moves = 'moveDataEliteRedux'
+typeNames = 'typeNamesEliteRedux'
+typeChart = 'typeEffectivenessEliteRedux'
+speciesTypes = 'speciesTypeDataEliteRedux'
+
+# (2.65.3b's few differing names are not applied: its tables are 4.1b's.)
+[text.elite_redux_v2_65_3b]
+species = 'speciesNamesEliteRedux'
+items = 'itemNamesEliteRedux'
+moves = 'moveDataEliteRedux'
+typeNames = 'typeNamesEliteRedux'
+typeChart = 'typeEffectivenessEliteRedux'
+speciesTypes = 'speciesTypeDataEliteRedux'

@@ -49,9 +49,10 @@ struct pd_party_layout {
     bool natureModifier;    // expansion's Mints: +0x12's bits above the language are XORed into the nature
     int nicknameOff, nicknameLen;
     bool rowe;              // R.O.W.E.'s bit-packed struct (no substructs, no IVs, no held item)
+    bool eliteRedux;        // Elite Redux's bit-packed struct (no substructs; IVs all 31)
 };
 extern const struct pd_party_layout pd_party_layout_vanilla, pd_party_layout_quetzal, pd_party_layout_soulgold,
-    pd_party_layout_team_rocket, pd_party_layout_rowe, pd_party_layout_rogue;
+    pd_party_layout_team_rocket, pd_party_layout_rowe, pd_party_layout_rogue, pd_party_layout_elite_redux;
 
 // struct BattlePokemon's field offsets (the app's BattleMonLayout); a config without one is retail's.
 struct pd_battle_layout {
