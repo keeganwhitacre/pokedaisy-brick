@@ -48,6 +48,8 @@ static const struct want WANT[] = {
       { false, true, -1, "da68241d", false }, { true, true, -1, "fb5a508c", false }, { false, true, -1, "dc9b54be", true }),
     W("soulgold_v12_card_max", SOULGOLD_V1_2, PD_GAME_EMERALD, "Pokemon Soulgold (v1.2.1).gba",
       { false, true, -1, "da68241d", false }),
+    W("recharged_yellow_v197_card_max", RECHARGED_YELLOW_V1_9_7, PD_GAME_FIRERED, "Pokemon recharged-yellow_1.9.7.gba",
+      { false, true, -1, "a8c33291", false }, { true, true, -1, "797f2e18", false }),
     W("lazarus_card", LAZARUS, PD_GAME_EMERALD, "Pokemon Lazarus v2.0.gba",
       { false, true, -1, "4daa6af1", false }, { true, true, -1, "4c5a1651", false }, { false, true, -1, "cfef77a8", true }),
     W("lazarus_card_max", LAZARUS, PD_GAME_EMERALD, "Pokemon Lazarus v2.0.gba",
