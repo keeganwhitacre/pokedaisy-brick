@@ -389,3 +389,29 @@ change to any of the places listed under "Where it's decided" updates its rows h
   headless, as `unbound_battle`'s README describes).
 - The POKéMON switch for English LeafGreen and FireRed rev 0.
 - Battle buttons for Emerald Rogue; the POKéMON switch for Ruby / Sapphire (their party cursor lives in a sprite).
+
+## Linux / 3DS companion: tabs read per hack
+
+The Linux (and 3DS) companion reads each tab from the game's own data. For the ROM hacks it draws from the player's own ROM
+and save, so every row needs the exact build listed; any other build of the same hack shows the tab as unavailable rather
+than guessing. Checked: the DEX against the app's seen / caught sets for each fixture save, the CARD pixel for pixel
+against the app's recorded cards (`make -C 3ds test-card`), the GUIDE's boss teams read from the ROM (`make -C 3ds test-guide`).
+
+| Game | DEX | CARD | GUIDE |
+| ---- | :-: | :--: | :---: |
+| Unbound 2.1.1.1 (and the French fan translation) | ✅ | ✅ | — |
+| Lazarus | ✅ | ✅ | — |
+| Recharged Yellow 1.8.0 | ✅ | ✅ | — |
+| Recharged Yellow 1.9.x | ✅ | ◐ ²³ | — |
+| SoulGold | ✅ | ✅ | — |
+| Glazed, Imperium | ✅ | — ²⁴ | — |
+| Quetzal (Alpha 0.8.4 and 9.x, English and Spanish) | ✅ | — | — |
+| Rocket Edition, Ash Gray, GS Chronicles, Radical Red, Orange Islands | ✅ | — | ✅ |
+| Dreamstone Mysteries, Wishes of Tomorrow, R.O.W.E., Odyssey, Amethyst, Gaia, Heart and Soul, Seaglass, Too Many Types 2, Emerald Rogue (EX) | ✅ | — | — |
+| Celia's Stupid Romhack | ◐ ²⁵ | — | — |
+
+²³ Wired, but only the 1.8.0 card is checked; the lighter red and moved icon tables of 1.9.x have no ROM here to check against.
+²⁴ No reference render of their card exists to check against, so the tab stays off.
+²⁵ The dex probe the C reader uses (the first entry's category) does not match this ROM; whether the app's own check passes was not tested.
+
+Hacks that are not in the table have no DEX, CARD or GUIDE yet. The MAP tab on a hack shows nothing for now.
