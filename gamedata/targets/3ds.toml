@@ -220,3 +220,33 @@ records = { items = 'FIELD_ITEMS_PORTS_AXVE0' }
 name = 'SAPPHIRE_REV0'
 parts = ['ram', 'foes', 'icons', 'dex', 'guide', 'fly', 'field']
 records = { items = 'FIELD_ITEMS_PORTS_AXPE0' }
+
+# The retail-struct hacks whose ROMs aren't to hand: RAM-only (PARTY / BATTLE / foes, checked on the app's captured RAM);
+# the tabs that read the ROM (icons, POKéDEX, GUIDE, CARD, FLY) join once a ROM is there to check them against.
+[config.emerald_kaizo]
+name = 'EMERALD_KAIZO'
+parts = ['ram', 'foes']
+
+[config.glazed]
+name = 'GLAZED'
+parts = ['ram', 'foes']
+
+[config.celia]
+name = 'CELIA'
+parts = ['ram']
+
+[config.orange_islands]
+name = 'ORANGE_ISLANDS'
+parts = ['ram', 'foes']
+
+[config.ultra_violet]
+name = 'ULTRA_VIOLET'
+parts = ['ram', 'foes']
+
+[config.rocket_edition]
+name = 'ROCKET_EDITION'
+parts = ['ram', 'foes']
+
+[config.ash_gray]
+name = 'ASH_GRAY'
+parts = ['ram', 'foes']
