@@ -170,6 +170,12 @@ static const struct known_rom KNOWN_ROMS[] = {
      PD_GUIDE_NONE},
     {"932323d1fa3732d8673d1319fa86ed4df41087b9", &PD_CONFIG_SWORD_SHIELD, PD_GAME_FIRERED, "Pokémon Sword and Shield Ultimate Plus",
      PD_GUIDE_NONE},
+    {"964f951a0fdaf209e4ea1344883ef0d557bb3a80", &PD_CONFIG_RADICAL_RED, PD_GAME_FIRERED, "Pokémon Radical Red",
+     PD_GUIDE_NONE},
+    {"b4776b82a4c7915d0fadeaa27e013523f99dfd94", &PD_CONFIG_UNBOUND, PD_GAME_FIRERED, "Pokémon Unbound",
+     PD_GUIDE_NONE},
+    {"0ce2a880aa097f1dce4e1db8ee513d0e82d15859", &PD_CONFIG_UNBOUND_FR, PD_GAME_FIRERED, "Pokémon Unbound",
+     PD_GUIDE_NONE},
     {NULL, NULL, PD_GAME_NONE, NULL, PD_GUIDE_NONE},
 };
 

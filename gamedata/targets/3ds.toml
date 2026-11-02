@@ -280,3 +280,16 @@ parts = ['ram', 'foes']
 [config.ghost_grey]
 name = 'GHOST_GREY'
 parts = ['ram', 'foes']
+
+# CFRU (plaintext party boxes): Radical Red 4.1 (ROM checked: party icons, POKéDEX) and Unbound (RAM only, no ROM to hand).
+[config.radical_red_v4_1]
+name = 'RADICAL_RED'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.unbound_with_dex]
+name = 'UNBOUND'
+parts = ['ram', 'foes']
+
+[config.unbound_fr]
+name = 'UNBOUND_FR'
+parts = ['ram', 'foes']
