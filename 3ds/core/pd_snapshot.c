@@ -101,13 +101,20 @@ static void decode_name(const uint8_t* src, int maxLen, char* out, size_t outLen
 // GetMonGender: the personality's low byte against the species' ratio; and
 // DisplayPartyPokemonGender's rule that a Nidoran still named "NIDORAN♀" /
 // "NIDORAN♂" shows no mark (its name has one) - the app's withNativeGender.
-static enum pd_gender gender_of(const struct pd_mon* m, uint32_t personality) {
-    if (m->species == PD_SPECIES_EGG || m->species >= pd_gender_ratios_count) return PD_GENDER_NONE;
+// The ratio table is the game's own (its [text.*] genderRatios) where the config has one, else retail's.
+static enum pd_gender gender_of(const struct pd_config* cfg, const struct pd_mon* m, uint32_t personality) {
+    const uint8_t* ratios = pd_gender_ratios;
+    int count = pd_gender_ratios_count;
+    if (cfg && cfg->text && cfg->text->genderRatios) {
+        ratios = cfg->text->genderRatios;
+        count = cfg->text->genderRatiosCount;
+    }
+    if (m->species == PD_SPECIES_EGG || m->species >= count) return PD_GENDER_NONE;
     if ((m->species == 29 && !strcmp(m->nickname, "NIDORAN♀")) ||
         (m->species == 32 && !strcmp(m->nickname, "NIDORAN♂"))) {
         return PD_GENDER_NONE;
     }
-    int ratio = pd_gender_ratios[m->species];
+    int ratio = ratios[m->species];
     if (ratio == 255) return PD_GENDER_NONE;
     if (ratio == 0) return PD_GENDER_MALE;
     if (ratio == 254) return PD_GENDER_FEMALE;
@@ -119,7 +126,7 @@ bool pd_decode_party_mon(const uint8_t* raw, struct pd_mon* m) {
 }
 
 // R.O.W.E.'s bit-packed struct (Gen3Mon.kt decodeRoweMon): no held item, no IVs (stats recompute with 0).
-static bool decode_rowe_mon(const uint8_t* raw, const struct pd_party_layout* l, struct pd_mon* m) {
+static bool decode_rowe_mon(const uint8_t* raw, const struct pd_party_layout* l, const struct pd_config* cfg, struct pd_mon* m) {
     uint32_t personality = u32(raw), w14 = u32(raw + 0x14), w18 = u32(raw + 0x18);
     int species = (int) (u32(raw + 0x1C) & 0xFFF);
     if (species == 0) return false;
@@ -147,13 +154,13 @@ static bool decode_rowe_mon(const uint8_t* raw, const struct pd_party_layout* l,
     m->status = u32(raw + l->status);
     if (raw[l->flags] & l->eggMask) m->species = PD_SPECIES_EGG;
     decode_name(raw + l->nicknameOff, l->nicknameLen, m->nickname, sizeof(m->nickname));
-    m->gender = gender_of(m, personality);
+    m->gender = gender_of(cfg, m, personality);
     return true;
 }
 
 // Elite Redux's bit-packed struct (Gen3Mon.kt decodeEliteReduxMon): species +0x10, moves in 11-bit fields, held item and
 // nature in +0x14; every IV is 31 but a Speed one of 0 where speedDown (+0x32 bit 5) is set.
-static bool decode_er_mon(const uint8_t* raw, const struct pd_party_layout* l, struct pd_mon* m) {
+static bool decode_er_mon(const uint8_t* raw, const struct pd_party_layout* l, const struct pd_config* cfg, struct pd_mon* m) {
     uint32_t w08 = u32(raw + 0x08), w0c = u32(raw + 0x0C), w10 = u32(raw + 0x10), w14 = u32(raw + 0x14);
     int species = (int) (w10 & 0xFFFF);
     if (species == 0) return false;
@@ -185,7 +192,7 @@ static bool decode_er_mon(const uint8_t* raw, const struct pd_party_layout* l, s
     m->status = u32(raw + l->status);
     if ((w14 >> 15) & 1) m->species = PD_SPECIES_EGG;
     decode_name(raw + l->nicknameOff, l->nicknameLen, m->nickname, sizeof(m->nickname));
-    m->gender = gender_of(m, m->personality);
+    m->gender = gender_of(cfg, m, m->personality);
     return true;
 }
 
@@ -200,8 +207,8 @@ bool pd_decode_party_mon_c(const uint8_t* raw, const struct pd_party_layout* l, 
                            struct pd_mon* m) {
     memset(m, 0, sizeof(*m));
     uint32_t personality = u32(raw);
-    if (l->rowe) return decode_rowe_mon(raw, l, m);
-    if (l->eliteRedux) return decode_er_mon(raw, l, m);
+    if (l->rowe) return decode_rowe_mon(raw, l, cfg, m);
+    if (l->eliteRedux) return decode_er_mon(raw, l, cfg, m);
     uint32_t key = personality ^ u32(raw + 4);
     uint16_t stored = u16(raw + 28);
 
@@ -280,7 +287,7 @@ bool pd_decode_party_mon_c(const uint8_t* raw, const struct pd_party_layout* l, 
     // The flags byte (isBadEgg, hasSpecies, isEgg): an egg shows as SPECIES_EGG, like the party menu.
     if (l->eggInIvWord ? (ivWord >> 30) & 1 : (raw[l->flags] & l->eggMask) != 0) m->species = PD_SPECIES_EGG;
     decode_name(raw + l->nicknameOff, l->nicknameLen, m->nickname, sizeof(m->nickname));
-    m->gender = gender_of(m, personality);
+    m->gender = gender_of(cfg, m, personality);
     return true;
 }
 

@@ -6920,6 +6920,7 @@ const struct pd_text pd_text_gb_yellow = {
     .typeNames = pd_typeNamesYellow, .typeNamesCount = 27,
     .typeChart = pd_typeEffectivenessYellow, .typeChartCount = 82,
     .speciesTypes = pd_speciesTypeDataYellow, .speciesTypesCount = 152,
+    .genderRatios = 0, .genderRatiosCount = 0,
 };
 
 const struct pd_text pd_text_gb_pure_rgb = {
@@ -6929,6 +6930,7 @@ const struct pd_text pd_text_gb_pure_rgb = {
     .typeNames = pd_typeNamesPureRgb, .typeNamesCount = 27,
     .typeChart = pd_typeEffectivenessPureRgb, .typeChartCount = 107,
     .speciesTypes = pd_speciesTypeDataPureRgb, .speciesTypesCount = 152,
+    .genderRatios = 0, .genderRatiosCount = 0,
 };
 
 const struct pd_text pd_text_gb_crystal = {
@@ -6938,6 +6940,7 @@ const struct pd_text pd_text_gb_crystal = {
     .typeNames = pd_typeNamesCrystal, .typeNamesCount = 28,
     .typeChart = pd_typeEffectivenessCrystal, .typeChartCount = 110,
     .speciesTypes = pd_speciesTypeDataCrystal, .speciesTypesCount = 252,
+    .genderRatios = 0, .genderRatiosCount = 0,
 };
 
 const struct pd_text pd_text_gb_gold_silver = {
@@ -6947,6 +6950,7 @@ const struct pd_text pd_text_gb_gold_silver = {
     .typeNames = pd_typeNamesCrystal, .typeNamesCount = 28,
     .typeChart = pd_typeEffectivenessCrystal, .typeChartCount = 110,
     .speciesTypes = pd_speciesTypeDataCrystal, .speciesTypesCount = 252,
+    .genderRatios = 0, .genderRatiosCount = 0,
 };
 
 const struct pd_text pd_text_gb_crystal_clear = {
@@ -6956,6 +6960,7 @@ const struct pd_text pd_text_gb_crystal_clear = {
     .typeNames = pd_typeNamesCrystal, .typeNamesCount = 28,
     .typeChart = pd_typeEffectivenessCrystal, .typeChartCount = 110,
     .speciesTypes = pd_speciesTypeDataCrystal, .speciesTypesCount = 252,
+    .genderRatios = 0, .genderRatiosCount = 0,
 };
 
 const struct pd_text pd_text_gb_prism = {
@@ -6965,6 +6970,7 @@ const struct pd_text pd_text_gb_prism = {
     .typeNames = pd_typeNamesPrism, .typeNamesCount = 28,
     .typeChart = pd_typeEffectivenessPrism, .typeChartCount = 168,
     .speciesTypes = pd_speciesTypeDataPrism, .speciesTypesCount = 255,
+    .genderRatios = 0, .genderRatiosCount = 0,
 };
 
 const struct pd_text pd_text_gb_polished = {
@@ -6974,6 +6980,7 @@ const struct pd_text pd_text_gb_polished = {
     .typeNames = pd_typeNamesPolishedCrystal, .typeNamesCount = 18,
     .typeChart = pd_typeEffectivenessPolishedCrystal, .typeChartCount = 119,
     .speciesTypes = pd_speciesTypeDataPolishedCrystal, .speciesTypesCount = 338,
+    .genderRatios = 0, .genderRatiosCount = 0,
 };
 
 const struct pd_text pd_text_gb_polished_faithful = {
@@ -6983,6 +6990,7 @@ const struct pd_text pd_text_gb_polished_faithful = {
     .typeNames = pd_typeNamesPolishedCrystal, .typeNamesCount = 18,
     .typeChart = pd_typeEffectivenessPolishedCrystal, .typeChartCount = 119,
     .speciesTypes = pd_speciesTypeDataPolishedCrystal_speciesTypeDataPolishedCrystalFaithfulChanges, .speciesTypesCount = 338,
+    .genderRatios = 0, .genderRatiosCount = 0,
 };
 
 const uint16_t pd_gb_internal_to_dex_yellow[191] = {

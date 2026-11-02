@@ -32,6 +32,9 @@ struct pd_text {
     int typeChartCount;
     const uint8_t (*speciesTypes)[2];
     int speciesTypesCount;
+    // GetMonGender's ratio byte by species id (Gen 3 games); NULL = retail's pd_gender_ratios.
+    const uint8_t* genderRatios;
+    int genderRatiosCount;
 };
 
 struct pd_game;

@@ -577,36 +577,43 @@ species = 'speciesNamesGaia'
 species = 'speciesNamesSwordShield'
 items = 'itemNamesSwordShield'
 moves = 'moveDataSwordShield'
+genderRatios = 'genderRatiosSwordShield'
 
 [text.amethyst]
 species = 'speciesNamesAmethyst'
 items = 'itemNamesAmethyst'
 moves = 'moveDataAmethyst'
+genderRatios = 'genderRatiosAmethyst'
 
 [text.amethyst_v1_4_1]
 species = 'speciesNamesAmethystV141'
 items = 'itemNamesAmethystV141'
 moves = 'moveDataAmethyst'
+genderRatios = 'genderRatiosAmethystV141'
 
 [text.gs_chronicles]
 species = 'speciesNamesGsChronicles'
 items = 'itemNamesGsChronicles'
 moves = 'moveDataGsChronicles'
+genderRatios = 'genderRatiosGsChronicles'
 
 [text.radical_red_v4_1]
 species = 'speciesNamesRadicalRed'
 items = 'itemNamesRadicalRed'
 moves = 'moveDataRadicalRed'
+genderRatios = 'genderRatiosRadicalRed'
 
 [text.unbound_with_dex]
 species = 'speciesNamesUnbound'
 items = 'itemNamesUnbound'
 moves = 'moveDataUnbound'
+genderRatios = 'genderRatiosUnbound'
 
 [text.unbound_fr]
 species = 'speciesNamesUnbound'
 items = 'itemNamesUnbound'
 moves = 'moveDataUnbound'
+genderRatios = 'genderRatiosUnbound'
 
 [text.celia]
 species = 'speciesNamesCelia'
@@ -617,11 +624,13 @@ moves = 'moveDataCelia'
 species = 'speciesNamesGlazed'
 items = 'itemNamesGlazed'
 moves = 'moveDataGlazed'
+genderRatios = 'genderRatiosGlazed'
 
 [text.orange_islands]
 species = 'speciesNamesOrangeIslands'
 items = 'itemNamesOrangeIslands'
 moves = 'moveDataOrangeIslands'
+genderRatios = 'genderRatiosOrangeIslands'
 
 [text.imperium]
 species = 'speciesNamesImperium'
@@ -630,6 +639,7 @@ moves = 'moveDataImperium'
 typeNames = 'typeNamesImperium'
 typeChart = 'typeEffectivenessImperium'
 speciesTypes = 'speciesTypeDataImperium'
+genderRatios = 'genderRatiosImperium'
 
 [text.tmt2]
 species = 'speciesNamesTmt2'
@@ -666,6 +676,7 @@ moves = 'moveDataSeaglass'
 typeNames = 'typeNamesHns'
 typeChart = 'typeEffectivenessHns'
 speciesTypes = 'speciesTypeDataSeaglass'
+genderRatios = 'genderRatiosSeaglass'
 
 [text.lazarus]
 species = 'speciesNamesLazarus'
@@ -674,6 +685,7 @@ moves = 'moveDataLazarus'
 typeNames = 'typeNamesLazarus'
 typeChart = 'typeEffectivenessLazarus'
 speciesTypes = 'speciesTypeDataLazarus'
+genderRatios = 'genderRatiosLazarus'
 
 [text.wishes]
 species = 'speciesNamesWishes'
@@ -682,6 +694,7 @@ moves = 'moveDataWishes'
 typeNames = 'typeNamesWishes'
 typeChart = 'typeEffectivenessWishes'
 speciesTypes = 'speciesTypeDataWishes'
+genderRatios = 'genderRatiosWishes'
 
 [text.mariomon_v1_5_2]
 species = 'speciesNamesMariomon'
@@ -690,6 +703,7 @@ moves = 'moveDataMariomon'
 typeNames = 'typeNamesMariomon'
 typeChart = 'typeEffectivenessMariomon'
 speciesTypes = 'speciesTypeDataMariomon'
+genderRatios = 'genderRatiosMariomon'
 
 [text.mariomon_v1_5_1]
 species = 'speciesNamesMariomon'
@@ -698,6 +712,7 @@ moves = 'moveDataMariomon'
 typeNames = 'typeNamesMariomon'
 typeChart = 'typeEffectivenessMariomon'
 speciesTypes = 'speciesTypeDataMariomon'
+genderRatios = 'genderRatiosMariomon'
 
 [text.mariomon_v1_3]
 species = 'speciesNamesMariomonV13'
@@ -706,6 +721,7 @@ moves = 'moveDataMariomonV13'
 typeNames = 'typeNamesMariomon'
 typeChart = 'typeEffectivenessMariomon'
 speciesTypes = 'speciesTypeDataMariomonV13'
+genderRatios = 'genderRatiosMariomonV13'
 
 [text.mariomon_v1_2_2]
 species = 'speciesNamesMariomonV13'
@@ -714,6 +730,7 @@ moves = 'moveDataMariomonV13'
 typeNames = 'typeNamesMariomon'
 typeChart = 'typeEffectivenessMariomon'
 speciesTypes = 'speciesTypeDataMariomonV13'
+genderRatios = 'genderRatiosMariomonV13'
 
 [text.mariomon_v1_2_1]
 species = 'speciesNamesMariomonV13'
@@ -722,6 +739,7 @@ moves = 'moveDataMariomonV13'
 typeNames = 'typeNamesMariomon'
 typeChart = 'typeEffectivenessMariomon'
 speciesTypes = 'speciesTypeDataMariomonV13'
+genderRatios = 'genderRatiosMariomonV13'
 
 [text.rowe]
 species = 'speciesNamesRowe'
@@ -730,6 +748,7 @@ moves = 'moveDataRowe'
 typeNames = 'typeNamesRowe'
 typeChart = 'typeEffectivenessRowe'
 speciesTypes = 'speciesTypeDataRowe'
+genderRatios = 'genderRatiosRowe'
 
 [text.team_rocket]
 species = 'speciesNamesTeamRocket'
@@ -738,6 +757,7 @@ moves = 'moveDataTeamRocket'
 typeNames = 'typeNamesTeamRocket'
 typeChart = 'typeEffectivenessTeamRocket'
 speciesTypes = 'speciesTypeDataTeamRocket'
+genderRatios = 'genderRatiosTeamRocket'
 
 [text.dreamstone]
 species = 'speciesNamesDreamstone'
@@ -746,6 +766,7 @@ moves = 'moveDataDreamstone'
 typeNames = 'typeNamesDreamstone'
 typeChart = 'typeEffectivenessDreamstone'
 speciesTypes = 'speciesTypeDataDreamstone'
+genderRatios = 'genderRatiosDreamstone'
 
 [text.soulgold]
 species = 'speciesNamesSoulGold'
@@ -754,6 +775,7 @@ moves = 'moveDataSoulGold'
 typeNames = 'typeNamesSoulGold'
 typeChart = 'typeEffectivenessSoulGold'
 speciesTypes = 'speciesTypeDataSoulGold'
+genderRatios = 'genderRatiosSoulGold'
 
 [text.soulgold_v1_2]
 species = 'speciesNamesSoulGold'
@@ -762,6 +784,7 @@ moves = 'moveDataSoulGold'
 typeNames = 'typeNamesSoulGold'
 typeChart = 'typeEffectivenessSoulGold'
 speciesTypes = 'speciesTypeDataSoulGold'
+genderRatios = 'genderRatiosSoulGold'
 
 [text.soulgold_v1_2b]
 species = 'speciesNamesSoulGold'
@@ -770,6 +793,7 @@ moves = 'moveDataSoulGold'
 typeNames = 'typeNamesSoulGold'
 typeChart = 'typeEffectivenessSoulGold'
 speciesTypes = 'speciesTypeDataSoulGold'
+genderRatios = 'genderRatiosSoulGold'
 
 [text.soulgold_v1_2c]
 species = 'speciesNamesSoulGold'
@@ -778,6 +802,7 @@ moves = 'moveDataSoulGold'
 typeNames = 'typeNamesSoulGold'
 typeChart = 'typeEffectivenessSoulGold'
 speciesTypes = 'speciesTypeDataSoulGold'
+genderRatios = 'genderRatiosSoulGold'
 
 [text.heart_and_soul]
 species = 'speciesNamesHns'
@@ -786,6 +811,7 @@ moves = 'moveDataHns'
 typeNames = 'typeNamesHns'
 typeChart = 'typeEffectivenessHns'
 speciesTypes = 'speciesTypeDataHns'
+genderRatios = 'genderRatiosHns'
 
 [text.quetzal]
 species = 'speciesNamesQuetzal'
@@ -794,6 +820,7 @@ moves = 'moveDataQuetzal'
 typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
+genderRatios = 'genderRatiosQuetzal'
 
 [text.quetzal_es]
 species = 'speciesNamesQuetzal + speciesNamesQuetzalEs'
@@ -802,6 +829,7 @@ moves = 'moveDataQuetzal'
 typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
+genderRatios = 'genderRatiosQuetzal'
 
 [text.quetzal_v1]
 species = 'speciesNamesQuetzal'
@@ -810,6 +838,7 @@ moves = 'moveDataQuetzal'
 typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
+genderRatios = 'genderRatiosQuetzal'
 
 [text.quetzal_es_v1]
 species = 'speciesNamesQuetzal + speciesNamesQuetzalEs'
@@ -818,6 +847,7 @@ moves = 'moveDataQuetzal'
 typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
+genderRatios = 'genderRatiosQuetzal'
 
 [text.quetzal_v084]
 species = 'speciesNamesQuetzal'
@@ -826,6 +856,7 @@ moves = 'moveDataQuetzal + moveDataQuetzalV084Changes'
 typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
+genderRatios = 'genderRatiosQuetzal'
 
 [text.quetzal_v084_es]
 species = 'speciesNamesQuetzal + speciesNamesQuetzalEs'
@@ -834,6 +865,7 @@ moves = 'moveDataQuetzal + moveDataQuetzalV084Changes'
 typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
+genderRatios = 'genderRatiosQuetzal'
 
 [text.quetzal_moemon_v084]
 species = 'speciesNamesQuetzal'
@@ -842,6 +874,7 @@ moves = 'moveDataQuetzal + moveDataQuetzalV084Changes'
 typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
+genderRatios = 'genderRatiosQuetzal'
 
 [text.quetzal_moemon_v084_es]
 species = 'speciesNamesQuetzal + speciesNamesQuetzalEs'
@@ -850,6 +883,7 @@ moves = 'moveDataQuetzal + moveDataQuetzalV084Changes'
 typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
+genderRatios = 'genderRatiosQuetzal'
 
 [text.emerald_rogue]
 species = 'speciesNamesRogue'
@@ -866,6 +900,7 @@ moves = 'moveDataEliteRedux'
 typeNames = 'typeNamesEliteRedux'
 typeChart = 'typeEffectivenessEliteRedux'
 speciesTypes = 'speciesTypeDataEliteRedux'
+genderRatios = 'genderRatiosEliteRedux'
 
 # (2.65.3b's few differing names are not applied: its tables are 4.1b's.)
 [text.elite_redux_v2_65_3b]
@@ -875,6 +910,7 @@ moves = 'moveDataEliteRedux'
 typeNames = 'typeNamesEliteRedux'
 typeChart = 'typeEffectivenessEliteRedux'
 speciesTypes = 'speciesTypeDataEliteRedux'
+genderRatios = 'genderRatiosEliteRedux'
 
 # FireRed hacks edited in place: their own names and types over retail's (Ash Gray's few renames in capitals, like the game).
 [text.ash_gray]
@@ -884,6 +920,7 @@ moves = 'UPPER moveData + fireRedHackAshGray.moves'
 typeNames = 'typeNames + fireRedHackAshGray.typeNames'
 typeChart = 'typeEffectiveness + fireRedHackAshGray.typeChart'
 speciesTypes = 'speciesTypeData + fireRedHackAshGray.types'
+genderRatios = 'fireRedHackAshGray.genderRatios'
 
 [text.rocket_edition]
 species = 'fireRedHackRocketEdition.species'
@@ -900,6 +937,7 @@ moves = 'fireRedHackGhostGrey.moves'
 typeNames = 'typeNames + fireRedHackGhostGrey.typeNames'
 typeChart = 'typeEffectiveness + fireRedHackGhostGrey.typeChart'
 speciesTypes = 'speciesTypeData + fireRedHackGhostGrey.types'
+genderRatios = 'fireRedHackGhostGrey.genderRatios'
 
 [text.odyssey]
 species = 'fireRedHackOdyssey.species'
@@ -908,6 +946,7 @@ moves = 'fireRedHackOdyssey.moves'
 typeNames = 'typeNames + fireRedHackOdyssey.typeNames'
 typeChart = 'typeEffectiveness + fireRedHackOdyssey.typeChart'
 speciesTypes = 'speciesTypeData + fireRedHackOdyssey.types'
+genderRatios = 'genderRatiosOdyssey'
 
 [text.ultra_violet]
 species = 'UPPER speciesNames + speciesNamesUltraViolet'
