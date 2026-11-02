@@ -418,4 +418,4 @@ against the app's recorded cards (`make -C 3ds test-card`), the GUIDE's boss tea
 
 ²⁶ Boss teams with several difficulties (Unbound's four, Odyssey's NORMAL / HARD) show one section per team. Unbound has no learnset table here, so a VANILLA team's moves are blank. The guide's left out for hacks whose bosses are built by Kotlin helpers or lambdas (Amethyst, Gaia, Ghost Grey, Celia, SoulGold, Imperium, Quetzal, Recharged Emerald / Yellow).
 
-Hacks that are not in the table have no DEX, CARD or GUIDE yet. The MAP tab on a hack shows nothing for now.
+Hacks that are not in the table have no DEX, CARD or GUIDE yet. The MAP tab draws a hack's region map only where the ROM's art is found (Radical Red, Rocket Edition, Recharged Yellow, Ultra Violet, Kaizo, Emerald Legacy, Quetzal, Emerald Rogue, Too Many Types 2); elsewhere it says "NO MAP".
