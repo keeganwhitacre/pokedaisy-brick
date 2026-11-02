@@ -115,6 +115,8 @@ struct pd_snapshot {
     // game's encoding, 0xFF-ended), ID and play time; the game stats decrypted;
     // Emerald's museum paintings (each winner's species) and battle points.
     bool cardOk;
+    uint8_t achievements[16]; // SaveBlock1 + achievementBitsOff; achievementsOn = its magic (if it has one) reads 0xACE1
+    bool achievementsOn;
     uint8_t cardMagic; // SaveBlock2 + cardMagicOff
     uint8_t playerName[8];
     uint16_t trainerId, playHours;

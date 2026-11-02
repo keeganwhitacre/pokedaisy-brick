@@ -43,6 +43,8 @@ BLOBS = [
     "LZ_CARD_BADGES_PAL", "LZ_CARD_BADGES_GFX",
     "LZ_PIC_MALE", "LZ_PIC_MALE_PAL", "LZ_PIC_FEMALE", "LZ_PIC_FEMALE_PAL",
     "LZ_FONT_NORMAL", "LZ_FONT_NORMAL_WIDTHS",
+    # Recharged Yellow's card (TrainerCardArt.kt RECHARGED_YELLOW): FireRed's with its own pics and font.
+    "RY_PIC_MALE", "RY_PIC_MALE_PAL", "RY_PIC_FEMALE", "RY_PIC_FEMALE_PAL", "RY_FONT_NORMAL", "RY_FONT_NORMAL_WIDTHS",
 ]
 
 # Regional dexes the card counts (TrainerCard.kt), by name: written as pd_card_dex_<lower>[].

@@ -46,6 +46,45 @@ static int capped(const struct pd_snapshot* s, int stat, uint32_t max) {
     return (int) (v < max ? v : max);
 }
 
+static bool is_kanto(int style);
+static void palette(const uint8_t* b, int colours, uint32_t* out);
+
+static bool ry_style(int style) {
+    return style == PD_CARD_RECHARGED_YELLOW || style == PD_CARD_RECHARGED_YELLOW_V1_9;
+}
+
+// Recharged Yellow's LoadMonIconGfx (TrainerCard.kt cardIcon): mail is the var's species (30000 + letter = an UNOWN
+// form, past 412 the "?" icon); the first frame's 16 tiles and the sprite palette, tinted (1 black, 2 pink, 3 sepia).
+static void card_icon(const struct pd_game* g, int mail, int tint, struct pd_card_icon* out) {
+    out->ok = false;
+    if (mail == 0) return;
+    int species = mail - 30000 >= 0 && mail - 30000 <= 27 ? (mail == 30000 ? 201 : 412 + (mail - 30000)) : mail > 412 ? 260 : mail;
+    const struct pd_config* cfg = g->cfg;
+    uint32_t tp, pp;
+    if (!pd_rom_read(g, cfg->cardIconTable + 4u * (uint32_t) species, &tp, 4) ||
+        !pd_rom_read(g, cfg->cardPaletteTable + 8u * (uint32_t) species, &pp, 4)) return;
+    const uint8_t* tiles = pd_rom_at(g, tp, 0x200);
+    const uint8_t* packed = pd_rom_at(g, pp, 0x40);
+    uint8_t raw[32];
+    if (!tiles || !packed || pd_lz77(packed, 0x40, raw, 32) != 32) return;
+    static const int tones[4][3] = { { 0, 0, 0 }, { 0, 0, 0 }, { 500, 330, 310 }, { 307, 256, 240 } };
+    uint8_t tinted[32];
+    for (int i = 0; i < 16; i++) {
+        int v = raw[2 * i] | raw[2 * i + 1] << 8;
+        if (tint >= 1 && tint <= 3) {
+            int gray = ((v & 31) * 76 + (v >> 5 & 31) * 151 + (v >> 10 & 31) * 29) >> 8;
+            int r = ((tones[tint][0] * gray) & 0xFFFF) >> 8, gg = ((tones[tint][1] * gray) & 0xFFFF) >> 8;
+            int b = ((tones[tint][2] * gray) & 0xFFFF) >> 8;
+            v = (r < 31 ? r : 31) | (tint == 3 ? gg : gg < 31 ? gg : 31) << 5 | (tint == 3 ? b : b < 31 ? b : 31) << 10;
+        }
+        tinted[2 * i] = (uint8_t) v;
+        tinted[2 * i + 1] = (uint8_t) (v >> 8);
+    }
+    memcpy(out->tiles, tiles, 0x200);
+    palette(tinted, 16, out->pal);
+    out->ok = true;
+}
+
 bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct pd_card_info* c) {
     const struct pd_config* cfg = g->cfg;
     memset(c, 0, sizeof(*c));
@@ -62,7 +101,7 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
     c->money = s->money >= 0 ? s->money : 0;
 
     // The magic is read where the card's own record says (Lazarus keeps it at +0x1E, the dex's table says +0x1A).
-    bool national = s->dexOk && (cfg->nationalMagicOff < 0 ||
+    bool national = s->dexOk && (cfg->nationalFlagOnly ? pd_flag(s, cfg->nationalFlag) : cfg->nationalMagicOff < 0 ||
         (s->cardMagic == cfg->nationalMagic && pd_var(s, cfg->nationalVar) == cfg->nationalVarValue &&
          pd_flag(s, cfg->nationalFlag)));
     int caught = 0;
@@ -94,8 +133,11 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
         for (int i = 0; i < pd_card_lazarus_regional_to_national_count && allHoenn; i++)
             allHoenn = pd_dex_caught(s, pd_card_lazarus_regional_to_national[i]);
         allHoenn = allHoenn && s->dexStray;
+    } else if (is_kanto(cfg->cardStyle) || cfg->cardStyle == PD_CARD_RECHARGED_YELLOW ||
+               cfg->cardStyle == PD_CARD_RECHARGED_YELLOW_V1_9) { // Kanto's 151, less the last allRegionalDrop
+        for (int n = 1; n <= 151 - cfg->allRegionalDrop && allHoenn; n++) allHoenn = pd_dex_caught(s, n);
     } else {
-        for (int i = 0; i < 200 && allHoenn; i++) allHoenn = pd_dex_caught(s, HOENN_TO_NATIONAL[i]);
+        for (int i = 0; i < 202 - cfg->allRegionalDrop && allHoenn; i++) allHoenn = pd_dex_caught(s, HOENN_TO_NATIONAL[i]);
     }
     // Legacy's regional dex runs 210 (Hoenn's 202, JIRACHI and DEOXYS still left out of "all", then eight more).
     for (int i = 0; i < 8 && allHoenn && cfg->cardStyle == PD_CARD_LEGACY; i++) allHoenn = pd_dex_caught(s, LEGACY_EXTRA[i]);
@@ -114,22 +156,32 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
         }
         c->stars += symbols;
     }
+    if (ry_style(cfg->cardStyle)) {
+        // Recharged Yellow: every one of its 37 achievements, and 1-248 + 252-384 caught.
+        bool all = s->achievementsOn;
+        for (int i = 0; i < cfg->achievementsNeeded && all; i++) all = s->achievements[i / 8] >> (i % 8) & 1;
+        c->stars += all;
+        all = true;
+        for (int n = 1; n <= 384 && all; n++) all = (n >= 249 && n <= 251) || pd_dex_caught(s, n);
+        c->stars += all;
+    }
     c->drawnStars = c->stars;
     // Lazarus draws stars by a rule of its own (0x082288B0): the HALL OF FAME, flags 0x29 and 0x4A6, the symbols.
     if (cfg->cardStyle == PD_CARD_LAZARUS) {
         c->drawnStars = (s->gameStats[STAT_ENTERED_HOF] != 0) + pd_flag(s, 0x29) + pd_flag(s, 0x4A6) + symbols;
     }
 
-    bool hoenn = cfg->cardStyle != PD_CARD_KANTO && cfg->cardStyle != PD_CARD_UNBOUND;
+    bool hoenn = !is_kanto(cfg->cardStyle) && !ry_style(cfg->cardStyle);
     c->linkWins = capped(s, STAT_LINK_BATTLE_WINS, 9999);
     c->linkLosses = capped(s, STAT_LINK_BATTLE_LOSSES, 9999);
     c->trades = capped(s, STAT_POKEMON_TRADES, 0xFFFF);
-    c->unionRoom = hoenn ? 0 : capped(s, STAT_UNION_ROOM_BATTLES, 0xFFFF);
-    c->berryCrush = hoenn ? 0 : capped(s, STAT_BERRY_CRUSH_POINTS, 0xFFFF);
+    c->unionRoom = hoenn || !cfg->linkLines ? 0 : capped(s, STAT_UNION_ROOM_BATTLES, 0xFFFF);
+    c->berryCrush = hoenn || !cfg->linkLines ? 0 : capped(s, STAT_BERRY_CRUSH_POINTS, 0xFFFF);
     c->linkContests = hoenn ? capped(s, STAT_WON_LINK_CONTEST, 999) : 0;
     c->linkPokeblocks = hoenn ? capped(s, STAT_POKEBLOCKS_WITH_FRIENDS, 0xFFFF) : 0;
     c->battlePoints = cfg->frontierBpOff ? s->battlePoints : 0;
     for (int i = 0; cfg->stickerVar && i < 3; i++) c->stickers[i] = pd_var(s, cfg->stickerVar + i);
+    for (int i = 0; cfg->iconVar > 0 && cfg->cardIconTable && i < 6; i++) card_icon(g, pd_var(s, cfg->iconVar + i), pd_var(s, cfg->tintVar), &c->icons[i]);
     return true;
 }
 
@@ -169,6 +221,18 @@ static const struct blobs UNBOUND = {
     PD_UB_PIC_MALE, PD_UB_PIC_MALE_PAL, PD_UB_PIC_FEMALE, PD_UB_PIC_FEMALE_PAL,
     PD_FR_FONT_NORMAL, PD_FR_FONT_NORMAL_WIDTHS,
     { -1, -1, -1, -1, -1 },
+};
+
+// Recharged Yellow: FireRed's card byte for byte with its own pics and FONT_NORMAL; its stickers' palettes are
+// FireRed's first three, the fourth brag level reusing the third.
+static const struct blobs RECHARGED_YELLOW = {
+    PD_FR_CARD_GFX, PD_FR_CARD_FRONT, PD_FR_CARD_BACK, PD_FR_CARD_BG,
+    { PD_FR_CARD_PAL0, PD_FR_CARD_PAL1, PD_FR_CARD_PAL2, PD_FR_CARD_PAL3, PD_FR_CARD_PAL4, -1 },
+    PD_FR_CARD_FEMALE_PAL, PD_FR_CARD_BADGES_PAL, PD_FR_CARD_BADGES_GFX,
+    PD_RY_PIC_MALE, PD_RY_PIC_MALE_PAL, PD_RY_PIC_FEMALE, PD_RY_PIC_FEMALE_PAL,
+    PD_RY_FONT_NORMAL, PD_RY_FONT_NORMAL_WIDTHS,
+    { PD_FR_CARD_STICKERS_GFX, PD_FR_CARD_STICKER_PAL1, PD_FR_CARD_STICKER_PAL2, PD_FR_CARD_STICKER_PAL3,
+      PD_FR_CARD_STICKER_PAL3 },
 };
 
 // Lazarus (TrainerCardArt.kt LAZARUS): its own tiles, tilemaps, 0- and 1-star palettes, badges, pics and font; the
@@ -232,17 +296,22 @@ static uint32_t unbound_purple(uint32_t argb) {
 }
 
 static bool is_kanto(int style) {
-    return style == PD_CARD_KANTO || style == PD_CARD_UNBOUND;
+    return style == PD_CARD_KANTO || style == PD_CARD_UNBOUND || style == PD_CARD_RECHARGED_YELLOW ||
+        style == PD_CARD_RECHARGED_YELLOW_V1_9;
 }
+
+enum { COLS_ALL, COLS_NARROW, COLS_WIDTH };
 
 struct layout {
     int textW, glyphH, pad, starY, badgeY, picX, picY;
-    bool narrowLeft; // only the left 8 columns of a glyph no wider than 8 (expansion's DecompressGlyph)
+    int cols;        // which of a glyph's 16 columns are drawn: COLS_ALL, COLS_NARROW (the left 8 of a glyph no wider than 8,
+                     // expansion's DecompressGlyph) or COLS_WIDTH (its width)
     int starPal;     // the stars' BG palette
 };
-static const struct layout KANTO_LAYOUT = { 27 * 8, 14, 0x00, 7, 16, 13, 4, false, 4 };
-static const struct layout HOENN_LAYOUT = { 28 * 8, 16, 0x77, 7, 15, 1, 0, false, 4 };
-static const struct layout LAZARUS_LAYOUT = { 28 * 8, 15, 0x77, 7, 15, 1, 0, true, 1 };
+static const struct layout KANTO_LAYOUT = { 27 * 8, 14, 0x00, 7, 16, 13, 4, COLS_ALL, 4 };
+static const struct layout HOENN_LAYOUT = { 28 * 8, 16, 0x77, 7, 15, 1, 0, COLS_ALL, 4 };
+static const struct layout LAZARUS_LAYOUT = { 28 * 8, 15, 0x77, 7, 15, 1, 0, COLS_NARROW, 1 };
+static const struct layout RY_LAYOUT = { 27 * 8, 14, 0x00, 7, 16, 13, 4, COLS_WIDTH, 4 };
 
 #define TEXT 0xFF636363u
 #define TEXT_SHADOW 0xFFD6D6CEu
@@ -379,7 +448,8 @@ static void print(const struct art* a, const struct blobs* b, int x0, int y, con
     int x = x0;
     for (int i = 0; i < s->n; i++) {
         int g = s->c[i];
-        int cols = a->lay->narrowLeft && a->d[b->widths][g] <= 8 ? 8 : 16;
+        int w = a->d[b->widths][g];
+        int cols = a->lay->cols == COLS_NARROW ? (w <= 8 ? 8 : 16) : a->lay->cols == COLS_WIDTH ? (w < 16 ? w : 16) : 16;
         for (int py = 0; py < a->lay->glyphH; py++) {
             for (int px = 0; px < cols; px++) {
                 int wx = x + px, wy = y + py;
@@ -496,6 +566,77 @@ static void kanto_text(const struct art* a, const struct blobs* b, const struct 
     }
 }
 
+#define RY19_STAT 0xFFE75252u
+
+// Recharged Yellow's text (TrainerCardArt.rechargedYellowText): its own labels and edges; red is the stat colour.
+static void ry_text(const struct art* a, const struct blobs* b, const struct pd_card_info* c, bool back, bool colon,
+                    uint32_t red) {
+    struct str s, t;
+#define RIGHT_EDGE(edge, str) ((((edge) - width(a, b, &(str))) > 0 ? (edge) - width(a, b, &(str)) : 0) & 0xFF)
+    if (!back) {
+        s = enc("Name: ");
+        t = name_of(c);
+        cat(&s, &t);
+        say(a, b, 20, 28, &s);
+        s = enc("IDNo.");
+        t = digits(c->trainerId, 5, LEADING_ZEROS, 0);
+        cat(&s, &t);
+        int idx = (80 - width(a, b, &s)) / 2;
+        say(a, b, ((idx > 0 ? idx : 0) + 132) & 0xFF, 9, &s);
+        s = enc("Money");
+        say(a, b, 20, 56, &s);
+        struct str money = enc("¥");
+        t = digits((int) c->money, 7, LEFT, 0);
+        cat(&money, &t);
+        say(a, b, RIGHT_EDGE(144, money), 56, &money);
+        if (c->dexCaught >= 0) {
+            s = enc("Pokédex");
+            say(a, b, 20, 72, &s);
+            t = digits(c->dexCaught, 3, LEFT, 0);
+            say(a, b, RIGHT_EDGE(144, t), 72, &t);
+        }
+        s = enc("Time");
+        say(a, b, 20, 88, &s);
+        struct str colonStr = enc(":");
+        int colonW = width(a, b, &colonStr);
+        int x = 144 - (colonW + 30);
+        t = digits(c->hours, 3, RIGHT, 0x00);
+        say(a, b, x & 0xFF, 88, &t);
+        if (colon) say(a, b, (x + 18) & 0xFF, 88, &colonStr);
+        t = digits(c->minutes, 2, LEADING_ZEROS, 0);
+        say(a, b, (x + 18 + colonW) & 0xFF, 88, &t);
+        return;
+    }
+    t = name_of(c);
+    say(a, b, 136, 9, &t);
+    if (c->hofDebut) {
+        s = enc("Hall of Fame debut  ");
+        say(a, b, 8, 33, &s);
+        t = hof_time(c->hofDebut, 0x00);
+        print(a, b, RIGHT_EDGE(216, t), 33, &t, red, STAT_SHADOW);
+    }
+    if (c->linkWins || c->linkLosses) {
+        struct str parts[4] = { enc("W:"), digits(c->linkWins, 4, LEFT, 0), enc("  L:"), digits(c->linkLosses, 4, LEFT, 0) };
+        struct str all = { 0 };
+        for (int i = 0; i < 4; i++) cat(&all, &parts[i]);
+        s = enc("Lik battles");
+        say(a, b, 8, 49, &s);
+        int x = RIGHT_EDGE(216, all);
+        for (int i = 0; i < 4; i++) {
+            if (i & 1) print(a, b, x, 49, &parts[i], red, STAT_SHADOW);
+            else say(a, b, x, 49, &parts[i]);
+            x += width(a, b, &parts[i]);
+        }
+    }
+    if (c->trades) {
+        s = enc("Pokémon Trades");
+        say(a, b, 8, 2 * 16 + 33, &s);
+        t = digits(c->trades, 5, RIGHT, 0x00);
+        print(a, b, RIGHT_EDGE(216, t), 2 * 16 + 33, &t, red, STAT_SHADOW);
+    }
+#undef RIGHT_EDGE
+}
+
 // PrintStatOnBackOfCard: the label at x 16, the value right-aligned to 216, a row every 16 px.
 static void hoenn_stat(const struct art* a, const struct blobs* b, int row, const struct str* label,
                        const struct str* value) {
@@ -605,11 +746,12 @@ static void hoenn_text(const struct art* a, const struct blobs* b, const struct 
 bool pd_card_render(const struct pd_game* g, const struct pd_card_info* c, bool back, bool colon, bool backdrop,
                     uint32_t* img) {
     bool kanto = is_kanto(c->style);
-    const struct blobs* b = c->style == PD_CARD_UNBOUND ? &UNBOUND : kanto ? &KANTO :
+    bool ry = ry_style(c->style);
+    const struct blobs* b = c->style == PD_CARD_UNBOUND ? &UNBOUND : ry ? &RECHARGED_YELLOW : kanto ? &KANTO :
         c->style == PD_CARD_LEGACY ? &LEGACY : c->style == PD_CARD_LAZARUS ? &LAZARUS : &HOENN;
-    struct art a = { .img = img, .lay = kanto ? &KANTO_LAYOUT : c->style == PD_CARD_LAZARUS ? &LAZARUS_LAYOUT : &HOENN_LAYOUT };
+    struct art a = { .img = img, .lay = ry ? &RY_LAYOUT : kanto ? &KANTO_LAYOUT : c->style == PD_CARD_LAZARUS ? &LAZARUS_LAYOUT : &HOENN_LAYOUT };
     if (c->style != PD_CARD_KANTO && c->style != PD_CARD_HOENN && c->style != PD_CARD_LEGACY && c->style != PD_CARD_UNBOUND &&
-        c->style != PD_CARD_LAZARUS) return false;
+        c->style != PD_CARD_LAZARUS && !ry) return false;
     // Every blob the card needs, or no card.
     const int need[] = {
         b->gfx, b->front, b->back, b->bg, b->pals[0], b->pals[1], b->pals[2], b->pals[3], b->pals[4], b->pals[5],
@@ -667,7 +809,7 @@ bool pd_card_render(const struct pd_game* g, const struct pd_card_info* c, bool 
         pic(img, a.d[c->female ? b->picFemale : b->picMale], picPal, a.lay);
     } else if (kanto) {
         // DrawCardBackStats: a little marker beside each FireRed stat line that has a count.
-        const int marks[3][3] = { { c->trades, 26, 9 }, { c->berryCrush, 21, 13 }, { c->unionRoom, 27, 11 } };
+        const int marks[3][3] = { { c->trades, ry ? 27 : 26, 9 }, { c->berryCrush, 21, 13 }, { c->unionRoom, 27, 11 } };
         for (int i = 0; i < 3; i++) {
             if (!marks[i][0]) continue;
             tile(img, bg3, sizeof(bg3), pal, 1 << 12 | 141, marks[i][1], marks[i][2]);
@@ -684,6 +826,11 @@ bool pd_card_render(const struct pd_game* g, const struct pd_card_info* c, bool 
                      2 + k / 2);
             }
         }
+        // Recharged Yellow's PrintPokemonIconsOnCard: icon i, 4x4 tiles at (3 + 4i, 15), in its own colours.
+        for (int i = 0; i < 6; i++) {
+            if (!c->icons[i].ok) continue;
+            for (int k = 0; k < 16; k++) tile(img, c->icons[i].tiles, 0x200, c->icons[i].pal, k, 3 + 4 * i + k % 4, 15 + k / 4);
+        }
     } else {
         // Emerald's DrawCardBackStats (palette 0).
         const int marks[2][3] = { { c->trades, 27, 9 }, { c->linkContests, 27, 13 } };
@@ -694,7 +841,8 @@ bool pd_card_render(const struct pd_game* g, const struct pd_card_info* c, bool 
         }
     }
     // BG1: the text.
-    if (kanto) kanto_text(&a, b, c, back, colon);
+    if (ry) ry_text(&a, b, c, back, colon, c->style == PD_CARD_RECHARGED_YELLOW_V1_9 ? RY19_STAT : STAT);
+    else if (kanto) kanto_text(&a, b, c, back, colon);
     else hoenn_text(&a, b, c, back, colon);
     return true;
 }

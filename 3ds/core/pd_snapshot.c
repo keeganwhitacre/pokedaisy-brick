@@ -469,6 +469,12 @@ static void read_card_fields(struct pd_snapshot* s, const struct pd_config* cfg,
         if (!read(ctx, sb2 + cfg->frontierBpOff, bp, 2)) return;
         s->battlePoints = u16(bp);
     }
+    if (cfg->achievementBitsOff) {
+        uint8_t magic[2] = { 0xE1, 0xAC };
+        if (!read(ctx, sb1 + cfg->achievementBitsOff, s->achievements, sizeof s->achievements)) return;
+        if (cfg->achievementMagicOff && !read(ctx, sb1 + cfg->achievementMagicOff, magic, 2)) return;
+        s->achievementsOn = u16(magic) == 0xACE1;
+    }
     if (cfg->cardMagicOff && !read(ctx, sb2 + cfg->cardMagicOff, &s->cardMagic, 1)) return;
     s->cardOk = true;
 }
