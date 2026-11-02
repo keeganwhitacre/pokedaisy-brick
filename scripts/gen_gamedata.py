@@ -623,6 +623,13 @@ def load_records():
             fail(f"{rel}:{tables[0]['entries'][0][4]}", "keys before the first [record.*] / [list.*]")
         for i, tab in enumerate(tables[1:]):
             where = f"{rel}:{tab['line']}"
+            sub = re.fullmatch(r"record\.([A-Za-z0-9_]+)((?:\.[A-Za-z]\w*)+)", tab["name"])
+            if sub:  # [record.NAME.field]: the record that field holds, spelled out (as under [config.key.field])
+                parent = records.get(sub.group(1))
+                if parent is None or parent["kind"] != "record":
+                    fail(where, f"[{tab['name']}] must come after [record.{sub.group(1)}]")
+                add_record(parent, sub.group(2)[1:].split("."), tab, parent["schema"], rel)
+                continue
             m = re.fullmatch(r"(record|list)\.([A-Za-z0-9_]+)", tab["name"])
             if not m or not RECORD_NAME.fullmatch(m.group(2)):
                 fail(where, f"[{tab['name']}] isn't [record.<UPPER_SNAKE>] or [list.<UPPER_SNAKE>]")
@@ -798,6 +805,13 @@ def c_value(v, f, names, lists, where, none):
             fields = ["size", "species", "moves", "type1", "type2", "pp", "hp", "level", "maxHp", "status1", "speciesMask"]
             return "&(const struct pd_battle_layout){ " + ", ".join(
                 f".{'status' if k == 'status1' else k} = {kv[k]}" for k in fields) + " }"
+        if v.get("record") == "gen3_speciesinfo":  # an expansion game's gSpeciesInfo page, spelled out as a sub-table
+            schema = load_schema("gen3_speciesinfo")
+            kv = {n: val for n, val, *_ in v["entries"]}
+            if v.get("base"):
+                fail(where, "a gSpeciesInfo page is spelled out in full (no base)")
+            return "&(const struct pd_dex_x){ " + ", ".join(
+                f".{n} = {kv[n] if n in kv else fl['default']}" for n, fl in schema["fields"].items()) + " }"
         if expr.startswith("BaseStatsLayout("):  # a hack's gBaseStats shape, spelled out
             kv = dict(re.findall(r"(\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+|true|false)", expr))
             known = {"stride", "genderOff", "eggGroupsOff", "abilitiesOff", "abilityU16", "statsU16", "typesOff", "catchRateOff"}

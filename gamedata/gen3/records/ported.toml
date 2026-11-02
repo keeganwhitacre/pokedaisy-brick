@@ -2131,11 +2131,18 @@ nationalCount = 1025
 regionalCount = 315
 regionName = 'CORMORIA'
 regionalOrder = 0x08E65C20
-expansion = { kotlin = 'SpeciesInfoDex(stride = 0x104, paletteOff = 0x60, footprintOff = 0x80, levelUpOff = 0x94, teachableOff = 0x98, evolutionsOff = 0xA0)' }
 evoLayout = { kotlin = 'EvoLayout(EvoScheme.EXPANSION)' }
 flags = 'POKEDEX_DREAMSTONE_FLAGS'
 nationalMagicOff = 2
 nationalMagic = 0xDA
+
+[record.POKEDEX_DREAMSTONE.expansion]
+stride = 0x104
+paletteOff = 0x60
+footprintOff = 0x80
+levelUpOff = 0x94
+teachableOff = 0x98
+evolutionsOff = 0xA0
 
 #
 # Pokémon Elite Redux 2.65.4.1b: one National dex of 1222 (its own fakemon past Gen 9: LUCINEON is No. 1072), its forms and
@@ -2366,11 +2373,19 @@ regionalCount = 400
 regionName = 'MODERN'
 regionalOrder = 0x084A96D8
 regionalOrderIsSpecies = true
-expansion = { kotlin = 'SpeciesInfoDex( stride = 0x98, natDexOff = 0x3A, descriptionOff = 0x48, frontPicOff = 0x54, paletteOff = 0x64, footprintOff = 0x7C, evolutionsOff = 0x8C, )' }
 evoLayout = { kotlin = 'EvoLayout(EvoScheme.ROGUE)' }
 flags = 'POKEDEX_EMERALD_ROGUE_FLAGS'
 nationalMagicOff = -1
 probeCategory = 'Seed'
+
+[record.POKEDEX_EMERALD_ROGUE.expansion]
+stride = 0x98
+natDexOff = 0x3A
+descriptionOff = 0x48
+frontPicOff = 0x54
+paletteOff = 0x64
+footprintOff = 0x7C
+evolutionsOff = 0x8C
 
 # Emerald Seaglass v3.0: its own numbering puts Hoenn first (TREECKO = No. 1,
 # BULBASAUR = 141), 430 in all; the HOENN dex has 212.
@@ -2394,11 +2409,17 @@ nationalCount = 430
 regionalCount = 212
 regionName = 'HOENN'
 regionalOrder = 0x086E37E0
-expansion = { kotlin = 'SpeciesInfoDex(stride = 0xD0, paletteOff = 0x68, levelUpOff = 0x8C, teachableOff = 0x90, evolutionsOff = 0x98)' }
 evoLayout = { kotlin = 'EvoLayout(EvoScheme.EXPANSION)' }
 flags = 'POKEDEX_EMERALD_SEAGLASS_FLAGS'
 nationalMagicOff = 2
 nationalMagic = 0xDA
+
+[record.POKEDEX_EMERALD_SEAGLASS.expansion]
+stride = 0xD0
+paletteOff = 0x68
+levelUpOff = 0x8C
+teachableOff = 0x90
+evolutionsOff = 0x98
 
 #
 # Pokémon Gaia v3.2: one dex, national 1-721. Its flags live outside the save
@@ -2544,11 +2565,18 @@ regionalCount = 282
 regionName = 'JOHTO'
 regionalOrder = 0x08D34C78
 regionalOrderStride = 4
-expansion = { kotlin = 'SpeciesInfoDex(stride = 0x10C, paletteOff = 0x60, footprintOff = 0x84, levelUpOff = 0x98, teachableOff = 0x9C, evolutionsOff = 0xA4)' }
 evoLayout = { kotlin = 'EvoLayout(EvoScheme.EXPANSION_PARAMS, record = 12, conditionsEnd = 39)' }
 flags = 'POKEDEX_HEART_AND_SOUL_FLAGS'
 nationalMagicOff = 2
 nationalMagic = 0xDA
+
+[record.POKEDEX_HEART_AND_SOUL.expansion]
+stride = 0x10C
+paletteOff = 0x60
+footprintOff = 0x84
+levelUpOff = 0x98
+teachableOff = 0x9C
+evolutionsOff = 0xA4
 
 #
 # Emerald Imperium v1.3.1 (expansion 1.10): the page from gSpeciesInfo (0x104-byte entries, the
@@ -2576,11 +2604,18 @@ nationalCount = 1025
 regionalCount = 214
 regionName = 'HOENN'
 regionalOrder = 0x08715890
-expansion = { kotlin = 'SpeciesInfoDex(stride = 0x104, paletteOff = 0x60, footprintOff = 0x80, levelUpOff = 0x94, teachableOff = 0x98, evolutionsOff = 0xA0)' }
 evoLayout = { kotlin = 'EvoLayout(EvoScheme.EXPANSION)' }
 flags = 'POKEDEX_IMPERIUM_FLAGS'
 nationalMagicOff = 2
 nationalMagic = 0xDA
+
+[record.POKEDEX_IMPERIUM.expansion]
+stride = 0x104
+paletteOff = 0x60
+footprintOff = 0x80
+levelUpOff = 0x94
+teachableOff = 0x98
+evolutionsOff = 0xA0
 
 # Pokémon Lazarus v2.0: a sparse national dex up to 1028 (unused species are
 # zeroed), the ILIOS dex (430). No footprints. Its menu has no POKéDEX in the
@@ -2606,11 +2641,17 @@ nationalCount = 1028
 regionalCount = 430
 regionName = 'ILIOS'
 regionalOrder = 0x088DFC5C
-expansion = { kotlin = 'SpeciesInfoDex(stride = 0xD4, paletteOff = 0x68, levelUpOff = 0x90, teachableOff = 0x94, evolutionsOff = 0x9C)' }
 evoLayout = { kotlin = 'EvoLayout(EvoScheme.EXPANSION_LAZARUS)' }
 flags = 'POKEDEX_LAZARUS_FLAGS'
 nationalMagicOff = 2
 nationalMagic = 0xDA
+
+[record.POKEDEX_LAZARUS.expansion]
+stride = 0xD4
+paletteOff = 0x68
+levelUpOff = 0x90
+teachableOff = 0x94
+evolutionsOff = 0x9C
 
 #
 # Super Mariomon v1.5.1-Anniversary: vanilla-shaped tables (an old pokeemerald-expansion's), the
@@ -3243,11 +3284,22 @@ regionalCount = 702
 regionName = 'JOHTO'
 regionalOrder = 0x08F03DD8
 regionalOrderStride = 4
-expansion = { kotlin = 'SpeciesInfoDex( stride = 0x118, abilitiesOff = 0x18, categoryOff = 0x26, natDexOff = 0x42, descriptionOff = 0x50, frontPicOff = 0x5C, paletteOff = 0x64, levelUpOff = 0xA8, teachableOff = 0xAC, evolutionsOff = 0xB4, )' }
 evoLayout = { kotlin = 'EvoLayout(EvoScheme.EXPANSION_PARAMS, record = 12, conditionsEnd = 39)' }
 flags = 'POKEDEX_SOULGOLD_FLAGS'
 nationalMagicOff = 2
 nationalMagic = 0xDA
+
+[record.POKEDEX_SOULGOLD.expansion]
+stride = 0x118
+abilitiesOff = 0x18
+categoryOff = 0x26
+natDexOff = 0x42
+descriptionOff = 0x50
+frontPicOff = 0x5C
+paletteOff = 0x64
+levelUpOff = 0xA8
+teachableOff = 0xAC
+evolutionsOff = 0xB4
 
 # SoulGold v1.2: v1.1.4's dex moved (gSpeciesInfo 0x120 bytes per entry, the
 # same offsets inside), the Johto list and ability names byte for byte the same.
@@ -3260,7 +3312,18 @@ kotlin = false
 speciesInfo = 0x087D5CD0
 abilityNames = 0x08F0FCC8
 regionalOrder = 0x08F0EE78
-expansion = { kotlin = 'POKEDEX_SOULGOLD.expansion!!.copy(stride = 0x120)' }
+
+[record.POKEDEX_SOULGOLD_V1_2.expansion]
+stride = 0x120
+abilitiesOff = 0x18
+categoryOff = 0x26
+natDexOff = 0x42
+descriptionOff = 0x50
+frontPicOff = 0x5C
+paletteOff = 0x64
+levelUpOff = 0xA8
+teachableOff = 0xAC
+evolutionsOff = 0xB4
 
 # The second SoulGold v1.2 build (sha1 5d6a0362...): the same tables 0x98 / 0x9C earlier.
 #
@@ -3340,11 +3403,24 @@ nationalCount = 1052
 regionalCount = 398
 regionName = 'HOENN'
 regionalOrder = 0x08DF4C80
-expansion = { kotlin = 'SpeciesInfoDex( stride = 0x104, catchRateOff = 0x09, genderOff = 0x14, eggGroupsOff = 0x18, abilitiesOff = 0x1A, categoryOff = 0x21, natDexOff = 0x3E, paletteOff = 0x60, footprintOff = 0x80, levelUpOff = 0x94, teachableOff = 0x98, evolutionsOff = 0xA0, )' }
 evoLayout = { kotlin = 'EvoLayout(EvoScheme.EXPANSION_PARAMS, record = 12, conditionsEnd = 37)' }
 flags = 'POKEDEX_TMT2_FLAGS'
 nationalMagicOff = 2
 nationalMagic = 0xDA
+
+[record.POKEDEX_TMT2.expansion]
+stride = 0x104
+catchRateOff = 0x09
+genderOff = 0x14
+eggGroupsOff = 0x18
+abilitiesOff = 0x1A
+categoryOff = 0x21
+natDexOff = 0x3E
+paletteOff = 0x60
+footprintOff = 0x80
+levelUpOff = 0x94
+teachableOff = 0x98
+evolutionsOff = 0xA0
 
 #
 # Pokémon Unbound v2.1.1.1 (sha1 b4776b82…), a closed-source CFRU/DPE hack:
@@ -3428,11 +3504,18 @@ regionalCount = 214
 regionName = 'HOENN'
 regionalOrder = 0x08CC18B0
 regionalOrderStride = 4
-expansion = { kotlin = 'SpeciesInfoDex(stride = 0x104, paletteOff = 0x60, footprintOff = 0x80, levelUpOff = 0x94, teachableOff = 0x98, evolutionsOff = 0xA0)' }
 evoLayout = { kotlin = 'EvoLayout(EvoScheme.EXPANSION_PARAMS, record = 12, conditionsEnd = 39)' }
 flags = 'POKEDEX_WISHES_FLAGS'
 nationalMagicOff = 2
 nationalMagic = 0xDA
+
+[record.POKEDEX_WISHES.expansion]
+stride = 0x104
+paletteOff = 0x60
+footprintOff = 0x80
+levelUpOff = 0x94
+teachableOff = 0x98
+evolutionsOff = 0xA0
 
 # From app/src/main/kotlin/com/pokedaisy/app/companion/data/GuideRom.kt.
 [record.GUIDE_TABLES_AMETHYST_TRAINER_MON]

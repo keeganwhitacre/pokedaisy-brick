@@ -73,6 +73,12 @@ struct pd_base_stats {
     bool abilityU16, statsU16; // ability ids are u16; base stats are u16
 };
 
+// An expansion game's gSpeciesInfo page (the app's SpeciesInfoDex): the offsets inside one entry; -1 = none.
+struct pd_dex_x {
+    int stride, catchRateOff, genderOff, eggGroupsOff, abilitiesOff, categoryOff, natDexOff, descriptionOff, frontPicOff,
+        paletteOff, footprintOff, levelUpOff, teachableOff, evolutionsOff;
+};
+
 struct pd_config {
     const struct pd_text* text; // the hack's own species / item / move names; NULL = retail's
     const struct pd_party_layout* partyLayout; // NULL = pd_party_layout_vanilla
@@ -141,6 +147,7 @@ struct pd_config {
     int abilityNameLength, abilityNameStride; // 0 stride = the length
     bool abilityNamePtr;       // each ability record starts with a pointer to the name
     const struct pd_base_stats* baseStats;
+    const struct pd_dex_x* expansion; // NULL = the vanilla-shaped tables above
     const char *probeCategory; // entry 1's category in this game's own language, and its height / weight
     int probeHeight, probeWeight, probeSpecies;
     int regionalCount;
