@@ -45,6 +45,7 @@ extern const struct pd_text pd_text_quetzal_v084;
 extern const struct pd_text pd_text_quetzal_v084_es;
 extern const struct pd_text pd_text_quetzal_moemon_v084;
 extern const struct pd_text pd_text_quetzal_moemon_v084_es;
+extern const struct pd_text pd_text_emerald_rogue;
 
 // The configs, each with the parts the port reads for it so far (`name` is the C's: PD_CONFIG_<name>) and the
 // records `@name.` paths start from (`records`).
@@ -3573,6 +3574,57 @@ static const struct pd_config PD_CONFIG_RECHARGED_EMERALD_REBALANCED_V2_2_8 = {
     .monPalIdxStride = 1,
     .monPalIdxMask = 0xFF,
     .itemPalCompressed = true,
+};
+
+// Emerald Rogue (v2.2.1 EX): vanilla's party struct grown to 104 bytes, expansion's battle struct, nine bag views.
+// gamedata/gen3/hacks/emerald_rogue.toml: emerald_rogue (ram, foes, icons)
+static const struct pd_config PD_CONFIG_EMERALD_ROGUE = {
+    .playerParty = 0x02036C7C,
+    .partyLayout = &pd_party_layout_rogue,
+    .playerPartyCount = 0x02036C79,
+    .speciesMask = 0x07FF,
+    .moveMask = 0xFFFF,
+    .ppMask = 0xFF,
+    .battleMons = 0x0201C358,
+    .battleLayout = &pd_battle_layout_expansion,
+    .battlerPositions = 0x0201C348,
+    .battlersCount = 0x0201C33C,
+    .battleTypeFlags = 0x0201C2C0,
+    .gMain = 0x030014B4,
+    .saveBlock1Ptr = 0x03003614,
+    .saveBlock2Ptr = 0x03003618,
+    .mapHeader = 0x020264B4,
+    .encryptionKeyOff = 0x4C,
+    .moneyOff = 0x4A8,
+    .maxMoney = 999999,
+    .staticSaveBlocks = false,
+    .bagPockets = 0x02026524,
+    .bagOrder = { PD_POCKET_ITEMS, PD_POCKET_ITEMS, PD_POCKET_ITEMS, PD_POCKET_ITEMS, PD_POCKET_BALLS, PD_POCKET_TMHM, PD_POCKET_BERRIES, PD_POCKET_ITEMS, PD_POCKET_KEY },
+    .bagCount = 9,
+    .dexSeenCopy1 = 0,
+    .dexSeenCopy2 = 0,
+    .nationalMagicOff = -1,
+    .nationalMagic = 0xB9,
+    .flagsOff = 0xEE0,
+    .varsOff = 0x1000,
+    .flagBytes = 0x120,
+    .enemyParty = 0x02036EEC,
+    .battlerPartyIndexes = 0x0201C340,
+    .battleStructPtr = 0x0201C83C,
+    .battleStructStatic = false,
+    .monToSwitchIntoOff = 0x3C,
+    .eggSpecies = 0,
+    .speciesCount = 1574,
+    .monIconTable = 0x0905BCB4,
+    .monIconPaletteIndices = 0x0905BCC6,
+    .monIconPaletteTable = 0x0909713C,
+    .itemIconTable = 0x08BA038C,
+    .itemIconStride = 8,
+    .monIconStride = 0x98,
+    .monPalIdxStride = 0x98,
+    .monPalIdxMask = 0x07,
+    .itemPalCompressed = true,
+    .text = &pd_text_emerald_rogue,
 };
 
 #endif

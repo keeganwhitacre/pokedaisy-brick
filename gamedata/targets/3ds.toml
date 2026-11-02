@@ -19,6 +19,7 @@ QUETZAL_PARTY_MON = '&pd_party_layout_quetzal'
 SOULGOLD_PARTY_MON = '&pd_party_layout_soulgold'
 TEAM_ROCKET_PARTY_MON = '&pd_party_layout_team_rocket'
 ROWE_PARTY_MON = '&pd_party_layout_rowe'
+ROGUE_PARTY_MON = '&pd_party_layout_rogue'
 VANILLA_BATTLE_MON = '&pd_battle_layout_vanilla'
 EXPANSION_BATTLE_MON = '&pd_battle_layout_expansion'
 TMT2_BATTLE_MON = '&pd_battle_layout_tmt2'
@@ -451,6 +452,12 @@ parts = ['ram', 'foes', 'icons']
 name = 'RECHARGED_EMERALD_REBALANCED_V2_2_8'
 parts = ['ram', 'foes', 'icons']
 
+# Emerald Rogue (v2.2.1 EX): vanilla's party struct grown to 104 bytes, expansion's battle struct, nine bag views.
+[config.emerald_rogue]
+name = 'EMERALD_ROGUE'
+parts = ['ram', 'foes', 'icons']
+set = { partyMonLayout = 'ROGUE_PARTY_MON' }
+
 # A hack's own species / item / move names (the Kotlin val of the app's data/), as ActiveTables.kt picks them; a config
 # without a [text.*] reads retail's. Not here yet: Odyssey and the in-place FireRed hacks (Ultra Violet, Rocket Edition,
 # Ash Gray, Ghost Grey) - their names are retail's with a few runtime-merged renames.
@@ -736,3 +743,10 @@ typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
 
+[text.emerald_rogue]
+species = 'speciesNamesRogue'
+items = 'itemNamesRogue'
+moves = 'moveDataRogue'
+typeNames = 'typeNamesRogue'
+typeChart = 'typeEffectivenessRogue'
+speciesTypes = 'speciesTypeDataRogue'
