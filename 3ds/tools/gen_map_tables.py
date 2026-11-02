@@ -45,10 +45,16 @@ BLOBS = [
     "LZ_FONT_NORMAL", "LZ_FONT_NORMAL_WIDTHS",
     # Recharged Yellow's card (TrainerCardArt.kt RECHARGED_YELLOW): FireRed's with its own pics and font.
     "RY_PIC_MALE", "RY_PIC_MALE_PAL", "RY_PIC_FEMALE", "RY_PIC_FEMALE_PAL", "RY_FONT_NORMAL", "RY_FONT_NORMAL_WIDTHS",
+    # SoulGold's card (TrainerCardArt.kt SOULGOLD): its Johto art, most of it smol-compressed.
+    "SG_CARD_GFX", "SG_CARD_FRONT", "SG_CARD_BACK", "SG_CARD_BG",
+    "SG_CARD_PAL0", "SG_CARD_PAL1", "SG_CARD_PAL2", "SG_CARD_PAL3", "SG_CARD_PAL4",
+    "SG_CARD_FEMALE_PAL", "SG_CARD_BADGES_PAL", "SG_CARD_BADGES_GFX",
+    "SG_PIC_MALE", "SG_PIC_MALE_PAL", "SG_PIC_FEMALE", "SG_PIC_FEMALE_PAL", "SG_FONT_NORMAL", "SG_FONT_NORMAL_WIDTHS",
 ]
 
 # Regional dexes the card counts (TrainerCard.kt), by name: written as pd_card_dex_<lower>[].
-CARD_DEXES = ["LAZARUS_REGIONAL_TO_NATIONAL"]
+CARD_DEXES = ["LAZARUS_REGIONAL_TO_NATIONAL", "SOULGOLD_REGIONAL_TO_NATIONAL", "SOULGOLD_CARD_SKIPPED",
+              "SOULGOLD_ACHIEVEMENT_IDS"]
 
 
 def family(name):
@@ -69,11 +75,11 @@ def blobs():
     text = read("RomArtSigsGen.kt")
     out = []
     for name in BLOBS:
-        m = re.search(r"\b" + name + r"\((true|false), (\d+), (0x[0-9A-F]+)L, (\d+), (-?\d+)L, (0x[0-9A-F]+)", text)
+        m = re.search(r"\b" + name + r"\((true|false), (\d+), (0x[0-9A-F]+)L, (\d+), (-?\d+)L, (0x[0-9A-F]+)(, smol = true)?", text)
         if not m:
             raise SystemExit(f"gen_map_tables: no {name} in RomArtSigsGen.kt")
-        lz, size, crc, head_off, head, pre = m.groups()
-        out.append((name, lz == "true", int(size), int(crc, 16), int(head_off), int(head) & (2**64 - 1), int(pre, 16)))
+        lz, size, crc, head_off, head, pre, smol = m.groups()
+        out.append((name, lz == "true", int(size), int(crc, 16), int(head_off), int(head) & (2**64 - 1), int(pre, 16), bool(smol)))
     return out
 
 
@@ -132,9 +138,9 @@ def main():
         "",
         "const struct pd_blob_sig pd_blob_sigs[PD_BLOB_COUNT] = {",
     ]
-    for name, lz, size, crc, head_off, head, pre in blobs():
+    for name, lz, size, crc, head_off, head, pre, smol in blobs():
         out.append(f"    [PD_{name}] = {{ {str(lz).lower()}, {size}, 0x{crc:08X}u, {head_off}, 0x{head:016X}ull, 0x{pre:04X}, "
-                   f"{family(name)} }},")
+                   f"{family(name)}, {str(smol).lower()} }},")
     out.append("};")
     out.append("")
     out.extend(card_dexes())

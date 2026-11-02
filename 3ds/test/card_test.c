@@ -38,6 +38,16 @@ static const struct want WANT[] = {
       { false, true, -1, "a8c33291", false }, { true, true, -1, "3a1532af", false }),
     W("recharged_yellow_card_tint", RECHARGED_YELLOW_V1_8_0, PD_GAME_FIRERED, "Pokemon Recharged v1.8.0.gba",
       { true, true, -1, "f2c5a87a", false }),
+    W("soulgold_card", SOULGOLD, PD_GAME_EMERALD, "Pokemon Soulgold (v1.2.1).gba",
+      { false, true, -1, "da0265f8", false }, { true, true, -1, "03fb2d2e", false }),
+    W("soulgold_card_1star", SOULGOLD, PD_GAME_EMERALD, "Pokemon Soulgold (v1.2.1).gba",
+      { false, true, -1, "aceca0ed", false }),
+    W("soulgold_card_3star", SOULGOLD, PD_GAME_EMERALD, "Pokemon Soulgold (v1.2.1).gba",
+      { false, true, -1, "2496c107", false }),
+    W("soulgold_card_max", SOULGOLD, PD_GAME_EMERALD, "Pokemon Soulgold (v1.2.1).gba",
+      { false, true, -1, "da68241d", false }, { true, true, -1, "fb5a508c", false }, { false, true, -1, "dc9b54be", true }),
+    W("soulgold_v12_card_max", SOULGOLD_V1_2, PD_GAME_EMERALD, "Pokemon Soulgold (v1.2.1).gba",
+      { false, true, -1, "da68241d", false }),
     W("lazarus_card", LAZARUS, PD_GAME_EMERALD, "Pokemon Lazarus v2.0.gba",
       { false, true, -1, "4daa6af1", false }, { true, true, -1, "4c5a1651", false }, { false, true, -1, "cfef77a8", true }),
     W("lazarus_card_max", LAZARUS, PD_GAME_EMERALD, "Pokemon Lazarus v2.0.gba",
@@ -85,7 +95,7 @@ int main(int argc, char** argv) {
         static struct pd_snapshot s; pd_snapshot_read(&s, &g, rd, NULL);
         struct pd_card_info c;
         if (!pd_card_info(&g, &s, &c)) { printf("FAIL %s: no card info\n", t->fixture); bad++; free(rom); continue; }
-        if (getenv("CARD_DEBUG")) printf("%s stars %d drawn %d badges %x hof %x dex %d money %ld nat %d cnt %d\n", t->fixture, c.stars, c.drawnStars, c.badges, c.hofDebut, c.dexCaught, c.money, s.dexNational, s.dexCount);
+        if (getenv("CARD_DEBUG")) printf("%s stars %d drawn %d badges %x hof %x dex %d money %ld nat %d cnt %d magic %x/%x var %x/%x flag %d\n", t->fixture, c.stars, c.drawnStars, c.badges, c.hofDebut, c.dexCaught, c.money, s.dexNational, s.dexCount, s.cardMagic, t->cfg->nationalMagic, pd_var(&s, t->cfg->nationalVar), t->cfg->nationalVarValue, pd_flag(&s, t->cfg->nationalFlag));
         for (int i = 0; i < 6 && t->shots[i].crc; i++) {
             struct pd_card_info k = c;
             if (t->shots[i].minutes >= 0) k.minutes = t->shots[i].minutes;

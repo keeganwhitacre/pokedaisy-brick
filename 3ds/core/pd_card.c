@@ -12,6 +12,8 @@
 // Emerald Legacy's regional dex past Hoenn's (TrainerCard.kt LEGACY_HOENN_TO_NATIONAL).
 static const uint16_t LEGACY_EXTRA[8] = { 77, 78, 198, 215, 220, 221, 228, 229 };
 
+extern const uint16_t pd_card_soulgold_regional_to_national[], pd_card_soulgold_card_skipped[], pd_card_soulgold_achievement_ids[];
+extern const int pd_card_soulgold_regional_to_national_count, pd_card_soulgold_card_skipped_count, pd_card_soulgold_achievement_ids_count;
 extern const uint16_t pd_card_lazarus_regional_to_national[];
 extern const int pd_card_lazarus_regional_to_national_count;
 
@@ -85,10 +87,19 @@ static void card_icon(const struct pd_game* g, int mail, int tint, struct pd_car
     out->ok = true;
 }
 
+static bool card_flag(const struct pd_snapshot* s, int flag) {
+    return flag >= 0 && flag / 8 < PD_FLAG_BYTES && (s->cardFlags[flag / 8] >> (flag % 8) & 1);
+}
+
+static int card_var(const struct pd_snapshot* s, int var) {
+    int i = var - 0x4000;
+    return i >= 0 && i < PD_VAR_COUNT ? s->cardVars[i] : 0;
+}
+
 bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct pd_card_info* c) {
     const struct pd_config* cfg = g->cfg;
     memset(c, 0, sizeof(*c));
-    if (!cfg || !cfg->cardStyle || !s->valid || !s->cardOk || !s->flagsOk || !s->dexOk) return false;
+    if (!cfg || !cfg->cardStyle || !s->valid || !s->cardOk || !s->dexOk) return false;
     c->style = cfg->cardStyle;
     while (c->nameLen < 7 && s->playerName[c->nameLen] != 0xFF) {
         c->name[c->nameLen] = s->playerName[c->nameLen];
@@ -101,12 +112,15 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
     c->money = s->money >= 0 ? s->money : 0;
 
     // The magic is read where the card's own record says (Lazarus keeps it at +0x1E, the dex's table says +0x1A).
-    bool national = s->dexOk && (cfg->nationalFlagOnly ? pd_flag(s, cfg->nationalFlag) : cfg->nationalMagicOff < 0 ||
-        (s->cardMagic == cfg->nationalMagic && pd_var(s, cfg->nationalVar) == cfg->nationalVarValue &&
-         pd_flag(s, cfg->nationalFlag)));
+    bool national = s->dexOk && (cfg->nationalFlagOnly ? card_flag(s, cfg->nationalFlag) : cfg->nationalMagicOff < 0 ||
+        (s->cardMagic == cfg->nationalMagic && card_var(s, cfg->nationalVar) == cfg->nationalVarValue &&
+         card_flag(s, cfg->nationalFlag)));
     int caught = 0;
     if (national) {
         for (int n = 1; n <= s->dexCount; n++) caught += pd_dex_caught(s, n);
+    } else if (cfg->cardStyle == PD_CARD_SOULGOLD) {
+        for (int i = 0; i < pd_card_soulgold_regional_to_national_count; i++)
+            caught += pd_dex_caught(s, pd_card_soulgold_regional_to_national[i]);
     } else if (cfg->cardStyle == PD_CARD_LAZARUS) {
         for (int i = 0; i < pd_card_lazarus_regional_to_national_count; i++)
             caught += pd_dex_caught(s, pd_card_lazarus_regional_to_national[i]);
@@ -118,9 +132,9 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
     } else {
         for (int n = 1; n <= 151; n++) caught += pd_dex_caught(s, n);
     }
-    c->dexCaught = pd_flag(s, cfg->pokedexFlag) ? caught : -1;
+    c->dexCaught = card_flag(s, cfg->pokedexFlag) ? caught : -1;
     for (int i = 0; i < 8; i++) {
-        if (pd_flag(s, cfg->badgeFlag + i)) c->badges |= 1 << i;
+        if (card_flag(s, cfg->badgeFlag + i)) c->badges |= 1 << i;
     }
 
     // GAME_STAT_FIRST_HOF_PLAY_TIME counts only once ENTERED_HOF is set; hours cap at 999:59:59.
@@ -129,7 +143,15 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
     c->hofDebut = hof;
     // HasAllHoennMons: the Hoenn dex minus Jirachi and Deoxys.
     bool allHoenn = true;
-    if (cfg->cardStyle == PD_CARD_LAZARUS) { // its whole ILIOS dex, and the stray entry 0 (nothing left out)
+    if (cfg->cardStyle == PD_CARD_SOULGOLD) { // every regional entry but the legendaries (the v1.2 builds mark six more)
+        for (int i = 0; i < pd_card_soulgold_regional_to_national_count && allHoenn; i++) {
+            int n = pd_card_soulgold_regional_to_national[i];
+            bool skip = false;
+            for (int k = 0; k < pd_card_soulgold_card_skipped_count && !skip; k++) skip = pd_card_soulgold_card_skipped[k] == n;
+            if (cfg->monIconStride == 0x120) skip |= n == 1009 || n == 1010 || (n >= 1020 && n <= 1023); // the v1.2 builds
+            allHoenn = skip || pd_dex_caught(s, n);
+        }
+    } else if (cfg->cardStyle == PD_CARD_LAZARUS) { // its whole ILIOS dex, and the stray entry 0 (nothing left out)
         for (int i = 0; i < pd_card_lazarus_regional_to_national_count && allHoenn; i++)
             allHoenn = pd_dex_caught(s, pd_card_lazarus_regional_to_national[i]);
         allHoenn = allHoenn && s->dexStray;
@@ -142,7 +164,7 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
     // Legacy's regional dex runs 210 (Hoenn's 202, JIRACHI and DEOXYS still left out of "all", then eight more).
     for (int i = 0; i < 8 && allHoenn && cfg->cardStyle == PD_CARD_LEGACY; i++) allHoenn = pd_dex_caught(s, LEGACY_EXTRA[i]);
     c->stars = (hof != 0) + allHoenn;
-    if (cfg->extraStarFlag && pd_flag(s, cfg->extraStarFlag)) c->stars++;
+    if (cfg->extraStarFlag && card_flag(s, cfg->extraStarFlag)) c->stars++;
     if (cfg->museumWinnersOff) {
         bool all = true;
         for (int i = 0; i < 5; i++) all &= s->museumWinners[i] != 0;
@@ -152,7 +174,7 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
     if (cfg->frontierSymbolFlag) {
         symbols = true;
         for (int i = 0; i < 7; i++) {
-            symbols &= pd_flag(s, cfg->frontierSymbolFlag + 2 * i) && pd_flag(s, cfg->frontierSymbolFlag + 2 * i + 1);
+            symbols &= card_flag(s, cfg->frontierSymbolFlag + 2 * i) && card_flag(s, cfg->frontierSymbolFlag + 2 * i + 1);
         }
         c->stars += symbols;
     }
@@ -165,13 +187,23 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
         for (int n = 1; n <= 384 && all; n++) all = (n >= 249 && n <= 251) || pd_dex_caught(s, n);
         c->stars += all;
     }
+    if (cfg->cardStyle == PD_CARD_SOULGOLD) {
+        // A Battle Frontier record over 49, and 80 of its 120 achievements (counted while the magic reads 0xACE1).
+        c->stars += s->frontierRecordHigh;
+        int have = 0;
+        for (int i = 0; s->achievementsOn && i < pd_card_soulgold_achievement_ids_count; i++) {
+            int id = pd_card_soulgold_achievement_ids[i];
+            have += s->achievements[id / 8] >> (id % 8) & 1;
+        }
+        c->stars += have >= cfg->achievementsNeeded;
+    }
     c->drawnStars = c->stars;
     // Lazarus draws stars by a rule of its own (0x082288B0): the HALL OF FAME, flags 0x29 and 0x4A6, the symbols.
     if (cfg->cardStyle == PD_CARD_LAZARUS) {
-        c->drawnStars = (s->gameStats[STAT_ENTERED_HOF] != 0) + pd_flag(s, 0x29) + pd_flag(s, 0x4A6) + symbols;
+        c->drawnStars = (s->gameStats[STAT_ENTERED_HOF] != 0) + card_flag(s, 0x29) + card_flag(s, 0x4A6) + symbols;
     }
 
-    bool hoenn = !is_kanto(cfg->cardStyle) && !ry_style(cfg->cardStyle);
+    bool hoenn = !is_kanto(cfg->cardStyle);
     c->linkWins = capped(s, STAT_LINK_BATTLE_WINS, 9999);
     c->linkLosses = capped(s, STAT_LINK_BATTLE_LOSSES, 9999);
     c->trades = capped(s, STAT_POKEMON_TRADES, 0xFFFF);
@@ -180,8 +212,8 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
     c->linkContests = hoenn ? capped(s, STAT_WON_LINK_CONTEST, 999) : 0;
     c->linkPokeblocks = hoenn ? capped(s, STAT_POKEBLOCKS_WITH_FRIENDS, 0xFFFF) : 0;
     c->battlePoints = cfg->frontierBpOff ? s->battlePoints : 0;
-    for (int i = 0; cfg->stickerVar && i < 3; i++) c->stickers[i] = pd_var(s, cfg->stickerVar + i);
-    for (int i = 0; cfg->iconVar > 0 && cfg->cardIconTable && i < 6; i++) card_icon(g, pd_var(s, cfg->iconVar + i), pd_var(s, cfg->tintVar), &c->icons[i]);
+    for (int i = 0; cfg->stickerVar && i < 3; i++) c->stickers[i] = card_var(s, cfg->stickerVar + i);
+    for (int i = 0; cfg->iconVar > 0 && cfg->cardIconTable && i < 6; i++) card_icon(g, card_var(s, cfg->iconVar + i), card_var(s, cfg->tintVar), &c->icons[i]);
     return true;
 }
 
@@ -220,6 +252,16 @@ static const struct blobs UNBOUND = {
     -1, -1, -1,
     PD_UB_PIC_MALE, PD_UB_PIC_MALE_PAL, PD_UB_PIC_FEMALE, PD_UB_PIC_FEMALE_PAL,
     PD_FR_FONT_NORMAL, PD_FR_FONT_NORMAL_WIDTHS,
+    { -1, -1, -1, -1, -1 },
+};
+
+// SoulGold: Emerald's card code with its Johto art, smol-compressed: its own everything but the star's palette.
+static const struct blobs SOULGOLD = {
+    PD_SG_CARD_GFX, PD_SG_CARD_FRONT, PD_SG_CARD_BACK, PD_SG_CARD_BG,
+    { PD_SG_CARD_PAL0, PD_SG_CARD_PAL1, PD_SG_CARD_PAL2, PD_SG_CARD_PAL3, PD_SG_CARD_PAL4, -1 },
+    PD_SG_CARD_FEMALE_PAL, PD_SG_CARD_BADGES_PAL, PD_SG_CARD_BADGES_GFX,
+    PD_SG_PIC_MALE, PD_SG_PIC_MALE_PAL, PD_SG_PIC_FEMALE, PD_SG_PIC_FEMALE_PAL,
+    PD_SG_FONT_NORMAL, PD_SG_FONT_NORMAL_WIDTHS,
     { -1, -1, -1, -1, -1 },
 };
 
@@ -307,13 +349,17 @@ struct layout {
     int cols;        // which of a glyph's 16 columns are drawn: COLS_ALL, COLS_NARROW (the left 8 of a glyph no wider than 8,
                      // expansion's DecompressGlyph) or COLS_WIDTH (its width)
     int starPal;     // the stars' BG palette
+    uint32_t text;   // the window palette's text colour (0 = TEXT)
+    bool noMarks;    // the back's little stat markers are left out
 };
-static const struct layout KANTO_LAYOUT = { 27 * 8, 14, 0x00, 7, 16, 13, 4, COLS_ALL, 4 };
-static const struct layout HOENN_LAYOUT = { 28 * 8, 16, 0x77, 7, 15, 1, 0, COLS_ALL, 4 };
-static const struct layout LAZARUS_LAYOUT = { 28 * 8, 15, 0x77, 7, 15, 1, 0, COLS_NARROW, 1 };
-static const struct layout RY_LAYOUT = { 27 * 8, 14, 0x00, 7, 16, 13, 4, COLS_WIDTH, 4 };
+static const struct layout KANTO_LAYOUT = { 27 * 8, 14, 0x00, 7, 16, 13, 4, COLS_ALL, 4, 0, false };
+static const struct layout HOENN_LAYOUT = { 28 * 8, 16, 0x77, 7, 15, 1, 0, COLS_ALL, 4, 0, false };
+static const struct layout LAZARUS_LAYOUT = { 28 * 8, 15, 0x77, 7, 15, 1, 0, COLS_NARROW, 1, 0, false };
+static const struct layout SOULGOLD_LAYOUT = { 28 * 8, 15, 0x77, 7, 15, 1, 0, COLS_WIDTH, 4, 0xFF181818u, true };
+static const struct layout RY_LAYOUT = { 27 * 8, 14, 0x00, 7, 16, 13, 4, COLS_WIDTH, 4, 0, false };
 
 #define TEXT 0xFF636363u
+#define WHITE 0xFFFFFFFFu
 #define TEXT_SHADOW 0xFFD6D6CEu
 #define STAT 0xFFE70808u
 #define STAT_SHADOW 0xFFFFBD73u
@@ -466,7 +512,7 @@ static void print(const struct art* a, const struct blobs* b, int x0, int y, con
 }
 
 static void say(const struct art* a, const struct blobs* b, int x, int y, const struct str* s) {
-    print(a, b, x, y, s, TEXT, TEXT_SHADOW);
+    print(a, b, x, y, s, a->lay->text ? a->lay->text : TEXT, TEXT_SHADOW);
 }
 
 static void say_red(const struct art* a, const struct blobs* b, int x, int y, const struct str* s) {
@@ -646,30 +692,36 @@ static void hoenn_stat(const struct art* a, const struct blobs* b, int row, cons
 
 // What the Emerald-style card prints, per style (TrainerCardArt.words): labels and digit counts.
 struct words {
-    const char *dex, *hof, *trades;
-    int dexDigits;
+    const char *name, *money, *dex, *time, *cardOf, *hof, *link, *trades, *blocks, *contests, *points;
+    int moneyDigits, dexDigits;
+    bool white; // SoulGold's white headings: its ID once the card has a star, the back's title
 };
-static const struct words HOENN_WORDS = { "POKéDEX", "HALL OF FAME DEBUT  ", "POKéMON TRADES", 3 };
-static const struct words LAZARUS_WORDS = { "Pokédex", "Hall of Fame DEBUT  ", "Pokémon TRADES", 4 };
+static const struct words HOENN_WORDS = { "NAME: ", "MONEY", "POKéDEX", "TIME", "'s TRAINER CARD", "HALL OF FAME DEBUT  ",
+    "LINK BATTLES", "POKéMON TRADES", "S W/FRIENDS", "WON CONTESTS W/FRIENDS", "BATTLE POINTS WON", 6, 3, false };
+static const struct words LAZARUS_WORDS = { "NAME: ", "MONEY", "Pokédex", "TIME", "'s TRAINER CARD", "Hall of Fame DEBUT  ",
+    "LINK BATTLES", "Pokémon TRADES", "S W/FRIENDS", "WON CONTESTS W/FRIENDS", "BATTLE POINTS WON", 6, 4, false };
+static const struct words SOULGOLD_WORDS = { "Name: ", "Money", "Pokédex", "Time", "'s Trainer Card", "Hall of Fame Debut  ",
+    "Link Battles", "Pokémon Trades", "S W/Friends", "Won Contests W/Friends", "Battle Points Won", 7, 4, true };
 
 static void hoenn_text(const struct art* a, const struct blobs* b, const struct pd_card_info* c, bool back,
                        bool colon) {
     const int pad = 0x77;
-    const struct words* w = c->style == PD_CARD_LAZARUS ? &LAZARUS_WORDS : &HOENN_WORDS;
+    const struct words* w = c->style == PD_CARD_LAZARUS ? &LAZARUS_WORDS : c->style == PD_CARD_SOULGOLD ? &SOULGOLD_WORDS : &HOENN_WORDS;
     struct str s, t;
     if (!back) {
-        s = enc("NAME: ");
+        s = enc(w->name);
         t = name_of(c);
         cat(&s, &t);
         say(a, b, 16, 33, &s);
         s = enc("IDNo.");
         t = digits(c->trainerId, 5, LEADING_ZEROS, pad);
         cat(&s, &t);
-        say(a, b, (96 - width(a, b, &s)) / 2 + 120, 9, &s);
+        if (w->white && c->stars > 0) print(a, b, (96 - width(a, b, &s)) / 2 + 120, 9, &s, WHITE, a->lay->text ? a->lay->text : TEXT);
+        else say(a, b, (96 - width(a, b, &s)) / 2 + 120, 9, &s);
         struct str money = enc("¥");
-        t = digits((int) c->money, 6, LEFT, pad);
+        t = digits((int) c->money, w->moneyDigits, LEFT, pad);
         cat(&money, &t);
-        s = enc("MONEY");
+        s = enc(w->money);
         say(a, b, 16, 57, &s);
         say(a, b, 128 - width(a, b, &money), 57, &money);
         if (c->dexCaught >= 0) {
@@ -678,7 +730,7 @@ static void hoenn_text(const struct art* a, const struct blobs* b, const struct 
             say(a, b, 16, 73, &s);
             say(a, b, 128 - width(a, b, &t), 73, &t);
         }
-        s = enc("TIME");
+        s = enc(w->time);
         say(a, b, 16, 89, &s);
         struct str colonStr = enc(":");
         int colonW = width(a, b, &colonStr);
@@ -691,9 +743,10 @@ static void hoenn_text(const struct art* a, const struct blobs* b, const struct 
         return;
     }
     s = name_of(c);
-    t = enc("'s TRAINER CARD");
+    t = enc(w->cardOf);
     cat(&s, &t);
-    say(a, b, 216 - width(a, b, &s), 9, &s);
+    if (w->white) print(a, b, 216 - width(a, b, &s), 9, &s, WHITE, a->lay->text ? a->lay->text : TEXT);
+    else say(a, b, 216 - width(a, b, &s), 9, &s);
     if (c->hofDebut) {
         s = enc(w->hof);
         t = hof_time(c->hofDebut, pad);
@@ -701,13 +754,13 @@ static void hoenn_text(const struct art* a, const struct blobs* b, const struct 
     }
     if (c->linkWins || c->linkLosses) {
         // "W:{red}wins{grey}  L:{red}losses": one string, colours switching inside it.
-        struct str w = enc("W:"), wins = digits(c->linkWins, 4, LEFT, pad), l = enc("  L:");
+        struct str wl = enc("W:"), wins = digits(c->linkWins, 4, LEFT, pad), l = enc("  L:");
         struct str losses = digits(c->linkLosses, 4, LEFT, pad);
-        s = enc("LINK BATTLES");
+        s = enc(w->link);
         say(a, b, 16, 49, &s);
-        int x = 216 - (width(a, b, &w) + width(a, b, &wins) + width(a, b, &l) + width(a, b, &losses));
-        say(a, b, x, 49, &w);
-        x += width(a, b, &w);
+        int x = 216 - (width(a, b, &wl) + width(a, b, &wins) + width(a, b, &l) + width(a, b, &losses));
+        say(a, b, x, 49, &wl);
+        x += width(a, b, &wl);
         say_red(a, b, x, 49, &wins);
         x += width(a, b, &wins);
         say(a, b, x, 49, &l);
@@ -723,20 +776,20 @@ static void hoenn_text(const struct art* a, const struct blobs* b, const struct 
         // POKéBLOCKS: the game's own "POKéBLOCK" characters.
         s = (struct str) { 0 };
         for (int ch = 0x55; ch <= 0x59; ch++) add(&s, ch);
-        t = enc("S W/FRIENDS");
+        t = enc(w->blocks);
         cat(&s, &t);
         t = digits(c->linkPokeblocks, 5, RIGHT, pad);
         hoenn_stat(a, b, 3, &s, &t);
     }
     if (c->linkContests) {
-        s = enc("WON CONTESTS W/FRIENDS");
+        s = enc(w->contests);
         t = digits(c->linkContests, 5, RIGHT, pad);
         hoenn_stat(a, b, 4, &s, &t);
     }
     if (c->battlePoints) {
         struct str n = digits(c->battlePoints, 5, RIGHT, pad), bp = enc("BP");
         int x = 216 - (width(a, b, &n) + width(a, b, &bp));
-        s = enc("BATTLE POINTS WON");
+        s = enc(w->points);
         say(a, b, 16, 5 * 16 + 33, &s);
         say_red(a, b, x, 5 * 16 + 33, &n);
         say(a, b, x + width(a, b, &n), 5 * 16 + 33, &bp);
@@ -748,10 +801,11 @@ bool pd_card_render(const struct pd_game* g, const struct pd_card_info* c, bool 
     bool kanto = is_kanto(c->style);
     bool ry = ry_style(c->style);
     const struct blobs* b = c->style == PD_CARD_UNBOUND ? &UNBOUND : ry ? &RECHARGED_YELLOW : kanto ? &KANTO :
-        c->style == PD_CARD_LEGACY ? &LEGACY : c->style == PD_CARD_LAZARUS ? &LAZARUS : &HOENN;
-    struct art a = { .img = img, .lay = ry ? &RY_LAYOUT : kanto ? &KANTO_LAYOUT : c->style == PD_CARD_LAZARUS ? &LAZARUS_LAYOUT : &HOENN_LAYOUT };
+        c->style == PD_CARD_LEGACY ? &LEGACY : c->style == PD_CARD_LAZARUS ? &LAZARUS : c->style == PD_CARD_SOULGOLD ? &SOULGOLD : &HOENN;
+    struct art a = { .img = img, .lay = ry ? &RY_LAYOUT : kanto ? &KANTO_LAYOUT : c->style == PD_CARD_LAZARUS ? &LAZARUS_LAYOUT :
+        c->style == PD_CARD_SOULGOLD ? &SOULGOLD_LAYOUT : &HOENN_LAYOUT };
     if (c->style != PD_CARD_KANTO && c->style != PD_CARD_HOENN && c->style != PD_CARD_LEGACY && c->style != PD_CARD_UNBOUND &&
-        c->style != PD_CARD_LAZARUS && !ry) return false;
+        c->style != PD_CARD_LAZARUS && c->style != PD_CARD_SOULGOLD && !ry) return false;
     // Every blob the card needs, or no card.
     const int need[] = {
         b->gfx, b->front, b->back, b->bg, b->pals[0], b->pals[1], b->pals[2], b->pals[3], b->pals[4], b->pals[5],
@@ -835,7 +889,7 @@ bool pd_card_render(const struct pd_game* g, const struct pd_card_info* c, bool 
         // Emerald's DrawCardBackStats (palette 0).
         const int marks[2][3] = { { c->trades, 27, 9 }, { c->linkContests, 27, 13 } };
         for (int i = 0; i < 2; i++) {
-            if (!marks[i][0]) continue;
+            if (!marks[i][0] || a.lay->noMarks) continue;
             tile(img, bg3, sizeof(bg3), pal, 141, marks[i][1], marks[i][2]);
             tile(img, bg3, sizeof(bg3), pal, 157, marks[i][1], marks[i][2] + 1);
         }

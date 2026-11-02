@@ -43,6 +43,7 @@ LEGACY = 'PD_CARD_LEGACY'
 UNBOUND = 'PD_CARD_UNBOUND'
 LAZARUS = 'PD_CARD_LAZARUS'
 RECHARGED_YELLOW = 'PD_CARD_RECHARGED_YELLOW'
+SOULGOLD = 'PD_CARD_SOULGOLD'
 RECHARGED_YELLOW_V1_9 = 'PD_CARD_RECHARGED_YELLOW_V1_9'
 
 # Each part is a set of pd_config fields = a path into the config: a field, then (through a record
@@ -164,6 +165,9 @@ gameStatsOff = 'trainerCard.gameStatsOff'
 badgeFlag = 'trainerCard.badgeFlag'
 pokedexFlag = 'trainerCard.pokedexFlag'
 cardMagicOff = 'trainerCard.nationalMagicOff'
+cardFlagsOff = 'trainerCard.flagsOff'
+cardVarsOff = 'trainerCard.varsOff'
+cardFlagBytes = 'trainerCard.flagBytes'
 nationalFlagOnly = 'trainerCard.nationalFlagOnly'
 linkLines = 'trainerCard.linkLines'
 allRegionalDrop = 'trainerCard.allRegionalDrop'
@@ -438,19 +442,19 @@ parts = ['ram', 'foes', 'icons', 'dex']
 
 [config.soulgold]
 name = 'SOULGOLD'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'card']
 
 [config.soulgold_v1_2]
 name = 'SOULGOLD_V1_2'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'card']
 
 [config.soulgold_v1_2b]
 name = 'SOULGOLD_V1_2B'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'card']
 
 [config.soulgold_v1_2c]
 name = 'SOULGOLD_V1_2C'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'card']
 
 [config.heart_and_soul]
 name = 'HEART_AND_SOUL'

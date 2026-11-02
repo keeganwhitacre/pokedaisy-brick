@@ -117,6 +117,9 @@ struct pd_snapshot {
     bool cardOk;
     uint8_t achievements[16]; // SaveBlock1 + achievementBitsOff; achievementsOn = its magic (if it has one) reads 0xACE1
     bool achievementsOn;
+    bool frontierRecordHigh; // SoulGold: any of its Battle Frontier records (SaveBlock2 +0x8B4 x16, +0x9B6 x8) past 49
+    uint8_t cardFlags[PD_FLAG_BYTES]; // the card's own reads (TrainerCard.kt flagsOff / varsOff)
+    uint16_t cardVars[PD_VAR_COUNT];
     uint8_t cardMagic; // SaveBlock2 + cardMagicOff
     uint8_t playerName[8];
     uint16_t trainerId, playHours;

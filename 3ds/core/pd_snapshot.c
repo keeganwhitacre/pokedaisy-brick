@@ -469,6 +469,18 @@ static void read_card_fields(struct pd_snapshot* s, const struct pd_config* cfg,
         if (!read(ctx, sb2 + cfg->frontierBpOff, bp, 2)) return;
         s->battlePoints = u16(bp);
     }
+    if (cfg->cardFlagBytes && cfg->cardFlagBytes <= PD_FLAG_BYTES) {
+        uint8_t vars[PD_VAR_COUNT * 2];
+        if (!read(ctx, sb1 + cfg->cardFlagsOff, s->cardFlags, cfg->cardFlagBytes) ||
+            !read(ctx, sb1 + cfg->cardVarsOff, vars, sizeof vars)) return;
+        for (int i = 0; i < PD_VAR_COUNT; i++) s->cardVars[i] = u16(vars + i * 2);
+    }
+    if (cfg->cardStyle == PD_CARD_SOULGOLD) {
+        uint8_t rec[2][32];
+        if (!read(ctx, sb2 + 0x8B4, rec[0], 32) || !read(ctx, sb2 + 0x9B6, rec[1], 16)) return;
+        for (int i = 0; i < 16; i++) s->frontierRecordHigh |= u16(rec[0] + 2 * i) > 49;
+        for (int i = 0; i < 8; i++) s->frontierRecordHigh |= u16(rec[1] + 2 * i) > 49;
+    }
     if (cfg->achievementBitsOff) {
         uint8_t magic[2] = { 0xE1, 0xAC };
         if (!read(ctx, sb1 + cfg->achievementBitsOff, s->achievements, sizeof s->achievements)) return;

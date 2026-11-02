@@ -41,6 +41,11 @@ enum pd_blob {
     PD_LZ_FONT_NORMAL, PD_LZ_FONT_NORMAL_WIDTHS,
     PD_RY_PIC_MALE, PD_RY_PIC_MALE_PAL, PD_RY_PIC_FEMALE, PD_RY_PIC_FEMALE_PAL,
     PD_RY_FONT_NORMAL, PD_RY_FONT_NORMAL_WIDTHS,
+    PD_SG_CARD_GFX, PD_SG_CARD_FRONT, PD_SG_CARD_BACK, PD_SG_CARD_BG,
+    PD_SG_CARD_PAL0, PD_SG_CARD_PAL1, PD_SG_CARD_PAL2, PD_SG_CARD_PAL3, PD_SG_CARD_PAL4,
+    PD_SG_CARD_FEMALE_PAL, PD_SG_CARD_BADGES_PAL, PD_SG_CARD_BADGES_GFX,
+    PD_SG_PIC_MALE, PD_SG_PIC_MALE_PAL, PD_SG_PIC_FEMALE, PD_SG_PIC_FEMALE_PAL,
+    PD_SG_FONT_NORMAL, PD_SG_FONT_NORMAL_WIDTHS,
     PD_BLOB_COUNT,
 };
 
@@ -57,6 +62,7 @@ struct pd_blob_sig {
     uint64_t head;
     uint16_t pre;
     uint8_t family; // PD_BLOB_*
+    bool smol;      // expansion's smol compression instead of LZ77 (lz false)
 };
 
 extern const struct pd_blob_sig pd_blob_sigs[PD_BLOB_COUNT];

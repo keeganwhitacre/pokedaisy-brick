@@ -12,4 +12,7 @@ bool pd_is_smol(const uint8_t* src, size_t avail);
 // Decode into out; returns the decoded byte count, or 0 if it isn't valid smol data or doesn't fit outCap.
 size_t pd_smol(const uint8_t* src, size_t avail, uint8_t* out, size_t outCap);
 
+// Mode 8 (a tilemap: running sums of the decoded u16s) into out; returns the byte count or 0.
+size_t pd_smol_tilemap(const uint8_t* src, size_t avail, uint8_t* out, size_t outCap);
+
 #endif

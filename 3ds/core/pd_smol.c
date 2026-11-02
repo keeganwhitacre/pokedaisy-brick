@@ -51,6 +51,41 @@ static int next(struct reader* r, const struct tans* table) {
     return t.sym;
 }
 
+// Runs the instruction bytes `lo` over the symbols into words[] (static, shared); the u16 count, or -1 if malformed.
+static uint16_t words[(8192 + 2) / 2 + 2];
+
+static size_t instructions(const uint8_t* lo, size_t loSize, const uint16_t* sym, size_t symSize, size_t outBytes) {
+    // lo holds (length, offset) pairs, 7 bits per byte + continue bit. A nonzero length emits one symbol, then copies
+    // `length` values from `offset` back (1 = a run); length 0 emits `offset` literal symbols.
+    size_t cap = outBytes / 2 + 1, n = 0, i = 0, si = 0;
+#define B(at) ((at) < loSize ? lo[at] : 0)
+    while (i < loSize && n < cap) {
+        size_t length, offset;
+        if (B(i) & 0x80) {
+            length = (size_t) (B(i) & 0x7F) | (size_t) B(i + 1) << 7;
+            offset = B(i + 2) & 0x7F;
+            if (B(i + 2) & 0x80) { offset |= (size_t) B(i + 3) << 7; i += 4; } else i += 3;
+        } else {
+            length = B(i) & 0x7F;
+            offset = B(i + 1) & 0x7F;
+            if (B(i + 1) & 0x80) { offset |= (size_t) B(i + 2) << 7; i += 3; } else i += 2;
+        }
+        if (length) {
+            if (si >= symSize || n >= cap) return (size_t) -1;
+            words[n++] = sym[si++];
+            if (offset == 0 || offset > n) return (size_t) -1;
+            for (size_t k = 0; k < length && n < cap; k++) { words[n] = words[n - offset]; n++; }
+        } else {
+            for (size_t k = 0; k < offset && n < cap; k++) {
+                if (si >= symSize) return (size_t) -1;
+                words[n++] = sym[si++];
+            }
+        }
+    }
+#undef B
+    return n;
+}
+
 bool pd_is_smol(const uint8_t* src, size_t avail) {
     return avail >= 8 && (src[0] & 0x0F) >= 1 && (src[0] & 0x0F) <= 6;
 }
@@ -58,7 +93,6 @@ bool pd_is_smol(const uint8_t* src, size_t avail) {
 size_t pd_smol(const uint8_t* src, size_t avail, uint8_t* out, size_t outCap) {
     static uint8_t lo[LO_MAX];
     static uint16_t sym[SYM_MAX];
-    static uint16_t words[(8192 + 2) / 2 + 2];
     bool ok = true;
     uint32_t h0 = rd32(src, avail, 0, &ok), h1 = rd32(src, avail, 4, &ok);
     if (!ok) return 0;
@@ -113,38 +147,39 @@ size_t pd_smol(const uint8_t* src, size_t avail, uint8_t* out, size_t outCap) {
         memcpy(lo, src + leftover, loSize);
     }
 
-    // lo holds (length, offset) pairs, 7 bits per byte + continue bit. A nonzero length emits one symbol, then copies
-    // `length` values from `offset` back (1 = a run); length 0 emits `offset` literal symbols.
-    size_t cap = outBytes / 2 + 1, n = 0, i = 0, si = 0;
-#define B(at) ((at) < loSize ? lo[at] : 0)
-    while (i < loSize && n < cap) {
-        size_t length, offset;
-        if (B(i) & 0x80) {
-            length = (size_t) (B(i) & 0x7F) | (size_t) B(i + 1) << 7;
-            offset = B(i + 2) & 0x7F;
-            if (B(i + 2) & 0x80) { offset |= (size_t) B(i + 3) << 7; i += 4; } else i += 3;
-        } else {
-            length = B(i) & 0x7F;
-            offset = B(i + 1) & 0x7F;
-            if (B(i + 1) & 0x80) { offset |= (size_t) B(i + 2) << 7; i += 3; } else i += 2;
-        }
-        if (length) {
-            if (si >= symSize || n >= cap) return 0;
-            words[n++] = sym[si++];
-            if (offset == 0 || offset > n) return 0;
-            for (size_t k = 0; k < length && n < cap; k++) { words[n] = words[n - offset]; n++; }
-        } else {
-            for (size_t k = 0; k < offset && n < cap; k++) {
-                if (si >= symSize) return 0;
-                words[n++] = sym[si++];
-            }
-        }
-    }
-#undef B
+    size_t n = instructions(lo, loSize, sym, symSize, outBytes);
+    if (n == (size_t) -1) return 0;
     memset(out, 0, outBytes);
     for (size_t w = 0; w < n && w < outBytes / 2; w++) {
         out[2 * w] = (uint8_t) words[w];
         out[2 * w + 1] = (uint8_t) (words[w] >> 8);
     }
     return outBytes;
+}
+
+// Mode 8, SmolDecompressTilemap: u32 mode:4 | tilemapSize:14 | symSize:14 and a u32 instruction-byte count, then the raw
+// u16 symbols (padded to a word) and the instruction bytes. The decoded u16s are deltas: each tile entry is the
+// running sum of them.
+size_t pd_smol_tilemap(const uint8_t* src, size_t avail, uint8_t* out, size_t outCap) {
+    static uint8_t lo[LO_MAX];
+    static uint16_t sym[SYM_MAX];
+    bool ok = true;
+    uint32_t h0 = rd32(src, avail, 0, &ok), h1 = rd32(src, avail, 4, &ok);
+    if (!ok || (h0 & 0xF) != 8) return 0;
+    size_t size = h0 >> 4 & 0x3FFF, symSize = h0 >> 18 & 0x3FFF, loSize = h1;
+    if (!symSize || !loSize || loSize > LO_MAX || symSize > SYM_MAX || size > 8192 || size > outCap) return 0;
+    size_t loAt = 8 + symSize * 2 + 2 * (symSize % 2);
+    if (loAt + loSize > avail) return 0;
+    for (size_t i = 0; i < symSize; i++) sym[i] = (uint16_t) (src[8 + 2 * i] | src[9 + 2 * i] << 8);
+    memcpy(lo, src + loAt, loSize);
+    size_t n = instructions(lo, loSize, sym, symSize, size);
+    if (n == (size_t) -1) return 0;
+    memset(out, 0, size);
+    unsigned acc = 0;
+    for (size_t w = 0; w < n && w < size / 2; w++) {
+        acc = (acc + words[w]) & 0xFFFF;
+        out[2 * w] = (uint8_t) acc;
+        out[2 * w + 1] = (uint8_t) (acc >> 8);
+    }
+    return size;
 }
