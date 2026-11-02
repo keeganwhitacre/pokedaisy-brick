@@ -103,6 +103,43 @@ bool pd_rom_read(const struct pd_game* g, uint32_t addr, void* out, size_t len) 
     return true;
 }
 
+
+// Other-language retail carts (the app's RETAIL_PORTS): by game code and revision.
+struct port_rom {
+    const char* code;
+    int rev;
+    const struct pd_config* cfg;
+    enum pd_game_kind kind;
+    const char* title;
+};
+static const struct port_rom PORT_ROMS[] = {
+    {"AXPD", 0, &PD_CONFIG_PORT_AXPD0, PD_GAME_EMERALD, "Pokémon Saphir-Edition"},
+    {"AXPD", 1, &PD_CONFIG_PORT_AXPD1, PD_GAME_EMERALD, "Pokémon Saphir-Edition"},
+    {"AXPF", 0, &PD_CONFIG_PORT_AXPF0, PD_GAME_EMERALD, "Pokémon Version Saphir"},
+    {"AXPF", 1, &PD_CONFIG_PORT_AXPF1, PD_GAME_EMERALD, "Pokémon Version Saphir"},
+    {"AXPI", 0, &PD_CONFIG_PORT_AXPI0, PD_GAME_EMERALD, "Pokémon Versione Zaffiro"},
+    {"AXPI", 1, &PD_CONFIG_PORT_AXPI1, PD_GAME_EMERALD, "Pokémon Versione Zaffiro"},
+    {"AXPS", 0, &PD_CONFIG_PORT_AXPS0, PD_GAME_EMERALD, "Pokémon Edición Zafiro"},
+    {"AXPS", 1, &PD_CONFIG_PORT_AXPS1, PD_GAME_EMERALD, "Pokémon Edición Zafiro"},
+    {"AXVD", 0, &PD_CONFIG_PORT_AXVD0, PD_GAME_EMERALD, "Pokémon Rubin-Edition"},
+    {"AXVD", 1, &PD_CONFIG_PORT_AXVD1, PD_GAME_EMERALD, "Pokémon Rubin-Edition"},
+    {"AXVF", 0, &PD_CONFIG_PORT_AXVF0, PD_GAME_EMERALD, "Pokémon Version Rubis"},
+    {"AXVF", 1, &PD_CONFIG_PORT_AXVF1, PD_GAME_EMERALD, "Pokémon Version Rubis"},
+    {"AXVI", 0, &PD_CONFIG_PORT_AXVI0, PD_GAME_EMERALD, "Pokémon Versione Rubino"},
+    {"AXVI", 1, &PD_CONFIG_PORT_AXVI1, PD_GAME_EMERALD, "Pokémon Versione Rubino"},
+    {"AXVS", 0, &PD_CONFIG_PORT_AXVS0, PD_GAME_EMERALD, "Pokémon Edición Rubí"},
+    {"AXVS", 1, &PD_CONFIG_PORT_AXVS1, PD_GAME_EMERALD, "Pokémon Edición Rubí"},
+    {"BPGD", 0, &PD_CONFIG_PORT_BPGD0, PD_GAME_FIRERED, "Pokémon Blattgrüne Edition"},
+    {"BPGF", 0, &PD_CONFIG_PORT_BPGF0, PD_GAME_FIRERED, "Pokémon Version Vert Feuille"},
+    {"BPGI", 0, &PD_CONFIG_PORT_BPGI0, PD_GAME_FIRERED, "Pokémon Versione Verde Foglia"},
+    {"BPGS", 0, &PD_CONFIG_PORT_BPGS0, PD_GAME_FIRERED, "Pokémon Edición Verde Hoja"},
+    {"BPRD", 0, &PD_CONFIG_PORT_BPRD0, PD_GAME_FIRERED, "Pokémon Feuerrote Edition"},
+    {"BPRF", 0, &PD_CONFIG_PORT_BPRF0, PD_GAME_FIRERED, "Pokémon Version Rouge Feu"},
+    {"BPRI", 0, &PD_CONFIG_PORT_BPRI0, PD_GAME_FIRERED, "Pokémon Versione Rosso Fuoco"},
+    {"BPRS", 0, &PD_CONFIG_PORT_BPRS0, PD_GAME_FIRERED, "Pokémon Edición Rojo Fuego"},
+    {NULL, 0, NULL, PD_GAME_NONE, NULL},
+};
+
 void pd_game_detect(struct pd_game* g, const uint8_t* header, size_t romSize) {
     static unsigned loads;
     memset(g, 0, sizeof(*g));
@@ -149,6 +186,14 @@ void pd_game_detect(struct pd_game* g, const uint8_t* header, size_t romSize) {
         g->guide = PD_GUIDE_EMERALD;
         g->cfg = &PD_CONFIG_EMERALD;
     } else {
+        for (const struct port_rom* r = PORT_ROMS; r->code; r++) {
+            if (strcmp(r->code, g->code) || r->rev != g->revision) continue;
+            g->kind = r->kind;
+            g->title = r->title;
+            g->cfg = romSize > 0x1000000 ? NULL : r->cfg;
+            if (!g->cfg) g->unsupported = "Not a version the companion knows";
+            return;
+        }
         g->title = "Unknown game";
         g->unsupported = "Not a game the 3DS companion knows yet";
         return;

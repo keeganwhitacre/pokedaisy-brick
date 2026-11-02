@@ -907,6 +907,11 @@ def kt_unescape(raw, where):
 def kotlin_text_table(name, kind, where):
     """{id: name} (species, items) or {id: (name, type, power)} (moves) of the Kotlin `val name`;
     `A + B` is A with B's entries laid over it (a language pack)."""
+    if " RENAMED " in name:  # `moveData RENAMED moveNamesX`: the base table's moves under another language's names
+        base, names = [n.strip() for n in name.split(" RENAMED ")]
+        t = kotlin_text_table(base, kind, where)
+        ren = kotlin_text_table(names, "species", where)
+        return {k: ((ren.get(k, v[0]),) + tuple(v[1:])) for k, v in t.items()}
     if name.startswith("UPPER "):  # a game that prints its names in capitals (Config.gameCase)
         t = kotlin_text_table(name[6:], kind, where)
         return {k: ((v[0].upper(),) + tuple(v[1:]) if kind == "moves" else v.upper()) for k, v in t.items()}

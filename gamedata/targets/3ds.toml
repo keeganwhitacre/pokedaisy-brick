@@ -468,6 +468,104 @@ parts = ['ram', 'foes', 'icons']
 name = 'ELITE_REDUX_V2_65_3B'
 parts = ['ram', 'foes', 'icons']
 
+# Other-language FireRed / LeafGreen / Ruby / Sapphire (German, French, Italian, Spanish): the app's RETAIL_PORTS, found by game code
+# and revision. PARTY / BAG / BATTLE and the POKéDEX from RAM and the ROM, with the cart's own species, move and item names.
+[config.port_axpd0]
+name = 'PORT_AXPD0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axpd1]
+name = 'PORT_AXPD1'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axpf0]
+name = 'PORT_AXPF0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axpf1]
+name = 'PORT_AXPF1'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axpi0]
+name = 'PORT_AXPI0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axpi1]
+name = 'PORT_AXPI1'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axps0]
+name = 'PORT_AXPS0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axps1]
+name = 'PORT_AXPS1'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axvd0]
+name = 'PORT_AXVD0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axvd1]
+name = 'PORT_AXVD1'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axvf0]
+name = 'PORT_AXVF0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axvf1]
+name = 'PORT_AXVF1'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axvi0]
+name = 'PORT_AXVI0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axvi1]
+name = 'PORT_AXVI1'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axvs0]
+name = 'PORT_AXVS0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_axvs1]
+name = 'PORT_AXVS1'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_bpgd0]
+name = 'PORT_BPGD0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_bpgf0]
+name = 'PORT_BPGF0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_bpgi0]
+name = 'PORT_BPGI0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_bpgs0]
+name = 'PORT_BPGS0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_bprd0]
+name = 'PORT_BPRD0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_bprf0]
+name = 'PORT_BPRF0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_bpri0]
+name = 'PORT_BPRI0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
+[config.port_bprs0]
+name = 'PORT_BPRS0'
+parts = ['ram', 'foes', 'icons', 'dex']
+
 # A hack's own species / item / move names (the Kotlin val of the app's data/), as ActiveTables.kt picks them; a config
 # without a [text.*] reads retail's. Not here yet: Odyssey and the in-place FireRed hacks (Ultra Violet, Rocket Edition,
 # Ash Gray, Ghost Grey) - their names are retail's with a few runtime-merged renames.
@@ -818,4 +916,124 @@ moves = 'UPPER moveData + moveDataUltraViolet'
 typeNames = 'typeNames'
 typeChart = 'typeEffectiveness'
 speciesTypes = 'speciesTypeData + speciesTypesUltraViolet'
+
+[text.port_axpd0]
+species = 'speciesNamesAxpd'
+items = 'itemNamesAxpd'
+moves = 'moveData RENAMED moveNamesAxpd'
+
+[text.port_axpd1]
+species = 'speciesNamesAxpd'
+items = 'itemNamesAxpd'
+moves = 'moveData RENAMED moveNamesAxpd'
+
+[text.port_axpf0]
+species = 'speciesNamesAxpf'
+items = 'itemNamesAxpf'
+moves = 'moveData RENAMED moveNamesAxpf'
+
+[text.port_axpf1]
+species = 'speciesNamesAxpf'
+items = 'itemNamesAxpf'
+moves = 'moveData RENAMED moveNamesAxpf'
+
+[text.port_axpi0]
+species = 'speciesNamesAxpi'
+items = 'itemNamesAxpi'
+moves = 'moveData RENAMED moveNamesAxpi'
+
+[text.port_axpi1]
+species = 'speciesNamesAxpi'
+items = 'itemNamesAxpi'
+moves = 'moveData RENAMED moveNamesAxpi'
+
+[text.port_axps0]
+species = 'speciesNamesAxps'
+items = 'itemNamesAxps'
+moves = 'moveData RENAMED moveNamesAxps'
+
+[text.port_axps1]
+species = 'speciesNamesAxps'
+items = 'itemNamesAxps'
+moves = 'moveData RENAMED moveNamesAxps'
+
+[text.port_axvd0]
+species = 'speciesNamesAxvd'
+items = 'itemNamesAxvd'
+moves = 'moveData RENAMED moveNamesAxvd'
+
+[text.port_axvd1]
+species = 'speciesNamesAxvd'
+items = 'itemNamesAxvd'
+moves = 'moveData RENAMED moveNamesAxvd'
+
+[text.port_axvf0]
+species = 'speciesNamesAxvf'
+items = 'itemNamesAxvf'
+moves = 'moveData RENAMED moveNamesAxvf'
+
+[text.port_axvf1]
+species = 'speciesNamesAxvf'
+items = 'itemNamesAxvf'
+moves = 'moveData RENAMED moveNamesAxvf'
+
+[text.port_axvi0]
+species = 'speciesNamesAxvi'
+items = 'itemNamesAxvi'
+moves = 'moveData RENAMED moveNamesAxvi'
+
+[text.port_axvi1]
+species = 'speciesNamesAxvi'
+items = 'itemNamesAxvi'
+moves = 'moveData RENAMED moveNamesAxvi'
+
+[text.port_axvs0]
+species = 'speciesNamesAxvs'
+items = 'itemNamesAxvs'
+moves = 'moveData RENAMED moveNamesAxvs'
+
+[text.port_axvs1]
+species = 'speciesNamesAxvs'
+items = 'itemNamesAxvs'
+moves = 'moveData RENAMED moveNamesAxvs'
+
+[text.port_bpgd0]
+species = 'speciesNamesBpgd'
+items = 'itemNamesBpgd'
+moves = 'moveData RENAMED moveNamesBpgd'
+
+[text.port_bpgf0]
+species = 'speciesNamesBpgf'
+items = 'itemNamesBpgf'
+moves = 'moveData RENAMED moveNamesBpgf'
+
+[text.port_bpgi0]
+species = 'speciesNamesBpgi'
+items = 'itemNamesBpgi'
+moves = 'moveData RENAMED moveNamesBpgi'
+
+[text.port_bpgs0]
+species = 'speciesNamesBpgs'
+items = 'itemNamesBpgs'
+moves = 'moveData RENAMED moveNamesBpgs'
+
+[text.port_bprd0]
+species = 'speciesNamesBprd'
+items = 'itemNamesBprd'
+moves = 'moveData RENAMED moveNamesBprd'
+
+[text.port_bprf0]
+species = 'speciesNamesBprf'
+items = 'itemNamesBprf'
+moves = 'moveData RENAMED moveNamesBprf'
+
+[text.port_bpri0]
+species = 'speciesNamesBpri'
+items = 'itemNamesBpri'
+moves = 'moveData RENAMED moveNamesBpri'
+
+[text.port_bprs0]
+species = 'speciesNamesBprs'
+items = 'itemNamesBprs'
+moves = 'moveData RENAMED moveNamesBprs'
 
