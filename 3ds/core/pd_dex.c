@@ -5,6 +5,8 @@
 #include <string.h>
 
 #include "pd_map.h"
+#include "pd_romart.h"
+#include "pd_smol.h"
 #include "pd_snapshot.h"
 #include "pd_tables.h"
 
@@ -239,21 +241,42 @@ bool pd_dex_entry(const struct pd_game* g, int national, struct pd_dex_entry* ou
 bool pd_dex_sprite(const struct pd_game* g, int species, uint32_t* out) {
     const struct pd_config* cfg = g->cfg;
     if (!pd_dex_available(g) || species < 1 || species >= species_count(cfg)) return false;
-    const uint8_t* pic = pd_rom_at(g, cfg->frontPics + (uint32_t) species * 8, 8);
-    const uint8_t* pal = pd_rom_at(g, cfg->palettes + (uint32_t) species * 8, 8);
-    if (!pic || !pal) return false;
-    const uint8_t* picLz = pd_rom_at(g, u32(pic), 4);
-    const uint8_t* palLz = pd_rom_at(g, u32(pal), 4);
+    uint32_t picPtr, palPtr;
+    if (cfg->expansion) {
+        // The pointers sit in the species' own gSpeciesInfo entry.
+        const struct pd_dex_x* x = cfg->expansion;
+        const uint8_t* info = pd_rom_at(g, cfg->speciesInfo + (uint32_t) species * (uint32_t) x->stride, (size_t) x->stride);
+        if (!info) return false;
+        picPtr = u32(info + x->frontPicOff);
+        palPtr = u32(info + x->paletteOff);
+    } else {
+        const uint8_t* pic = pd_rom_at(g, cfg->frontPics + (uint32_t) species * 8, 8);
+        const uint8_t* pal = pd_rom_at(g, cfg->palettes + (uint32_t) species * 8, 8);
+        if (!pic || !pal) return false;
+        picPtr = u32(pic);
+        palPtr = u32(pal);
+    }
+    const uint8_t* picLz = in_rom(g, picPtr) ? pd_rom_at(g, picPtr, 4) : NULL;
+    const uint8_t* palLz = in_rom(g, palPtr) ? pd_rom_at(g, palPtr, 4) : NULL;
     if (!picLz || !palLz) return false;
-    // The decoded sizes come from the LZ77 headers: one 64x64 frame is 2048
-    // bytes (Emerald's pics hold two frames; the first is used).
-    size_t picSize = picLz[1] | (size_t) picLz[2] << 8 | (size_t) picLz[3] << 16;
-    size_t palSize = palLz[1] | (size_t) palLz[2] << 8 | (size_t) palLz[3] << 16;
-    if (picSize < 2048 || picSize > 8192 || palSize < 32 || palSize > 64) return false;
+    // One 64x64 frame is 2048 bytes (Emerald's pics hold two frames; the first is used). The pictures are LZ77 or
+    // expansion's smol; a palette is LZ77 (it starts with 0x10) or, in some expansion games, 16 raw colours.
     static uint8_t tiles[8192], colours[64];
     size_t picAvail = g->romSize - (size_t) (picLz - g->rom), palAvail = g->romSize - (size_t) (palLz - g->rom);
-    if (pd_lz77(picLz, picAvail, tiles, picSize) != picSize || pd_lz77(palLz, palAvail, colours, palSize) != palSize) {
-        return false;
+    size_t picSize;
+    if (pd_is_smol(picLz, picAvail)) {
+        picSize = pd_smol(picLz, picAvail, tiles, sizeof tiles);
+        if (picSize < 2048) return false;
+    } else {
+        picSize = picLz[1] | (size_t) picLz[2] << 8 | (size_t) picLz[3] << 16;
+        if (picLz[0] != 0x10 || picSize < 2048 || picSize > 8192 || pd_lz77(picLz, picAvail, tiles, picSize) != picSize) return false;
+    }
+    if (palLz[0] == 0x10) {
+        size_t palSize = palLz[1] | (size_t) palLz[2] << 8 | (size_t) palLz[3] << 16;
+        if (palSize < 32 || palSize > 64 || pd_lz77(palLz, palAvail, colours, palSize) != palSize) return false;
+    } else {
+        if (palAvail < 32) return false;
+        memcpy(colours, palLz, 32);
     }
     uint32_t rgb[16];
     for (int i = 0; i < 16; i++) {
