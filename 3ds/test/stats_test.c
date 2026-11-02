@@ -120,10 +120,10 @@ int main(int argc,char** argv) {
     assert(pd_nature_raises(3)==1 && pd_nature_lowers(3)==4); // Adamant
     assert(pd_nature_raises(-1)==-1 && pd_nature_lowers(25)==-1);
     struct pd_mon_stats stats={.valid=true};
-    assert(!strcmp(pd_type_name(pd_hidden_power_type(&stats)),"Fighting"));
+    assert(!strcmp(pd_type_name(NULL,pd_hidden_power_type(&stats)),"Fighting"));
     assert(pd_hidden_power_power(&stats)==30);
     memset(stats.ivs,31,sizeof stats.ivs);
-    assert(!strcmp(pd_type_name(pd_hidden_power_type(&stats)),"Dark"));
+    assert(!strcmp(pd_type_name(NULL,pd_hidden_power_type(&stats)),"Dark"));
     assert(pd_hidden_power_power(&stats)==70);
     stats.valid=false;assert(pd_hidden_power_type(&stats)==PD_TYPE_NONE);
     if(argc==4) {

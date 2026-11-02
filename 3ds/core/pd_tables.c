@@ -67,7 +67,11 @@ const char* pd_move_name(const struct pd_game* g, int move, char* buf, size_t le
     return buf;
 }
 
-const char* pd_type_name(int type) {
+const char* pd_type_name(const struct pd_game* g, int type) {
+    const struct pd_text* t = hack_text(g);
+    if (t && t->typeNames) {
+        return type >= 0 && type < t->typeNamesCount && t->typeNames[type] ? t->typeNames[type] : "";
+    }
     if (type >= 0 && type < pd_type_names_count && pd_type_names[type]) return pd_type_names[type];
     return "";
 }
@@ -82,21 +86,32 @@ int pd_move_power(const struct pd_game* g, int move) {
     return m ? m->power : 0;
 }
 
-static int single_pct(int atk, int def) {
-    for (int i = 0; i < pd_type_chart_count; i++) {
-        if (pd_type_chart[i].atk == atk && pd_type_chart[i].def == def) return pd_type_chart[i].pct;
+static int single_pct(const struct pd_game* g, int atk, int def) {
+    const struct pd_text* t = hack_text(g);
+    const struct pd_type_pair* chart = t && t->typeChart ? t->typeChart : pd_type_chart;
+    int n = t && t->typeChart ? t->typeChartCount : pd_type_chart_count;
+    for (int i = 0; i < n; i++) {
+        if (chart[i].atk == atk && chart[i].def == def) return chart[i].pct;
     }
     return 100;
 }
 
-int pd_type_multiplier_pct(int atk, int def1, int def2) {
-    int pct = single_pct(atk, def1);
-    if (def2 != PD_TYPE_NONE && def2 != def1) pct = pct * single_pct(atk, def2) / 100;
+int pd_type_multiplier_pct(const struct pd_game* g, int atk, int def1, int def2) {
+    int pct = single_pct(g, atk, def1);
+    if (def2 != PD_TYPE_NONE && def2 != def1) pct = pct * single_pct(g, atk, def2) / 100;
     return pct;
 }
 
-void pd_species_type_pair(int species, int* t1, int* t2) {
+void pd_species_type_pair(const struct pd_game* g, int species, int* t1, int* t2) {
     *t1 = *t2 = PD_TYPE_NONE;
+    const struct pd_text* t = hack_text(g);
+    if (t && t->speciesTypes) {
+        if (species > 0 && species < t->speciesTypesCount) {
+            *t1 = t->speciesTypes[species][0];
+            *t2 = t->speciesTypes[species][1];
+        }
+        return;
+    }
     species = form_base(species);
     if (species <= 0 || species >= pd_species_type_table_count) return;
     *t1 = pd_species_type_table[species][0];

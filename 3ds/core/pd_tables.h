@@ -4,11 +4,16 @@
 #define PD_TABLES_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 struct pd_move_info {
     const char* name;
     int type;
     int power;
+};
+
+struct pd_type_pair {
+    int atk, def, pct;
 };
 
 // A hack's own names and moves (pd_text_gen.c, from the app's Kotlin tables), dense by id; a NULL table (or an id
@@ -20,13 +25,16 @@ struct pd_text {
     int itemsCount;
     const struct pd_move_info* moves;
     int movesCount;
+    // Its own type numbering (expansion's Normal = 1): names by id, the chart's non-100 pairs, each species' two types.
+    const char* const* typeNames;
+    int typeNamesCount;
+    const struct pd_type_pair* typeChart;
+    int typeChartCount;
+    const uint8_t (*speciesTypes)[2];
+    int speciesTypesCount;
 };
 
 struct pd_game;
-
-struct pd_type_pair {
-    int atk, def, pct;
-};
 
 extern const char* const pd_species_names[];
 extern const int pd_species_names_count;
@@ -68,15 +76,16 @@ extern const unsigned char pd_hidden_power_types[16];
 // g = the running game (NULL = retail's tables).
 const char* pd_species_name(const struct pd_game* g, int species, char* buf, size_t len);
 const char* pd_move_name(const struct pd_game* g, int move, char* buf, size_t len);
-const char* pd_type_name(int type);
+// g NULL (or a game on retail's numbering) = retail's names; Hidden Power's type is always retail-numbered.
+const char* pd_type_name(const struct pd_game* g, int type);
 int pd_move_type(const struct pd_game* g, int move);
 int pd_move_power(const struct pd_game* g, int move);
 
 // One attacking type against a (possibly dual-typed) defender, in percent
 // (100 = 1x) - the app's typeMultiplierPct().
-int pd_type_multiplier_pct(int atk, int def1, int def2);
+int pd_type_multiplier_pct(const struct pd_game* g, int atk, int def1, int def2);
 // A species' types (the app's speciesTypeData; the same type twice for one),
 // PD_TYPE_NONE both when unknown.
-void pd_species_type_pair(int species, int* t1, int* t2);
+void pd_species_type_pair(const struct pd_game* g, int species, int* t1, int* t2);
 
 #endif

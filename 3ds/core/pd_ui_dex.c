@@ -142,9 +142,9 @@ static void entry_view(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
     snprintf(buf, sizeof(buf), "%s POKéMON", e.category);
     pd_text_fit(c, tx, top + 18, tw, buf, PD_MUTED, PD_MUTED_SHADOW);
     if (e.type2 != e.type1 && e.type2 != PD_TYPE_NONE) {
-        snprintf(buf, sizeof(buf), "%s / %s", pd_type_name(e.type1), pd_type_name(e.type2));
+        snprintf(buf, sizeof(buf), "%s / %s", pd_type_name(g, e.type1), pd_type_name(g, e.type2));
     } else {
-        snprintf(buf, sizeof(buf), "%s", pd_type_name(e.type1));
+        snprintf(buf, sizeof(buf), "%s", pd_type_name(g, e.type1));
     }
     pd_text(c, tx, top + 36, buf, PD_VALUE, PD_VALUE_SHADOW);
     char ht[16], wt[20];

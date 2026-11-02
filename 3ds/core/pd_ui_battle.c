@@ -42,16 +42,16 @@ static struct mon_view from_battler(const struct pd_battle_mon* b) {
     return (struct mon_view) { b->species, b->level, b->hp, b->maxHp, b->type1, b->type2, b->status, b->moves, b->pp };
 }
 
-static struct mon_view from_party(const struct pd_mon* m) {
+static struct mon_view from_party(const struct pd_game* g, const struct pd_mon* m) {
     struct mon_view v = { m->species, m->level, m->hp, m->maxHp, PD_TYPE_NONE, PD_TYPE_NONE, m->status, m->moves, m->pp };
-    pd_species_type_pair(m->species, &v.type1, &v.type2);
+    pd_species_type_pair(g, m->species, &v.type1, &v.type2);
     return v;
 }
 
-static void types_text(int t1, int t2, char* buf, size_t len) {
+static void types_text(const struct pd_game* g, int t1, int t2, char* buf, size_t len) {
     if (t1 == PD_TYPE_NONE) snprintf(buf, len, "-");
-    else if (t2 != t1 && t2 != PD_TYPE_NONE) snprintf(buf, len, "%s/%s", pd_type_name(t1), pd_type_name(t2));
-    else snprintf(buf, len, "%s", pd_type_name(t1));
+    else if (t2 != t1 && t2 != PD_TYPE_NONE) snprintf(buf, len, "%s/%s", pd_type_name(g, t1), pd_type_name(g, t2));
+    else snprintf(buf, len, "%s", pd_type_name(g, t1));
 }
 
 // A small pill of white text (VerdictPill): returns its width.
@@ -94,7 +94,7 @@ static void card(struct pd_canvas* c, const struct pd_game* g, int x, int y, int
     if (stateW) pill(c, nameEnd + 4, ty, state, VERDICT_GREY);
 
     ty += LINE + 1;
-    types_text(m->type1, m->type2, buf, sizeof(buf));
+    types_text(g, m->type1, m->type2, buf, sizeof(buf));
     int typesW = pd_text_fit(c, tx, ty, 92, buf, PD_MUTED, PD_MUTED_SHADOW);
     char hp[16];
     snprintf(hp, sizeof(hp), "%d/%d", m->hp, m->maxHp);
@@ -135,7 +135,7 @@ static void move_cell(struct pd_canvas* c, const struct pd_game* g, int x, int y
         color = PD_MUTED;
         shadow = PD_MUTED_SHADOW;
     } else if (foe) {
-        verdict(pd_type_multiplier_pct(pd_move_type(g, move), foe->type1, foe->type2), &text, &color, &shadow);
+        verdict(pd_type_multiplier_pct(g, pd_move_type(g, move), foe->type1, foe->type2), &text, &color, &shadow);
     }
     pd_text(c, ix, ty + LINE + 1, text, color, shadow);
 }
@@ -235,7 +235,7 @@ static int rank(const struct pd_game* g, const struct pd_snapshot* s, const stru
         for (int k = 0; k < PD_NUM_MOVES; k++) {
             int power = m->moves[k] ? pd_move_power(g, m->moves[k]) : 0;
             if (power <= 0 || m->pp[k] <= 0) continue;
-            int value = power * pd_type_multiplier_pct(pd_move_type(g, m->moves[k]), foe->type1, foe->type2);
+            int value = power * pd_type_multiplier_pct(g, pd_move_type(g, m->moves[k]), foe->type1, foe->type2);
             if (value > bestValue) {
                 bestValue = value;
                 best = k;
@@ -243,16 +243,16 @@ static int rank(const struct pd_game* g, const struct pd_snapshot* s, const stru
         }
         if (best < 0) continue;
         int t1, t2;
-        pd_species_type_pair(m->species, &t1, &t2);
+        pd_species_type_pair(g, m->species, &t1, &t2);
         int risk = 100;
         if (foe->type1 != PD_TYPE_NONE) {
-            risk = pd_type_multiplier_pct(foe->type1, t1, t2);
+            risk = pd_type_multiplier_pct(g, foe->type1, t1, t2);
             if (foe->type2 != PD_TYPE_NONE && foe->type2 != foe->type1) {
-                int r2 = pd_type_multiplier_pct(foe->type2, t1, t2);
+                int r2 = pd_type_multiplier_pct(g, foe->type2, t1, t2);
                 if (r2 > risk) risk = r2;
             }
         }
-        int pct = pd_type_multiplier_pct(pd_move_type(g, m->moves[best]), foe->type1, foe->type2);
+        int pct = pd_type_multiplier_pct(g, pd_move_type(g, m->moves[best]), foe->type1, foe->type2);
         out[n++] = (struct pick) { m, m->moves[best], m->pp[best], pct, pd_move_power(g, m->moves[best]) * pct / 100 - risk };
     }
     qsort(out, (size_t) n, sizeof(out[0]), by_score);
@@ -342,7 +342,7 @@ void ui_battle_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* 
     struct mon_view foeView, you = from_battler(youB);
     const struct mon_view* foe = NULL;
     if (party) {
-        foeView = from_party(party);
+        foeView = from_party(g, party);
         foe = &foeView;
     } else if (s->battlers[PD_POS_OPPONENT_LEFT].species) {
         foeView = from_battler(&s->battlers[PD_POS_OPPONENT_LEFT]);

@@ -31,11 +31,12 @@ static bool decode(const struct pd_game* g, int species, uint32_t* out) {
     const struct pd_config* cfg = g->cfg;
     if (!cfg || !cfg->monIconTable || species <= 0) return false;
     if (species == PD_SPECIES_EGG) species = cfg->eggSpecies ? cfg->eggSpecies : 412;
-    else if (species >= (cfg->speciesCount ? cfg->speciesCount : 412)) return false;
+    else if (species >= (cfg->speciesCount ? cfg->speciesCount : cfg->eggSpecies ? cfg->eggSpecies + 1 : 412)) return false;
     uint8_t w[4], idx;
-    if (!pd_rom_read(g, cfg->monIconTable + (uint32_t) species * 4, w, 4)) return false;
+    if (!pd_rom_read(g, cfg->monIconTable + (uint32_t) species * (uint32_t) cfg->monIconStride, w, 4)) return false;
     const uint8_t* tiles = pd_rom_at(g, u32le(w), 16 * 32);
-    if (!tiles || !pd_rom_read(g, cfg->monIconPaletteIndices + (uint32_t) species, &idx, 1) || idx > 15) return false;
+    if (!tiles || !pd_rom_read(g, cfg->monIconPaletteIndices + (uint32_t) species * (uint32_t) cfg->monPalIdxStride, &idx, 1) ||
+        (idx &= (uint8_t) cfg->monPalIdxMask) > 15) return false;
     if (!pd_rom_read(g, cfg->monIconPaletteTable + (uint32_t) idx * 8, w, 4)) return false;
     const uint8_t* pal = pd_rom_at(g, u32le(w), 32);
     if (!pal) return false;
@@ -123,7 +124,12 @@ static bool decode_item(const struct pd_game* g, int item, uint32_t* out) {
     uint8_t tiles[9 * 32], pal[32];
     size_t left = g->romSize - (size_t) (tilesLz - g->rom), palLeft = g->romSize - (size_t) (palLz - g->rom);
     if (pd_lz77(tilesLz, left, tiles, sizeof(tiles)) < sizeof(tiles)) return false;
-    if (pd_lz77(palLz, palLeft, pal, sizeof(pal)) < sizeof(pal)) return false;
+    if (cfg->itemPalCompressed) {
+        if (pd_lz77(palLz, palLeft, pal, sizeof(pal)) < sizeof(pal)) return false;
+    } else {
+        if (palLeft < sizeof(pal)) return false;
+        memcpy(pal, palLz, sizeof(pal));
+    }
     uint32_t colours[16];
     for (int i = 0; i < 16; i++) colours[i] = bgr555((uint16_t) (pal[i * 2] | pal[i * 2 + 1] << 8));
     for (int t = 0; t < 9; t++) {

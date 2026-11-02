@@ -339,9 +339,9 @@ static void build_bosses(const struct pd_game* g, const struct pd_snapshot* s, c
             int t1, t2;
             pd_species_types(g, team[i].species, &t1, &t2);
             if (t2 != t1 && t2 != PD_TYPE_NONE) {
-                snprintf(e->hintBuf, sizeof(e->hintBuf), "%s / %s", pd_type_name(t1), pd_type_name(t2));
+                snprintf(e->hintBuf, sizeof(e->hintBuf), "%s / %s", pd_type_name(g, t1), pd_type_name(g, t2));
             } else {
-                snprintf(e->hintBuf, sizeof(e->hintBuf), "%s", pd_type_name(t1));
+                snprintf(e->hintBuf, sizeof(e->hintBuf), "%s", pd_type_name(g, t1));
             }
             e->hint = e->hintBuf;
             char name[40], move[32];

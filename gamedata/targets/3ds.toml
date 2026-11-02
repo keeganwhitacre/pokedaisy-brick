@@ -43,6 +43,9 @@ LEGACY = 'PD_CARD_LEGACY'
 playerParty = 'playerParty'
 partyLayout = 'partyMonLayout'
 playerPartyCount = 'playerPartyCount'
+speciesMask = 'speciesMask'
+moveMask = 'moveMask'
+ppMask = 'ppMask'
 battleMons = 'battleMons'
 battleLayout = 'battleMonLayout'
 battlerPositions = 'battlerPositions'
@@ -54,6 +57,7 @@ saveBlock2Ptr = 'saveBlock2Ptr'
 mapHeader = 'mapHeader'
 encryptionKeyOff = 'encryptionKeyOff'
 moneyOff = 'moneyOff'
+maxMoney = 'maxMoney'
 staticSaveBlocks = 'staticSaveBlocks'
 bagPockets = 'bagPockets'
 bagOrder = 'bagPocketOrder'
@@ -83,6 +87,10 @@ monIconPaletteIndices = 'monIconPaletteIndices'
 monIconPaletteTable = 'monIconPaletteTable'
 itemIconTable = 'itemIconTable'
 itemIconStride = 'itemIconStride'
+monIconStride = 'monIconStride'
+monPalIdxStride = 'monPalIdxStride'
+monPalIdxMask = 'monPalIdxMask'
+itemPalCompressed = 'itemPalCompressed'
 
 # POKéDEX.
 [part.dex]
@@ -309,6 +317,127 @@ parts = ['ram', 'foes']
 name = 'UNBOUND_FR'
 parts = ['ram', 'foes']
 
+# pokeemerald-expansion family (and Recharged Yellow): PARTY / BAG / BATTLE from RAM, party and bag icons from the ROM.
+[config.imperium]
+name = 'IMPERIUM'
+parts = ['ram', 'foes', 'icons']
+
+[config.tmt2]
+name = 'TMT2'
+parts = ['ram', 'foes', 'icons']
+
+[config.recharged_yellow_v1_8_0]
+name = 'RECHARGED_YELLOW_V1_8_0'
+parts = ['ram', 'foes', 'icons']
+
+[config.recharged_yellow_v1_9_0]
+name = 'RECHARGED_YELLOW_V1_9_0'
+parts = ['ram', 'foes', 'icons']
+
+[config.recharged_yellow_v1_9_4]
+name = 'RECHARGED_YELLOW_V1_9_4'
+parts = ['ram', 'foes', 'icons']
+
+[config.recharged_yellow_v1_9_7]
+name = 'RECHARGED_YELLOW_V1_9_7'
+parts = ['ram', 'foes', 'icons']
+
+[config.emerald_seaglass]
+name = 'SEAGLASS'
+parts = ['ram', 'foes', 'icons']
+
+[config.lazarus]
+name = 'LAZARUS'
+parts = ['ram', 'foes', 'icons']
+
+[config.wishes]
+name = 'WISHES'
+parts = ['ram', 'foes', 'icons']
+
+[config.mariomon_v1_5_2]
+name = 'MARIOMON_V1_5_2'
+parts = ['ram', 'foes', 'icons']
+
+[config.mariomon_v1_5_1]
+name = 'MARIOMON_V1_5_1'
+parts = ['ram', 'foes', 'icons']
+
+[config.mariomon_v1_3]
+name = 'MARIOMON_V1_3'
+parts = ['ram', 'foes', 'icons']
+
+[config.mariomon_v1_2_2]
+name = 'MARIOMON_V1_2_2'
+parts = ['ram', 'foes', 'icons']
+
+[config.mariomon_v1_2_1]
+name = 'MARIOMON_V1_2_1'
+parts = ['ram', 'foes', 'icons']
+
+[config.rowe]
+name = 'ROWE'
+parts = ['ram', 'foes', 'icons']
+
+[config.team_rocket]
+name = 'TEAM_ROCKET'
+parts = ['ram', 'foes', 'icons']
+
+[config.dreamstone]
+name = 'DREAMSTONE'
+parts = ['ram', 'foes', 'icons']
+
+[config.soulgold]
+name = 'SOULGOLD'
+parts = ['ram', 'foes', 'icons']
+
+[config.soulgold_v1_2]
+name = 'SOULGOLD_V1_2'
+parts = ['ram', 'foes', 'icons']
+
+[config.soulgold_v1_2b]
+name = 'SOULGOLD_V1_2B'
+parts = ['ram', 'foes', 'icons']
+
+[config.soulgold_v1_2c]
+name = 'SOULGOLD_V1_2C'
+parts = ['ram', 'foes', 'icons']
+
+[config.heart_and_soul]
+name = 'HEART_AND_SOUL'
+parts = ['ram', 'foes', 'icons']
+
+[config.quetzal]
+name = 'QUETZAL_V9_0'
+parts = ['ram', 'foes', 'icons']
+
+[config.quetzal_es]
+name = 'QUETZAL_V9_0_ES'
+parts = ['ram', 'foes', 'icons']
+
+[config.quetzal_v1]
+name = 'QUETZAL_V9_1'
+parts = ['ram', 'foes', 'icons']
+
+[config.quetzal_es_v1]
+name = 'QUETZAL_V9_1_ES'
+parts = ['ram', 'foes', 'icons']
+
+[config.quetzal_v084]
+name = 'QUETZAL_V0_8_4'
+parts = ['ram', 'foes', 'icons']
+
+[config.quetzal_v084_es]
+name = 'QUETZAL_V0_8_4_ES'
+parts = ['ram', 'foes', 'icons']
+
+[config.quetzal_moemon_v084]
+name = 'MOEMON_QUETZAL_V0_8_4'
+parts = ['ram', 'foes', 'icons']
+
+[config.quetzal_moemon_v084_es]
+name = 'MOEMON_QUETZAL_V0_8_4_ES'
+parts = ['ram', 'foes', 'icons']
+
 # A hack's own species / item / move names (the Kotlin val of the app's data/), as ActiveTables.kt picks them; a config
 # without a [text.*] reads retail's. Not here yet: Odyssey and the in-place FireRed hacks (Ultra Violet, Rocket Edition,
 # Ash Gray, Ghost Grey) - their names are retail's with a few runtime-merged renames.
@@ -365,3 +494,232 @@ moves = 'moveDataGlazed'
 species = 'speciesNamesOrangeIslands'
 items = 'itemNamesOrangeIslands'
 moves = 'moveDataOrangeIslands'
+
+[text.imperium]
+species = 'speciesNamesImperium'
+items = 'itemNamesImperium'
+moves = 'moveDataImperium'
+typeNames = 'typeNamesImperium'
+typeChart = 'typeEffectivenessImperium'
+speciesTypes = 'speciesTypeDataImperium'
+
+[text.tmt2]
+species = 'speciesNamesTmt2'
+items = 'itemNamesTmt2'
+moves = 'moveDataTmt2'
+typeNames = 'typeNamesTmt2'
+typeChart = 'typeEffectivenessTmt2'
+speciesTypes = 'speciesTypeDataTmt2'
+
+[text.recharged_yellow_v1_8_0]
+species = 'speciesNamesRechargedYellow'
+items = 'itemNamesRechargedYellow'
+moves = 'moveDataRechargedYellow'
+
+[text.recharged_yellow_v1_9_0]
+species = 'speciesNamesRechargedYellow'
+items = 'itemNamesRechargedYellow'
+moves = 'moveDataRechargedYellow'
+
+[text.recharged_yellow_v1_9_4]
+species = 'speciesNamesRechargedYellow'
+items = 'itemNamesRechargedYellow'
+moves = 'moveDataRechargedYellow'
+
+[text.recharged_yellow_v1_9_7]
+species = 'speciesNamesRechargedYellow'
+items = 'itemNamesRechargedYellow'
+moves = 'moveDataRechargedYellow'
+
+[text.emerald_seaglass]
+species = 'speciesNamesNationalDex'
+items = 'itemNamesSeaglass'
+moves = 'moveDataSeaglass'
+typeNames = 'typeNamesHns'
+typeChart = 'typeEffectivenessHns'
+speciesTypes = 'speciesTypeDataSeaglass'
+
+[text.lazarus]
+species = 'speciesNamesLazarus'
+items = 'itemNamesLazarus'
+moves = 'moveDataLazarus'
+typeNames = 'typeNamesLazarus'
+typeChart = 'typeEffectivenessLazarus'
+speciesTypes = 'speciesTypeDataLazarus'
+
+[text.wishes]
+species = 'speciesNamesWishes'
+items = 'itemNamesWishes'
+moves = 'moveDataWishes'
+typeNames = 'typeNamesWishes'
+typeChart = 'typeEffectivenessWishes'
+speciesTypes = 'speciesTypeDataWishes'
+
+[text.mariomon_v1_5_2]
+species = 'speciesNamesMariomon'
+items = 'itemNamesMariomon'
+moves = 'moveDataMariomon'
+typeNames = 'typeNamesMariomon'
+typeChart = 'typeEffectivenessMariomon'
+speciesTypes = 'speciesTypeDataMariomon'
+
+[text.mariomon_v1_5_1]
+species = 'speciesNamesMariomon'
+items = 'itemNamesMariomon'
+moves = 'moveDataMariomon'
+typeNames = 'typeNamesMariomon'
+typeChart = 'typeEffectivenessMariomon'
+speciesTypes = 'speciesTypeDataMariomon'
+
+[text.mariomon_v1_3]
+species = 'speciesNamesMariomonV13'
+items = 'itemNamesMariomon'
+moves = 'moveDataMariomonV13'
+typeNames = 'typeNamesMariomon'
+typeChart = 'typeEffectivenessMariomon'
+speciesTypes = 'speciesTypeDataMariomonV13'
+
+[text.mariomon_v1_2_2]
+species = 'speciesNamesMariomonV13'
+items = 'itemNamesMariomon'
+moves = 'moveDataMariomonV13'
+typeNames = 'typeNamesMariomon'
+typeChart = 'typeEffectivenessMariomon'
+speciesTypes = 'speciesTypeDataMariomonV13'
+
+[text.mariomon_v1_2_1]
+species = 'speciesNamesMariomonV13'
+items = 'itemNamesMariomon'
+moves = 'moveDataMariomonV13'
+typeNames = 'typeNamesMariomon'
+typeChart = 'typeEffectivenessMariomon'
+speciesTypes = 'speciesTypeDataMariomonV13'
+
+[text.rowe]
+species = 'speciesNamesRowe'
+items = 'itemNamesRowe'
+moves = 'moveDataRowe'
+typeNames = 'typeNamesRowe'
+typeChart = 'typeEffectivenessRowe'
+speciesTypes = 'speciesTypeDataRowe'
+
+[text.team_rocket]
+species = 'speciesNamesTeamRocket'
+items = 'itemNamesTeamRocket'
+moves = 'moveDataTeamRocket'
+typeNames = 'typeNamesTeamRocket'
+typeChart = 'typeEffectivenessTeamRocket'
+speciesTypes = 'speciesTypeDataTeamRocket'
+
+[text.dreamstone]
+species = 'speciesNamesDreamstone'
+items = 'itemNamesDreamstone'
+moves = 'moveDataDreamstone'
+typeNames = 'typeNamesDreamstone'
+typeChart = 'typeEffectivenessDreamstone'
+speciesTypes = 'speciesTypeDataDreamstone'
+
+[text.soulgold]
+species = 'speciesNamesSoulGold'
+items = 'itemNamesSoulGold'
+moves = 'moveDataSoulGold'
+typeNames = 'typeNamesSoulGold'
+typeChart = 'typeEffectivenessSoulGold'
+speciesTypes = 'speciesTypeDataSoulGold'
+
+[text.soulgold_v1_2]
+species = 'speciesNamesSoulGold'
+items = 'itemNamesSoulGold'
+moves = 'moveDataSoulGold'
+typeNames = 'typeNamesSoulGold'
+typeChart = 'typeEffectivenessSoulGold'
+speciesTypes = 'speciesTypeDataSoulGold'
+
+[text.soulgold_v1_2b]
+species = 'speciesNamesSoulGold'
+items = 'itemNamesSoulGold'
+moves = 'moveDataSoulGold'
+typeNames = 'typeNamesSoulGold'
+typeChart = 'typeEffectivenessSoulGold'
+speciesTypes = 'speciesTypeDataSoulGold'
+
+[text.soulgold_v1_2c]
+species = 'speciesNamesSoulGold'
+items = 'itemNamesSoulGold'
+moves = 'moveDataSoulGold'
+typeNames = 'typeNamesSoulGold'
+typeChart = 'typeEffectivenessSoulGold'
+speciesTypes = 'speciesTypeDataSoulGold'
+
+[text.heart_and_soul]
+species = 'speciesNamesHns'
+items = 'itemNamesHns'
+moves = 'moveDataHns'
+typeNames = 'typeNamesHns'
+typeChart = 'typeEffectivenessHns'
+speciesTypes = 'speciesTypeDataHns'
+
+[text.quetzal]
+species = 'speciesNamesQuetzal'
+items = 'itemNamesQuetzal'
+moves = 'moveDataQuetzal'
+typeNames = 'typeNamesQuetzal'
+typeChart = 'typeEffectivenessQuetzal'
+speciesTypes = 'speciesTypeDataQuetzal'
+
+[text.quetzal_es]
+species = 'speciesNamesQuetzal + speciesNamesQuetzalEs'
+items = 'itemNamesQuetzal + itemNamesQuetzalEs'
+moves = 'moveDataQuetzal'
+typeNames = 'typeNamesQuetzal'
+typeChart = 'typeEffectivenessQuetzal'
+speciesTypes = 'speciesTypeDataQuetzal'
+
+[text.quetzal_v1]
+species = 'speciesNamesQuetzal'
+items = 'itemNamesQuetzal'
+moves = 'moveDataQuetzal'
+typeNames = 'typeNamesQuetzal'
+typeChart = 'typeEffectivenessQuetzal'
+speciesTypes = 'speciesTypeDataQuetzal'
+
+[text.quetzal_es_v1]
+species = 'speciesNamesQuetzal + speciesNamesQuetzalEs'
+items = 'itemNamesQuetzal + itemNamesQuetzalEs'
+moves = 'moveDataQuetzal'
+typeNames = 'typeNamesQuetzal'
+typeChart = 'typeEffectivenessQuetzal'
+speciesTypes = 'speciesTypeDataQuetzal'
+
+[text.quetzal_v084]
+species = 'speciesNamesQuetzal'
+items = 'itemNamesQuetzal'
+moves = 'moveDataQuetzal + moveDataQuetzalV084Changes'
+typeNames = 'typeNamesQuetzal'
+typeChart = 'typeEffectivenessQuetzal'
+speciesTypes = 'speciesTypeDataQuetzal'
+
+[text.quetzal_v084_es]
+species = 'speciesNamesQuetzal + speciesNamesQuetzalEs'
+items = 'itemNamesQuetzal + itemNamesQuetzalEs'
+moves = 'moveDataQuetzal + moveDataQuetzalV084Changes'
+typeNames = 'typeNamesQuetzal'
+typeChart = 'typeEffectivenessQuetzal'
+speciesTypes = 'speciesTypeDataQuetzal'
+
+[text.quetzal_moemon_v084]
+species = 'speciesNamesQuetzal'
+items = 'itemNamesQuetzal'
+moves = 'moveDataQuetzal + moveDataQuetzalV084Changes'
+typeNames = 'typeNamesQuetzal'
+typeChart = 'typeEffectivenessQuetzal'
+speciesTypes = 'speciesTypeDataQuetzal'
+
+[text.quetzal_moemon_v084_es]
+species = 'speciesNamesQuetzal + speciesNamesQuetzalEs'
+items = 'itemNamesQuetzal + itemNamesQuetzalEs'
+moves = 'moveDataQuetzal + moveDataQuetzalV084Changes'
+typeNames = 'typeNamesQuetzal'
+typeChart = 'typeEffectivenessQuetzal'
+speciesTypes = 'speciesTypeDataQuetzal'
+

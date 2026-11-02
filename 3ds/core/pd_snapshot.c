@@ -153,6 +153,12 @@ static bool decode_rowe_mon(const uint8_t* raw, const struct pd_party_layout* l,
 // Android Gen3Mon.kt decodePartyMon: retail's encrypted, checksummed substructs first, else a
 // plaintext box (CFRU's: Unbound, Radical Red) at the layout's plainBox.
 bool pd_decode_party_mon_l(const uint8_t* raw, const struct pd_party_layout* l, struct pd_mon* m) {
+    return pd_decode_party_mon_c(raw, l, NULL, m);
+}
+
+// ... and a config's masks (Config.masked): an expansion game packs more into the species, move and PP words.
+bool pd_decode_party_mon_c(const uint8_t* raw, const struct pd_party_layout* l, const struct pd_config* cfg,
+                           struct pd_mon* m) {
     memset(m, 0, sizeof(*m));
     uint32_t personality = u32(raw);
     if (l->rowe) return decode_rowe_mon(raw, l, m);
@@ -192,7 +198,9 @@ bool pd_decode_party_mon_l(const uint8_t* raw, const struct pd_party_layout* l, 
             m->hasExperience = true;
         }
     }
-    int species = u16(growth) & (sum == stored && stored != 0 ? 0xFFFF : l->plainSpeciesMask);
+    unsigned speciesMask = cfg ? (unsigned) cfg->speciesMask : 0xFFFFu;
+    bool masked = cfg && (cfg->speciesMask != 0xFFFF || cfg->moveMask != 0xFFFF || cfg->ppMask != 0xFF);
+    int species = u16(growth) & speciesMask & (sum == stored && stored != 0 ? 0xFFFF : l->plainSpeciesMask);
     if (species == 0 || species > 4000) return false;
     m->species = (uint16_t) species;
     m->heldItem = u16(growth + 2) & (sum == stored && stored != 0 ? 0xFFFF : l->plainItemMask);
@@ -218,7 +226,12 @@ bool pd_decode_party_mon_l(const uint8_t* raw, const struct pd_party_layout* l, 
     for (int i = 0; i < PD_NUM_MOVES; i++) {
         m->moves[i] = u16(attacks + i * 2);
         m->pp[i] = attacks[8 + i];
+        if (masked) {
+            m->moves[i] &= (uint16_t) cfg->moveMask;
+            m->pp[i] &= (uint8_t) cfg->ppMask;
+        }
     }
+    if (masked && m->hasExperience) m->experience &= 0x1FFFFFu; // the same packing: experience in 21 bits
     m->personality = personality;
     m->level = raw[l->level];
     m->hp = u16(raw + l->hp) & ((1u << l->hpBits) - 1);
@@ -288,7 +301,7 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
     uint8_t raw[PD_PARTY_SIZE * MON_SIZE_MAX];
     if (count && read(ctx, cfg->playerParty, raw, count * lay->size)) {
         for (int i = 0; i < count; i++) {
-            if (pd_decode_party_mon_l(raw + i * lay->size, lay, &s->party[s->partyCount])) s->partyCount++;
+            if (pd_decode_party_mon_c(raw + i * lay->size, lay, cfg, &s->party[s->partyCount])) s->partyCount++;
         }
     }
 
@@ -330,7 +343,7 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
     if (haveKey && save_block(cfg, read, ctx, cfg->saveBlock1Ptr, &sb1) &&
         read_u32(read, ctx, sb1 + cfg->moneyOff, &money)) {
         uint32_t v = money ^ key;
-        if (v <= MAX_MONEY) s->money = (long) v;
+        if (v <= (cfg->maxMoney ? cfg->maxMoney : MAX_MONEY)) s->money = (long) v;
     }
 
     // --- bag: quantities XOR the key's low half (readNativeBag) ---
@@ -529,7 +542,7 @@ static void read_foes(struct pd_snapshot* s, const struct pd_config* cfg, pd_rea
     uint8_t raw[PD_PARTY_SIZE * MON_SIZE_MAX];
     if (!read(ctx, cfg->enemyParty, raw, PD_PARTY_SIZE * lay->size)) return;
     for (int i = 0; i < PD_PARTY_SIZE; i++) {
-        if (pd_decode_party_mon_l(raw + i * lay->size, lay, &s->foes[s->foeCount])) s->foeCount++;
+        if (pd_decode_party_mon_c(raw + i * lay->size, lay, cfg, &s->foes[s->foeCount])) s->foeCount++;
     }
     if (!s->foeCount || foeBattler < 0 || !cfg->battlerPartyIndexes) return;
     uint8_t idx[2];

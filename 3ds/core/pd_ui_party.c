@@ -275,8 +275,8 @@ static void summary_stats(struct pd_canvas* c, const struct pd_mon_stats* s,
     if(s->hasHiddenPower) {
         pd_text(c,x,ry+2*row,"HIDDEN POWER",PD_MUTED,PD_MUTED_SHADOW);
         if(s->hiddenPowerPower>0)
-            snprintf(buf,sizeof buf,"%s  PWR %d",pd_type_name(s->hiddenPowerType),s->hiddenPowerPower);
-        else snprintf(buf,sizeof buf,"%s",pd_type_name(s->hiddenPowerType));
+            snprintf(buf,sizeof buf,"%s  PWR %d",pd_type_name(NULL, s->hiddenPowerType),s->hiddenPowerPower);
+        else snprintf(buf,sizeof buf,"%s",pd_type_name(NULL, s->hiddenPowerType));
         pd_text_fit(c,x,ry+3*row,w,buf,PD_LABEL,PD_LABEL_SHADOW);
     }
 }
@@ -316,16 +316,17 @@ static void summary_info(struct pd_canvas* c, const struct pd_game* g, const str
         }
     }
     int t1, t2;
-    pd_species_type_pair(m->species, &t1, &t2);
+    pd_species_type_pair(g, m->species, &t1, &t2);
     static const char* const heads[3] = {"WEAK TO", "RESISTS", "IMMUNE"};
     for (int group = 0; group < 3; group++) {
         buf[0] = 0;
-        for (int t = 0; t < pd_type_names_count; t++) {
-            int pct = pd_type_multiplier_pct(t, t1, t2);
+        for (int t = 0; t < 32; t++) {
+            if (!pd_type_name(g, t)[0] || !strcmp(pd_type_name(g, t), "???")) continue;
+            int pct = pd_type_multiplier_pct(g, t, t1, t2);
             if (!((group == 0 && pct > 100) || (group == 1 && pct > 0 && pct < 100) || (group == 2 && pct == 0)))
                 continue;
             size_t n = strlen(buf);
-            snprintf(buf + n, sizeof(buf) - n, "%s%s", n ? ", " : "", pd_type_name(t));
+            snprintf(buf + n, sizeof(buf) - n, "%s%s", n ? ", " : "", pd_type_name(g, t));
         }
         if (!buf[0] || row + 13 > bottom) continue;
         pd_text(c, x, row, heads[group], PD_MUTED, PD_MUTED_SHADOW);
@@ -378,7 +379,7 @@ static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game*
         } else for (int i = 0; i < PD_NUM_MOVES; i++) {
             if (!m->moves[i]) continue;
             pd_text_fit(c, ix, ty, iw - 120, pd_move_name(g, m->moves[i], buf, sizeof(buf)), PD_LABEL, PD_LABEL_SHADOW);
-            pd_text(c, ix + iw - 116, ty, pd_type_name(pd_move_type(g, m->moves[i])), PD_MUTED, PD_MUTED_SHADOW);
+            pd_text(c, ix + iw - 116, ty, pd_type_name(g, pd_move_type(g, m->moves[i])), PD_MUTED, PD_MUTED_SHADOW);
             char pp[12];
             snprintf(pp, sizeof(pp), "PP %d", m->pp[i]);
             pd_text_right(c, ix + iw, ty, pp, PD_VALUE, PD_VALUE_SHADOW);

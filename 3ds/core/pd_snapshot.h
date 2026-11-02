@@ -142,6 +142,8 @@ void pd_gen3_text(const uint8_t* src, size_t maxLen, char* out, size_t outLen);
 bool pd_decode_party_mon(const uint8_t* raw, struct pd_mon* out);
 // ... by a config's layout (struct pd_party_layout; a plaintext box where the checksum fails).
 bool pd_decode_party_mon_l(const uint8_t* raw, const struct pd_party_layout* l, struct pd_mon* out);
+bool pd_decode_party_mon_c(const uint8_t* raw, const struct pd_party_layout* l, const struct pd_config* cfg,
+                           struct pd_mon* out);
 
 // The item's name / bag description in the game's own words ("" if unknown).
 const char* pd_item_name(const struct pd_game* g, int item);

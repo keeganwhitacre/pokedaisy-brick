@@ -79,6 +79,7 @@ struct pd_config {
     // Ruby / Sapphire: saveBlock1Ptr / saveBlock2Ptr are the blocks themselves, gBattleStruct a fixed block.
     bool staticSaveBlocks, battleStructStatic;
     uint32_t moneyOff;         // in SaveBlock1
+    uint32_t maxMoney;         // the most the game lets a player hold (retail 999999)
     // The battle's FOE TEAM: gEnemyParty (6 struct Pokemon), gBattlerPartyIndexes
     // (u16 per battler: which one is out) and gBattleStruct (a pointer) ->
     // monToSwitchIntoId[battler] (the trainer's next pick). 0 = unknown.
@@ -93,8 +94,14 @@ struct pd_config {
     // The bag's icons: sItemIconTable, {tiles, palette} (both LZ77) every itemIconStride bytes. 0 = none.
     uint32_t itemIconTable;
     int itemIconStride;
+    // An expansion game's icons live inside gSpeciesInfo / gItemsInfo entries: the strides of the mon icon pointers
+    // and palette indices (masked), and whether the item palette is LZ77 (else raw).
+    int monIconStride, monPalIdxStride, monPalIdxMask;
+    bool itemPalCompressed;
     // The game's own egg species (0 = retail's 412) and how many species its tables hold (with the egg).
     int eggSpecies, speciesCount;
+    // Bits an expansion game packs above the species / move / PP words (0xFFFF / 0xFFFF / 0xFF = none).
+    int speciesMask, moveMask, ppMask;
     // gBagPockets: five {slots pointer, capacity} pairs, 8 bytes apart;
     // bagOrder[i] is the pocket (PD_POCKET_*) the game keeps at index i.
     uint32_t bagPockets;
