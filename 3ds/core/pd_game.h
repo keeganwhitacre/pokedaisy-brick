@@ -159,9 +159,11 @@ struct pd_config {
     // dexBlock 0 = not read here (the schema's required field, so 0 only for a bare config).
     uint8_t dexBlock; // PD_DEX_SB1 / PD_DEX_SB2 / PD_DEX_FIXED (offsets then absolute)
     uint8_t dexFirstBit;
-    bool dexSeenLevels, dexBySpecies, dexSeenOrCaught; // Quetzal / Emerald Rogue: read differently, not here yet
+    bool dexSeenLevels, dexBySpecies, dexSeenOrCaught; // Quetzal's 3-bit levels / Emerald Rogue's species-indexed bits
     uint16_t dexBytes, nationalCount;
     uint32_t dexSeenOff, dexCaughtOff;
+    uint32_t dexCaughtRegion1, dexCaughtRegion2, dexCaughtRegion3; // Quetzal: caught is one bit array per region (dexBytes each), any of them counts
+    bool dexCaughtFromLevel;     // Quetzal Alpha 0.8.4: no caught arrays - a seen level of 2 or more is caught
     int8_t nationalMagicOff; // SaveBlock2 + 0x18 + off == nationalMagic; -1 = the National Dex is always there
     uint8_t nationalMagic;
 

@@ -507,17 +507,29 @@ static void read_save_fields(struct pd_snapshot* s, const struct pd_game* g, pd_
 
     // The seen / caught bit arrays (the app's readPokedexState): where there are anti-cheat copies of
     // seen, a bit only counts if every copy agrees, and caught needs seen too. Kept by national number.
-    // Quetzal's levels and Emerald Rogue's species-indexed arrays are not read here yet.
+    // Quetzal keeps a 3-bit level per species (8 to a u32): any level is seen, caught is a bit in any of three
+    // regions' arrays or (Alpha 0.8.4) a level of 2 or more.
     uint8_t magic = 0;
     int count = cfg->nationalCount;
     if (cfg->dexBlock && cfg->dexBytes && cfg->dexBytes <= PD_DEX_BYTES && count >= 1 && count <= PD_DEX_BYTES * 8 &&
-        !cfg->dexSeenLevels && (!cfg->dexBySpecies || (g->rom && pd_dex_available(g)))) {
-        uint8_t seen[PD_DEX_BYTES], owned[PD_DEX_BYTES], copy[2][PD_DEX_BYTES];
+        (!cfg->dexBySpecies || (g->rom && pd_dex_available(g)))) {
+        uint8_t seen[PD_DEX_BYTES * 4], owned[PD_DEX_BYTES], copy[2][PD_DEX_BYTES], region[PD_DEX_BYTES];
         uint32_t base = cfg->dexBlock == PD_DEX_SB1 ? sb1 : cfg->dexBlock == PD_DEX_SB2 ? sb2 : 0;
         const uint32_t copyOff[2] = { cfg->dexSeenCopy1, cfg->dexSeenCopy2 };
-        bool ok = read(ctx, base + cfg->dexSeenOff, seen, cfg->dexBytes) &&
-            read(ctx, base + cfg->dexCaughtOff, owned, cfg->dexBytes) &&
+        const uint32_t regionOff[3] = { cfg->dexCaughtRegion1, cfg->dexCaughtRegion2, cfg->dexCaughtRegion3 };
+        bool levels = cfg->dexSeenLevels;
+        bool ok = read(ctx, base + cfg->dexSeenOff, seen, levels ? cfg->dexBytes * 4u : cfg->dexBytes) &&
             (cfg->nationalMagicOff < 0 || read(ctx, sb2 + 0x18 + (uint32_t) cfg->nationalMagicOff, &magic, 1));
+        memset(owned, 0, sizeof owned);
+        if (ok && levels) {
+            for (int k = 0; ok && k < 3; k++) {
+                if (!regionOff[k]) continue;
+                ok = read(ctx, base + regionOff[k], region, cfg->dexBytes);
+                for (int j = 0; ok && j < cfg->dexBytes; j++) owned[j] |= region[j];
+            }
+        } else if (ok) {
+            ok = read(ctx, base + cfg->dexCaughtOff, owned, cfg->dexBytes);
+        }
         for (int k = 0; ok && k < 2; k++) ok = !copyOff[k] || read(ctx, sb1 + copyOff[k], copy[k], cfg->dexBytes);
         if (ok) {
             s->dexOk = true;
@@ -532,9 +544,19 @@ static void read_save_fields(struct pd_snapshot* s, const struct pd_game* g, pd_
             for (int n = 1; n <= count; n++) {
                 // Emerald Rogue keeps its bits by species id; the ROM's table says which species No. n is.
                 int i = (cfg->dexBySpecies ? pd_dex_species(g, n) : n) - cfg->dexFirstBit;
-                if (i < 0 || i / 8 >= cfg->dexBytes || (cfg->dexBySpecies && i + cfg->dexFirstBit == 0)) continue;
+                if (i < 0 || (cfg->dexBySpecies && i + cfg->dexFirstBit == 0)) continue;
                 int byte = i / 8, bit = i % 8;
-                bool sn = seen[byte] >> bit & 1, cn = owned[byte] >> bit & 1;
+                bool sn, cn;
+                if (levels) {
+                    if (byte >= cfg->dexBytes) continue;
+                    unsigned lvl = (u32(seen + i / 8 * 4) >> (3 * (i % 8))) & 7;
+                    sn = lvl >= 1;
+                    cn = cfg->dexCaughtFromLevel ? lvl >= 2 : (owned[byte] >> bit & 1);
+                } else {
+                    if (byte >= cfg->dexBytes) continue;
+                    sn = seen[byte] >> bit & 1;
+                    cn = owned[byte] >> bit & 1;
+                }
                 if (cfg->dexSeenOrCaught) sn = sn || cn; // Rogue's 2-bit state: a caught species is seen
                 for (int k = 0; k < 2; k++) if (copyOff[k]) sn = sn && (copy[k][byte] >> bit & 1);
                 if (copyOff[0]) cn = cn && sn; // with copies, caught needs seen too
