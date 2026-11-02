@@ -16,22 +16,26 @@ static bool rd(void* c, uint32_t a, void* o, size_t n) {
 }
 
 // One rendered card: back, colon, minutes override (-1 = the save's) and the CRC TrainerCardTest records.
-struct shot { bool back, colon; int minutes; const char* crc; };
+struct shot { bool back, colon; int minutes; const char* crc; bool female; };
 struct want {
     const char* fixture; const struct pd_config* cfg; int kind; const char* rom; struct shot shots[6];
 };
 #define W(fx, C, K, rom, ...) { fx, &PD_CONFIG_##C, K, rom, { __VA_ARGS__ } }
 static const struct want WANT[] = {
     W("firered_vanilla", FIRERED_REV1, PD_GAME_FIRERED, "Pokemon - Fire Red Version.gba",
-      { false, true, -1, "d62339db" }, { true, true, -1, "045996a2" }),
+      { false, true, -1, "d62339db", false }, { true, true, -1, "045996a2", false }),
     W("emerald_vanilla", EMERALD, PD_GAME_EMERALD, "Pokemon - Emerald Version.gba",
-      { false, true, 27, "f3e14960" }, { true, true, -1, "74484c21" }),
+      { false, true, 27, "f3e14960", false }, { true, true, -1, "74484c21", false }),
     W("unbound", UNBOUND, PD_GAME_FIRERED, "Pokemon Unbound (v2.1.1.1).gba",
-      { false, true, -1, "be68c6aa" }, { true, true, -1, "5155c5ba" }),
+      { false, true, -1, "be68c6aa", false }, { true, true, -1, "5155c5ba", false }),
     W("emerald_legacy", EMERALD_LEGACY, PD_GAME_EMERALD, "Pokemon Emerald Legacy (v1.1.4).gba",
-      { false, true, -1, "6da94bfe" }, { true, true, -1, "74484c21" }),
+      { false, true, -1, "6da94bfe", false }, { true, true, -1, "74484c21", false }),
     W("emerald_legacy_stars", EMERALD_LEGACY, PD_GAME_EMERALD, "Pokemon Emerald Legacy (v1.1.4).gba",
-      { false, false, -1, "19efdadd" }, { true, true, -1, "90074f39" }),
+      { false, false, -1, "19efdadd", false }, { true, true, -1, "90074f39", false }),
+    W("lazarus_card", LAZARUS, PD_GAME_EMERALD, "Pokemon Lazarus v2.0.gba",
+      { false, true, -1, "4daa6af1", false }, { true, true, -1, "4c5a1651", false }, { false, true, -1, "cfef77a8", true }),
+    W("lazarus_card_max", LAZARUS, PD_GAME_EMERALD, "Pokemon Lazarus v2.0.gba",
+      { false, true, -1, "f6224f73", false }, { true, true, -1, "f2eda466", false }),
 };
 
 static uint8_t* slurp(const char* path, long* n) {
@@ -75,9 +79,11 @@ int main(int argc, char** argv) {
         static struct pd_snapshot s; pd_snapshot_read(&s, &g, rd, NULL);
         struct pd_card_info c;
         if (!pd_card_info(&g, &s, &c)) { printf("FAIL %s: no card info\n", t->fixture); bad++; free(rom); continue; }
+        if (getenv("CARD_DEBUG")) printf("%s stars %d drawn %d badges %x hof %x dex %d money %ld nat %d cnt %d\n", t->fixture, c.stars, c.drawnStars, c.badges, c.hofDebut, c.dexCaught, c.money, s.dexNational, s.dexCount);
         for (int i = 0; i < 6 && t->shots[i].crc; i++) {
             struct pd_card_info k = c;
             if (t->shots[i].minutes >= 0) k.minutes = t->shots[i].minutes;
+            if (t->shots[i].female) k.female = true;
             static uint32_t img[PD_CARD_W * PD_CARD_H];
             char got[9] = "";
             if (!pd_card_render(&g, &k, t->shots[i].back, t->shots[i].colon, true, img)) strcpy(got, "(no art)");

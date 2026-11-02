@@ -26,6 +26,7 @@ struct pd_card_info {
     int dexCaught;       // regional until the National Dex; -1 = no POKéDEX yet
     int badges;          // bit i = badge i+1
     int stars;
+    int drawnStars;      // the stars drawn (Lazarus counts them by a rule of its own)
     int hofDebut;        // h << 16 | m << 8 | s of the first Hall of Fame; 0 = none
     int linkWins, linkLosses, trades, unionRoom, berryCrush, linkContests, linkPokeblocks, battlePoints;
     int stickers[3];     // FireRed's Sticker Man: a level 1-4 each, 0 = none

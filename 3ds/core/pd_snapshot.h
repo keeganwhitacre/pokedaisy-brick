@@ -102,6 +102,7 @@ struct pd_snapshot {
     // readPokedexState: seen only when SaveBlock2's flags and both of
     // SaveBlock1's copies agree; caught only when also seen).
     bool dexOk, dexNational;
+    bool dexStray; // Lazarus: national 0's caught bit, out at the caught array + 0x1FFF (bit 7)
     int dexCount; // national numbers this game's dex holds (bits 0..dexCount-1 of the arrays below)
     uint8_t dexSeen[PD_DEX_BYTES], dexCaught[PD_DEX_BYTES];
 
@@ -114,6 +115,7 @@ struct pd_snapshot {
     // game's encoding, 0xFF-ended), ID and play time; the game stats decrypted;
     // Emerald's museum paintings (each winner's species) and battle points.
     bool cardOk;
+    uint8_t cardMagic; // SaveBlock2 + cardMagicOff
     uint8_t playerName[8];
     uint16_t trainerId, playHours;
     uint8_t playMinutes;

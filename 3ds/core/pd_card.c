@@ -12,6 +12,9 @@
 // Emerald Legacy's regional dex past Hoenn's (TrainerCard.kt LEGACY_HOENN_TO_NATIONAL).
 static const uint16_t LEGACY_EXTRA[8] = { 77, 78, 198, 215, 220, 221, 228, 229 };
 
+extern const uint16_t pd_card_lazarus_regional_to_national[];
+extern const int pd_card_lazarus_regional_to_national_count;
+
 static const uint16_t HOENN_TO_NATIONAL[202] = {
     252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271,
     272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 63, 64,
@@ -58,11 +61,17 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
     c->minutes = s->playMinutes < 59 ? s->playMinutes : 59;
     c->money = s->money >= 0 ? s->money : 0;
 
-    bool national = s->dexNational && (cfg->nationalMagicOff < 0 ||
-        (pd_var(s, cfg->nationalVar) == cfg->nationalVarValue && pd_flag(s, cfg->nationalFlag)));
+    // The magic is read where the card's own record says (Lazarus keeps it at +0x1E, the dex's table says +0x1A).
+    bool national = s->dexOk && (cfg->nationalMagicOff < 0 ||
+        (s->cardMagic == cfg->nationalMagic && pd_var(s, cfg->nationalVar) == cfg->nationalVarValue &&
+         pd_flag(s, cfg->nationalFlag)));
     int caught = 0;
     if (national) {
         for (int n = 1; n <= s->dexCount; n++) caught += pd_dex_caught(s, n);
+    } else if (cfg->cardStyle == PD_CARD_LAZARUS) {
+        for (int i = 0; i < pd_card_lazarus_regional_to_national_count; i++)
+            caught += pd_dex_caught(s, pd_card_lazarus_regional_to_national[i]);
+        caught += s->dexStray;
     } else if (cfg->cardStyle == PD_CARD_HOENN || cfg->cardStyle == PD_CARD_LEGACY) {
         for (int i = 0; i < 202; i++) caught += pd_dex_caught(s, HOENN_TO_NATIONAL[i]);
         if (cfg->cardStyle == PD_CARD_LEGACY)
@@ -81,7 +90,13 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
     c->hofDebut = hof;
     // HasAllHoennMons: the Hoenn dex minus Jirachi and Deoxys.
     bool allHoenn = true;
-    for (int i = 0; i < 200 && allHoenn; i++) allHoenn = pd_dex_caught(s, HOENN_TO_NATIONAL[i]);
+    if (cfg->cardStyle == PD_CARD_LAZARUS) { // its whole ILIOS dex, and the stray entry 0 (nothing left out)
+        for (int i = 0; i < pd_card_lazarus_regional_to_national_count && allHoenn; i++)
+            allHoenn = pd_dex_caught(s, pd_card_lazarus_regional_to_national[i]);
+        allHoenn = allHoenn && s->dexStray;
+    } else {
+        for (int i = 0; i < 200 && allHoenn; i++) allHoenn = pd_dex_caught(s, HOENN_TO_NATIONAL[i]);
+    }
     // Legacy's regional dex runs 210 (Hoenn's 202, JIRACHI and DEOXYS still left out of "all", then eight more).
     for (int i = 0; i < 8 && allHoenn && cfg->cardStyle == PD_CARD_LEGACY; i++) allHoenn = pd_dex_caught(s, LEGACY_EXTRA[i]);
     c->stars = (hof != 0) + allHoenn;
@@ -91,15 +106,21 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
         for (int i = 0; i < 5; i++) all &= s->museumWinners[i] != 0;
         c->stars += all;
     }
+    bool symbols = false;
     if (cfg->frontierSymbolFlag) {
-        bool all = true;
+        symbols = true;
         for (int i = 0; i < 7; i++) {
-            all &= pd_flag(s, cfg->frontierSymbolFlag + 2 * i) && pd_flag(s, cfg->frontierSymbolFlag + 2 * i + 1);
+            symbols &= pd_flag(s, cfg->frontierSymbolFlag + 2 * i) && pd_flag(s, cfg->frontierSymbolFlag + 2 * i + 1);
         }
-        c->stars += all;
+        c->stars += symbols;
+    }
+    c->drawnStars = c->stars;
+    // Lazarus draws stars by a rule of its own (0x082288B0): the HALL OF FAME, flags 0x29 and 0x4A6, the symbols.
+    if (cfg->cardStyle == PD_CARD_LAZARUS) {
+        c->drawnStars = (s->gameStats[STAT_ENTERED_HOF] != 0) + pd_flag(s, 0x29) + pd_flag(s, 0x4A6) + symbols;
     }
 
-    bool hoenn = cfg->cardStyle == PD_CARD_HOENN || cfg->cardStyle == PD_CARD_LEGACY;
+    bool hoenn = cfg->cardStyle != PD_CARD_KANTO && cfg->cardStyle != PD_CARD_UNBOUND;
     c->linkWins = capped(s, STAT_LINK_BATTLE_WINS, 9999);
     c->linkLosses = capped(s, STAT_LINK_BATTLE_LOSSES, 9999);
     c->trades = capped(s, STAT_POKEMON_TRADES, 0xFFFF);
@@ -147,6 +168,17 @@ static const struct blobs UNBOUND = {
     -1, -1, -1,
     PD_UB_PIC_MALE, PD_UB_PIC_MALE_PAL, PD_UB_PIC_FEMALE, PD_UB_PIC_FEMALE_PAL,
     PD_FR_FONT_NORMAL, PD_FR_FONT_NORMAL_WIDTHS,
+    { -1, -1, -1, -1, -1 },
+};
+
+// Lazarus (TrainerCardArt.kt LAZARUS): its own tiles, tilemaps, 0- and 1-star palettes, badges, pics and font; the
+// backdrop, the other palettes and the girl's backdrop palette are retail's bytes.
+static const struct blobs LAZARUS = {
+    PD_LZ_CARD_GFX, PD_LZ_CARD_FRONT, PD_LZ_CARD_BACK, PD_EM_CARD_BG,
+    { PD_LZ_CARD_PAL0, PD_LZ_CARD_PAL1, PD_EM_CARD_PAL2, PD_EM_CARD_PAL3, PD_EM_CARD_PAL4, -1 },
+    PD_EM_CARD_FEMALE_PAL, PD_LZ_CARD_BADGES_PAL, PD_LZ_CARD_BADGES_GFX,
+    PD_LZ_PIC_MALE, PD_LZ_PIC_MALE_PAL, PD_LZ_PIC_FEMALE, PD_LZ_PIC_FEMALE_PAL,
+    PD_LZ_FONT_NORMAL, PD_LZ_FONT_NORMAL_WIDTHS,
     { -1, -1, -1, -1, -1 },
 };
 
@@ -205,9 +237,12 @@ static bool is_kanto(int style) {
 
 struct layout {
     int textW, glyphH, pad, starY, badgeY, picX, picY;
+    bool narrowLeft; // only the left 8 columns of a glyph no wider than 8 (expansion's DecompressGlyph)
+    int starPal;     // the stars' BG palette
 };
-static const struct layout KANTO_LAYOUT = { 27 * 8, 14, 0x00, 7, 16, 13, 4 };
-static const struct layout HOENN_LAYOUT = { 28 * 8, 16, 0x77, 7, 15, 1, 0 };
+static const struct layout KANTO_LAYOUT = { 27 * 8, 14, 0x00, 7, 16, 13, 4, false, 4 };
+static const struct layout HOENN_LAYOUT = { 28 * 8, 16, 0x77, 7, 15, 1, 0, false, 4 };
+static const struct layout LAZARUS_LAYOUT = { 28 * 8, 15, 0x77, 7, 15, 1, 0, true, 1 };
 
 #define TEXT 0xFF636363u
 #define TEXT_SHADOW 0xFFD6D6CEu
@@ -344,8 +379,9 @@ static void print(const struct art* a, const struct blobs* b, int x0, int y, con
     int x = x0;
     for (int i = 0; i < s->n; i++) {
         int g = s->c[i];
+        int cols = a->lay->narrowLeft && a->d[b->widths][g] <= 8 ? 8 : 16;
         for (int py = 0; py < a->lay->glyphH; py++) {
-            for (int px = 0; px < 16; px++) {
+            for (int px = 0; px < cols; px++) {
                 int wx = x + px, wy = y + py;
                 if (wx < 0 || wx >= a->lay->textW || wy < 0 || wy >= 144) continue;
                 int base = g * 64 + ((py / 8) * 2 + px / 8) * 16 + (py % 8) * 2;
@@ -467,9 +503,18 @@ static void hoenn_stat(const struct art* a, const struct blobs* b, int row, cons
     say_red(a, b, 216 - width(a, b, value), row * 16 + 33, value);
 }
 
+// What the Emerald-style card prints, per style (TrainerCardArt.words): labels and digit counts.
+struct words {
+    const char *dex, *hof, *trades;
+    int dexDigits;
+};
+static const struct words HOENN_WORDS = { "POKéDEX", "HALL OF FAME DEBUT  ", "POKéMON TRADES", 3 };
+static const struct words LAZARUS_WORDS = { "Pokédex", "Hall of Fame DEBUT  ", "Pokémon TRADES", 4 };
+
 static void hoenn_text(const struct art* a, const struct blobs* b, const struct pd_card_info* c, bool back,
                        bool colon) {
     const int pad = 0x77;
+    const struct words* w = c->style == PD_CARD_LAZARUS ? &LAZARUS_WORDS : &HOENN_WORDS;
     struct str s, t;
     if (!back) {
         s = enc("NAME: ");
@@ -487,8 +532,8 @@ static void hoenn_text(const struct art* a, const struct blobs* b, const struct 
         say(a, b, 16, 57, &s);
         say(a, b, 128 - width(a, b, &money), 57, &money);
         if (c->dexCaught >= 0) {
-            t = digits(c->dexCaught, 3, LEFT, pad);
-            s = enc("POKéDEX");
+            t = digits(c->dexCaught, w->dexDigits, LEFT, pad);
+            s = enc(w->dex);
             say(a, b, 16, 73, &s);
             say(a, b, 128 - width(a, b, &t), 73, &t);
         }
@@ -509,7 +554,7 @@ static void hoenn_text(const struct art* a, const struct blobs* b, const struct 
     cat(&s, &t);
     say(a, b, 216 - width(a, b, &s), 9, &s);
     if (c->hofDebut) {
-        s = enc("HALL OF FAME DEBUT  ");
+        s = enc(w->hof);
         t = hof_time(c->hofDebut, pad);
         hoenn_stat(a, b, 0, &s, &t);
     }
@@ -529,7 +574,7 @@ static void hoenn_text(const struct art* a, const struct blobs* b, const struct 
         say_red(a, b, x, 49, &losses);
     }
     if (c->trades) {
-        s = enc("POKéMON TRADES");
+        s = enc(w->trades);
         t = digits(c->trades, 5, RIGHT, pad);
         hoenn_stat(a, b, 2, &s, &t);
     }
@@ -561,9 +606,10 @@ bool pd_card_render(const struct pd_game* g, const struct pd_card_info* c, bool 
                     uint32_t* img) {
     bool kanto = is_kanto(c->style);
     const struct blobs* b = c->style == PD_CARD_UNBOUND ? &UNBOUND : kanto ? &KANTO :
-        c->style == PD_CARD_LEGACY ? &LEGACY : &HOENN;
-    struct art a = { .img = img, .lay = kanto ? &KANTO_LAYOUT : &HOENN_LAYOUT };
-    if (c->style != PD_CARD_KANTO && c->style != PD_CARD_HOENN && c->style != PD_CARD_LEGACY && c->style != PD_CARD_UNBOUND) return false;
+        c->style == PD_CARD_LEGACY ? &LEGACY : c->style == PD_CARD_LAZARUS ? &LAZARUS : &HOENN;
+    struct art a = { .img = img, .lay = kanto ? &KANTO_LAYOUT : c->style == PD_CARD_LAZARUS ? &LAZARUS_LAYOUT : &HOENN_LAYOUT };
+    if (c->style != PD_CARD_KANTO && c->style != PD_CARD_HOENN && c->style != PD_CARD_LEGACY && c->style != PD_CARD_UNBOUND &&
+        c->style != PD_CARD_LAZARUS) return false;
     // Every blob the card needs, or no card.
     const int need[] = {
         b->gfx, b->front, b->back, b->bg, b->pals[0], b->pals[1], b->pals[2], b->pals[3], b->pals[4], b->pals[5],
@@ -606,7 +652,8 @@ bool pd_card_render(const struct pd_game* g, const struct pd_card_info* c, bool 
     memcpy(bg3, tiles, tilesLen < 0x1800 ? tilesLen : 0x1800);
     if (b->badgesGfx >= 0) memcpy(bg3 + 192 * 32, a.d[b->badgesGfx], 0x400);
     if (!back) {
-        for (int i = 0; i < stars; i++) tile(img, bg3, sizeof(bg3), pal, 4 << 12 | 143, 15 + i, a.lay->starY);
+        int drawn = c->drawnStars < 0 ? 0 : c->drawnStars > most ? most : c->drawnStars;
+        for (int i = 0; i < drawn; i++) tile(img, bg3, sizeof(bg3), pal, a.lay->starPal << 12 | 143, 15 + i, a.lay->starY);
         for (int i = 0; i < 8; i++) {
             if (b->badgesGfx < 0 || !(c->badges >> i & 1)) continue;
             int t = 192 + 2 * i, x = 4 + 3 * i, y = a.lay->badgeY;

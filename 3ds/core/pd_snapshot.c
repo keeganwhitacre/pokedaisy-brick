@@ -469,6 +469,7 @@ static void read_card_fields(struct pd_snapshot* s, const struct pd_config* cfg,
         if (!read(ctx, sb2 + cfg->frontierBpOff, bp, 2)) return;
         s->battlePoints = u16(bp);
     }
+    if (cfg->cardMagicOff && !read(ctx, sb2 + cfg->cardMagicOff, &s->cardMagic, 1)) return;
     s->cardOk = true;
 }
 
@@ -503,6 +504,10 @@ static void read_save_fields(struct pd_snapshot* s, const struct pd_game* g, pd_
         if (ok) {
             s->dexOk = true;
             s->dexCount = count;
+            if (cfg->cardStyle == PD_CARD_LAZARUS) {
+                uint8_t stray = 0; // TrainerCard.kt readCaught(stray): (0 - 1) & 0xFFFF lands past the array
+                s->dexStray = read(ctx, base + cfg->dexCaughtOff + 0x1FFF, &stray, 1) && (stray >> 7 & 1);
+            }
             s->dexNational = cfg->nationalMagicOff < 0 || magic == cfg->nationalMagic;
             memset(s->dexSeen, 0, sizeof s->dexSeen);
             memset(s->dexCaught, 0, sizeof s->dexCaught);

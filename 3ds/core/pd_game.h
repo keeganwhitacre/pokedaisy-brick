@@ -182,6 +182,7 @@ struct pd_config {
     // and battle points. 0 = not in this game.
     int cardStyle;
     uint32_t gameStatsOff;
+    uint32_t cardMagicOff; // SaveBlock2 + this == nationalMagic, as the card reads it (readTrainerCard)
     int badgeFlag, pokedexFlag;
     int nationalVar, nationalVarValue, nationalFlag;
     int stickerVar;
@@ -223,9 +224,10 @@ struct pd_config {
     uint32_t pcSpecials, pcFn, pcCrcs[2], pcScript;
 };
 
+// LAZARUS: Emerald's card code with its own art, dex (430 regional) and star rules.
 // UNBOUND: FireRed's card in Unbound's purple, with its own player pics.
 // LEGACY: Emerald Legacy's - HOENN's card, a fifth star (extraStarFlag) on a black one, Hoenn's dex and eight more.
-enum pd_card_style { PD_CARD_NONE, PD_CARD_KANTO, PD_CARD_HOENN, PD_CARD_LEGACY, PD_CARD_UNBOUND };
+enum pd_card_style { PD_CARD_NONE, PD_CARD_KANTO, PD_CARD_HOENN, PD_CARD_LEGACY, PD_CARD_UNBOUND, PD_CARD_LAZARUS };
 
 // The bag's pockets, in a fixed order of our own (the app's POCKET_* ids).
 enum pd_pocket {
