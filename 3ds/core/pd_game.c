@@ -262,6 +262,8 @@ static const struct gb_rom GB_ROMS[] = {
     // Guessed: builds the app does not list, on the neighbour whose RAM they most plausibly share.
     {"60d445d5a38364cc77e8fd1c043157e50e7df209", &PD_GB_CONFIG_PURE_RED, "Pokémon PureRed 2.7.7 (unverified)"},
     {"b96ee563112c2b17ce1828e48446e1d71d61e8b5", &PD_GB_CONFIG_PURE_BLUE, "Pokémon PureBlue 2.7.7 (unverified)"},
+    // Green is Red's sibling (26k bytes differ from PureRed, 42k from PureBlue); no save of it has been read.
+    {"258ec7fef3d966cfb2a7e16c15fe1a329cf392ce", &PD_GB_CONFIG_PURE_RED, "Pokémon PureGreen 2.7.7 (unverified)"},
     {NULL, NULL, NULL},
 };
 
