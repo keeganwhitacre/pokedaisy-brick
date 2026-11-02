@@ -62,9 +62,25 @@ static void build(const struct pd_game* g) {
     memset(toNational, 0, sizeof(toNational));
     memset(toSpecies, 0, sizeof(toSpecies));
     const struct pd_config* cfg = g->cfg;
-    if (!cfg || !cfg->dexEntries || !g->rom) return;
+    if (!cfg || !g->rom || (!cfg->dexEntries && !cfg->expansion)) return;
     int speciesCount = species_count(cfg), nationalCount = cfg->nationalCount;
     if (speciesCount < 2 || speciesCount > SPECIES_MAX || nationalCount < 1 || nationalCount > NATIONAL_MAX) return;
+    if (cfg->expansion) {
+        // The page lives in gSpeciesInfo (the app's speciesNationals): each entry holds its own national number. As the
+        // app's BestEffort.dexHolds, species 1 must read national 1, 0.7 m, 6.9 kg.
+        const struct pd_dex_x* x = cfg->expansion;
+        const uint8_t* one = pd_rom_at(g, cfg->speciesInfo + (uint32_t) x->stride, (size_t) x->natDexOff + 6);
+        if (!one || u16(one + x->natDexOff) != 1 || u16(one + x->natDexOff + 2) != 7 || u16(one + x->natDexOff + 4) != 69) return;
+        for (int s = 1; s < speciesCount; s++) {
+            const uint8_t* e = pd_rom_at(g, cfg->speciesInfo + (uint32_t) s * (uint32_t) x->stride + (uint32_t) x->natDexOff, 2);
+            if (!e) return;
+            int n = u16(e);
+            toNational[s] = (uint16_t) n;
+            if (n >= 1 && n <= nationalCount && !toSpecies[n]) toSpecies[n] = (uint16_t) s;
+        }
+        available = true;
+        return;
+    }
     // The app's pokedexMatchesRom: entry 1 reads as the game's first Pokémon, and so do the species tables.
     size_t eLen = (size_t) cfg->entryHeightOff + 4;
     if (eLen < 0x10) eLen = 0x10;
@@ -146,12 +162,37 @@ static void ability_name(const struct pd_game* g, int id, char* out, size_t outL
     pd_gen3_text(at, len, out, outLen);
 }
 
+// The page of an expansion game (the app's readExpansionEntry): everything is in the species' gSpeciesInfo entry.
+static bool expansion_entry(const struct pd_game* g, int national, int species, struct pd_dex_entry* out) {
+    const struct pd_config* cfg = g->cfg;
+    const struct pd_dex_x* x = cfg->expansion;
+    const uint8_t* b = pd_rom_at(g, cfg->speciesInfo + (uint32_t) species * (uint32_t) x->stride, (size_t) x->stride);
+    if (!b) return false;
+    out->national = national;
+    out->species = species;
+    pd_gen3_text(b + x->categoryOff, 13, out->category, sizeof(out->category));
+    out->heightDm = u16(b + x->natDexOff + 2);
+    out->weightHg = u16(b + x->natDexOff + 4);
+    uint32_t d = u32(b + x->descriptionOff);
+    const uint8_t* text = in_rom(g, d) ? pd_rom_at(g, d, 200) : NULL;
+    if (text) pd_gen3_text(text, 200, out->description, sizeof(out->description));
+    static const int ORDER[6] = { 0, 1, 2, 4, 5, 3 };
+    for (int i = 0; i < 6; i++) out->stats[i] = b[ORDER[i]];
+    out->type1 = b[6];
+    out->type2 = b[7];
+    int a1 = u16(b + x->abilitiesOff), a2 = u16(b + x->abilitiesOff + 2);
+    if (a1) ability_name(g, a1, out->ability1, sizeof(out->ability1));
+    if (a2 && a2 != a1) ability_name(g, a2, out->ability2, sizeof(out->ability2));
+    return true;
+}
+
 bool pd_dex_entry(const struct pd_game* g, int national, struct pd_dex_entry* out) {
     memset(out, 0, sizeof(*out));
     const struct pd_config* cfg = g->cfg;
     if (!pd_dex_available(g)) return false;
     int species = pd_dex_species(g, national);
     if (!species) return false;
+    if (cfg->expansion) return expansion_entry(g, national, species, out);
     const struct pd_base_stats* bs = cfg->baseStats;
     const uint8_t* e = pd_rom_at(g, cfg->dexEntries + (uint32_t) (cfg->entriesBySpecies ? species : national) * cfg->dexEntryStride,
         cfg->dexEntryStride);
