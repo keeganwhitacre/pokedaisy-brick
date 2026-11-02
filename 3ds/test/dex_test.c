@@ -39,14 +39,20 @@ static const struct want WANT[] = {
 };
 
 // Quetzal (HackPokedexTest): seen / caught counts per save, plus some numbers that must be in the caught set.
-struct counts { const char* fixture; const struct pd_config* cfg; int seen, caught; int has[6]; };
-#define Q(fx, C, s, c, ...) { fx, &PD_CONFIG_##C, s, c, { __VA_ARGS__ } }
+struct counts { const char* fixture; const struct pd_config* cfg; int seen, caught; bool national; int has[6]; };
+#define Q(fx, C, s, c, ...) { fx, &PD_CONFIG_##C, s, c, true, { __VA_ARGS__ } }
+#define R(fx, C, s, c, ...) { fx, &PD_CONFIG_##C, s, c, false, { __VA_ARGS__ } } // National Dex off
 static const struct counts QUETZAL[] = {
     Q("quetzal", QUETZAL_V9_1, 6, 1, 4),
     Q("quetzal_es", QUETZAL_V9_1_ES, 468, 349, 6, 130),
     Q("quetzal_johto", QUETZAL_V9_1, -1, -1, 4, 215, 408, 442, 627),
     Q("quetzal_084", QUETZAL_V0_8_4, 466, 347, 6, 130),
     Q("quetzal_es_084", QUETZAL_V0_8_4_ES, 466, 347, 6, 130),
+    // Recharged Yellow (HackPokedexTest): seen 58 / owned 31 in every release, its party's among them.
+    R("recharged_yellow_v180", RECHARGED_YELLOW_V1_8_0, 58, 31, 1, 8, 25, 27, 37),
+    R("recharged_yellow_v190", RECHARGED_YELLOW_V1_9_0, 58, 31, 1, 8, 25, 27, 37),
+    R("recharged_yellow_v194", RECHARGED_YELLOW_V1_9_4, 58, 31, 1, 8, 25, 27, 37),
+    R("recharged_yellow", RECHARGED_YELLOW_V1_9_7, 58, 31, 1, 8, 25, 27, 37),
 };
 
 static int check(const struct pd_snapshot* s, bool caught, const int* want, const char* what) {
@@ -127,7 +133,7 @@ int main(int argc, char** argv) {
         for (int i = 0; i < 6 && q->has[i]; i++) {
             if (!pd_dex_caught(&s, q->has[i])) { printf("FAIL %s: No. %d not caught\n", q->fixture, q->has[i]); bad++; }
         }
-        if (!s.dexNational) { printf("FAIL %s: National Dex off\n", q->fixture); bad++; }
+        if (s.dexNational != q->national) { printf("FAIL %s: National Dex %d, want %d\n", q->fixture, s.dexNational, q->national); bad++; }
     }
     if (argc > 2) bad += rogue(argv[1], argv[2]);
     printf("%s (%zu games)\n", bad ? "FAILED" : "PASS dex", sizeof WANT / sizeof WANT[0]);
