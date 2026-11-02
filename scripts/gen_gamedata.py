@@ -879,10 +879,10 @@ def kotlin_pocket_order(name, lists, where):
 TEXT_KINDS = {"species": "String", "items": "String", "moves": "MoveInfo", "typeNames": "String", "typeChart": "Int",
               "speciesTypes": "SpeciesTypes"}
 KT_MAP = re.compile(r"^(?:internal |private )?val (\w+): Map<Int, (String|MoveInfo|Int|SpeciesTypes)>(?: = mapOf\(| by lazy \{ mapOf\(| by lazy \{)$")
-KT_STR_ENTRY = re.compile(r'^\s*(\d+) to "((?:[^"\\]|\\.)*)",?\s*$')
-KT_INT_ENTRY = re.compile(r"^\s*(\d+) to (-?\d+),?\s*$")
-KT_TYPES_ENTRY = re.compile(r"^\s*(\d+) to SpeciesTypes\((\d+|TYPE_NONE), (\d+|TYPE_NONE)\),?\s*$")
-KT_MOVE_ENTRY = re.compile(r'^\s*(\d+) to MoveInfo\("((?:[^"\\]|\\.)*)", (\d+|TYPE_NONE), (\d+)\),?\s*$')
+KT_STR_ENTRY = re.compile(r'^\s*(\d+|0x[0-9A-Fa-f]+) to "((?:[^"\\]|\\.)*)",?\s*$')
+KT_INT_ENTRY = re.compile(r"^\s*(\d+|0x[0-9A-Fa-f]+) to (-?\d+),?\s*$")
+KT_TYPES_ENTRY = re.compile(r"^\s*(\d+|0x[0-9A-Fa-f]+) to SpeciesTypes\((\d+|TYPE_NONE), (\d+|TYPE_NONE)\),?\s*$")
+KT_MOVE_ENTRY = re.compile(r'^\s*(\d+|0x[0-9A-Fa-f]+) to MoveInfo\("((?:[^"\\]|\\.)*)", (\d+|TYPE_NONE), (\d+)\),?\s*$')
 KT_ESCAPES = {"\\": "\\", '"': '"', "$": "$", "n": "\n", "t": "\t", "'": "'"}
 
 
@@ -932,18 +932,18 @@ def kotlin_text_table(name, kind, where):
                 if kind == "typeChart":
                     e = KT_INT_ENTRY.match(entry)
                     if e:
-                        table[int(e.group(1))] = int(e.group(2))
+                        table[int(e.group(1), 0)] = int(e.group(2))
                         continue
                 if kind == "speciesTypes":
                     e = KT_TYPES_ENTRY.match(entry)
                     if e:
-                        table[int(e.group(1))] = tuple(255 if g == "TYPE_NONE" else int(g) for g in e.groups()[1:])
+                        table[int(e.group(1), 0)] = tuple(255 if g == "TYPE_NONE" else int(g) for g in e.groups()[1:])
                         continue
                 e = KT_MOVE_ENTRY.match(entry) if kind == "moves" else KT_STR_ENTRY.match(entry)
                 if not e:
                     fail(where, f"{os.path.basename(path)}: can't read {entry.strip()!r} in {name}")
                 value = kt_unescape(e.group(2), where)
-                table[int(e.group(1))] = (value, 255 if e.group(3) == "TYPE_NONE" else int(e.group(3)), int(e.group(4))) if kind == "moves" else value
+                table[int(e.group(1), 0)] = (value, 255 if e.group(3) == "TYPE_NONE" else int(e.group(3)), int(e.group(4))) if kind == "moves" else value
             fail(where, f"{name} in {os.path.basename(path)} never closes")
     fail(where, f"no `val {name}` in the app's data/")
 
@@ -1078,6 +1078,66 @@ def c_target(path, configs, records, schema):
     return outputs
 
 
+# --- Game Boy games (3ds/core/pd_gb_gen.c): their names, type tables and the small int tables the readers use ---
+
+GB_TEXTS = {
+    # key: (species, items, moves, typeNames, typeChart, speciesTypes), as the app's ActiveTables picks them
+    "gb_yellow": ("speciesNamesYellow", "itemNamesYellow", "moveDataYellow", "typeNamesYellow",
+                  "typeEffectivenessYellow", "speciesTypeDataYellow"),
+    "gb_pure_rgb": ("speciesNamesPureRgb", "itemNamesPureRgb", "moveDataPureRgb", "typeNamesPureRgb",
+                    "typeEffectivenessPureRgb", "speciesTypeDataPureRgb"),
+    "gb_crystal": ("speciesNamesCrystal", "itemNamesCrystal", "moveDataCrystal", "typeNamesCrystal",
+                   "typeEffectivenessCrystal", "speciesTypeDataCrystal"),
+    "gb_gold_silver": ("speciesNamesCrystal", "itemNamesGoldSilver", "moveDataCrystal", "typeNamesCrystal",
+                       "typeEffectivenessCrystal", "speciesTypeDataCrystal"),
+    "gb_crystal_clear": ("speciesNamesCrystal", "itemNamesCrystalClear", "moveDataCrystal", "typeNamesCrystal",
+                         "typeEffectivenessCrystal", "speciesTypeDataCrystal"),
+    "gb_prism": ("speciesNamesPrism", "itemNamesPrism", "moveDataPrism", "typeNamesPrism",
+                 "typeEffectivenessPrism", "speciesTypeDataPrism"),
+    "gb_polished": ("speciesNamesPolishedCrystal", "itemNamesPolishedCrystal", "moveDataPolishedCrystal",
+                    "typeNamesPolishedCrystal", "typeEffectivenessPolishedCrystal", "speciesTypeDataPolishedCrystal"),
+    "gb_polished_faithful": ("speciesNamesPolishedCrystal",
+                             "itemNamesPolishedCrystal + itemNamesPolishedCrystalFaithfulChanges",
+                             "moveDataPolishedCrystal + moveDataPolishedCrystalFaithfulChanges",
+                             "typeNamesPolishedCrystal", "typeEffectivenessPolishedCrystal",
+                             "speciesTypeDataPolishedCrystal + speciesTypeDataPolishedCrystalFaithfulChanges"),
+}
+GB_INT_TABLES = {  # C name: (Kotlin intArrayOf val, C element type)
+    "pd_gb_internal_to_dex_yellow": "gen1InternalToDexYellow",
+    "pd_gb_internal_to_dex_pure_rgb": "gen1InternalToDexPureRgb",
+    "pd_gb_gender_crystal": "gen2GenderRatiosCrystal",
+    "pd_gb_gender_prism": "gen2GenderRatiosPrism",
+    "pd_gb_gender_polished": "gen2GenderRatiosPolishedCrystal",
+    "pd_gb_tm_crystal": "gen2TmItemsCrystal",
+    "pd_gb_tm_prism": "gen2TmItemsPrism",
+    "pd_gb_tm_polished": "gen2TmItemsPolishedCrystal",
+    "pd_gb_polished_variants": "polishedVariantForms",
+}
+
+
+def kotlin_int_array(name):
+    for path in sorted(glob.glob(os.path.join(DATA, "*.kt"))):
+        with open(path, encoding="utf-8") as fh:
+            m = re.search(r"^val " + name + r" = intArrayOf\((.*?)^\)", fh.read(), re.S | re.M)
+        if m:
+            return [int(v, 0) for v in re.findall(r"-?(?:0x[0-9A-Fa-f]+|\d+)", re.sub(r"//.*", "", m.group(1)))]
+    fail("pd_gb_gen.c", f"no `val {name} = intArrayOf(` in the app's data/")
+
+
+def gb_output():
+    texts = {k: ({"species": v[0], "items": v[1], "moves": v[2], "typeNames": v[3], "typeChart": v[4],
+                  "speciesTypes": v[5]}, "scripts/gen_gamedata.py GB_TEXTS") for k, v in GB_TEXTS.items()}
+    text = c_text(texts, "scripts/gen_gamedata.py's GB_TEXTS")
+    out = [text.rstrip("\n"), ""]
+    for cname, kname in GB_INT_TABLES.items():
+        vals = kotlin_int_array(kname)
+        ctype = "uint32_t" if max(vals) > 0xFFFF else "uint16_t"
+        out += [f"const {ctype} {cname}[{len(vals)}] = {{"]
+        out += ["    " + ", ".join(str(v) for v in vals[i:i + 16]) + "," for i in range(0, len(vals), 16)]
+        out += ["};", f"const int {cname}_count = {len(vals)};", ""]
+    return [(os.path.join(ROOT, "3ds/core/pd_gb_gen.c"), "\n".join(out))]
+
+
 def main():
     if "--new-schema" in sys.argv:
         i = sys.argv.index("--new-schema")
@@ -1093,6 +1153,7 @@ def main():
         outputs = [(KOTLIN_OUT, kotlin(configs, schema)), (RECORDS_OUT, record_kotlin(records))]
         for target in sorted(glob.glob(os.path.join(TARGETS, "*.toml"))):
             outputs += c_target(target, configs, records, schema)
+        outputs += gb_output()
     except GameDataError as e:
         sys.exit(f"gen_gamedata: {e}")
     summary = f"{len(configs)} configs, {len(records)} records"

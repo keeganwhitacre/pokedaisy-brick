@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "pd_gb.h"
 #include "pd_tables.h"
 
 #define MON_SIZE_MAX 128
@@ -290,6 +291,10 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
     s->money = -1;
     const struct pd_config* cfg = g->cfg;
     if (!cfg) return;
+    if (cfg->gb) {
+        pd_gb_snapshot_read(s, cfg, read, ctx);
+        return;
+    }
     s->valid = true;
     read_u32(read, ctx, cfg->gMain + 0x24, &s->frame);
 

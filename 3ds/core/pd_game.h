@@ -15,6 +15,7 @@ enum pd_game_kind {
     PD_GAME_NONE = 0,
     PD_GAME_FIRERED,  // FireRed and LeafGreen (LeafGreen runs as FireRed, like the app)
     PD_GAME_EMERALD,
+    PD_GAME_GB,       // Gen 1 / Gen 2 (cfg->gb)
 };
 
 // Which GUIDE a game gets (pd_guide_for): its own, or none until it's ported.
@@ -61,9 +62,12 @@ extern const struct pd_battle_layout pd_battle_layout_vanilla, pd_battle_layout_
     pd_battle_layout_team_rocket, pd_battle_layout_wishes, pd_battle_layout_rowe, pd_battle_layout_soulgold,
     pd_battle_layout_elite_redux;
 
+struct pd_gb_config;
+
 struct pd_config {
     const struct pd_text* text; // the hack's own species / item / move names; NULL = retail's
     const struct pd_party_layout* partyLayout; // NULL = pd_party_layout_vanilla
+    const struct pd_gb_config* gb; // a Game Boy game (pd_gb.c): the Gen 3 fields below are unused
     const struct pd_battle_layout* battleLayout; // NULL = pd_battle_layout_vanilla
     uint32_t playerParty;
     uint32_t playerPartyCount;

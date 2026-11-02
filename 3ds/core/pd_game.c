@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "pd_gb.h"
 #include "pd_sha1.h"
 
 // The configs come from gamedata/ (gamedata/targets/3ds.toml picks the fields
@@ -98,6 +99,14 @@ void pd_game_detect(struct pd_game* g, const uint8_t* header, size_t romSize) {
     g->code[4] = 0;
     g->revision = header[0xBC];
 
+    // A Game Boy cart (the Nintendo logo at 0x104): which one waits for pd_game_identify's hash.
+    if (romSize >= 0x150 && header[0x104] == 0xCE && header[0x105] == 0xED && header[0x106] == 0x66) {
+        g->kind = PD_GAME_GB;
+        g->title = "Game Boy ROM";
+        g->unsupported = "Not a Game Boy game the companion knows";
+        return;
+    }
+
     if (!strcmp(g->code, "BPRE") || !strcmp(g->code, "BPGE")) {
         g->kind = PD_GAME_FIRERED;
         g->title = g->code[2] == 'R' ? "Pokémon FireRed" : "Pokémon LeafGreen";
@@ -143,6 +152,69 @@ void pd_game_detect(struct pd_game* g, const uint8_t* header, size_t romSize) {
         g->unsupported = "ROM hacks aren't supported on 3DS yet";
     }
 }
+
+
+// Game Boy games: a config with the Gen 3 fields empty, the reader's addresses (pd_gb.c) and the game's own names.
+extern const struct pd_text pd_text_gb_yellow, pd_text_gb_pure_rgb, pd_text_gb_crystal, pd_text_gb_gold_silver,
+    pd_text_gb_crystal_clear, pd_text_gb_prism, pd_text_gb_polished, pd_text_gb_polished_faithful;
+#define PD_GB_BAG { PD_POCKET_ITEMS, PD_POCKET_BALLS, PD_POCKET_TMHM, PD_POCKET_BERRIES, PD_POCKET_KEY }
+#define PD_GB_CONFIG(NAME, GB, TEXT) \
+    static const struct pd_config PD_GB_CONFIG_##NAME = { .text = &pd_text_##TEXT, .gb = &GB, .bagOrder = PD_GB_BAG, .bagCount = 5 };
+PD_GB_CONFIG(RED, pd_gb_red, gb_yellow)
+PD_GB_CONFIG(BLUE, pd_gb_red, gb_yellow)
+PD_GB_CONFIG(YELLOW, pd_gb_yellow, gb_yellow)
+PD_GB_CONFIG(PURE_RED, pd_gb_pure_red, gb_pure_rgb)
+PD_GB_CONFIG(PURE_BLUE, pd_gb_pure_red, gb_pure_rgb)
+PD_GB_CONFIG(CRYSTAL, pd_gb_crystal, gb_crystal)
+PD_GB_CONFIG(GOLD, pd_gb_gold, gb_gold_silver)
+PD_GB_CONFIG(SILVER, pd_gb_gold, gb_gold_silver)
+PD_GB_CONFIG(CRYSTAL_CLEAR, pd_gb_crystal, gb_crystal_clear)
+PD_GB_CONFIG(PRISM, pd_gb_prism, gb_prism)
+PD_GB_CONFIG(POLISHED, pd_gb_polished, gb_polished)
+PD_GB_CONFIG(POLISHED_FAITHFUL, pd_gb_polished, gb_polished_faithful)
+
+struct gb_rom {
+    const char* sha1;
+    const struct pd_config* cfg;
+    const char* title;
+};
+static const struct gb_rom GB_ROMS[] = {
+    {"ea9bcae617fdf159b045185467ae58b2e4a48b9a", &PD_GB_CONFIG_RED, "Pokémon Red"},
+    {"d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", &PD_GB_CONFIG_BLUE, "Pokémon Blue"},
+    {"cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", &PD_GB_CONFIG_YELLOW, "Pokémon Yellow"},
+    {"2e94d09c1e16a57eb079404c030f26fdeeac949d", &PD_GB_CONFIG_PURE_RED, "Pokémon PureRed"},
+    {"d419fe244fa17196f7df46ddab47c840e7573652", &PD_GB_CONFIG_PURE_BLUE, "Pokémon PureBlue"},
+    {"f4cd194bdee0d04ca4eac29e09b8e4e9d818c133", &PD_GB_CONFIG_CRYSTAL, "Pokémon Crystal"},
+    {"f2f52230b536214ef7c9924f483392993e226cfb", &PD_GB_CONFIG_CRYSTAL, "Pokémon Crystal"},
+    {"a0fc810f1d4e124434f7be2c989ab5b5892ddf36", &PD_GB_CONFIG_CRYSTAL, "Pokémon Crystal"},
+    {"d8b8a3600a465308c9953dfa04f0081c05bdcb94", &PD_GB_CONFIG_GOLD, "Pokémon Gold"},
+    {"49b163f7e57702bc939d642a18f591de55d92dae", &PD_GB_CONFIG_SILVER, "Pokémon Silver"},
+    {"a1c4da6b0057c98fe4ebea45d6812a484fc69abd", &PD_GB_CONFIG_CRYSTAL_CLEAR, "Pokémon Crystal Clear"},
+    {"6fc677bf7a9db103cb9ee11ac08d26782e69ae41", &PD_GB_CONFIG_CRYSTAL_CLEAR, "Pokémon Crystal Clear"},
+    {"84d5c4924c3f1f3fc690669148b7e392948fb23d", &PD_GB_CONFIG_CRYSTAL_CLEAR, "Pokémon Crystal Clear"},
+    {"534876e4e4d0d79a82fef3bbe5bea11c40451727", &PD_GB_CONFIG_CRYSTAL_CLEAR, "Pokémon Crystal Clear"},
+    {"752076692ae3387cf426ce5f51a98c6b60e8df6a", &PD_GB_CONFIG_PRISM, "Pokémon Prism"},
+    {"6930b48af5844d373e3c9130f26d6dd1084cf4ed", &PD_GB_CONFIG_POLISHED, "Pokémon Polished Crystal"},
+    {"beb8b38280af59e9ef84be12684a6ecf09021c9b", &PD_GB_CONFIG_POLISHED, "Pokémon Polished Crystal"},
+    {"79ebf9984eac8081f488d15a35a6c5d11b4f84e2", &PD_GB_CONFIG_POLISHED, "Pokémon Polished Crystal"},
+    {"e55859484c5cda70e05daed59b14662e0a0f8eac", &PD_GB_CONFIG_POLISHED, "Pokémon Polished Crystal"},
+    {"457d61dfc28a17388b87792595433ba20bd1c1ed", &PD_GB_CONFIG_POLISHED, "Pokémon Polished Crystal"},
+    {"bea9804dc88a4ee370af62ff3139fdf1380277bf", &PD_GB_CONFIG_POLISHED, "Pokémon Polished Crystal"},
+    {"9c13585eb34efdcd881c2e68f029b820bddf349d", &PD_GB_CONFIG_POLISHED, "Pokémon Polished Crystal"},
+    {"11d461629363402fc15b5005ef51b8f44e726140", &PD_GB_CONFIG_POLISHED, "Pokémon Polished Crystal"},
+    {"3ff091a8e94a0c031372b6f0275e12620fe3d766", &PD_GB_CONFIG_POLISHED_FAITHFUL, "Pokémon Polished Crystal (Faithful)"},
+    {"e63b1e52a9f71c3948e3e7e515e9939d728fc679", &PD_GB_CONFIG_POLISHED_FAITHFUL, "Pokémon Polished Crystal (Faithful)"},
+    {"666f8edfb9efd8c301adbc14d38ccfaae33a047d", &PD_GB_CONFIG_POLISHED_FAITHFUL, "Pokémon Polished Crystal (Faithful)"},
+    {"b012f6d55c34c972778f5566e1cc910962dd7ab5", &PD_GB_CONFIG_POLISHED_FAITHFUL, "Pokémon Polished Crystal (Faithful)"},
+    {"b5393eb27fec51970cc9186f36c34e94494bfd39", &PD_GB_CONFIG_POLISHED_FAITHFUL, "Pokémon Polished Crystal (Faithful)"},
+    {"772858dd5a3e66dea4454d5f83b48c83d732ca69", &PD_GB_CONFIG_POLISHED_FAITHFUL, "Pokémon Polished Crystal (Faithful)"},
+    {"c4bd263e58325c6c04c34462c1b4a37fba085e9c", &PD_GB_CONFIG_POLISHED_FAITHFUL, "Pokémon Polished Crystal (Faithful)"},
+    {"c0a2c70d73ce68830a891ddd292300c90766acdd", &PD_GB_CONFIG_POLISHED_FAITHFUL, "Pokémon Polished Crystal (Faithful)"},
+    // Guessed: builds the app does not list, on the neighbour whose RAM they most plausibly share.
+    {"60d445d5a38364cc77e8fd1c043157e50e7df209", &PD_GB_CONFIG_PURE_RED, "Pokémon PureRed 2.7.7 (unverified)"},
+    {"b96ee563112c2b17ce1828e48446e1d71d61e8b5", &PD_GB_CONFIG_PURE_BLUE, "Pokémon PureBlue 2.7.7 (unverified)"},
+    {NULL, NULL, NULL},
+};
 
 // The retail carts (USA / Europe) detect's configs are for: GameTitles.RETAIL.
 static const char* const RETAIL_SHA1S[] = {
@@ -345,6 +417,18 @@ void pd_game_identify(struct pd_game* g) {
     pd_sha1_update(&s, g->rom, g->romSize);
     pd_sha1_hex(&s, g->sha1);
 
+    if (g->kind == PD_GAME_GB) {
+        for (const struct gb_rom* r = GB_ROMS; r->sha1; r++) {
+            if (strcmp(r->sha1, g->sha1)) continue;
+            g->cfg = r->cfg;
+            g->title = r->title;
+            g->guide = PD_GUIDE_NONE;
+            g->hackMaps = true;
+            g->unsupported = NULL;
+            return;
+        }
+        return;
+    }
     for (const struct known_rom* k = KNOWN_ROMS; k->sha1; k++) {
         if (strcmp(k->sha1, g->sha1)) continue;
         g->cfg = k->cfg;
