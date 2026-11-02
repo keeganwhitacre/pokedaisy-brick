@@ -61,7 +61,7 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
         pd_flag(s, cfg->nationalFlag);
     int caught = 0;
     if (national) {
-        for (int n = 1; n <= PD_NATIONAL_COUNT; n++) caught += pd_dex_caught(s, n);
+        for (int n = 1; n <= s->dexCount; n++) caught += pd_dex_caught(s, n);
     } else if (cfg->cardStyle == PD_CARD_HOENN || cfg->cardStyle == PD_CARD_LEGACY) {
         for (int i = 0; i < 202; i++) caught += pd_dex_caught(s, HOENN_TO_NATIONAL[i]);
         if (cfg->cardStyle == PD_CARD_LEGACY)

@@ -56,7 +56,7 @@ struct pd_battle_mon {
 // A pocket's slots: every pocket of FireRed's and Emerald's bag holds at most 64.
 #define PD_POCKET_SLOTS 256 // Emerald Legacy's ITEMS pocket holds 120
 #define PD_NATIONAL_COUNT 386
-#define PD_DEX_BYTES 52
+#define PD_DEX_BYTES 256 // 2048 national numbers; the largest game's count is 1222
 #define PD_FLAG_BYTES 0x300 // the most any game has (a hack's 767); Emerald 0x12C, Emerald Legacy 0x138
 #define PD_VAR_COUNT 0x100
 #define PD_GAME_STATS 52 // up to GAME_STAT_BERRY_CRUSH_POINTS
@@ -102,6 +102,7 @@ struct pd_snapshot {
     // readPokedexState: seen only when SaveBlock2's flags and both of
     // SaveBlock1's copies agree; caught only when also seen).
     bool dexOk, dexNational;
+    int dexCount; // national numbers this game's dex holds (bits 0..dexCount-1 of the arrays below)
     uint8_t dexSeen[PD_DEX_BYTES], dexCaught[PD_DEX_BYTES];
 
     // The GUIDE's save data: SaveBlock1's event flags and vars.

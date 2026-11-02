@@ -15,7 +15,7 @@ CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror
 CORE_SRC := $(wildcard core/*.c)
 DEVKITARM_IMAGE := devkitpro/devkitarm:latest
 
-.PHONY: preview test-font 3ds decomps fixture-roms azahar-test azahar-battle-test tables clean
+.PHONY: preview test-dex test-font 3ds decomps fixture-roms azahar-test azahar-battle-test tables clean
 
 $(BUILD)/pd_font_test: core/pd_canvas.c core/pd_canvas.h core/pd_font.h core/pd_font_gen.c test/font_test.c
 	@mkdir -p $(BUILD)
@@ -34,6 +34,13 @@ test-host: $(BUILD)/pd_host_test
 $(BUILD)/pd_stats_test: $(CORE_SRC) $(wildcard core/*.h) test/stats_test.c desktop/pd_png.c
 	@mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) -o $@ $(CORE_SRC) test/stats_test.c desktop/pd_png.c -lm
+
+$(BUILD)/pd_dex_test: $(CORE_SRC) $(wildcard core/*.h) test/dex_test.c
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(filter-out core/pd_game.c,$(CORE_SRC)) test/dex_test.c -lm
+
+test-dex: $(BUILD)/pd_dex_test
+	$(BUILD)/pd_dex_test $(FIXTURES)
 
 test-stats: $(BUILD)/pd_stats_test
 	python3 tools/gen_stats.py --check

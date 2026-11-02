@@ -65,6 +65,8 @@ extern const struct pd_battle_layout pd_battle_layout_vanilla, pd_battle_layout_
 
 struct pd_gb_config;
 
+enum { PD_DEX_SB1 = 1, PD_DEX_SB2, PD_DEX_FIXED };
+
 struct pd_config {
     const struct pd_text* text; // the hack's own species / item / move names; NULL = retail's
     const struct pd_party_layout* partyLayout; // NULL = pd_party_layout_vanilla
@@ -127,6 +129,13 @@ struct pd_config {
     // ... and the save: SaveBlock2's owned / seen flags, SaveBlock1's two
     // copies of seen (all must agree), the National Dex byte.
     uint32_t dexSeenCopy1, dexSeenCopy2; // in SaveBlock1
+    // The flag arrays (the app's DexFlags): No. n is bit n - dexFirstBit of two dexBytes-long arrays.
+    // dexBlock 0 = not read here (the schema's required field, so 0 only for a bare config).
+    uint8_t dexBlock; // PD_DEX_SB1 / PD_DEX_SB2 / PD_DEX_FIXED (offsets then absolute)
+    uint8_t dexFirstBit;
+    bool dexSeenLevels, dexBySpecies, dexSeenOrCaught; // Quetzal / Emerald Rogue: read differently, not here yet
+    uint16_t dexBytes, nationalCount;
+    uint32_t dexSeenOff, dexCaughtOff;
     uint8_t nationalMagicOff, nationalMagic; // SaveBlock2 + 0x18 + off == magic
 
     // GUIDE (the app's GuideTables): ROM tables and SaveBlock1 offsets.

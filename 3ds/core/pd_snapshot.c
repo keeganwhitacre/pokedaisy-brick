@@ -484,18 +484,36 @@ static void read_save_fields(struct pd_snapshot* s, const struct pd_config* cfg,
     uint8_t gender = 0xFF;
     if (read(ctx, sb2 + SAVEBLOCK2_GENDER_OFF, &gender, 1)) s->gender = gender <= 1 ? gender : -1;
 
-    // struct Pokedex at SaveBlock2+0x18: owned at +0x10, seen at +0x44.
-    uint8_t owned[PD_DEX_BYTES], seen[PD_DEX_BYTES], copy1[PD_DEX_BYTES], copy2[PD_DEX_BYTES], magic = 0;
-    if (cfg->dexSeenCopy1 && read(ctx, sb2 + 0x28, owned, PD_DEX_BYTES) && read(ctx, sb2 + 0x5C, seen, PD_DEX_BYTES) &&
-        read(ctx, sb1 + cfg->dexSeenCopy1, copy1, PD_DEX_BYTES) &&
-        (!cfg->dexSeenCopy2 || read(ctx, sb1 + cfg->dexSeenCopy2, copy2, PD_DEX_BYTES)) &&
-        read(ctx, sb2 + 0x18 + cfg->nationalMagicOff, &magic, 1)) {
-        if (!cfg->dexSeenCopy2) memset(copy2, 0xFF, sizeof copy2); // a record with one copy (the app ANDs those it has)
-        s->dexOk = true;
-        s->dexNational = magic == cfg->nationalMagic;
-        for (int i = 0; i < PD_DEX_BYTES; i++) {
-            s->dexSeen[i] = seen[i] & copy1[i] & copy2[i];
-            s->dexCaught[i] = owned[i] & s->dexSeen[i];
+    // The seen / caught bit arrays (the app's readPokedexState): where there are anti-cheat copies of
+    // seen, a bit only counts if every copy agrees, and caught needs seen too. Kept by national number.
+    // Quetzal's levels and Emerald Rogue's species-indexed arrays are not read here yet.
+    uint8_t magic = 0;
+    int count = cfg->nationalCount;
+    if (cfg->dexBlock && cfg->dexBytes && cfg->dexBytes <= PD_DEX_BYTES && count >= 1 && count <= PD_DEX_BYTES * 8 &&
+        !cfg->dexSeenLevels && !cfg->dexBySpecies && !cfg->dexSeenOrCaught) {
+        uint8_t seen[PD_DEX_BYTES], owned[PD_DEX_BYTES], copy[2][PD_DEX_BYTES];
+        uint32_t base = cfg->dexBlock == PD_DEX_SB1 ? sb1 : cfg->dexBlock == PD_DEX_SB2 ? sb2 : 0;
+        const uint32_t copyOff[2] = { cfg->dexSeenCopy1, cfg->dexSeenCopy2 };
+        bool ok = read(ctx, base + cfg->dexSeenOff, seen, cfg->dexBytes) &&
+            read(ctx, base + cfg->dexCaughtOff, owned, cfg->dexBytes) &&
+            read(ctx, sb2 + 0x18 + cfg->nationalMagicOff, &magic, 1);
+        for (int k = 0; ok && k < 2; k++) ok = !copyOff[k] || read(ctx, sb1 + copyOff[k], copy[k], cfg->dexBytes);
+        if (ok) {
+            s->dexOk = true;
+            s->dexCount = count;
+            s->dexNational = magic == cfg->nationalMagic;
+            memset(s->dexSeen, 0, sizeof s->dexSeen);
+            memset(s->dexCaught, 0, sizeof s->dexCaught);
+            for (int n = 1; n <= count; n++) {
+                int i = n - cfg->dexFirstBit;
+                if (i < 0 || i / 8 >= cfg->dexBytes) continue;
+                int byte = i / 8, bit = i % 8;
+                bool sn = seen[byte] >> bit & 1, cn = owned[byte] >> bit & 1;
+                for (int k = 0; k < 2; k++) if (copyOff[k]) sn = sn && (copy[k][byte] >> bit & 1);
+                if (copyOff[0]) cn = cn && sn; // with copies, caught needs seen too
+                if (sn) s->dexSeen[(n - 1) / 8] |= (uint8_t) (1 << ((n - 1) % 8));
+                if (cn) s->dexCaught[(n - 1) / 8] |= (uint8_t) (1 << ((n - 1) % 8));
+            }
         }
     }
 
@@ -519,17 +537,17 @@ int pd_var(const struct pd_snapshot* s, int var) {
     return s->flagsOk && i >= 0 && i < PD_VAR_COUNT ? s->vars[i] : 0;
 }
 
-static bool dex_bit(const uint8_t* bits, int national) {
+static bool dex_bit(const uint8_t* bits, int national, int count) {
     int i = national - 1;
-    return i >= 0 && i < PD_NATIONAL_COUNT && (bits[i / 8] >> (i % 8) & 1);
+    return i >= 0 && i < count && (bits[i / 8] >> (i % 8) & 1);
 }
 
 bool pd_dex_seen(const struct pd_snapshot* s, int national) {
-    return s->dexOk && dex_bit(s->dexSeen, national);
+    return s->dexOk && dex_bit(s->dexSeen, national, s->dexCount);
 }
 
 bool pd_dex_caught(const struct pd_snapshot* s, int national) {
-    return s->dexOk && dex_bit(s->dexCaught, national);
+    return s->dexOk && dex_bit(s->dexCaught, national, s->dexCount);
 }
 
 bool pd_bag_has(const struct pd_snapshot* s, int item) {
