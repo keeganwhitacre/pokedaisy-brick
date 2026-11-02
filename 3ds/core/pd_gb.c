@@ -79,44 +79,76 @@ static int be16(const uint8_t* b) {
     return (b[0] << 8) | b[1];
 }
 
-// The cart's text (constants/charmap.asm) for the letters, digits and signs the companion prints; Polished Crystal ends
+// The cart's text (constants/charmap.asm) for the letters, digits and signs the companion prints, one table per
+// charmap as the app has them: Gen1Charset.EN, Gen2Art.CHARS and Gen2Art.POLISHED_CHARS. Polished Crystal ends
 // names with 0x53 / 0x52 too.
-static void gb_name(const uint8_t* src, bool polished, char* out, size_t outLen) {
+enum { MAP_GEN1, MAP_GEN2, MAP_POLISHED, MAPS };
+
+static const char* gb_map[MAPS][256];
+static char gb_letters[MAPS][52 + 10][2];
+
+static void gb_map_init(void) {
+    static bool done;
+    if (done) return;
+    done = true;
+    for (int m = 0; m < MAPS; m++) {
+        for (int i = 0; i < 26; i++) {
+            gb_letters[m][i][0] = (char) ('A' + i);
+            gb_letters[m][26 + i][0] = (char) ('a' + i);
+            gb_map[m][0x80 + i] = gb_letters[m][i];
+            gb_map[m][0xA0 + i] = gb_letters[m][26 + i];
+        }
+        for (int i = 0; i < 10; i++) {
+            gb_letters[m][52 + i][0] = (char) ('0' + i);
+            gb_map[m][(m == MAP_POLISHED ? 0xE0 : 0xF6) + i] = gb_letters[m][52 + i];
+        }
+    }
+    const char** g1 = gb_map[MAP_GEN1];
+    g1[0x7F] = " "; g1[0x4E] = " "; g1[0x4F] = " "; g1[0x49] = " "; g1[0x51] = " ";
+    g1[0x9A] = "("; g1[0x9B] = ")"; g1[0x9C] = ":"; g1[0x9D] = ";"; g1[0x9E] = "["; g1[0x9F] = "]";
+    g1[0xBA] = "é"; g1[0xBB] = "'d"; g1[0xBC] = "'l"; g1[0xBD] = "'s"; g1[0xBE] = "'t"; g1[0xBF] = "'v";
+    g1[0xE0] = "'"; g1[0xE3] = "-"; g1[0xE4] = "'r"; g1[0xE5] = "'m"; g1[0xE6] = "?"; g1[0xE7] = "!"; g1[0xE8] = ".";
+    g1[0xEC] = "▷"; g1[0xED] = "▶"; g1[0xEE] = "▼"; g1[0xEF] = "♂"; g1[0xF0] = "¥"; g1[0xF1] = "×"; g1[0xF2] = ".";
+    g1[0xF3] = "/"; g1[0xF4] = ","; g1[0xF5] = "♀"; g1[0x54] = "POKé"; g1[0x75] = "…";
+
+    const char** g2 = gb_map[MAP_GEN2];
+    g2[0x7F] = " ";
+    g2[0x9A] = "("; g2[0x9B] = ")"; g2[0x9C] = ":"; g2[0x9D] = ";"; g2[0x9E] = "["; g2[0x9F] = "]";
+    g2[0xC0] = "Ä"; g2[0xC1] = "Ö"; g2[0xC2] = "Ü"; g2[0xC3] = "ä"; g2[0xC4] = "ö"; g2[0xC5] = "ü";
+    g2[0xE0] = "'"; g2[0xE3] = "-"; g2[0xE6] = "?"; g2[0xE7] = "!"; g2[0xE8] = "."; g2[0xE9] = "&"; g2[0xEA] = "é";
+    g2[0xEB] = "→"; g2[0xEC] = "▷"; g2[0xED] = "▶"; g2[0xEE] = "▼"; g2[0xEF] = "♂"; g2[0xF0] = "¥"; g2[0xF1] = "×";
+    g2[0xF3] = "/"; g2[0xF4] = ","; g2[0xF5] = "♀";
+
+    const char** pc = gb_map[MAP_POLISHED];
+    pc[0x7F] = " ";
+    pc[0x9A] = "("; pc[0x9B] = ")"; pc[0x9C] = "."; pc[0x9D] = ","; pc[0x9E] = "?"; pc[0x9F] = "!";
+    pc[0xBA] = "“"; pc[0xBB] = "”"; pc[0xBC] = "-"; pc[0xBD] = ":"; pc[0xBE] = "♂"; pc[0xBF] = "♀"; pc[0xC0] = "'";
+    pc[0xC8] = "é"; pc[0xC9] = "É"; pc[0xCA] = "á"; pc[0xCB] = "ê"; pc[0xCC] = "í"; pc[0xCD] = "ó"; pc[0xCE] = "¿"; pc[0xCF] = "¡";
+    pc[0xD5] = "№"; pc[0xD8] = "&"; pc[0xD9] = "♪"; pc[0xDA] = "♥"; pc[0xDB] = "×"; pc[0xDC] = "/"; pc[0xDD] = "%";
+    pc[0xDE] = "+"; pc[0xEA] = "¥"; pc[0xEB] = "…"; pc[0xEC] = "★"; pc[0xED] = "▼"; pc[0xEE] = "▲"; pc[0xEF] = "◀";
+    pc[0xF0] = "▶";
+}
+
+static void gb_name(const uint8_t* src, int gen, bool polished, char* out, size_t outLen) {
+    gb_map_init();
+    const char** map = gb_map[polished ? MAP_POLISHED : gen == 1 ? MAP_GEN1 : MAP_GEN2];
     size_t n = 0;
-    for (int i = 0; i < NAME_LEN && n + 4 < outLen; i++) {
+    for (int i = 0; i < NAME_LEN; i++) {
         int c = src[i];
         if (c == 0x00 || c == 0x50 || (polished && (c == 0x52 || c == 0x53))) break;
-        const char* s = NULL;
-        char one[2] = {0, 0};
-        if (c >= 0x80 && c <= 0x99) one[0] = (char) ('A' + c - 0x80);
-        else if (c >= 0xA0 && c <= 0xB9) one[0] = (char) ('a' + c - 0xA0);
-        else if (c >= 0xF6 && c <= 0xFF) one[0] = (char) ('0' + c - 0xF6);
-        else switch (c) {
-            case 0x7F: one[0] = ' '; break;
-            case 0xE0: one[0] = '\''; break;
-            case 0xE3: one[0] = '-'; break;
-            case 0xE6: one[0] = '?'; break;
-            case 0xE7: one[0] = '!'; break;
-            case 0xE8: case 0xF2: one[0] = '.'; break;
-            case 0xF3: one[0] = '/'; break;
-            case 0xF4: one[0] = ','; break;
-            case 0x9A: one[0] = '('; break;
-            case 0x9B: one[0] = ')'; break;
-            case 0x9C: one[0] = ':'; break;
-            case 0xEF: s = "♂"; break;
-            case 0xF5: s = "♀"; break;
-            case 0xBA: s = "é"; break;
-            default: break;
-        }
-        if (!s && one[0]) s = one;
+        const char* s = map[c];
         if (!s) continue;
         size_t l = strlen(s);
+        if (n + l >= outLen) break;
         memcpy(out + n, s, l);
         n += l;
     }
     out[n] = 0;
-    // Trailing spaces.
+    // Trailing spaces (the app trims both ends).
     while (n && out[n - 1] == ' ') out[--n] = 0;
+    size_t lead = 0;
+    while (out[lead] == ' ') lead++;
+    if (lead) memmove(out, out + lead, n - lead + 1);
 }
 
 static bool rd(pd_read_fn read, void* ctx, uint32_t a, void* out, size_t n) {
@@ -379,7 +411,7 @@ void pd_gb_snapshot_read(struct pd_snapshot* s, const struct pd_config* cfg, pd_
         for (int i = 0; i < count; i++) {
             struct pd_mon* m = &s->party[s->partyCount];
             if (!decode_mon(g, raw + i * monSize, g->gen == 2 && !g->polished && head[1 + i] == G2_EGG, m)) continue;
-            gb_name(nick + i * NAME_LEN, g->polished, m->nickname, sizeof m->nickname);
+            gb_name(nick + i * NAME_LEN, g->gen, g->polished, m->nickname, sizeof m->nickname);
             s->partyCount++;
         }
     }
