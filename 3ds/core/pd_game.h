@@ -27,6 +27,11 @@ enum pd_guide_id {
     PD_GUIDE_RUBY,
     PD_GUIDE_SAPPHIRE,
     PD_GUIDE_EMERALD_LEGACY,
+    PD_GUIDE_ROCKET_EDITION,
+    PD_GUIDE_ASH_GRAY,
+    PD_GUIDE_GS_CHRONICLES,
+    PD_GUIDE_RADICAL_RED,
+    PD_GUIDE_ORANGE_ISLANDS,
 };
 
 // struct Pokemon's party fields (the app's PartyMonLayout): the party-only fields after the

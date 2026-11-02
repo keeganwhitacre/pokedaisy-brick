@@ -1883,7 +1883,7 @@ static const struct pd_config PD_CONFIG_CELIA = {
     .text = &pd_text_celia,
 };
 
-// gamedata/gen3/hacks/orange_islands.toml: orange_islands (ram, foes, dex)
+// gamedata/gen3/hacks/orange_islands.toml: orange_islands (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_ORANGE_ISLANDS = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -1960,6 +1960,16 @@ static const struct pd_config PD_CONFIG_ORANGE_ISLANDS = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = "KANTO",
+    .trainerMonStride = 0,
+    .trainerMonMovesOff = 0,
+    .trainerMonSpeciesOff = 0,
+    .trainerMonItemOff = 0,
+    .trainerMonLevelOff = 0,
+    .trainers = 0x0823EAC8,
+    .learnsets = 0x0825D7B4,
+    .wildHeaders = 0x08A1B1B0,
+    .probeTrainer = 1,
+    .probeName = "CISSY",
     .text = &pd_text_orange_islands,
 };
 
@@ -2043,7 +2053,7 @@ static const struct pd_config PD_CONFIG_ULTRA_VIOLET = {
     .text = &pd_text_ultra_violet,
 };
 
-// gamedata/gen3/hacks/rocket_edition.toml: rocket_edition (ram, foes, dex)
+// gamedata/gen3/hacks/rocket_edition.toml: rocket_edition (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_ROCKET_EDITION = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -2120,10 +2130,20 @@ static const struct pd_config PD_CONFIG_ROCKET_EDITION = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = "KANTO",
+    .trainerMonStride = 0,
+    .trainerMonMovesOff = 0,
+    .trainerMonSpeciesOff = 0,
+    .trainerMonItemOff = 0,
+    .trainerMonLevelOff = 0,
+    .trainers = 0x0823EAC8,
+    .learnsets = 0x0825D7B4,
+    .wildHeaders = 0x083C9CB8,
+    .probeTrainer = 414,
+    .probeName = "Brock",
     .text = &pd_text_rocket_edition,
 };
 
-// gamedata/gen3/hacks/ash_gray.toml: ash_gray (ram, foes, dex)
+// gamedata/gen3/hacks/ash_gray.toml: ash_gray (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_ASH_GRAY = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -2200,6 +2220,16 @@ static const struct pd_config PD_CONFIG_ASH_GRAY = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = "KANTO",
+    .trainerMonStride = 0,
+    .trainerMonMovesOff = 0,
+    .trainerMonSpeciesOff = 0,
+    .trainerMonItemOff = 0,
+    .trainerMonLevelOff = 0,
+    .trainers = 0x0823EAC8,
+    .learnsets = 0x0825D7B4,
+    .wildHeaders = 0x088CD1F8,
+    .probeTrainer = 414,
+    .probeName = "BROCK",
     .text = &pd_text_ash_gray,
 };
 
@@ -2625,7 +2655,7 @@ static const struct pd_config PD_CONFIG_AMETHYST_V1_4_1 = {
     .text = &pd_text_amethyst_v1_4_1,
 };
 
-// gamedata/gen3/hacks/gs_chronicles.toml: gs_chronicles (ram, foes, dex)
+// gamedata/gen3/hacks/gs_chronicles.toml: gs_chronicles (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_GS_CHRONICLES = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -2702,6 +2732,16 @@ static const struct pd_config PD_CONFIG_GS_CHRONICLES = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = "JOHTO",
+    .trainerMonStride = 0,
+    .trainerMonMovesOff = 0,
+    .trainerMonSpeciesOff = 0,
+    .trainerMonItemOff = 0,
+    .trainerMonLevelOff = 0,
+    .trainers = 0x0823EAC8,
+    .learnsets = 0x097DD63C,
+    .wildHeaders = 0x08A31664,
+    .probeTrainer = 321,
+    .probeName = "Falkner",
     .text = &pd_text_gs_chronicles,
 };
 
@@ -2786,7 +2826,7 @@ static const struct pd_config PD_CONFIG_GHOST_GREY = {
 };
 
 // CFRU (plaintext party boxes): Radical Red 4.1 (ROM checked: party icons, POKéDEX) and Unbound (RAM only, no ROM to hand).
-// gamedata/gen3/hacks/radical_red.toml: radical_red_v4_1 (ram, foes, icons, dex)
+// gamedata/gen3/hacks/radical_red.toml: radical_red_v4_1 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_RADICAL_RED = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -2874,6 +2914,16 @@ static const struct pd_config PD_CONFIG_RADICAL_RED = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = "KANTO",
+    .trainerMonStride = 0,
+    .trainerMonMovesOff = 0,
+    .trainerMonSpeciesOff = 0,
+    .trainerMonItemOff = 0,
+    .trainerMonLevelOff = 0,
+    .trainers = 0x0823EAC8,
+    .learnsets = 0x0980175C,
+    .wildHeaders = 0x0872C984,
+    .probeTrainer = 414,
+    .probeName = "Brock",
     .text = &pd_text_radical_red_v4_1,
 };
 

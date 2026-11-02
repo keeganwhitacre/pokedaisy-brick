@@ -318,7 +318,7 @@ parts = ['ram', 'dex']
 
 [config.orange_islands]
 name = 'ORANGE_ISLANDS'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'guide']
 
 [config.ultra_violet]
 name = 'ULTRA_VIOLET'
@@ -326,11 +326,11 @@ parts = ['ram', 'foes', 'dex']
 
 [config.rocket_edition]
 name = 'ROCKET_EDITION'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'guide']
 
 [config.ash_gray]
 name = 'ASH_GRAY'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'guide']
 
 # Retail-like (CFRU) hacks: PARTY / BATTLE from RAM; Gaia and Sword and Shield (ROMs to hand) also party icons and the POKéDEX.
 
@@ -356,7 +356,7 @@ parts = ['ram', 'foes', 'dex']
 
 [config.gs_chronicles]
 name = 'GS_CHRONICLES'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'guide']
 
 [config.ghost_grey]
 name = 'GHOST_GREY'
@@ -365,7 +365,7 @@ parts = ['ram', 'foes', 'dex']
 # CFRU (plaintext party boxes): Radical Red 4.1 (ROM checked: party icons, POKéDEX) and Unbound (RAM only, no ROM to hand).
 [config.radical_red_v4_1]
 name = 'RADICAL_RED'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.unbound_with_dex]
 name = 'UNBOUND'

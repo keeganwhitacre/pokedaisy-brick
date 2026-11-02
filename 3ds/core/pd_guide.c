@@ -26,6 +26,11 @@ const struct pd_guide* pd_guide_for(const struct pd_game* g) {
     case PD_GUIDE_RUBY: return &pd_guide_ruby;
     case PD_GUIDE_SAPPHIRE: return &pd_guide_sapphire;
     case PD_GUIDE_EMERALD_LEGACY: return &pd_guide_emerald_legacy;
+    case PD_GUIDE_ROCKET_EDITION: return &pd_guide_rocket_edition;
+    case PD_GUIDE_ASH_GRAY: return &pd_guide_ash_gray;
+    case PD_GUIDE_GS_CHRONICLES: return &pd_guide_gs_chronicles;
+    case PD_GUIDE_RADICAL_RED: return &pd_guide_radical_red;
+    case PD_GUIDE_ORANGE_ISLANDS: return &pd_guide_orange_islands;
     default: return NULL;
     }
 }
@@ -38,6 +43,11 @@ const struct pd_area_thing* pd_areas_for(const struct pd_game* g, int* count) {
     case PD_GUIDE_RUBY:
     case PD_GUIDE_SAPPHIRE: *count = pd_areas_ruby_sapphire_count; return pd_areas_ruby_sapphire;
     case PD_GUIDE_EMERALD_LEGACY: *count = pd_areas_emerald_legacy_count; return pd_areas_emerald_legacy;
+    case PD_GUIDE_ROCKET_EDITION: *count = pd_areas_rocket_edition_count; return pd_areas_rocket_edition;
+    case PD_GUIDE_ASH_GRAY: *count = pd_areas_ash_gray_count; return pd_areas_ash_gray;
+    case PD_GUIDE_GS_CHRONICLES: *count = pd_areas_gs_chronicles_count; return pd_areas_gs_chronicles;
+    case PD_GUIDE_RADICAL_RED: *count = pd_areas_radical_red_count; return pd_areas_radical_red;
+    case PD_GUIDE_ORANGE_ISLANDS: *count = pd_areas_orange_islands_count; return pd_areas_orange_islands;
     default: *count = 0; return NULL;
     }
 }

@@ -63,7 +63,8 @@ struct pd_guide {
 };
 
 extern const struct pd_guide pd_guide_firered, pd_guide_leafgreen, pd_guide_emerald, pd_guide_ruby, pd_guide_sapphire,
-    pd_guide_emerald_legacy;
+    pd_guide_emerald_legacy,
+    pd_guide_rocket_edition, pd_guide_ash_gray, pd_guide_gs_chronicles, pd_guide_radical_red, pd_guide_orange_islands;
 
 enum pd_area_kind { PD_AREA_ITEM, PD_AREA_HIDDEN, PD_AREA_GIFT, PD_AREA_KEY, PD_AREA_MON, PD_AREA_EGG, PD_AREA_TRADE };
 
@@ -72,15 +73,15 @@ struct pd_area_thing {
     uint8_t kind;      // enum pd_area_kind
     uint16_t id;       // an item, or the species you get
     uint16_t flag;     // set once it's done (0 = none known)
-    uint8_t qty;
+    uint16_t qty;
     uint16_t wants;    // TRADE: the species they want
     const char* where; // the sub-map ("" = the area's main map)
 };
 
 extern const struct pd_area_thing pd_areas_firered[], pd_areas_leafgreen[], pd_areas_emerald[], pd_areas_ruby_sapphire[],
-    pd_areas_emerald_legacy[];
+    pd_areas_emerald_legacy[], pd_areas_rocket_edition[], pd_areas_ash_gray[], pd_areas_gs_chronicles[], pd_areas_radical_red[], pd_areas_orange_islands[];
 extern const int pd_areas_firered_count, pd_areas_leafgreen_count, pd_areas_emerald_count, pd_areas_ruby_sapphire_count,
-    pd_areas_emerald_legacy_count;
+    pd_areas_emerald_legacy_count, pd_areas_rocket_edition_count, pd_areas_ash_gray_count, pd_areas_gs_chronicles_count, pd_areas_radical_red_count, pd_areas_orange_islands_count;
 
 // The guide and area data for g (NULL / 0 if none).
 const struct pd_guide* pd_guide_for(const struct pd_game* g);

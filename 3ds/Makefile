@@ -43,6 +43,14 @@ $(BUILD)/pd_card_test: $(CORE_SRC) $(wildcard core/*.h) test/card_test.c
 	@mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) -o $@ $(filter-out core/pd_game.c,$(CORE_SRC)) test/card_test.c -lm
 
+$(BUILD)/pd_guide_test: $(CORE_SRC) $(wildcard core/*.h) test/guide_test.c
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(filter-out core/pd_game.c,$(CORE_SRC)) test/guide_test.c -lm
+
+# make test-guide ROMS=<dir with the ROMs>: every hack boss team reads sanely from its ROM.
+test-guide: $(BUILD)/pd_guide_test
+	$(BUILD)/pd_guide_test $(ROMS)
+
 # make test-card ROMS=<dir with the ROMs>: the cards vs the CRCs of TrainerCardTest.
 test-card: $(BUILD)/pd_card_test
 	$(BUILD)/pd_card_test $(FIXTURES) $(ROMS)
