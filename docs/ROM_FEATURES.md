@@ -402,16 +402,17 @@ against the app's recorded cards (`make -C 3ds test-card`), the GUIDE's boss tea
 | Unbound 2.1.1.1 (and the French fan translation) | ✅ | ✅ | — |
 | Lazarus | ✅ | ✅ | — |
 | Recharged Yellow 1.8.0 | ✅ | ✅ | — |
-| Recharged Yellow 1.9.x | ✅ | ◐ ²³ | — |
+| Recharged Yellow 1.9.x | ✅ | ✅ | — |
 | SoulGold | ✅ | ✅ | — |
-| Glazed, Imperium | ✅ | — ²⁴ | — |
+| Glazed | ✅ | ✅ ²³ | — |
+| Imperium | ✅ | — ²⁴ | — |
 | Quetzal (Alpha 0.8.4 and 9.x, English and Spanish) | ✅ | — | — |
 | Rocket Edition, Ash Gray, GS Chronicles, Radical Red, Orange Islands | ✅ | — | ✅ |
 | Dreamstone Mysteries, Wishes of Tomorrow, R.O.W.E., Odyssey, Amethyst, Gaia, Heart and Soul, Seaglass, Too Many Types 2, Emerald Rogue (EX) | ✅ | — | — |
 | Celia's Stupid Romhack | ◐ ²⁵ | — | — |
 
-²³ Wired, but only the 1.8.0 card is checked; the lighter red and moved icon tables of 1.9.x have no ROM here to check against.
-²⁴ No reference render of their card exists to check against, so the tab stays off.
+²³ Checked against a screenshot of the game's own card (0 pixels differ), not the app's recorded output.
+²⁴ No reference render of Imperium's card exists to check against, so the tab stays off.
 ²⁵ The dex probe the C reader uses (the first entry's category) does not match this ROM; whether the app's own check passes was not tested.
 
 Hacks that are not in the table have no DEX, CARD or GUIDE yet. The MAP tab on a hack shows nothing for now.
