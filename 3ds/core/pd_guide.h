@@ -43,6 +43,12 @@ enum pd_boss_kind {
     PD_BOSS_BY_FLAGS, // alts' first {flag, trainer} whose flag is set, else a (Emerald Legacy's BRAWLY)
 };
 
+// A team the game picks at run time (difficulty, a double battle's partners): shown under its label. {NULL, 0} ends.
+struct pd_variant {
+    const char* label;
+    uint16_t trainer;
+};
+
 struct pd_boss {
     const char* title;
     const char* where;
@@ -50,6 +56,7 @@ struct pd_boss {
     uint8_t kind;
     uint16_t a, b;
     const uint16_t* alts; // PD_BOSS_BY_FLAGS: {flag, trainer} pairs, 0-terminated
+    const struct pd_variant* variants; // when set, one team per entry instead of the kind's trainer
 };
 
 struct pd_guide {
@@ -64,7 +71,8 @@ struct pd_guide {
 
 extern const struct pd_guide pd_guide_firered, pd_guide_leafgreen, pd_guide_emerald, pd_guide_ruby, pd_guide_sapphire,
     pd_guide_emerald_legacy,
-    pd_guide_rocket_edition, pd_guide_ash_gray, pd_guide_gs_chronicles, pd_guide_radical_red, pd_guide_orange_islands;
+    pd_guide_rocket_edition, pd_guide_ash_gray, pd_guide_gs_chronicles, pd_guide_radical_red, pd_guide_orange_islands,
+    pd_guide_odyssey, pd_guide_sword_shield, pd_guide_unbound;
 
 enum pd_area_kind { PD_AREA_ITEM, PD_AREA_HIDDEN, PD_AREA_GIFT, PD_AREA_KEY, PD_AREA_MON, PD_AREA_EGG, PD_AREA_TRADE };
 
@@ -79,9 +87,11 @@ struct pd_area_thing {
 };
 
 extern const struct pd_area_thing pd_areas_firered[], pd_areas_leafgreen[], pd_areas_emerald[], pd_areas_ruby_sapphire[],
-    pd_areas_emerald_legacy[], pd_areas_rocket_edition[], pd_areas_ash_gray[], pd_areas_gs_chronicles[], pd_areas_radical_red[], pd_areas_orange_islands[];
+    pd_areas_emerald_legacy[], pd_areas_rocket_edition[], pd_areas_ash_gray[], pd_areas_gs_chronicles[], pd_areas_radical_red[], pd_areas_orange_islands[],
+    pd_areas_odyssey[], pd_areas_sword_shield[], pd_areas_unbound[];
 extern const int pd_areas_firered_count, pd_areas_leafgreen_count, pd_areas_emerald_count, pd_areas_ruby_sapphire_count,
-    pd_areas_emerald_legacy_count, pd_areas_rocket_edition_count, pd_areas_ash_gray_count, pd_areas_gs_chronicles_count, pd_areas_radical_red_count, pd_areas_orange_islands_count;
+    pd_areas_emerald_legacy_count, pd_areas_rocket_edition_count, pd_areas_ash_gray_count, pd_areas_gs_chronicles_count, pd_areas_radical_red_count, pd_areas_orange_islands_count,
+    pd_areas_odyssey_count, pd_areas_sword_shield_count, pd_areas_unbound_count;
 
 // The guide and area data for g (NULL / 0 if none).
 const struct pd_guide* pd_guide_for(const struct pd_game* g);

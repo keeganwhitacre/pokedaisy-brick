@@ -15,6 +15,9 @@ static const struct want WANT[] = {
     W("GS Chronicles", GS_CHRONICLES, GS_CHRONICLES, "Pokemon GS Chronicles (2.7.6).gba"),
     W("Radical Red", RADICAL_RED, RADICAL_RED, "Pokemon Radical Red (v4.1).gba"),
     W("Orange Islands", ORANGE_ISLANDS, ORANGE_ISLANDS, "Pokemon Orange Islands Beta (v5.7).gba"),
+    W("Odyssey", ODYSSEY, ODYSSEY, "Pokémon Odyssey COMPLETE v4.1.1 (EXPANDED BAG).gba"),
+    W("Sword and Shield", SWORD_SHIELD, SWORD_SHIELD, "Pokemon Sword and Shield Ultimate Plus (v1.2.1.2).gba"),
+    W("Unbound", UNBOUND, UNBOUND, "Pokemon Unbound (v2.1.1.1).gba"),
 };
 
 int main(int argc, char** argv) {
@@ -42,6 +45,7 @@ int main(int argc, char** argv) {
             const struct pd_boss* boss = &gd->bosses[b];
             int ids[16], k = 0;
             ids[k++] = pd_boss_trainer(gd, boss, &s);
+            for (const struct pd_variant* v = boss->variants; v && v->label && k < 15; v++) ids[k++] = v->trainer;
             if (boss->kind == PD_BOSS_BY_FLAGS) for (const uint16_t* a = boss->alts; a && a[0] && k < 15; a += 2) ids[k++] = a[1];
             for (int i = 0; i < k; i++) {
                 struct pd_team_mon team[PD_TEAM_MAX];
@@ -50,10 +54,10 @@ int main(int argc, char** argv) {
                 for (int m = 0; ok && m < cnt; m++) {
                     bool moves = false;
                     for (int q = 0; q < 4; q++) moves |= team[m].moves[q] != 0;
-                    ok = team[m].species > 0 && team[m].level >= 1 && team[m].level <= 100 && moves;
+                    ok = team[m].species > 0 && team[m].level >= 1 && team[m].level <= 100 && (moves || t->guide == PD_GUIDE_UNBOUND);  // Unbound has no learnset table here: default movesets stay empty
                 }
                 teams++;
-                if (!ok) { printf("FAIL %s %s (trainer %d)\n", t->name, boss->title, ids[i]); bad++; }
+                if (!ok) { printf("FAIL %s %s (trainer %d: %d mons, first sp %d lv %d)\n", t->name, boss->title, ids[i], cnt, cnt ? team[0].species : 0, cnt ? team[0].level : 0); bad++; }
             }
         }
         free(rom);

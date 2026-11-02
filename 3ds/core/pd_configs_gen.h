@@ -2350,7 +2350,7 @@ static const struct pd_config PD_CONFIG_GAIA = {
     .text = &pd_text_gaia_v3_2,
 };
 
-// gamedata/gen3/hacks/sword_shield.toml: sword_shield (ram, foes, icons, dex)
+// gamedata/gen3/hacks/sword_shield.toml: sword_shield (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_SWORD_SHIELD = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -2438,10 +2438,20 @@ static const struct pd_config PD_CONFIG_SWORD_SHIELD = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = 0,
+    .trainerMonStride = 0,
+    .trainerMonMovesOff = 0,
+    .trainerMonSpeciesOff = 0,
+    .trainerMonItemOff = 0,
+    .trainerMonLevelOff = 0,
+    .trainers = 0x0823EAC8,
+    .learnsets = 0x099F4D98,
+    .wildHeaders = 0x0892E408,
+    .probeTrainer = 414,
+    .probeName = "Milo",
     .text = &pd_text_sword_shield,
 };
 
-// gamedata/gen3/hacks/odyssey.toml: odyssey (ram, foes, dex)
+// gamedata/gen3/hacks/odyssey.toml: odyssey (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_ODYSSEY = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -2518,6 +2528,16 @@ static const struct pd_config PD_CONFIG_ODYSSEY = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = "TALREGA",
+    .trainerMonStride = 0,
+    .trainerMonMovesOff = 0,
+    .trainerMonSpeciesOff = 0,
+    .trainerMonItemOff = 0,
+    .trainerMonLevelOff = 0,
+    .trainers = 0x0823EAC8,
+    .learnsets = 0x0825D7B4,
+    .wildHeaders = 0x092C5540,
+    .probeTrainer = 33,
+    .probeName = "Karin",
     .text = &pd_text_odyssey,
 };
 
@@ -2953,7 +2973,7 @@ static const struct pd_config PD_CONFIG_RADICAL_RED = {
     .text = &pd_text_radical_red_v4_1,
 };
 
-// gamedata/gen3/hacks/unbound.toml: unbound_with_dex (ram, foes, dex, card)
+// gamedata/gen3/hacks/unbound.toml: unbound_with_dex (ram, foes, dex, card, guide)
 static const struct pd_config PD_CONFIG_UNBOUND = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -3056,10 +3076,20 @@ static const struct pd_config PD_CONFIG_UNBOUND = {
     .extraStarFlag = 0,
     .museumWinnersOff = 0,
     .frontierBpOff = 0,
+    .trainerMonStride = 0,
+    .trainerMonMovesOff = 0,
+    .trainerMonSpeciesOff = 0,
+    .trainerMonItemOff = 0,
+    .trainerMonLevelOff = 0,
+    .trainers = 0x0823EAC8,
+    .learnsets = 0x09A2457C,
+    .wildHeaders = 0x08C230D8,
+    .probeTrainer = 6,
+    .probeName = "Mirskle",
     .text = &pd_text_unbound_with_dex,
 };
 
-// gamedata/gen3/hacks/unbound.toml: unbound_fr (ram, foes, dex, card)
+// gamedata/gen3/hacks/unbound.toml: unbound_fr (ram, foes, dex, card, guide)
 static const struct pd_config PD_CONFIG_UNBOUND_FR = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -3162,6 +3192,16 @@ static const struct pd_config PD_CONFIG_UNBOUND_FR = {
     .extraStarFlag = 0,
     .museumWinnersOff = 0,
     .frontierBpOff = 0,
+    .trainerMonStride = 0,
+    .trainerMonMovesOff = 0,
+    .trainerMonSpeciesOff = 0,
+    .trainerMonItemOff = 0,
+    .trainerMonLevelOff = 0,
+    .trainers = 0x0823EAC8,
+    .learnsets = 0x09A2457C,
+    .wildHeaders = 0x08C230D8,
+    .probeTrainer = 6,
+    .probeName = "Sylvain",
     .text = &pd_text_unbound_fr,
 };
 

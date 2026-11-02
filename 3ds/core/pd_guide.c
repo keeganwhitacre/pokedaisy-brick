@@ -31,6 +31,9 @@ const struct pd_guide* pd_guide_for(const struct pd_game* g) {
     case PD_GUIDE_GS_CHRONICLES: return &pd_guide_gs_chronicles;
     case PD_GUIDE_RADICAL_RED: return &pd_guide_radical_red;
     case PD_GUIDE_ORANGE_ISLANDS: return &pd_guide_orange_islands;
+    case PD_GUIDE_ODYSSEY: return &pd_guide_odyssey;
+    case PD_GUIDE_SWORD_SHIELD: return &pd_guide_sword_shield;
+    case PD_GUIDE_UNBOUND: return &pd_guide_unbound;
     default: return NULL;
     }
 }
@@ -48,6 +51,9 @@ const struct pd_area_thing* pd_areas_for(const struct pd_game* g, int* count) {
     case PD_GUIDE_GS_CHRONICLES: *count = pd_areas_gs_chronicles_count; return pd_areas_gs_chronicles;
     case PD_GUIDE_RADICAL_RED: *count = pd_areas_radical_red_count; return pd_areas_radical_red;
     case PD_GUIDE_ORANGE_ISLANDS: *count = pd_areas_orange_islands_count; return pd_areas_orange_islands;
+    case PD_GUIDE_ODYSSEY: *count = pd_areas_odyssey_count; return pd_areas_odyssey;
+    case PD_GUIDE_SWORD_SHIELD: *count = pd_areas_sword_shield_count; return pd_areas_sword_shield;
+    case PD_GUIDE_UNBOUND: *count = pd_areas_unbound_count; return pd_areas_unbound;
     default: *count = 0; return NULL;
     }
 }

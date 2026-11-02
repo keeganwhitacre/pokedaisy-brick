@@ -399,7 +399,7 @@ against the app's recorded cards (`make -C 3ds test-card`), the GUIDE's boss tea
 
 | Game | DEX | CARD | GUIDE |
 | ---- | :-: | :--: | :---: |
-| Unbound 2.1.1.1 (and the French fan translation) | ✅ | ✅ | — |
+| Unbound 2.1.1.1 (and the French fan translation) | ✅ | ✅ | ✅ ²⁶ |
 | Lazarus | ✅ | ✅ | — |
 | Recharged Yellow 1.8.0 | ✅ | ✅ | — |
 | Recharged Yellow 1.9.x | ✅ | ✅ | — |
@@ -408,11 +408,14 @@ against the app's recorded cards (`make -C 3ds test-card`), the GUIDE's boss tea
 | Imperium | ✅ | — ²⁴ | — |
 | Quetzal (Alpha 0.8.4 and 9.x, English and Spanish) | ✅ | — | — |
 | Rocket Edition, Ash Gray, GS Chronicles, Radical Red, Orange Islands | ✅ | — | ✅ |
-| Dreamstone Mysteries, Wishes of Tomorrow, R.O.W.E., Odyssey, Amethyst, Gaia, Heart and Soul, Seaglass, Too Many Types 2, Emerald Rogue (EX) | ✅ | — | — |
+| Odyssey, Sword and Shield Ultimate Plus | ✅ | — | ✅ |
+| Dreamstone Mysteries, Wishes of Tomorrow, R.O.W.E., Amethyst, Gaia, Heart and Soul, Seaglass, Too Many Types 2, Emerald Rogue (EX) | ✅ | — | — |
 | Celia's Stupid Romhack | ◐ ²⁵ | — | — |
 
 ²³ Checked against a screenshot of the game's own card (0 pixels differ), not the app's recorded output.
 ²⁴ No reference render of Imperium's card exists to check against, so the tab stays off.
 ²⁵ The dex probe the C reader uses (the first entry's category) does not match this ROM; whether the app's own check passes was not tested.
+
+²⁶ Boss teams with several difficulties (Unbound's four, Odyssey's NORMAL / HARD) show one section per team. Unbound has no learnset table here, so a VANILLA team's moves are blank. The guide's left out for hacks whose bosses are built by Kotlin helpers or lambdas (Amethyst, Gaia, Ghost Grey, Celia, SoulGold, Imperium, Quetzal, Recharged Emerald / Yellow).
 
 Hacks that are not in the table have no DEX, CARD or GUIDE yet. The MAP tab on a hack shows nothing for now.

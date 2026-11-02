@@ -323,12 +323,20 @@ static void build_bosses(const struct pd_game* g, const struct pd_snapshot* s, c
     for (int b = 0; b < gd->bossCount && shown < MAX_BOSSES_SHOWN; b++) {
         const struct pd_boss* boss = &gd->bosses[b];
         if (pd_flag(s, boss->doneFlag)) continue;
+        int nv = 1;
+        while (boss->variants && boss->variants[nv].label) nv++;
+        for (int vi = 0; vi < nv; vi++) {
+        const struct pd_variant* var = boss->variants ? &boss->variants[vi] : NULL;
         struct pd_team_mon team[PD_TEAM_MAX];
-        int n = pd_trainer_team(g, pd_boss_trainer(gd, boss, s), team);
+        int n = pd_trainer_team(g, var ? var->trainer : pd_boss_trainer(gd, boss, s), team);
         int ace = 0;
         for (int i = 0; i < n; i++) ace = team[i].level > ace ? team[i].level : ace;
         char heading[56], note[120];
-        snprintf(heading, sizeof(heading), shown ? "%s" : "NEXT: %s", boss->title);
+        snprintf(heading, sizeof(heading), shown || vi ? "%s" : "NEXT: %s", boss->title);
+        if (var) {
+            size_t hl = strlen(heading);
+            snprintf(heading + hl, sizeof(heading) - hl, " (%s)", var->label);
+        }
         snprintf(note, sizeof(note), "%s - %d POKéMON - UP TO LV%d - YOUR BEST LV%d", boss->where, n, ace, best);
         add_section(heading, note);
         for (int i = 0; i < n; i++) {
@@ -359,6 +367,7 @@ static void build_bosses(const struct pd_game* g, const struct pd_snapshot* s, c
                          pd_item_name(g, team[i].item));
             }
             e->answer = e->answerBuf;
+        }
         }
         shown++;
     }

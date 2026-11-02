@@ -341,11 +341,11 @@ parts = ['ram', 'foes', 'icons', 'dex']
 
 [config.sword_shield]
 name = 'SWORD_SHIELD'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.odyssey]
 name = 'ODYSSEY'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'guide']
 
 [config.amethyst]
 name = 'AMETHYST'
@@ -370,11 +370,11 @@ parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.unbound_with_dex]
 name = 'UNBOUND'
-parts = ['ram', 'foes', 'dex', 'card']
+parts = ['ram', 'foes', 'dex', 'card', 'guide']
 
 [config.unbound_fr]
 name = 'UNBOUND_FR'
-parts = ['ram', 'foes', 'dex', 'card']
+parts = ['ram', 'foes', 'dex', 'card', 'guide']
 
 # pokeemerald-expansion family (and Recharged Yellow): PARTY / BAG / BATTLE from RAM, party and bag icons from the ROM.
 [config.imperium]

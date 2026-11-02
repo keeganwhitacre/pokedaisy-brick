@@ -25,7 +25,13 @@ HACK_GUIDES = [
     ("gaia", "Gaia", "GAIA"), ("rocket_edition", "RocketEdition", "ROCKET_EDITION"), ("ash_gray", "AshGray", "ASH_GRAY"),
     ("ghost_grey", "GhostGrey", "GHOST_GREY"), ("gs_chronicles", "GsChronicles", "GS_CHRONICLES"),
     ("radical_red", "RadicalRed", "RADICAL_RED"), ("orange_islands", "OrangeIslands", "ORANGE_ISLANDS"),
+    ("odyssey", "Odyssey", "ODYSSEY"), ("celia", "Celia", "CELIA"), ("sword_shield", "SwordShield", "SWORD_SHIELD"),
+    ("unbound", "Unbound", "UNBOUND"), ("amethyst", "Amethyst", "AMETHYST"), ("soulgold", "SoulGold", "SOULGOLD"),
+    ("imperium", "Imperium", "IMPERIUM"), ("quetzal", "Quetzal", "QUETZAL"),
+    ("recharged_emerald", "RechargedEmerald", "RECHARGED_EMERALD"), ("recharged_yellow", "RechargedYellow", "RECHARGED_YELLOW"),
 ]
+# Hacks whose guide has no area file in the app (their WHERE IS is empty here).
+AREAS_OPTIONAL = {"soulgold", "imperium", "quetzal", "recharged_emerald"}
 AREA_KINDS = ["ITEM", "HIDDEN", "GIFT", "KEY", "MON", "EGG", "TRADE"]
 
 
@@ -230,25 +236,33 @@ def bosses_of(text, decl, env):
         title = Parser(tokenize(m.group(1)), env).expr()
         where = Parser(tokenize(m.group(2)), env).expr()
         flag = Parser(tokenize(m.group(3)), env).expr()
-        out.append((m.start(), (title, where, flag, "BY_FLAGS", default, 0, alts)))
+        out.append((m.start(), (title, where, flag, "BY_FLAGS", default, 0, alts, [])))
     plain = []
-    for m in re.finditer(r'Boss\(("[^"]*"), ("[^"]*"), ([^,){]+?)(?:, trainer = league\((\d+), (\d+)\))?\)\s*(\{[^}]*\})?', body):
+    for m in re.finditer(r'Boss\(("[^"]*"), ("[^"]*"), ([^,){]+?)(?:, variants = (normalHard\(\d+, \d+\)|listOf\((?:"[^"]*" to \d+(?:, )?)+\)))?(?:, trainer = league\((\d+), (\d+)\))?\)\s*(\{[^}]*\})?', body):
         title = Parser(tokenize(m.group(1)), env).expr()
         where = Parser(tokenize(m.group(2)), env).expr()
         flag = Parser(tokenize(m.group(3)), env).expr()
+        variants = []
         if m.group(4):
-            plain.append((m.start(), (title, where, flag, "LEAGUE", int(m.group(4)), int(m.group(5)))))
+            v = m.group(4)
+            if v.startswith("normalHard"):
+                n, h = re.findall(r"\d+", v)
+                variants = [("NORMAL", int(n)), ("HARD", int(h))]
+            else:
+                variants = [(l, int(n)) for l, n in re.findall(r'"([^"]*)" to (\d+)', v)]
+        if m.group(5):
+            plain.append((m.start(), (title, where, flag, "LEAGUE", int(m.group(5)), int(m.group(6)), [], variants)))
         else:
-            lam = m.group(6) or ""
+            lam = m.group(7) or ""
             champ = re.search(r"league\((\d+), (\d+)\)\(p\) \+ rivalOffset", body[m.end():m.end() + 300])
             if "rivalOffset" in lam or (champ and "val rivalOffset" in body[m.end():m.end() + 200]):
-                plain.append((m.start(), (title, where, flag, "CHAMPION", int(champ.group(1)), int(champ.group(2)))))
+                plain.append((m.start(), (title, where, flag, "CHAMPION", int(champ.group(1)), int(champ.group(2)), [], variants)))
             else:
-                plain.append((m.start(), (title, where, flag, "FIXED", int(re.search(r"\d+", lam).group()), 0)))
+                plain.append((m.start(), (title, where, flag, "FIXED", int(re.search(r"\d+", lam).group()), 0, [], variants)))
     # In the list's order; every Boss( read, or the guide would quietly skip one.
     bosses = [b for _, b in sorted(out + plain, key=lambda e: e[0])]
     assert len(bosses) == body.count("Boss("), f"gen_guide: {decl}: read {len(bosses)} of {body.count('Boss(')} bosses"
-    return [b if len(b) == 7 else b + ([],) for b in bosses]
+    return bosses
 
 
 def areas_of(name, decl):
@@ -292,14 +306,18 @@ def emit_guide(out, prefix, pages, bosses, verified, extra):
     for pi, (title, sections) in enumerate(pages):
         out.append(f"    {{ {c_str(title)}, {prefix}_p{pi}, {len(sections)} }},")
     out.append("};")
-    for bi, (title, where, flag, kind, a, b, alts) in enumerate(bosses):
+    for bi, (title, where, flag, kind, a, b, alts, variants) in enumerate(bosses):
+        if variants:
+            vs = ", ".join(f"{{ {c_str(l)}, {t} }}" for l, t in variants)
+            out.append(f"static const struct pd_variant {prefix}_vars{bi}[] = {{ {vs}, {{ NULL, 0 }} }};")
         if alts:
             pairs = ", ".join(f"0x{f:X}, {t}" for f, t in alts)
             out.append(f"static const uint16_t {prefix}_alts{bi}[] = {{ {pairs}, 0 }};")
     out.append(f"static const struct pd_boss {prefix}_bosses[] = {{")
-    for bi, (title, where, flag, kind, a, b, alts) in enumerate(bosses):
+    for bi, (title, where, flag, kind, a, b, alts, variants) in enumerate(bosses):
         alt = f"{prefix}_alts{bi}" if alts else "NULL"
-        out.append(f"    {{ {c_str(title)}, {c_str(where)}, 0x{flag:X}, PD_BOSS_{kind}, {a}, {b}, {alt} }},")
+        var = f"{prefix}_vars{bi}" if variants else "NULL"
+        out.append(f"    {{ {c_str(title)}, {c_str(where)}, 0x{flag:X}, PD_BOSS_{kind}, {a}, {b}, {alt}, {var} }},")
     out.append("};")
     out.append(f"const struct pd_guide {prefix} = {{")
     out.append(f"    {prefix}_pages, {len(pages)}, {prefix}_bosses, {len(bosses)}, {str(verified).lower()}, {extra},")
@@ -373,7 +391,16 @@ def main():
         text = read(f"Guide{cls}.kt")
         env = {"consts": consts(text), "template": no_template}
         try:
+            if slug == "unbound":  # gym(n, title, where, difficult, vanilla, expert, insane) -> a Boss with its four teams
+                text = re.sub(r'gym\((\d+), ("[^"]*"), ("[^"]*"), (\d+), (\d+), (\d+), (\d+)\)',
+                              lambda m: f'Boss({m.group(2)}, {m.group(3)}, FLAG_BADGE01_GET + {int(m.group(1)) - 1}, variants = listOf("VANILLA" to {m.group(5)}, "DIFFICULT" to {m.group(4)}, "EXPERT" to {m.group(6)}, "INSANE" to {m.group(7)})) {{ {m.group(4)} }}',
+                              text.replace("private fun gym(", "private fun gym_unused("))
+                env = {"consts": consts(text), "template": no_template}
             bosses = bosses_of(text, f"BOSSES_{up}", env)
+            lst = text[text.index(f"val BOSSES_{up}"):]
+            lst = lst[lst.index("\n"):lst.index("\n)\n")]
+            helpers = re.findall(r"^\s+(?!Boss\()([a-z]\w*)\(", lst, re.M)
+            assert not helpers, f"bosses built by helper {helpers[0]}()"
             pages_of(text, env)
         except (AssertionError, SyntaxError, KeyError, ValueError) as e:
             print(f"gen_guide: {slug} left out: {e}")
@@ -399,7 +426,10 @@ def main():
                "verified = false" not in el_text, "0, 0")
     for slug, cls, up, text, env, bosses in hack_guides:
         emit_guide(out, f"pd_guide_{slug}", pages_of(text, env), bosses, "verified = false" not in text, "0, 0")
-        emit_areas(out, f"pd_areas_{slug}", areas_of(f"GuideAreas{cls}Gen.kt", f"GUIDE_AREAS_{up}_RAW"))
+        if os.path.exists(os.path.join(DATA, f"GuideAreas{cls}Gen.kt")):
+            emit_areas(out, f"pd_areas_{slug}", areas_of(f"GuideAreas{cls}Gen.kt", f"GUIDE_AREAS_{up}_RAW"))
+        else:
+            assert slug in AREAS_OPTIONAL, slug
     emit_areas(out, "pd_areas_emerald_legacy", areas_of("GuideAreasEmeraldLegacyGen.kt", "GUIDE_AREAS_EMERALD_LEGACY_RAW"))
     emit_areas(out, "pd_areas_ruby_sapphire", areas_of("GuideAreasRubySapphireGen.kt", "GUIDE_AREAS_RUBY_SAPPHIRE_RAW"))
     emit_areas(out, "pd_areas_firered", areas_of("GuideAreasFireRedGen.kt", "GUIDE_AREAS_FIRERED_RAW"))
