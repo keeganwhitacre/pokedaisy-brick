@@ -148,14 +148,6 @@ void pd_game_detect(struct pd_game* g, const uint8_t* header, size_t romSize) {
     g->code[4] = 0;
     g->revision = header[0xBC];
 
-    // A Game Boy cart (the Nintendo logo at 0x104): which one waits for pd_game_identify's hash.
-    if (romSize >= 0x150 && header[0x104] == 0xCE && header[0x105] == 0xED && header[0x106] == 0x66) {
-        g->kind = PD_GAME_GB;
-        g->title = "Game Boy ROM";
-        g->unsupported = "Not a Game Boy game the companion knows";
-        return;
-    }
-
     if (!strcmp(g->code, "BPRE") || !strcmp(g->code, "BPGE")) {
         g->kind = PD_GAME_FIRERED;
         g->title = g->code[2] == 'R' ? "Pokémon FireRed" : "Pokémon LeafGreen";
@@ -477,6 +469,15 @@ static bool retail_dump(const struct pd_game* g) {
 
 void pd_game_identify(struct pd_game* g) {
     if (!g->rom) return;
+    // A Game Boy cart (the Nintendo logo at 0x104, and no GBA header's 0x96 at 0xB2): which one waits for its hash.
+    // The logo is past the 0xC0 header pd_game_detect gets, so it is tested here, with the whole ROM.
+    if (g->romSize >= 0x150 && g->rom[0xB2] != 0x96 && g->rom[0x104] == 0xCE && g->rom[0x105] == 0xED &&
+        g->rom[0x106] == 0x66) {
+        g->kind = PD_GAME_GB;
+        g->cfg = NULL;
+        g->title = "Game Boy ROM";
+        g->unsupported = "Not a Game Boy game the companion knows";
+    }
     struct pd_sha1 s;
     pd_sha1_init(&s);
     pd_sha1_update(&s, g->rom, g->romSize);

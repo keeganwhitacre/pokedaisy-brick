@@ -228,7 +228,8 @@ bool pd_rom_read(const struct pd_game* g, uint32_t addr, void* out, size_t len);
 // A pointer into the ROM at a bus address, with at least len bytes after it.
 const uint8_t* pd_rom_at(const struct pd_game* g, uint32_t addr, size_t len);
 
-// Reads the ROM header (the first 0xC0 bytes of the ROM) and its size.
+// Reads the ROM header (the first 0xC0 bytes of the ROM, no more) and its size. A Game Boy cart is told apart in
+// pd_game_identify, which has the whole ROM.
 void pd_game_detect(struct pd_game* g, const uint8_t* header, size_t romSize);
 
 // Once g->rom is set: which FireRed / LeafGreen / Emerald file this is, by its SHA-1, as the app's Poller.detect
