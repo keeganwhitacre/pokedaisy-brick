@@ -20,7 +20,7 @@ struct look {
 static const struct look LOOKS[PD_HUD_LOOKS] = {
     {0xB8121620u, 0x66FFFFFFu, 0xF4F6FA, 0x0C0F15, 0xFFCF5A, 0xB2BACB, 0x59FFFFFFu, false},
     {0xC4F6F7FAu, 0x59000000u, 0x262B34, 0xD9DCE3, 0xC8321E, 0x6A7282, 0x4D000000u, false},
-    {PD_TITLE_FILL, PD_MUTED, PD_LABEL, PD_LABEL_SHADOW, PD_VALUE, PD_MUTED, 0xFFE9A8, true},
+    {0xFFFFFF, 0x8C8C94, 0x575656, 0xBCBBB4, 0xCB0707, 0x8C8C94, 0xFFE9A8, true}, // the FireRed window look, whatever the game
 };
 
 #define PAD 4
@@ -570,7 +570,7 @@ static void dock(struct hud *u) {
     if (!parts[i])
       continue;
     if (shown++) { // DockDivider
-      pd_fill(u->c, x + 3, mid - 15, 1, 30, u->L->window ? PD_MUTED : u->L->edge);
+      pd_fill(u->c, x + 3, mid - 15, 1, 30, u->L->window ? 0x8C8C94u : u->L->edge);
       x += 7;
     }
     if (i == 0)

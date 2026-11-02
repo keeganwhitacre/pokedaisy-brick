@@ -46,6 +46,20 @@ static const struct bag_palette EMERALD_BAG = {
     .backdropA = 0xC871F7, .backdropB = 0x5882F7,
 };
 
+// Game Boy: black on white, the games' double-line frame; the cursor is an ink bar like the menus' arrow.
+static const struct bag_palette GB_BAG = {
+    .panel = { { 0x181818, 1 }, { 0xFFFFFF, 1 }, { 0x181818, 1 } },
+    .panelLayers = 3,
+    .tabLayers = 2,
+    .fill = 0xFFFFFF, .divider = 0xC8C8C8,
+    .text = 0x181818, .textShadow = 0xFFFFFF,
+    .tabText = 0x181818, .tabTextShadow = 0xFFFFFF,
+    .cursor = 0x181818,
+    .desc = { { 0x181818, 1 } },
+    .descLayers = 1,
+    .descFill = 0xFFFFFF, .descText = 0x181818, .descTextShadow = 0xFFFFFF,
+};
+
 #define TAB_H 22
 #define BAG_ROW 17
 #define DESC_H 44
@@ -190,7 +204,7 @@ void ui_bag_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, 
         ui_notice(c, "NO BAG YET", "The bag shows once the game", "has loaded a save.");
         return;
     }
-    const struct bag_palette* p = g->kind == PD_GAME_EMERALD ? &EMERALD_BAG : &FIRERED_BAG;
+    const struct bag_palette* p = g->kind == PD_GAME_GB ? &GB_BAG : g->kind == PD_GAME_EMERALD ? &EMERALD_BAG : &FIRERED_BAG;
     if (p->backdropA) {
         for (int y = 0; y < c->h; y += 8) pd_fill(c, 0, y, c->w, 8, (y / 8) % 2 ? p->backdropB : p->backdropA);
     }

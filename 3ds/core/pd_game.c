@@ -1,4 +1,5 @@
 #include "pd_game.h"
+#include "pd_style.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -473,6 +474,7 @@ static bool retail_dump(const struct pd_game* g) {
 }
 
 void pd_game_identify(struct pd_game* g) {
+    pd_gb_look = 0;
     if (!g->rom) return;
     // A Game Boy cart (the Nintendo logo at 0x104, and no GBA header's 0x96 at 0xB2): which one waits for its hash.
     // The logo is past the 0xC0 header pd_game_detect gets, so it is tested here, with the whole ROM.
@@ -488,6 +490,7 @@ void pd_game_identify(struct pd_game* g) {
     pd_sha1_update(&s, g->rom, g->romSize);
     pd_sha1_hex(&s, g->sha1);
 
+    pd_gb_look = g->kind == PD_GAME_GB;
     if (g->kind == PD_GAME_GB) {
         for (const struct gb_rom* r = GB_ROMS; r->sha1; r++) {
             if (strcmp(r->sha1, g->sha1)) continue;

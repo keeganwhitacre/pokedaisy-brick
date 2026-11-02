@@ -15,10 +15,14 @@ struct slot_colors {
 };
 static const struct slot_colors SLOT_NORMAL = { 0x4A4A63, 0x84C6DE, 0x3994DE, 0x297BB5 };
 static const struct slot_colors SLOT_SELECTED = { 0xFF7331, 0xADEFFF, 0x7BD6EF, 0x4AADCE };
+// Game Boy: a white window with an ink frame; the selected one has a grey fill, a fainted one a dark grey.
+static const struct slot_colors GB_SLOT = { 0x181818, 0xFFFFFF, 0xFFFFFF, 0xE8E8E8 };
+static const struct slot_colors GB_SLOT_SELECTED = { 0x181818, 0xC8C8C8, 0xC8C8C8, 0xA8A8A8 };
+static const struct slot_colors GB_SLOT_FAINTED = { 0x181818, 0xB0B0B0, 0xB0B0B0, 0x909090 };
 static const struct slot_colors SLOT_FAINTED = { 0x4A4A63, 0xD6A521, 0xC66B10, 0xA54A00 };
 static const struct slot_colors SLOT_SELECTED_FAINTED = { 0xFF7331, 0xD6A521, 0xC66B10, 0xA54A00 };
-#define SLOT_TEXT 0xFFFFFF
-#define SLOT_TEXT_SHADOW 0x737373
+#define SLOT_TEXT PD_GB(0xFFFFFF, PD_GB_INK)
+#define SLOT_TEXT_SHADOW PD_GB(0x737373, PD_GB_PAPER)
 #define MALE 0x42CEFF
 #define MALE_SHADOW 0x006394
 #define FEMALE 0xFF9C94
@@ -163,7 +167,7 @@ static void empty_slot(struct pd_canvas* c, int x, int y, int w, int h, const st
     struct pd_canvas t;
     pd_canvas_init(&t, w, h, scratch);
     memset(scratch, 0xFF, (size_t) w * h * sizeof(*scratch)); // 0xFFFFFFFF: nothing drawn
-    slot_frame(&t, 0, 0, g, &SLOT_NORMAL);
+    slot_frame(&t, 0, 0, g, pd_gb_look ? &GB_SLOT : &SLOT_NORMAL);
     for (int yy = 0; yy < h; yy++) {
         int sy = y + yy;
         if (sy < c->cy0 || sy >= c->cy1) continue;
@@ -193,8 +197,8 @@ static void party_slot(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
     char buf[40];
     bool egg = m->species == PD_SPECIES_EGG;
     bool fainted = !egg && m->hp == 0;
-    const struct slot_colors* col = fainted ? (selected ? &SLOT_SELECTED_FAINTED : &SLOT_FAINTED)
-        : selected ? &SLOT_SELECTED : &SLOT_NORMAL;
+    const struct slot_colors* col = pd_gb_look ? (fainted ? &GB_SLOT_FAINTED : selected ? &GB_SLOT_SELECTED : &GB_SLOT)
+        : fainted ? (selected ? &SLOT_SELECTED_FAINTED : &SLOT_FAINTED) : selected ? &SLOT_SELECTED : &SLOT_NORMAL;
     slot_frame(c, x, y, &geo, col);
     if (!egg) hp_bar(c, x, y, &geo, m->hp, m->maxHp);
 
