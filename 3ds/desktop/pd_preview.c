@@ -226,6 +226,7 @@ int main(int argc, char** argv) {
         pd_game_detect(&game, rom, n);
         game.rom = rom;
         game.romSize = n;
+        pd_game_identify(&game); // a hack's ROM gets its own config
     }
 
     struct pd_snapshot snap;
@@ -301,6 +302,9 @@ int main(int argc, char** argv) {
     printf("action %d\n", pd_ui_take_action(&ui));
     host.ffOn = false;
 
+    // PD_PREVIEW_DEX_ONLY=1: just the POKéDEX shots (a hack's ROM has no MAP / GUIDE tables here yet).
+    if (getenv("PD_PREVIEW_DEX_ONLY")) goto dex_only;
+
     // MAP: where the player is, a tapped place, the cursor's other size, PLACES.
     tap(&p, HIT_TAB + PD_TAB_MAP, 0);
     shot(out, name, "map", px);
@@ -340,6 +344,7 @@ int main(int argc, char** argv) {
         draw(&p);
     }
 
+dex_only:
     // POKéDEX: the list, scrolled, an entry, the next one, the other dex.
     // (In a battle DEX's chip is BATTLE's.)
     ui.tab = PD_TAB_DEX;
