@@ -6,7 +6,7 @@
 #include "pd_tables.h"
 
 #define MON_SIZE_MAX 128
-#define BATTLE_MON_SIZE 0x58
+#define BATTLE_MON_MAX 0x98 // the largest layout's size
 #define MAP_HEADER_MAPSEC_OFF 0x14
 #define MAP_HEADER_MAP_TYPE_OFF 0x17
 #define SAVEBLOCK2_GENDER_OFF 8
@@ -117,11 +117,45 @@ bool pd_decode_party_mon(const uint8_t* raw, struct pd_mon* m) {
     return pd_decode_party_mon_l(raw, &pd_party_layout_vanilla, m);
 }
 
+// R.O.W.E.'s bit-packed struct (Gen3Mon.kt decodeRoweMon): no held item, no IVs (stats recompute with 0).
+static bool decode_rowe_mon(const uint8_t* raw, const struct pd_party_layout* l, struct pd_mon* m) {
+    uint32_t personality = u32(raw), w14 = u32(raw + 0x14), w18 = u32(raw + 0x18);
+    int species = (int) (u32(raw + 0x1C) & 0xFFF);
+    if (species == 0) return false;
+    m->species = (uint16_t) species;
+    m->moves[0] = w14 & 0x3FF;
+    m->moves[1] = w18 & 0x3FF;
+    m->moves[2] = (w18 >> 10) & 0x3FF;
+    m->moves[3] = (u16(raw + 0x1E) >> 1) & 0x3FF;
+    for (int i = 0; i < PD_NUM_MOVES; i++) m->pp[i] = raw[0x34 + i];
+    m->experience = (w14 >> 10) & 0x1FFFFF;
+    m->hasExperience = true;
+    for (int i = 0; i < 6; i++) {
+        m->stats.evs[i] = raw[0x20 + i];
+        m->stats.values[i] = u16(raw + l->maxHp + 2 * i);
+    }
+    m->stats.nature = (raw[0x27] >> 2) & 0x1F;
+    m->stats.valid = m->stats.hasEvs = m->stats.hasNature = m->stats.hasIvs = true;
+    m->stats.hasHiddenPower = true;
+    m->stats.hiddenPowerType = pd_hidden_power_type(&m->stats);
+    m->stats.hiddenPowerPower = pd_hidden_power_power(&m->stats);
+    m->personality = personality;
+    m->level = raw[l->level];
+    m->hp = u16(raw + l->hp);
+    m->maxHp = u16(raw + l->maxHp);
+    m->status = u32(raw + l->status);
+    if (raw[l->flags] & l->eggMask) m->species = PD_SPECIES_EGG;
+    decode_name(raw + l->nicknameOff, l->nicknameLen, m->nickname, sizeof(m->nickname));
+    m->gender = gender_of(m, personality);
+    return true;
+}
+
 // Android Gen3Mon.kt decodePartyMon: retail's encrypted, checksummed substructs first, else a
 // plaintext box (CFRU's: Unbound, Radical Red) at the layout's plainBox.
 bool pd_decode_party_mon_l(const uint8_t* raw, const struct pd_party_layout* l, struct pd_mon* m) {
     memset(m, 0, sizeof(*m));
     uint32_t personality = u32(raw);
+    if (l->rowe) return decode_rowe_mon(raw, l, m);
     uint32_t key = personality ^ u32(raw + 4);
     uint16_t stored = u16(raw + 28);
 
@@ -197,20 +231,20 @@ bool pd_decode_party_mon_l(const uint8_t* raw, const struct pd_party_layout* l, 
     return true;
 }
 
-static void decode_battle_mon(const uint8_t* raw, struct pd_battle_mon* b) {
+static void decode_battle_mon(const uint8_t* raw, const struct pd_battle_layout* l, struct pd_battle_mon* b) {
     memset(b, 0, sizeof(*b));
-    b->species = u16(raw);
+    b->species = u16(raw + l->species) & l->speciesMask;
     if (!b->species) return;
     for (int i = 0; i < PD_NUM_MOVES; i++) {
-        b->moves[i] = u16(raw + 0x0C + i * 2);
-        b->pp[i] = raw[0x24 + i];
+        b->moves[i] = u16(raw + l->moves + i * 2);
+        b->pp[i] = raw[l->pp + i];
     }
-    b->type1 = raw[0x21];
-    b->type2 = raw[0x22];
-    b->hp = u16(raw + 0x28);
-    b->level = raw[0x2A];
-    b->maxHp = u16(raw + 0x2C);
-    b->status = u32(raw + 0x4C);
+    b->type1 = raw[l->type1];
+    b->type2 = raw[l->type2];
+    b->hp = u16(raw + l->hp);
+    b->level = raw[l->level];
+    b->maxHp = u16(raw + l->maxHp);
+    b->status = u32(raw + l->status);
 }
 
 static void read_save_fields(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx,
@@ -272,12 +306,13 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
         read(ctx, cfg->battlersCount, &n, 1);
         if (n < 1 || n > 4) n = 4;
         read(ctx, cfg->battlerPositions, pos, 4);
-        uint8_t mons[4 * BATTLE_MON_SIZE];
+        const struct pd_battle_layout* bl = cfg->battleLayout ? cfg->battleLayout : &pd_battle_layout_vanilla;
+        uint8_t mons[4 * BATTLE_MON_MAX];
         int foeBattler = -1;
-        if (read(ctx, cfg->battleMons, mons, sizeof(mons))) {
+        if (read(ctx, cfg->battleMons, mons, (size_t) 4 * bl->size)) {
             for (int b = 0; b < n; b++) {
                 int p = pos[b] < 4 ? pos[b] : b;
-                decode_battle_mon(mons + b * BATTLE_MON_SIZE, &s->battlers[p]);
+                decode_battle_mon(mons + b * bl->size, bl, &s->battlers[p]);
                 if (p == PD_POS_OPPONENT_LEFT) foeBattler = b;
             }
         }
@@ -299,10 +334,11 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
     }
 
     // --- bag: quantities XOR the key's low half (readNativeBag) ---
-    uint8_t pockets[PD_POCKET_COUNT * 8];
-    if (haveKey && read(ctx, cfg->bagPockets, pockets, sizeof(pockets))) {
+    uint8_t pockets[PD_BAG_POCKETS_MAX * 8];
+    int nPockets = cfg->bagCount > PD_BAG_POCKETS_MAX ? PD_BAG_POCKETS_MAX : cfg->bagCount;
+    if (haveKey && nPockets > 0 && read(ctx, cfg->bagPockets, pockets, (size_t) nPockets * 8)) {
         s->bagOk = true;
-        for (int p = 0; p < PD_POCKET_COUNT; p++) {
+        for (int p = 0; p < nPockets; p++) {
             uint32_t slots = u32(pockets + p * 8);
             int capacity = pockets[p * 8 + 4];
             if (!in_ram(slots) || capacity == 0) continue;
@@ -310,7 +346,7 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
             uint8_t items[PD_POCKET_SLOTS * 4];
             if (!read(ctx, slots, items, (size_t) capacity * 4)) continue;
             struct pd_pocket_items* out = &s->bag[cfg->bagOrder[p]];
-            for (int i = 0; i < capacity; i++) {
+            for (int i = 0; i < capacity && out->count < PD_POCKET_SLOTS; i++) {
                 uint16_t id = u16(items + i * 4);
                 if (!id) continue;
                 out->items[out->count].id = id;

@@ -65,17 +65,30 @@ struct bag_view {
     } rows[MAX_ROWS];
 };
 
+// The game's pockets folded into PD_POCKET_*, each once, in the order the game first lists it.
+static int base_pockets(const struct pd_game* g, int out[PD_POCKET_COUNT]) {
+    int n = 0;
+    int total = g->cfg->bagCount < PD_BAG_POCKETS_MAX ? g->cfg->bagCount : PD_BAG_POCKETS_MAX;
+    for (int i = 0; i < total; i++) {
+        int pocket = g->cfg->bagOrder[i], seen = 0;
+        for (int j = 0; j < n; j++) seen |= out[j] == pocket;
+        if (!seen && n < PD_POCKET_COUNT) out[n++] = pocket;
+    }
+    return n;
+}
+
 static void gather(const struct pd_game* g, const struct pd_snapshot* s, int tab, struct bag_view* v) {
+    int order[PD_POCKET_COUNT];
+    int n = base_pockets(g, order);
     v->tabs = 0;
     v->pockets[v->tabs++] = -1;
-    for (int i = 0; i < PD_POCKET_COUNT; i++) {
-        int pocket = g->cfg->bagOrder[i];
-        if (s->bag[pocket].count > 0) v->pockets[v->tabs++] = pocket;
+    for (int i = 0; i < n; i++) {
+        if (s->bag[order[i]].count > 0) v->pockets[v->tabs++] = order[i];
     }
     if (tab < 0 || tab >= v->tabs) tab = 0;
     v->count = 0;
-    for (int i = 0; i < PD_POCKET_COUNT; i++) {
-        int pocket = g->cfg->bagOrder[i];
+    for (int i = 0; i < n; i++) {
+        int pocket = order[i];
         if (v->pockets[tab] >= 0 && pocket != v->pockets[tab]) continue;
         const struct pd_pocket_items* items = &s->bag[pocket];
         for (int j = 0; j < items->count && v->count < MAX_ROWS; j++) {

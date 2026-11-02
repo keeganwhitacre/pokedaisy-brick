@@ -31,6 +31,7 @@ enum pd_guide_id {
 // struct Pokemon's party fields (the app's PartyMonLayout): the party-only fields after the
 // BoxPokemon, and where a plaintext (unencrypted) box keeps its substructs. A config without
 // one (partyLayout NULL) is retail's: pd_party_layout_vanilla.
+#define PD_BAG_POCKETS_MAX 12
 struct pd_party_layout {
     int size;               // the whole struct (the party's stride)
     int status, level, hp, maxHp; // maxHp is followed by the five other stats
@@ -46,12 +47,24 @@ struct pd_party_layout {
     bool hasStats;          // IVs / EVs / nature / stats come out right from these offsets
     bool natureModifier;    // expansion's Mints: +0x12's bits above the language are XORed into the nature
     int nicknameOff, nicknameLen;
+    bool rowe;              // R.O.W.E.'s bit-packed struct (no substructs, no IVs, no held item)
 };
-extern const struct pd_party_layout pd_party_layout_vanilla;
+extern const struct pd_party_layout pd_party_layout_vanilla, pd_party_layout_quetzal, pd_party_layout_soulgold,
+    pd_party_layout_team_rocket, pd_party_layout_rowe;
+
+// struct BattlePokemon's field offsets (the app's BattleMonLayout); a config without one is retail's.
+struct pd_battle_layout {
+    int size, species, moves, type1, type2, pp, hp, level, maxHp, status;
+    unsigned speciesMask;
+};
+extern const struct pd_battle_layout pd_battle_layout_vanilla, pd_battle_layout_expansion, pd_battle_layout_tmt2,
+    pd_battle_layout_team_rocket, pd_battle_layout_wishes, pd_battle_layout_rowe, pd_battle_layout_soulgold,
+    pd_battle_layout_elite_redux;
 
 struct pd_config {
     const struct pd_text* text; // the hack's own species / item / move names; NULL = retail's
     const struct pd_party_layout* partyLayout; // NULL = pd_party_layout_vanilla
+    const struct pd_battle_layout* battleLayout; // NULL = pd_battle_layout_vanilla
     uint32_t playerParty;
     uint32_t playerPartyCount;
     uint32_t battleMons;
@@ -85,7 +98,8 @@ struct pd_config {
     // gBagPockets: five {slots pointer, capacity} pairs, 8 bytes apart;
     // bagOrder[i] is the pocket (PD_POCKET_*) the game keeps at index i.
     uint32_t bagPockets;
-    uint8_t bagOrder[5];
+    uint8_t bagOrder[PD_BAG_POCKETS_MAX];
+    int bagCount; // how many pockets gBagPockets holds (a hack's: up to PD_BAG_POCKETS_MAX); folded into PD_POCKET_*
 
     // POKéDEX (the app's PokedexTables): ROM tables ...
     uint32_t dexEntries;       // gPokedexEntries, by national number

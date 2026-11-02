@@ -12,6 +12,64 @@ const struct pd_party_layout pd_party_layout_vanilla = {
     .plainBox = 0x20, .plainSpeciesMask = 0xFFFF, .plainItemMask = 0xFFFF, .hpBits = 16, .statusMask = 0xFFFFFFFFu,
     .hasStats = true, .natureModifier = true, .nicknameOff = 0x08, .nicknameLen = 10,
 };
+// struct BattlePokemon layouts (Gen3Mon.kt): retail's / CFRU's, pokeemerald-expansion's and the hacks' variants of it.
+const struct pd_battle_layout pd_battle_layout_vanilla = {
+    .size = 88, .species = 0, .moves = 12, .type1 = 33, .type2 = 34, .pp = 36, .hp = 40, .level = 42,
+    .maxHp = 44, .status = 76, .speciesMask = 0xFFFF,
+};
+const struct pd_battle_layout pd_battle_layout_expansion = {
+    .size = 96, .species = 0, .moves = 12, .type1 = 34, .type2 = 35, .pp = 37, .hp = 42, .level = 44,
+    .maxHp = 46, .status = 80, .speciesMask = 0xFFFF,
+};
+const struct pd_battle_layout pd_battle_layout_tmt2 = {
+    .size = 96, .species = 0, .moves = 12, .type1 = 34, .type2 = 35, .pp = 38, .hp = 42, .level = 44,
+    .maxHp = 46, .status = 80, .speciesMask = 0xFFFF,
+};
+const struct pd_battle_layout pd_battle_layout_team_rocket = {
+    .size = 92, .species = 0, .moves = 12, .type1 = 34, .type2 = 35, .pp = 37, .hp = 42, .level = 44,
+    .maxHp = 46, .status = 80, .speciesMask = 0xFFFF,
+};
+const struct pd_battle_layout pd_battle_layout_wishes = {
+    .size = 136, .species = 0, .moves = 12, .type1 = 34, .type2 = 35, .pp = 37, .hp = 42, .level = 44,
+    .maxHp = 46, .status = 80, .speciesMask = 0xFFFF,
+};
+const struct pd_battle_layout pd_battle_layout_rowe = {
+    .size = 96, .species = 0, .moves = 12, .type1 = 34, .type2 = 35, .pp = 37, .hp = 42, .level = 44,
+    .maxHp = 46, .status = 80, .speciesMask = 0x7FF,
+};
+const struct pd_battle_layout pd_battle_layout_soulgold = {
+    .size = 152, .species = 0, .moves = 12, .type1 = 34, .type2 = 35, .pp = 37, .hp = 42, .level = 44,
+    .maxHp = 46, .status = 84, .speciesMask = 0xFFFF,
+};
+const struct pd_battle_layout pd_battle_layout_elite_redux = {
+    .size = 104, .species = 20, .moves = 32, .type1 = 68, .type2 = 69, .pp = 71, .hp = 54, .level = 75,
+    .maxHp = 56, .status = 8, .speciesMask = 0xFFFF,
+};
+// Pokemon Quetzal: a 0x68-byte plaintext struct (expansion's, bit-packed HP and status), egg flag in the IV word.
+const struct pd_party_layout pd_party_layout_quetzal = {
+    .size = 0x68, .status = 0x24, .level = 0x58, .hp = 0x23, .maxHp = 0x5A, .flags = 0x13, .eggMask = 0x04,
+    .plainBox = 0x28, .plainSpeciesMask = 0xFFFF, .plainItemMask = 0xFFFF, .plainExp = true, .hpBits = 10,
+    .statusShift = 2, .statusMask = 0xFFF, .eggInIvWord = true, .hasStats = true, .natureModifier = true,
+    .nicknameOff = 0x08, .nicknameLen = 10,
+};
+// SoulGold: 96 bytes, a 12-letter nickname; no stats (the offsets here don't add up) and its species / item are narrower.
+const struct pd_party_layout pd_party_layout_soulgold = {
+    .size = 96, .status = 0x4C, .level = 0x50, .hp = 0x52, .maxHp = 0x54, .flags = 0x15, .eggMask = 0x04,
+    .plainBox = 0x20, .plainSpeciesMask = 0x07FF, .plainItemMask = 0x03FF, .hpBits = 16, .statusMask = 0xFFFFFFFFu,
+    .hasStats = false, .natureModifier = true, .nicknameOff = 0x08, .nicknameLen = 12,
+};
+// Team Rocket Edition (Dragonsden): retail's struct, the flags in the language byte, no Mints.
+const struct pd_party_layout pd_party_layout_team_rocket = {
+    .size = 100, .status = 0x50, .level = 0x54, .hp = 0x56, .maxHp = 0x58, .flags = 0x12, .eggMask = 0x20,
+    .plainBox = 0x20, .plainSpeciesMask = 0xFFFF, .plainItemMask = 0xFFFF, .hpBits = 16, .statusMask = 0xFFFFFFFFu,
+    .hasStats = true, .natureModifier = false, .nicknameOff = 0x08, .nicknameLen = 10,
+};
+// R.O.W.E. 2.x: 0x4C bytes, plaintext and bit-packed (Gen3Mon.kt decodeRoweMon).
+const struct pd_party_layout pd_party_layout_rowe = {
+    .size = 0x4C, .status = 0x38, .level = 0x3C, .hp = 0x3E, .maxHp = 0x40, .flags = 0x27, .eggMask = 0x80,
+    .plainBox = 0x20, .plainSpeciesMask = 0xFFFF, .plainItemMask = 0xFFFF, .hpBits = 16, .statusMask = 0xFFFFFFFFu,
+    .hasStats = true, .nicknameOff = 0x08, .nicknameLen = 12, .rowe = true,
+};
 #include "pd_configs_gen.h"
 
 const uint8_t* pd_rom_at(const struct pd_game* g, uint32_t addr, size_t len) {
