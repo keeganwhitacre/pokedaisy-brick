@@ -878,7 +878,7 @@ def kotlin_pocket_order(name, lists, where):
 
 TEXT_KINDS = {"species": "String", "items": "String", "moves": "MoveInfo", "typeNames": "String", "typeChart": "Int",
               "speciesTypes": "SpeciesTypes"}
-KT_MAP = re.compile(r"^(?:internal |private )?val (\w+): Map<Int, (String|MoveInfo|Int|SpeciesTypes)>(?: = mapOf\(| by lazy \{ mapOf\(| by lazy \{)$")
+KT_MAP = re.compile(r"^(?:internal |private )?val (\w+)(?:: Map<Int, (String|MoveInfo|Int|SpeciesTypes)>)?(?: = mapOf\(| by lazy \{ mapOf\(| by lazy \{)$")
 KT_STR_ENTRY = re.compile(r'^\s*(\d+|0x[0-9A-Fa-f]+) to "((?:[^"\\]|\\.)*)",?\s*$')
 KT_INT_ENTRY = re.compile(r"^\s*(\d+|0x[0-9A-Fa-f]+) to (-?\d+),?\s*$")
 KT_TYPES_ENTRY = re.compile(r"^\s*(\d+|0x[0-9A-Fa-f]+) to SpeciesTypes\((\d+|TYPE_NONE), (\d+|TYPE_NONE)\),?\s*$")
@@ -907,11 +907,17 @@ def kt_unescape(raw, where):
 def kotlin_text_table(name, kind, where):
     """{id: name} (species, items) or {id: (name, type, power)} (moves) of the Kotlin `val name`;
     `A + B` is A with B's entries laid over it (a language pack)."""
+    if name.startswith("UPPER "):  # a game that prints its names in capitals (Config.gameCase)
+        t = kotlin_text_table(name[6:], kind, where)
+        return {k: ((v[0].upper(),) + tuple(v[1:]) if kind == "moves" else v.upper()) for k, v in t.items()}
     if "+" in name:
         merged = {}
         for part in name.split("+"):
             merged.update(kotlin_text_table(part.strip(), kind, where))
         return merged
+    if "." in name:  # `hackVal.field`: one named table inside a HackText(...) the app lays over its base game
+        hack, field = name.split(".")
+        return kotlin_hack_table(hack, field, kind, where)
     for path in sorted(glob.glob(os.path.join(DATA, "*.kt"))):
         with open(path, encoding="utf-8") as fh:
             lines = fh.read().split("\n")
@@ -919,7 +925,7 @@ def kotlin_text_table(name, kind, where):
             m = KT_MAP.match(line)
             if not m or m.group(1) != name:
                 continue
-            if m.group(2) != TEXT_KINDS[kind]:
+            if m.group(2) and m.group(2) != TEXT_KINDS[kind]:
                 fail(where, f"{name} is a Map<Int, {m.group(2)}>, not a {kind} table")
             table = {}
             for entry in lines[n + 1:]:
@@ -940,12 +946,55 @@ def kotlin_text_table(name, kind, where):
                         table[int(e.group(1), 0)] = tuple(255 if g == "TYPE_NONE" else int(g) for g in e.groups()[1:])
                         continue
                 e = KT_MOVE_ENTRY.match(entry) if kind == "moves" else KT_STR_ENTRY.match(entry)
+                if not e and kind == "typeNames":  # several to a line (the retail table)
+                    pairs = re.findall(r'(\d+) to "([^"]*)"', entry)
+                    if pairs:
+                        table.update({int(k): v for k, v in pairs})
+                        continue
                 if not e:
                     fail(where, f"{os.path.basename(path)}: can't read {entry.strip()!r} in {name}")
                 value = kt_unescape(e.group(2), where)
                 table[int(e.group(1), 0)] = (value, 255 if e.group(3) == "TYPE_NONE" else int(e.group(3)), int(e.group(4))) if kind == "moves" else value
             fail(where, f"{name} in {os.path.basename(path)} never closes")
     fail(where, f"no `val {name}` in the app's data/")
+
+
+def kotlin_hack_table(hack, field, kind, where):
+    for path in sorted(glob.glob(os.path.join(DATA, "*.kt"))):
+        with open(path, encoding="utf-8") as fh:
+            lines = fh.read().split("\n")
+        for n, line in enumerate(lines):
+            if not re.match(r"^(?:internal )?val " + hack + r": HackText by lazy \{$", line):
+                continue
+            for m in range(n, len(lines)):
+                if lines[m].strip() != f"{field} = mapOf(":
+                    continue
+                table = {}
+                for entry in lines[m + 1:]:
+                    if entry.strip() in ("),", ")"):
+                        return table
+                    if not entry.strip() or entry.strip().startswith("//"):
+                        continue
+                    if kind == "typeChart":
+                        e = KT_INT_ENTRY.match(entry)
+                    elif kind == "speciesTypes":
+                        e = KT_TYPES_ENTRY.match(entry)
+                    else:
+                        e = (KT_MOVE_ENTRY if kind == "moves" else KT_STR_ENTRY).match(entry)
+                    if not e:
+                        fail(where, f"{os.path.basename(path)}: can't read {entry.strip()!r} in {hack}.{field}")
+                    k = int(e.group(1), 0)
+                    if kind == "typeChart":
+                        table[k] = int(e.group(2))
+                    elif kind == "speciesTypes":
+                        table[k] = tuple(255 if g == "TYPE_NONE" else int(g) for g in e.groups()[1:])
+                    elif kind == "moves":
+                        table[k] = (kt_unescape(e.group(2), where), 255 if e.group(3) == "TYPE_NONE" else int(e.group(3)), int(e.group(4)))
+                    else:
+                        table[k] = kt_unescape(e.group(2), where)
+                fail(where, f"{hack}.{field} never closes")
+            fail(where, f"{hack} has no `{field} = mapOf(`")
+    fail(where, f"no `val {hack}: HackText` in the app's data/")
 
 
 def c_string(v):

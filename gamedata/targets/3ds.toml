@@ -777,3 +777,45 @@ moves = 'moveDataEliteRedux'
 typeNames = 'typeNamesEliteRedux'
 typeChart = 'typeEffectivenessEliteRedux'
 speciesTypes = 'speciesTypeDataEliteRedux'
+
+# FireRed hacks edited in place: their own names and types over retail's (Ash Gray's few renames in capitals, like the game).
+[text.ash_gray]
+species = 'UPPER speciesNames + fireRedHackAshGray.species'
+items = 'UPPER itemNames + fireRedHackAshGray.items'
+moves = 'UPPER moveData + fireRedHackAshGray.moves'
+typeNames = 'typeNames + fireRedHackAshGray.typeNames'
+typeChart = 'typeEffectiveness + fireRedHackAshGray.typeChart'
+speciesTypes = 'speciesTypeData + fireRedHackAshGray.types'
+
+[text.rocket_edition]
+species = 'fireRedHackRocketEdition.species'
+items = 'fireRedHackRocketEdition.items'
+moves = 'fireRedHackRocketEdition.moves'
+typeNames = 'typeNames + fireRedHackRocketEdition.typeNames'
+typeChart = 'typeEffectiveness + fireRedHackRocketEdition.typeChart'
+speciesTypes = 'speciesTypeData + fireRedHackRocketEdition.types'
+
+[text.ghost_grey]
+species = 'fireRedHackGhostGrey.species'
+items = 'fireRedHackGhostGrey.items'
+moves = 'fireRedHackGhostGrey.moves'
+typeNames = 'typeNames + fireRedHackGhostGrey.typeNames'
+typeChart = 'typeEffectiveness + fireRedHackGhostGrey.typeChart'
+speciesTypes = 'speciesTypeData + fireRedHackGhostGrey.types'
+
+[text.odyssey]
+species = 'fireRedHackOdyssey.species'
+items = 'fireRedHackOdyssey.items'
+moves = 'fireRedHackOdyssey.moves'
+typeNames = 'typeNames + fireRedHackOdyssey.typeNames'
+typeChart = 'typeEffectiveness + fireRedHackOdyssey.typeChart'
+speciesTypes = 'speciesTypeData + fireRedHackOdyssey.types'
+
+[text.ultra_violet]
+species = 'UPPER speciesNames + speciesNamesUltraViolet'
+items = 'UPPER itemNames + itemNamesUltraViolet'
+moves = 'UPPER moveData + moveDataUltraViolet'
+typeNames = 'typeNames'
+typeChart = 'typeEffectiveness'
+speciesTypes = 'speciesTypeData + speciesTypesUltraViolet'
+

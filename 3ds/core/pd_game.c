@@ -431,7 +431,7 @@ static bool retail_dump(const struct pd_game* g) {
 }
 
 void pd_game_identify(struct pd_game* g) {
-    if (!g->rom || !g->kind) return;
+    if (!g->rom) return;
     struct pd_sha1 s;
     pd_sha1_init(&s);
     pd_sha1_update(&s, g->rom, g->romSize);
@@ -459,7 +459,7 @@ void pd_game_identify(struct pd_game* g) {
         g->unsupported = NULL;
         return;
     }
-    if (!g->cfg) return; // detect's verdict (a revision past 1, a big hack) stands
+    if (!g->kind || !g->cfg) return; // detect's verdict (a revision past 1, a big hack) stands
     // LeafGreen, Ruby and Sapphire are read by code and revision alone, like the app (OTHER_RETAIL_CODES):
     // only FireRed and Emerald, which most hacks build on, need a retail hash.
     if (strcmp(g->code, "BPRE") && strcmp(g->code, "BPEE")) return;

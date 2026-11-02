@@ -48,6 +48,11 @@ extern const struct pd_text pd_text_quetzal_moemon_v084_es;
 extern const struct pd_text pd_text_emerald_rogue;
 extern const struct pd_text pd_text_elite_redux_v2_65_4_1b;
 extern const struct pd_text pd_text_elite_redux_v2_65_3b;
+extern const struct pd_text pd_text_ash_gray;
+extern const struct pd_text pd_text_rocket_edition;
+extern const struct pd_text pd_text_ghost_grey;
+extern const struct pd_text pd_text_odyssey;
+extern const struct pd_text pd_text_ultra_violet;
 
 // The configs, each with the parts the port reads for it so far (`name` is the C's: PD_CONFIG_<name>) and the
 // records `@name.` paths start from (`records`).
@@ -1399,6 +1404,7 @@ static const struct pd_config PD_CONFIG_ULTRA_VIOLET = {
     .battleStructPtr = 0x02023FE8,
     .battleStructStatic = false,
     .monToSwitchIntoOff = 0x5C,
+    .text = &pd_text_ultra_violet,
 };
 
 // gamedata/gen3/hacks/rocket_edition.toml: rocket_edition (ram, foes)
@@ -1437,6 +1443,7 @@ static const struct pd_config PD_CONFIG_ROCKET_EDITION = {
     .battleStructPtr = 0x02023FE8,
     .battleStructStatic = false,
     .monToSwitchIntoOff = 0x5C,
+    .text = &pd_text_rocket_edition,
 };
 
 // gamedata/gen3/hacks/ash_gray.toml: ash_gray (ram, foes)
@@ -1475,6 +1482,7 @@ static const struct pd_config PD_CONFIG_ASH_GRAY = {
     .battleStructPtr = 0x02023FE8,
     .battleStructStatic = false,
     .monToSwitchIntoOff = 0x5C,
+    .text = &pd_text_ash_gray,
 };
 
 // gamedata/gen3/hacks/gaia.toml: gaia_v3_2 (ram, foes, icons, dex)
@@ -1633,6 +1641,7 @@ static const struct pd_config PD_CONFIG_ODYSSEY = {
     .battleStructPtr = 0,
     .battleStructStatic = false,
     .monToSwitchIntoOff = 0,
+    .text = &pd_text_odyssey,
 };
 
 // gamedata/gen3/hacks/amethyst.toml: amethyst (ram, foes)
@@ -1788,6 +1797,7 @@ static const struct pd_config PD_CONFIG_GHOST_GREY = {
     .battleStructPtr = 0x02023FE8,
     .battleStructStatic = false,
     .monToSwitchIntoOff = 0x5C,
+    .text = &pd_text_ghost_grey,
 };
 
 // CFRU (plaintext party boxes): Radical Red 4.1 (ROM checked: party icons, POKéDEX) and Unbound (RAM only, no ROM to hand).
