@@ -1,6 +1,7 @@
 // The dex save read per game (the app's readPokedexState): each fixture is decoded with its own static
 // config and the seen / caught sets are those the app's Kotlin tests assert (HackPokedexTest and the
-// *DecodeTest files). Usage: pd_dex_test <fixtures dir>
+// *DecodeTest files). Usage: pd_dex_test <fixtures dir> [<dir with the ROMs>] - Emerald Rogue's bits are by species,
+// so it needs its ROM and is skipped without one.
 #include "../core/pd_game.c" // for the static PD_CONFIG_* tables
 #include "../core/pd_snapshot.h"
 #include <stdio.h>
@@ -48,6 +49,34 @@ static int check(const struct pd_snapshot* s, bool caught, const int* want, cons
     return bad;
 }
 
+// Emerald Rogue v2.2.1-EX: seen {546, 744}, caught {744} (HackPokedexTest).
+static int rogue(const char* fixtures, const char* roms) {
+    char p[1024];
+    snprintf(p, sizeof p, "%s/Pokemon Emerald Rogue (v2.2.1-EX).gba", roms);
+    FILE* f = fopen(p, "rb");
+    if (!f) { printf("skip Rogue (no ROM)\n"); return 0; }
+    fseek(f, 0, SEEK_END); long n = ftell(f); fseek(f, 0, SEEK_SET);
+    uint8_t* rom = malloc((size_t) n);
+    if (!rom || fread(rom, 1, (size_t) n, f) != (size_t) n) { fclose(f); return 1; }
+    fclose(f);
+    memset(ram, 0, sizeof ram); memset(iram, 0, sizeof iram);
+    snprintf(p, sizeof p, "%s/emerald_rogue/ewram.bin", fixtures);
+    f = fopen(p, "rb"); if (!f) return 1;
+    if (fread(ram, 1, sizeof ram, f) == 0) return 1;
+    fclose(f);
+    snprintf(p, sizeof p, "%s/emerald_rogue/iwram.bin", fixtures);
+    f = fopen(p, "rb"); if (f) { if (fread(iram, 1, sizeof iram, f) == 0) return 1; fclose(f); }
+    struct pd_game g; memset(&g, 0, sizeof g);
+    pd_game_detect(&g, rom, (size_t) n); g.rom = rom; g.romSize = (size_t) n;
+    g.cfg = &PD_CONFIG_EMERALD_ROGUE; g.kind = PD_GAME_EMERALD;
+    static struct pd_snapshot s; pd_snapshot_read(&s, &g, rd, NULL);
+    int bad = !s.dexOk;
+    if (bad) printf("FAIL Rogue: no dex\n");
+    else bad = check(&s, false, (const int[8]) { 546, 744 }, "Rogue") + check(&s, true, (const int[8]) { 744 }, "Rogue");
+    free(rom);
+    return bad;
+}
+
 int main(int argc, char** argv) {
     int bad = 0;
     if (argc < 2) return 2;
@@ -66,6 +95,7 @@ int main(int argc, char** argv) {
         if (!s.dexOk) { printf("FAIL %s: no dex\n", what); bad++; continue; }
         bad += check(&s, false, WANT[w].seen, what) + check(&s, true, WANT[w].caught, what);
     }
+    if (argc > 2) bad += rogue(argv[1], argv[2]);
     printf("%s (%zu games)\n", bad ? "FAILED" : "PASS dex", sizeof WANT / sizeof WANT[0]);
     return bad != 0;
 }

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "pd_dex.h"
 #include "pd_gb.h"
 #include "pd_tables.h"
 
@@ -309,7 +310,7 @@ static void decode_battle_mon(const uint8_t* raw, const struct pd_battle_layout*
     if (b->level < 1 || b->level > 100 || b->maxHp < 1 || b->maxHp > 9999 || b->hp > b->maxHp) memset(b, 0, sizeof(*b));
 }
 
-static void read_save_fields(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx,
+static void read_save_fields(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn read, void* ctx,
                              uint32_t sb1, uint32_t sb2);
 static void read_foes(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx, int foeBattler);
 
@@ -424,7 +425,7 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
 
     bool saveOk = haveKey && in_ram(sb1);
     s->gender = -1;
-    if (saveOk) read_save_fields(s, cfg, read, ctx, sb1, sb2);
+    if (saveOk) read_save_fields(s, g, read, ctx, sb1, sb2);
 
     // --- the map: gMapHeader's layout size and type ---
     uint32_t layout = 0, w = 0, h = 0;
@@ -471,8 +472,9 @@ static void read_card_fields(struct pd_snapshot* s, const struct pd_config* cfg,
     s->cardOk = true;
 }
 
-static void read_save_fields(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx,
+static void read_save_fields(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn read, void* ctx,
                              uint32_t sb1, uint32_t sb2) {
+    const struct pd_config* cfg = g->cfg;
     uint8_t pos[6];
     if (read(ctx, sb1, pos, sizeof(pos))) {
         s->posOk = true;
@@ -490,25 +492,27 @@ static void read_save_fields(struct pd_snapshot* s, const struct pd_config* cfg,
     uint8_t magic = 0;
     int count = cfg->nationalCount;
     if (cfg->dexBlock && cfg->dexBytes && cfg->dexBytes <= PD_DEX_BYTES && count >= 1 && count <= PD_DEX_BYTES * 8 &&
-        !cfg->dexSeenLevels && !cfg->dexBySpecies && !cfg->dexSeenOrCaught) {
+        !cfg->dexSeenLevels && (!cfg->dexBySpecies || (g->rom && pd_dex_available(g)))) {
         uint8_t seen[PD_DEX_BYTES], owned[PD_DEX_BYTES], copy[2][PD_DEX_BYTES];
         uint32_t base = cfg->dexBlock == PD_DEX_SB1 ? sb1 : cfg->dexBlock == PD_DEX_SB2 ? sb2 : 0;
         const uint32_t copyOff[2] = { cfg->dexSeenCopy1, cfg->dexSeenCopy2 };
         bool ok = read(ctx, base + cfg->dexSeenOff, seen, cfg->dexBytes) &&
             read(ctx, base + cfg->dexCaughtOff, owned, cfg->dexBytes) &&
-            read(ctx, sb2 + 0x18 + cfg->nationalMagicOff, &magic, 1);
+            (cfg->nationalMagicOff < 0 || read(ctx, sb2 + 0x18 + (uint32_t) cfg->nationalMagicOff, &magic, 1));
         for (int k = 0; ok && k < 2; k++) ok = !copyOff[k] || read(ctx, sb1 + copyOff[k], copy[k], cfg->dexBytes);
         if (ok) {
             s->dexOk = true;
             s->dexCount = count;
-            s->dexNational = magic == cfg->nationalMagic;
+            s->dexNational = cfg->nationalMagicOff < 0 || magic == cfg->nationalMagic;
             memset(s->dexSeen, 0, sizeof s->dexSeen);
             memset(s->dexCaught, 0, sizeof s->dexCaught);
             for (int n = 1; n <= count; n++) {
-                int i = n - cfg->dexFirstBit;
-                if (i < 0 || i / 8 >= cfg->dexBytes) continue;
+                // Emerald Rogue keeps its bits by species id; the ROM's table says which species No. n is.
+                int i = (cfg->dexBySpecies ? pd_dex_species(g, n) : n) - cfg->dexFirstBit;
+                if (i < 0 || i / 8 >= cfg->dexBytes || (cfg->dexBySpecies && i + cfg->dexFirstBit == 0)) continue;
                 int byte = i / 8, bit = i % 8;
                 bool sn = seen[byte] >> bit & 1, cn = owned[byte] >> bit & 1;
+                if (cfg->dexSeenOrCaught) sn = sn || cn; // Rogue's 2-bit state: a caught species is seen
                 for (int k = 0; k < 2; k++) if (copyOff[k]) sn = sn && (copy[k][byte] >> bit & 1);
                 if (copyOff[0]) cn = cn && sn; // with copies, caught needs seen too
                 if (sn) s->dexSeen[(n - 1) / 8] |= (uint8_t) (1 << ((n - 1) % 8));

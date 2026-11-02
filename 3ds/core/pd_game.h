@@ -162,7 +162,8 @@ struct pd_config {
     bool dexSeenLevels, dexBySpecies, dexSeenOrCaught; // Quetzal / Emerald Rogue: read differently, not here yet
     uint16_t dexBytes, nationalCount;
     uint32_t dexSeenOff, dexCaughtOff;
-    uint8_t nationalMagicOff, nationalMagic; // SaveBlock2 + 0x18 + off == magic
+    int8_t nationalMagicOff; // SaveBlock2 + 0x18 + off == nationalMagic; -1 = the National Dex is always there
+    uint8_t nationalMagic;
 
     // GUIDE (the app's GuideTables): ROM tables and SaveBlock1 offsets.
     uint32_t trainers;    // gTrainers, 0x28 bytes each
