@@ -488,8 +488,9 @@ static void read_save_fields(struct pd_snapshot* s, const struct pd_config* cfg,
     uint8_t owned[PD_DEX_BYTES], seen[PD_DEX_BYTES], copy1[PD_DEX_BYTES], copy2[PD_DEX_BYTES], magic = 0;
     if (cfg->dexSeenCopy1 && read(ctx, sb2 + 0x28, owned, PD_DEX_BYTES) && read(ctx, sb2 + 0x5C, seen, PD_DEX_BYTES) &&
         read(ctx, sb1 + cfg->dexSeenCopy1, copy1, PD_DEX_BYTES) &&
-        read(ctx, sb1 + cfg->dexSeenCopy2, copy2, PD_DEX_BYTES) &&
+        (!cfg->dexSeenCopy2 || read(ctx, sb1 + cfg->dexSeenCopy2, copy2, PD_DEX_BYTES)) &&
         read(ctx, sb2 + 0x18 + cfg->nationalMagicOff, &magic, 1)) {
+        if (!cfg->dexSeenCopy2) memset(copy2, 0xFF, sizeof copy2); // a record with one copy (the app ANDs those it has)
         s->dexOk = true;
         s->dexNational = magic == cfg->nationalMagic;
         for (int i = 0; i < PD_DEX_BYTES; i++) {

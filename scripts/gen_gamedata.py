@@ -1001,7 +1001,9 @@ def kotlin_hack_table(hack, field, kind, where):
         for n, line in enumerate(lines):
             if not re.match(r"^(?:internal )?val " + hack + r": HackText by lazy \{$", line):
                 continue
-            for m in range(n, len(lines)):
+            for m in range(n + 1, len(lines)):
+                if lines[m] == "}":  # the HackText's own closing brace: another hack's table isn't this one's
+                    break
                 if lines[m].strip() != f"{field} = mapOf(":
                     continue
                 table = {}
@@ -1207,7 +1209,11 @@ def kotlin_int_array(name):
         with open(path, encoding="utf-8") as fh:
             m = re.search(r"^val " + name + r" = intArrayOf\((.*?)^\)", fh.read(), re.S | re.M)
         if m:
-            return [int(v, 0) for v in re.findall(r"-?(?:0x[0-9A-Fa-f]+|\d+)", re.sub(r"//.*", "", m.group(1)))]
+            items = [i.strip() for i in re.sub(r"//.*", "", m.group(1)).split(",") if i.strip()]
+            for i in items:
+                if not re.fullmatch(r"-?(?:0x[0-9A-Fa-f]+|\d+)", i):
+                    fail("pd_gb_gen.c", f"`val {name}`: `{i}` isn't one number (an expression would shift the table)")
+            return [int(i, 0) for i in items]
     fail("pd_gb_gen.c", f"no `val {name} = intArrayOf(` in the app's data/")
 
 
