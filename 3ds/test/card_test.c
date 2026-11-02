@@ -111,6 +111,29 @@ int main(int argc, char** argv) {
         }
         free(rom);
     }
+    // Glazed: a card read off the user's screenshot of the game's own (Sakkkuu, 48679, 45452, 22 caught, 21:24, eight
+    // badges, the colon blinked off); the render matched that screenshot but for the colon.
+    {
+        char p[1024]; long n = 0;
+        snprintf(p, sizeof p, "%s/Pokemon Glazed (9.2.0).gba", argv[2]);
+        uint8_t* rom = slurp(p, &n);
+        if (!rom) printf("skip Glazed (no ROM)\n");
+        else {
+            struct pd_game g; memset(&g, 0, sizeof g);
+            g.rom = rom; g.romSize = (size_t) n; g.cfg = &PD_CONFIG_GLAZED; g.kind = PD_GAME_EMERALD; g.loadId = 99;
+            struct pd_card_info c; memset(&c, 0, sizeof c);
+            c.style = PD_CARD_GLAZED;
+            const uint8_t nm[7] = { 0xCD, 0xD5, 0xDF, 0xDF, 0xDF, 0xE9, 0xE9 };
+            memcpy(c.name, nm, 7); c.nameLen = 7;
+            c.trainerId = 48679; c.hours = 21; c.minutes = 24; c.money = 45452; c.dexCaught = 22; c.badges = 0xFF;
+            static uint32_t img[PD_CARD_W * PD_CARD_H];
+            char got[9] = "(no art)";
+            if (pd_card_render(&g, &c, false, false, true, img)) crc_of(img, got);
+            ran++;
+            if (strcmp(got, "d18d3a7f")) { printf("FAIL Glazed screenshot card: %s\n", got); bad++; }
+            free(rom);
+        }
+    }
     printf("%s (%d cards)\n", bad ? "FAILED" : "PASS card", ran);
     return bad != 0;
 }

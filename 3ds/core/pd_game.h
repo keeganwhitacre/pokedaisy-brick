@@ -239,13 +239,14 @@ struct pd_config {
     uint32_t pcSpecials, pcFn, pcCrcs[2], pcScript;
 };
 
+// GLAZED: Emerald's card with its own badges, pics, font and regional dex.
 // SOULGOLD: Emerald's card code with Johto art (smol-compressed) and its own stars.
 // RECHARGED_YELLOW: FireRed's card under code of its own, icons on the back; _V1_9 has a lighter red.
 // LAZARUS: Emerald's card code with its own art, dex (430 regional) and star rules.
 // UNBOUND: FireRed's card in Unbound's purple, with its own player pics.
 // LEGACY: Emerald Legacy's - HOENN's card, a fifth star (extraStarFlag) on a black one, Hoenn's dex and eight more.
 enum pd_card_style { PD_CARD_NONE, PD_CARD_KANTO, PD_CARD_HOENN, PD_CARD_LEGACY, PD_CARD_UNBOUND, PD_CARD_LAZARUS,
-                      PD_CARD_RECHARGED_YELLOW, PD_CARD_RECHARGED_YELLOW_V1_9, PD_CARD_SOULGOLD };
+                      PD_CARD_RECHARGED_YELLOW, PD_CARD_RECHARGED_YELLOW_V1_9, PD_CARD_SOULGOLD, PD_CARD_GLAZED };
 
 // The bag's pockets, in a fixed order of our own (the app's POCKET_* ids).
 enum pd_pocket {

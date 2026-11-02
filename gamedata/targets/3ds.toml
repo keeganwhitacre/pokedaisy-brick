@@ -44,6 +44,7 @@ UNBOUND = 'PD_CARD_UNBOUND'
 LAZARUS = 'PD_CARD_LAZARUS'
 RECHARGED_YELLOW = 'PD_CARD_RECHARGED_YELLOW'
 SOULGOLD = 'PD_CARD_SOULGOLD'
+GLAZED = 'PD_CARD_GLAZED'
 RECHARGED_YELLOW_V1_9 = 'PD_CARD_RECHARGED_YELLOW_V1_9'
 
 # Each part is a set of pd_config fields = a path into the config: a field, then (through a record
@@ -310,7 +311,7 @@ parts = ['ram', 'foes', 'dex']
 
 [config.glazed]
 name = 'GLAZED'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'card']
 
 [config.celia]
 name = 'CELIA'

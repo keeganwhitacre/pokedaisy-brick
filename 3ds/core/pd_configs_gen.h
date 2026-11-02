@@ -1728,7 +1728,7 @@ static const struct pd_config PD_CONFIG_EMERALD_KAIZO = {
     .regionName = "HOENN",
 };
 
-// gamedata/gen3/hacks/glazed.toml: glazed (ram, foes, dex)
+// gamedata/gen3/hacks/glazed.toml: glazed (ram, foes, dex, card)
 static const struct pd_config PD_CONFIG_GLAZED = {
     .playerParty = 0x020244EC,
     .partyLayout = &pd_party_layout_vanilla,
@@ -1805,6 +1805,32 @@ static const struct pd_config PD_CONFIG_GLAZED = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = "HOENN",
+    .cardStyle = PD_CARD_GLAZED,
+    .gameStatsOff = 0x159C,
+    .badgeFlag = 0x867,
+    .pokedexFlag = 0x861,
+    .cardMagicOff = 0x1A,
+    .cardFlagsOff = 0x1270,
+    .cardVarsOff = 0x139C,
+    .cardFlagBytes = 0x12C,
+    .nationalFlagOnly = false,
+    .linkLines = true,
+    .allRegionalDrop = 2,
+    .iconVar = 0,
+    .tintVar = 0,
+    .cardIconTable = 0,
+    .cardPaletteTable = 0,
+    .achievementBitsOff = 0,
+    .achievementMagicOff = 0,
+    .achievementsNeeded = 80,
+    .nationalVar = 0x4046,
+    .nationalVarValue = 0x302,
+    .nationalFlag = 0x896,
+    .stickerVar = 0,
+    .frontierSymbolFlag = 0x8C4,
+    .extraStarFlag = 0,
+    .museumWinnersOff = 0x2F90,
+    .frontierBpOff = 0xEBA,
     .text = &pd_text_glazed,
 };
 

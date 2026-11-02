@@ -45,6 +45,9 @@ BLOBS = [
     "LZ_FONT_NORMAL", "LZ_FONT_NORMAL_WIDTHS",
     # Recharged Yellow's card (TrainerCardArt.kt RECHARGED_YELLOW): FireRed's with its own pics and font.
     "RY_PIC_MALE", "RY_PIC_MALE_PAL", "RY_PIC_FEMALE", "RY_PIC_FEMALE_PAL", "RY_FONT_NORMAL", "RY_FONT_NORMAL_WIDTHS",
+    # Glazed's card (TrainerCardArt.kt GLAZED): retail Emerald's with its own badges, pics and font.
+    "GZ_CARD_BADGES_PAL", "GZ_CARD_BADGES_GFX", "GZ_PIC_MALE", "GZ_PIC_MALE_PAL", "GZ_PIC_FEMALE", "GZ_PIC_FEMALE_PAL",
+    "GZ_FONT_NORMAL",
     # SoulGold's card (TrainerCardArt.kt SOULGOLD): its Johto art, most of it smol-compressed.
     "SG_CARD_GFX", "SG_CARD_FRONT", "SG_CARD_BACK", "SG_CARD_BG",
     "SG_CARD_PAL0", "SG_CARD_PAL1", "SG_CARD_PAL2", "SG_CARD_PAL3", "SG_CARD_PAL4",
@@ -53,7 +56,7 @@ BLOBS = [
 ]
 
 # Regional dexes the card counts (TrainerCard.kt), by name: written as pd_card_dex_<lower>[].
-CARD_DEXES = ["LAZARUS_REGIONAL_TO_NATIONAL", "SOULGOLD_REGIONAL_TO_NATIONAL", "SOULGOLD_CARD_SKIPPED",
+CARD_DEXES = ["GLAZED_REGIONAL_TO_NATIONAL", "LAZARUS_REGIONAL_TO_NATIONAL", "SOULGOLD_REGIONAL_TO_NATIONAL", "SOULGOLD_CARD_SKIPPED",
               "SOULGOLD_ACHIEVEMENT_IDS"]
 
 

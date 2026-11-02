@@ -14,6 +14,8 @@ static const uint16_t LEGACY_EXTRA[8] = { 77, 78, 198, 215, 220, 221, 228, 229 }
 
 extern const uint16_t pd_card_soulgold_regional_to_national[], pd_card_soulgold_card_skipped[], pd_card_soulgold_achievement_ids[];
 extern const int pd_card_soulgold_regional_to_national_count, pd_card_soulgold_card_skipped_count, pd_card_soulgold_achievement_ids_count;
+extern const uint16_t pd_card_glazed_regional_to_national[];
+extern const int pd_card_glazed_regional_to_national_count;
 extern const uint16_t pd_card_lazarus_regional_to_national[];
 extern const int pd_card_lazarus_regional_to_national_count;
 
@@ -118,6 +120,9 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
     int caught = 0;
     if (national) {
         for (int n = 1; n <= s->dexCount; n++) caught += pd_dex_caught(s, n);
+    } else if (cfg->cardStyle == PD_CARD_GLAZED) {
+        for (int i = 0; i < pd_card_glazed_regional_to_national_count; i++)
+            caught += pd_dex_caught(s, pd_card_glazed_regional_to_national[i]);
     } else if (cfg->cardStyle == PD_CARD_SOULGOLD) {
         for (int i = 0; i < pd_card_soulgold_regional_to_national_count; i++)
             caught += pd_dex_caught(s, pd_card_soulgold_regional_to_national[i]);
@@ -151,6 +156,9 @@ bool pd_card_info(const struct pd_game* g, const struct pd_snapshot* s, struct p
             if (cfg->monIconStride == 0x120) skip |= n == 1009 || n == 1010 || (n >= 1020 && n <= 1023); // the v1.2 builds
             allHoenn = skip || pd_dex_caught(s, n);
         }
+    } else if (cfg->cardStyle == PD_CARD_GLAZED) { // its regional dex less the last allRegionalDrop
+        for (int i = 0; i < pd_card_glazed_regional_to_national_count - cfg->allRegionalDrop && allHoenn; i++)
+            allHoenn = pd_dex_caught(s, pd_card_glazed_regional_to_national[i]);
     } else if (cfg->cardStyle == PD_CARD_LAZARUS) { // its whole ILIOS dex, and the stray entry 0 (nothing left out)
         for (int i = 0; i < pd_card_lazarus_regional_to_national_count && allHoenn; i++)
             allHoenn = pd_dex_caught(s, pd_card_lazarus_regional_to_national[i]);
@@ -252,6 +260,17 @@ static const struct blobs UNBOUND = {
     -1, -1, -1,
     PD_UB_PIC_MALE, PD_UB_PIC_MALE_PAL, PD_UB_PIC_FEMALE, PD_UB_PIC_FEMALE_PAL,
     PD_FR_FONT_NORMAL, PD_FR_FONT_NORMAL_WIDTHS,
+    { -1, -1, -1, -1, -1 },
+};
+
+// Glazed: retail Emerald's card, with its own Tunod badges (repointed tiles, the palette edited in place), its own
+// player pics and FONT_NORMAL edited in place; the widths are retail's.
+static const struct blobs GLAZED = {
+    PD_EM_CARD_GFX, PD_EM_CARD_FRONT, PD_EM_CARD_BACK, PD_EM_CARD_BG,
+    { PD_EM_CARD_PAL0, PD_EM_CARD_PAL1, PD_EM_CARD_PAL2, PD_EM_CARD_PAL3, PD_EM_CARD_PAL4, -1 },
+    PD_EM_CARD_FEMALE_PAL, PD_GZ_CARD_BADGES_PAL, PD_GZ_CARD_BADGES_GFX,
+    PD_GZ_PIC_MALE, PD_GZ_PIC_MALE_PAL, PD_GZ_PIC_FEMALE, PD_GZ_PIC_FEMALE_PAL,
+    PD_GZ_FONT_NORMAL, PD_EM_FONT_NORMAL_WIDTHS,
     { -1, -1, -1, -1, -1 },
 };
 
@@ -700,13 +719,16 @@ static const struct words HOENN_WORDS = { "NAME: ", "MONEY", "POKéDEX", "TIME",
     "LINK BATTLES", "POKéMON TRADES", "S W/FRIENDS", "WON CONTESTS W/FRIENDS", "BATTLE POINTS WON", 6, 3, false };
 static const struct words LAZARUS_WORDS = { "NAME: ", "MONEY", "Pokédex", "TIME", "'s TRAINER CARD", "Hall of Fame DEBUT  ",
     "LINK BATTLES", "Pokémon TRADES", "S W/FRIENDS", "WON CONTESTS W/FRIENDS", "BATTLE POINTS WON", 6, 4, false };
+static const struct words GLAZED_WORDS = { "NAME: ", "MONEY", "POKéDEX", "TIME", "'s TRAINER CARD", "HALL OF FAME DEBUT  ",
+    "LINK BATTLES", "POKéMON TRADES", "S W/FRIENDS", "WON CONTESTS W/FRIENDS", "BATTLE POINTS WON", 7, 3, false };
 static const struct words SOULGOLD_WORDS = { "Name: ", "Money", "Pokédex", "Time", "'s Trainer Card", "Hall of Fame Debut  ",
     "Link Battles", "Pokémon Trades", "S W/Friends", "Won Contests W/Friends", "Battle Points Won", 7, 4, true };
 
 static void hoenn_text(const struct art* a, const struct blobs* b, const struct pd_card_info* c, bool back,
                        bool colon) {
     const int pad = 0x77;
-    const struct words* w = c->style == PD_CARD_LAZARUS ? &LAZARUS_WORDS : c->style == PD_CARD_SOULGOLD ? &SOULGOLD_WORDS : &HOENN_WORDS;
+    const struct words* w = c->style == PD_CARD_LAZARUS ? &LAZARUS_WORDS : c->style == PD_CARD_SOULGOLD ? &SOULGOLD_WORDS :
+        c->style == PD_CARD_GLAZED ? &GLAZED_WORDS : &HOENN_WORDS;
     struct str s, t;
     if (!back) {
         s = enc(w->name);
@@ -801,11 +823,12 @@ bool pd_card_render(const struct pd_game* g, const struct pd_card_info* c, bool 
     bool kanto = is_kanto(c->style);
     bool ry = ry_style(c->style);
     const struct blobs* b = c->style == PD_CARD_UNBOUND ? &UNBOUND : ry ? &RECHARGED_YELLOW : kanto ? &KANTO :
-        c->style == PD_CARD_LEGACY ? &LEGACY : c->style == PD_CARD_LAZARUS ? &LAZARUS : c->style == PD_CARD_SOULGOLD ? &SOULGOLD : &HOENN;
+        c->style == PD_CARD_LEGACY ? &LEGACY : c->style == PD_CARD_LAZARUS ? &LAZARUS : c->style == PD_CARD_SOULGOLD ? &SOULGOLD :
+        c->style == PD_CARD_GLAZED ? &GLAZED : &HOENN;
     struct art a = { .img = img, .lay = ry ? &RY_LAYOUT : kanto ? &KANTO_LAYOUT : c->style == PD_CARD_LAZARUS ? &LAZARUS_LAYOUT :
         c->style == PD_CARD_SOULGOLD ? &SOULGOLD_LAYOUT : &HOENN_LAYOUT };
     if (c->style != PD_CARD_KANTO && c->style != PD_CARD_HOENN && c->style != PD_CARD_LEGACY && c->style != PD_CARD_UNBOUND &&
-        c->style != PD_CARD_LAZARUS && c->style != PD_CARD_SOULGOLD && !ry) return false;
+        c->style != PD_CARD_LAZARUS && c->style != PD_CARD_SOULGOLD && c->style != PD_CARD_GLAZED && !ry) return false;
     // Every blob the card needs, or no card.
     const int need[] = {
         b->gfx, b->front, b->back, b->bg, b->pals[0], b->pals[1], b->pals[2], b->pals[3], b->pals[4], b->pals[5],
