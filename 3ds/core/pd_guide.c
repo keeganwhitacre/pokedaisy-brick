@@ -34,6 +34,9 @@ const struct pd_guide* pd_guide_for(const struct pd_game* g) {
     case PD_GUIDE_ODYSSEY: return &pd_guide_odyssey;
     case PD_GUIDE_SWORD_SHIELD: return &pd_guide_sword_shield;
     case PD_GUIDE_UNBOUND: return &pd_guide_unbound;
+    case PD_GUIDE_GAIA: return &pd_guide_gaia;
+    case PD_GUIDE_GHOST_GREY: return &pd_guide_ghost_grey;
+    case PD_GUIDE_CELIA: return &pd_guide_celia;
     default: return NULL;
     }
 }
@@ -54,6 +57,9 @@ const struct pd_area_thing* pd_areas_for(const struct pd_game* g, int* count) {
     case PD_GUIDE_ODYSSEY: *count = pd_areas_odyssey_count; return pd_areas_odyssey;
     case PD_GUIDE_SWORD_SHIELD: *count = pd_areas_sword_shield_count; return pd_areas_sword_shield;
     case PD_GUIDE_UNBOUND: *count = pd_areas_unbound_count; return pd_areas_unbound;
+    case PD_GUIDE_GAIA: *count = pd_areas_gaia_count; return pd_areas_gaia;
+    case PD_GUIDE_GHOST_GREY: *count = pd_areas_ghost_grey_count; return pd_areas_ghost_grey;
+    case PD_GUIDE_CELIA: *count = pd_areas_celia_count; return pd_areas_celia;
     default: *count = 0; return NULL;
     }
 }

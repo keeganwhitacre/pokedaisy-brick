@@ -315,7 +315,7 @@ parts = ['ram', 'foes', 'dex', 'card']
 
 [config.celia]
 name = 'CELIA'
-parts = ['ram', 'dex']
+parts = ['ram', 'dex', 'guide']
 
 [config.orange_islands]
 name = 'ORANGE_ISLANDS'
@@ -337,7 +337,7 @@ parts = ['ram', 'foes', 'dex', 'guide']
 
 [config.gaia_v3_2]
 name = 'GAIA'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.sword_shield]
 name = 'SWORD_SHIELD'
@@ -361,7 +361,7 @@ parts = ['ram', 'foes', 'dex', 'guide']
 
 [config.ghost_grey]
 name = 'GHOST_GREY'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'guide']
 
 # CFRU (plaintext party boxes): Radical Red 4.1 (ROM checked: party icons, POKéDEX) and Unbound (RAM only, no ROM to hand).
 [config.radical_red_v4_1]

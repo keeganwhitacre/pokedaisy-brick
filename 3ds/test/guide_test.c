@@ -18,6 +18,9 @@ static const struct want WANT[] = {
     W("Odyssey", ODYSSEY, ODYSSEY, "Pokémon Odyssey COMPLETE v4.1.1 (EXPANDED BAG).gba"),
     W("Sword and Shield", SWORD_SHIELD, SWORD_SHIELD, "Pokemon Sword and Shield Ultimate Plus (v1.2.1.2).gba"),
     W("Unbound", UNBOUND, UNBOUND, "Pokemon Unbound (v2.1.1.1).gba"),
+    W("Gaia", GAIA, GAIA, "Pokemon Gaia (v3.2).gba"),
+    W("Ghost Grey", GHOST_GREY, GHOST_GREY, "Pokémon_ Ghost Grey Version (1.0.4).gba"),
+    W("Celia", CELIA, CELIA, "Pokemon Celia's Stupid Romhack (1.1.4).gba"),
 };
 
 int main(int argc, char** argv) {

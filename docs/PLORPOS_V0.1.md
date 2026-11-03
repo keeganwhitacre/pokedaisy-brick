@@ -22,7 +22,7 @@ companion brought toward the Android app. aarch64, built for the TrimUI Brick; p
 | GBA retail (FireRed, LeafGreen, Emerald, Ruby, Sapphire) | Party, bag, map, guide, dex, card, battle helper, HUD. Unchanged from before; 80 retail preview images identical. |
 | GBA hacks, DEX | 18 games' tables verified, incl. Quetzal (0.8.4, 9.x), Recharged Yellow (4 builds). |
 | GBA hacks, CARD | Unbound, Lazarus, Recharged Yellow (1.8.0, 1.9.x), SoulGold, Glazed. |
-| GBA hacks, GUIDE | Rocket Edition, Ash Gray, GS Chronicles, Radical Red, Orange Islands, Odyssey, Sword and Shield Ultimate Plus, Unbound. Bosses with several teams (difficulties) show one section per team. |
+| GBA hacks, GUIDE | Rocket Edition, Ash Gray, GS Chronicles, Radical Red, Orange Islands, Odyssey, Sword and Shield Ultimate Plus, Unbound, Gaia, Ghost Grey, Celia. Bosses with several teams (difficulties) show one section per team. |
 | Shiny marks | SoulGold, R.O.W.E., Elite Redux party mons show a gold `*` (party slot and summary). |
 | Game Boy / Color | Black-on-white windows (party, bag, boxes) instead of FireRed's look. Party and bag read from real saves. |
 | ROM identity | By SHA-1; PureGreen 2.7.7 row (unverified). |
@@ -52,7 +52,7 @@ companion brought toward the Android app. aarch64, built for the TrimUI Brick; p
 | Gen 3 retail tabs | all | all |
 | Hack DEX | all supported hacks | the 18 verified; Celia's probe doesn't match (untested whether Android's check passes) |
 | Hack CARD | per hack | 5 hacks (above); Imperium off (no reference render) |
-| Hack GUIDE | all | 8 hacks. Not: Amethyst, Gaia, Ghost Grey, Celia, SoulGold, Imperium, Quetzal, Recharged Emerald/Yellow (bosses built by Kotlin helpers/lambdas) |
+| Hack GUIDE | all | 11 hacks. Not: Amethyst, SoulGold, Imperium, Quetzal, Recharged Emerald/Yellow (bosses built by Kotlin helpers/lambdas, HARD teams in alternate trainer tables) |
 | Hack MAP | town maps | Region art loads from the ROM for Radical Red, Rocket Edition, Recharged Yellow, Ultra Violet, Kaizo, Emerald Legacy, Quetzal, Emerald Rogue, Too Many Types 2 (host probe over my ROMs; cursor, labels and player head not checked per hack, nothing seen on a device). Every other hack shows "NO MAP" |
 | Shiny icons | recoloured icons + marks | `*` mark only; icons keep normal colours |
 | Game Boy look | the game's own ROM font and icons | black-on-white windows with the standard font; no ROM font, no ROM party icons (Pokéball) |

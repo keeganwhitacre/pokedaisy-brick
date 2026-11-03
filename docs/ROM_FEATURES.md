@@ -408,14 +408,17 @@ against the app's recorded cards (`make -C 3ds test-card`), the GUIDE's boss tea
 | Imperium | ✅ | — ²⁴ | — |
 | Quetzal (Alpha 0.8.4 and 9.x, English and Spanish) | ✅ | — | — |
 | Rocket Edition, Ash Gray, GS Chronicles, Radical Red, Orange Islands | ✅ | — | ✅ |
-| Odyssey, Sword and Shield Ultimate Plus | ✅ | — | ✅ |
-| Dreamstone Mysteries, Wishes of Tomorrow, R.O.W.E., Amethyst, Gaia, Heart and Soul, Seaglass, Too Many Types 2, Emerald Rogue (EX) | ✅ | — | — |
-| Celia's Stupid Romhack | ◐ ²⁵ | — | — |
+| Odyssey, Sword and Shield Ultimate Plus, Gaia | ✅ | — | ✅ |
+| Dreamstone Mysteries, Wishes of Tomorrow, R.O.W.E., Amethyst, Heart and Soul, Seaglass, Too Many Types 2, Emerald Rogue (EX) | ✅ | — | — |
+| Celia's Stupid Romhack | ◐ ²⁵ | — | ✅ |
+| Ghost Grey | ✅ | — | ✅ ²⁷ |
 
 ²³ Checked against a screenshot of the game's own card (0 pixels differ), not the app's recorded output.
 ²⁴ No reference render of Imperium's card exists to check against, so the tab stays off.
 ²⁵ The dex probe the C reader uses (the first entry's category) does not match this ROM; whether the app's own check passes was not tested.
 
-²⁶ Boss teams with several difficulties (Unbound's four, Odyssey's NORMAL / HARD) show one section per team. Unbound has no learnset table here, so a VANILLA team's moves are blank. The guide's left out for hacks whose bosses are built by Kotlin helpers or lambdas (Amethyst, Gaia, Ghost Grey, Celia, SoulGold, Imperium, Quetzal, Recharged Emerald / Yellow).
+²⁶ Boss teams with several difficulties (Unbound's four, Odyssey's NORMAL / HARD) show one section per team. Unbound has no learnset table here, so a VANILLA team's moves are blank. The guide's left out for hacks whose bosses are built by Kotlin helpers or lambdas (Amethyst, SoulGold, Imperium, Quetzal, Recharged Emerald / Yellow). Gaia's Elite Four count as beaten once the game is cleared; Celia's BLAINE shows his eight one-on-one battles.
+
+²⁷ Ghost Grey's last boss, SUMMER, has a team that answers the starter; the guide shows all three (LITWICK, SPIRITLE, ROWLET) and counts her beaten when any of them is.
 
 Hacks that are not in the table have no DEX, CARD or GUIDE yet. The MAP tab draws a hack's region map only where the ROM's art is found (Radical Red, Rocket Edition, Recharged Yellow, Ultra Violet, Kaizo, Emerald Legacy, Quetzal, Emerald Rogue, Too Many Types 2); elsewhere it says "NO MAP".

@@ -322,7 +322,9 @@ static void build_bosses(const struct pd_game* g, const struct pd_snapshot* s, c
     int shown = 0;
     for (int b = 0; b < gd->bossCount && shown < MAX_BOSSES_SHOWN; b++) {
         const struct pd_boss* boss = &gd->bosses[b];
-        if (pd_flag(s, boss->doneFlag)) continue;
+        bool done = pd_flag(s, boss->doneFlag);
+        for (const uint16_t* f = boss->doneAny; f && *f && !done; f++) done = pd_flag(s, *f);
+        if (done) continue;
         int nv = 1;
         while (boss->variants && boss->variants[nv].label) nv++;
         for (int vi = 0; vi < nv; vi++) {

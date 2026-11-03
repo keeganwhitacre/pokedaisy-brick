@@ -1834,7 +1834,7 @@ static const struct pd_config PD_CONFIG_GLAZED = {
     .text = &pd_text_glazed,
 };
 
-// gamedata/gen3/hacks/celia.toml: celia (ram, dex)
+// gamedata/gen3/hacks/celia.toml: celia (ram, dex, guide)
 static const struct pd_config PD_CONFIG_CELIA = {
     .playerParty = 0x0202433C,
     .partyLayout = &pd_party_layout_vanilla,
@@ -1906,6 +1906,16 @@ static const struct pd_config PD_CONFIG_CELIA = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = 0,
+    .trainerMonStride = 0,
+    .trainerMonMovesOff = 0,
+    .trainerMonSpeciesOff = 0,
+    .trainerMonItemOff = 0,
+    .trainerMonLevelOff = 0,
+    .trainers = 0x0871FCA0,
+    .learnsets = 0,
+    .wildHeaders = 0x08C01578,
+    .probeTrainer = 414,
+    .probeName = "BROCK",
     .text = &pd_text_celia,
 };
 
@@ -2259,7 +2269,7 @@ static const struct pd_config PD_CONFIG_ASH_GRAY = {
     .text = &pd_text_ash_gray,
 };
 
-// gamedata/gen3/hacks/gaia.toml: gaia_v3_2 (ram, foes, icons, dex)
+// gamedata/gen3/hacks/gaia.toml: gaia_v3_2 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_GAIA = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -2347,6 +2357,16 @@ static const struct pd_config PD_CONFIG_GAIA = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = 0,
+    .trainerMonStride = 0,
+    .trainerMonMovesOff = 0,
+    .trainerMonSpeciesOff = 0,
+    .trainerMonItemOff = 0,
+    .trainerMonLevelOff = 0,
+    .trainers = 0x0823EAC8,
+    .learnsets = 0x082BDD70,
+    .wildHeaders = 0x08A2E1CC,
+    .probeTrainer = 414,
+    .probeName = "Fernando",
     .text = &pd_text_gaia_v3_2,
 };
 
@@ -2791,7 +2811,7 @@ static const struct pd_config PD_CONFIG_GS_CHRONICLES = {
     .text = &pd_text_gs_chronicles,
 };
 
-// gamedata/gen3/hacks/ghost_grey.toml: ghost_grey (ram, foes, dex)
+// gamedata/gen3/hacks/ghost_grey.toml: ghost_grey (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_GHOST_GREY = {
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
@@ -2868,6 +2888,16 @@ static const struct pd_config PD_CONFIG_GHOST_GREY = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = "KANTO",
+    .trainerMonStride = 0,
+    .trainerMonMovesOff = 0,
+    .trainerMonSpeciesOff = 0,
+    .trainerMonItemOff = 0,
+    .trainerMonLevelOff = 0,
+    .trainers = 0x0823EAC8,
+    .learnsets = 0x0825D7B4,
+    .wildHeaders = 0x09300100,
+    .probeTrainer = 414,
+    .probeName = "Aston",
     .text = &pd_text_ghost_grey,
 };
 
