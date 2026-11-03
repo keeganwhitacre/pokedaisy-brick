@@ -73,7 +73,7 @@ $(BUILD)/pd_guide_test: $(CORE_SRC) $(wildcard core/*.h) test/guide_test.c
 
 # make test-guide ROMS=<dir with the ROMs>: every hack boss team reads sanely from its ROM.
 test-guide: $(BUILD)/pd_guide_test
-	$(BUILD)/pd_guide_test $(ROMS)
+	$(BUILD)/pd_guide_test $(ROMS) $(FIXTURES)
 
 # make test-card ROMS=<dir with the ROMs>: the cards vs the CRCs of TrainerCardTest.
 test-card: $(BUILD)/pd_card_test

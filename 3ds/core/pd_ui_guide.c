@@ -327,12 +327,12 @@ static void build_bosses(const struct pd_game* g, const struct pd_snapshot* s, c
         if (s->party[i].species != PD_SPECIES_EGG && s->party[i].level > best) best = s->party[i].level;
     }
     int shown = 0;
-    for (int b = 0; b < gd->bossCount && shown < MAX_BOSSES_SHOWN; b++) {
-        const struct pd_boss* boss = &gd->bosses[b];
-        bool done = pd_flag(s, boss->doneFlag);
-        for (const uint16_t* f = boss->doneAny; f && *f && !done; f++) done = pd_flag(s, *f);
-        if (done) continue;
-        const struct pd_variant* variants = boss->variants;
+    int order[256];
+    int count = pd_boss_order(gd, s, order, 256);
+    for (int oi = 0; oi < count && shown < MAX_BOSSES_SHOWN; oi++) {
+        const struct pd_boss* boss = &gd->bosses[order[oi]];
+        if (pd_boss_done(boss, s)) continue;
+        const struct pd_variant* variants = pd_boss_variants(gd, boss, s);
         if (boss->kind == PD_BOSS_TEAMVAR) {  // Gen 1's champion: the save's team byte picks one, else every team shows
             for (const uint16_t* p = boss->alts; p && p[0]; p += 2)
                 if (p[0] == pd_var(s, 0x4000)) variants = NULL;

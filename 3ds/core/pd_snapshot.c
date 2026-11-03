@@ -351,6 +351,8 @@ static bool save_key(const struct pd_config* cfg, pd_read_fn read, void* ctx, ui
 
 void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn read, void* ctx) {
     memset(s, 0, sizeof(*s));
+    s->cfg = g->cfg;
+    s->hour = -1;
     s->partyActive = -1;
     s->money = -1;
     const struct pd_config* cfg = g->cfg;
@@ -589,16 +591,37 @@ static void read_save_fields(struct pd_snapshot* s, const struct pd_game* g, pd_
             s->flagsOk = true;
             for (int i = 0; i < PD_VAR_COUNT; i++) s->vars[i] = u16(vars + i * 2);
         }
+        uint32_t fb = (cfg->flagBank.count + 7) / 8;
+        if (fb && fb <= PD_BANK_FLAG_BYTES && !read(ctx, sb1 + cfg->flagBank.sb1Off, s->bankFlags, fb)) memset(s->bankFlags, 0, fb);
+        if (cfg->varBank.count && cfg->varBank.count <= PD_BANK_VARS) {
+            uint8_t bv[PD_BANK_VARS * 2];
+            if (read(ctx, sb1 + cfg->varBank.sb1Off, bv, cfg->varBank.count * 2))
+                for (uint32_t i = 0; i < cfg->varBank.count; i++) s->bankVars[i] = u16(bv + i * 2);
+        }
     }
+    s->hour = -1;
+    uint8_t hour;
+    if (cfg->nightWild && read(ctx, cfg->nightWild->hourAddr, &hour, 1)) s->hour = (int8_t) hour;
 }
 
 bool pd_flag(const struct pd_snapshot* s, int flag) {
-    return s->flagsOk && flag >= 0 && flag / 8 < PD_FLAG_BYTES && (s->flags[flag / 8] >> (flag % 8) & 1);
+    if (!s->flagsOk || flag < 0) return false;
+    const struct pd_config* cfg = s->cfg;
+    if (cfg && cfg->flagBank.count && (uint32_t) flag >= cfg->flagBank.firstId &&
+        (uint32_t) flag < cfg->flagBank.firstId + cfg->flagBank.count) {
+        uint32_t i = (uint32_t) flag - cfg->flagBank.firstId;
+        return i / 8 < PD_BANK_FLAG_BYTES && (s->bankFlags[i / 8] >> (i % 8) & 1);
+    }
+    return flag / 8 < PD_FLAG_BYTES && (s->flags[flag / 8] >> (flag % 8) & 1);
 }
 
 int pd_var(const struct pd_snapshot* s, int var) {
+    if (!s->flagsOk) return 0;
+    const struct pd_config* cfg = s->cfg;
+    if (cfg && cfg->varBank.count && (uint32_t) var >= cfg->varBank.firstId && (uint32_t) var < cfg->varBank.firstId + cfg->varBank.count)
+        return var - (int) cfg->varBank.firstId < PD_BANK_VARS ? s->bankVars[var - cfg->varBank.firstId] : 0;
     int i = var - 0x4000;
-    return s->flagsOk && i >= 0 && i < PD_VAR_COUNT ? s->vars[i] : 0;
+    return i >= 0 && i < PD_VAR_COUNT ? s->vars[i] : 0;
 }
 
 static bool dex_bit(const uint8_t* bits, int national, int count) {

@@ -58,6 +58,8 @@ struct pd_battle_mon {
 #define PD_POCKET_SLOTS 256 // Emerald Legacy's ITEMS pocket holds 120
 #define PD_NATIONAL_COUNT 386
 #define PD_DEX_BYTES 256 // 2048 national numbers; the largest game's count is 1222
+#define PD_BANK_FLAG_BYTES 0x400 // Quetzal's 0x2000 flags from 0x1000
+#define PD_BANK_VARS 0x100
 #define PD_FLAG_BYTES 0x300 // the most any game has (a hack's 767); Emerald 0x12C, Emerald Legacy 0x138
 #define PD_VAR_COUNT 0x100
 #define PD_GAME_STATS 52 // up to GAME_STAT_BERRY_CRUSH_POINTS
@@ -109,8 +111,14 @@ struct pd_snapshot {
 
     // The GUIDE's save data: SaveBlock1's event flags and vars.
     bool flagsOk;
+    const struct pd_config* cfg; // the config it was read with (its flag / var banks)
     uint8_t flags[PD_FLAG_BYTES];
     uint16_t vars[PD_VAR_COUNT];
+    // cfg->flagBank / varBank's flags and vars (Quetzal's Johto and Kanto), and the game's clock hour (cfg->nightWild,
+    // -1 = not read).
+    uint8_t bankFlags[PD_BANK_FLAG_BYTES];
+    uint16_t bankVars[PD_BANK_VARS];
+    int hour;
 
     // The TRAINER CARD's (games with a cfg->cardStyle): SaveBlock2's name (the
     // game's encoding, 0xFF-ended), ID and play time; the game stats decrypted;

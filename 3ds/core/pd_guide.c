@@ -8,7 +8,6 @@
 #include "pd_dex.h"
 
 #define TRAINER_STRIDE 0x28
-#define WILD_HEADER 20
 #define MAX_HEADERS 512
 
 static uint16_t u16(const uint8_t* p) {
@@ -44,9 +43,36 @@ const struct pd_guide* pd_guide_for(const struct pd_game* g) {
     case PD_GUIDE_GB_YELLOW: return &pd_guide_gb_yellow;
     case PD_GUIDE_RECHARGED_YELLOW: return &pd_guide_recharged_yellow;
     case PD_GUIDE_RECHARGED_EMERALD: return &pd_guide_recharged_emerald;
+    case PD_GUIDE_AMETHYST: return &pd_guide_amethyst;
+    case PD_GUIDE_SOULGOLD: return &pd_guide_soulgold;
+    case PD_GUIDE_QUETZAL_V084: return &pd_guide_quetzal_v084;
+    case PD_GUIDE_QUETZAL: return &pd_guide_quetzal;
+    case PD_GUIDE_TMT2: return &pd_guide_tmt2;
+    case PD_GUIDE_SEAGLASS: return &pd_guide_seaglass;
+    case PD_GUIDE_LAZARUS: return &pd_guide_lazarus;
+    case PD_GUIDE_HEART_AND_SOUL: return &pd_guide_heart_and_soul;
+    case PD_GUIDE_GLAZED: return &pd_guide_glazed;
+    case PD_GUIDE_MARIOMON: return &pd_guide_mariomon;
+    case PD_GUIDE_DREAMSTONE: return &pd_guide_dreamstone;
+    case PD_GUIDE_WISHES: return &pd_guide_wishes;
+    case PD_GUIDE_TEAM_ROCKET: return &pd_guide_team_rocket;
+    case PD_GUIDE_ELITE_REDUX: return &pd_guide_elite_redux;
+    case PD_GUIDE_ULTRA_VIOLET: return &pd_guide_ultra_violet;
+    case PD_GUIDE_AMETHYST_V141: return &pd_guide_amethyst;
+    case PD_GUIDE_RECHARGED_YELLOW_V180:
+    case PD_GUIDE_RECHARGED_YELLOW_V190:
+    case PD_GUIDE_RECHARGED_YELLOW_V194: return &pd_guide_recharged_yellow;
+    case PD_GUIDE_EMERALD_KAIZO: return &pd_guide_emerald; // the app's EMERALD guide, Kaizo's own wild table
     default: return NULL;
     }
 }
+
+int pd_quetzal_region(int mapGroup) {
+    return mapGroup >= 34 && mapGroup <= 35 ? 1 : mapGroup >= 36 && mapGroup <= 39 ? 2 : 0;
+}
+
+// The app's quetzalBosses: Hoenn + Johto + Kanto, Johto + Kanto + Hoenn, Kanto + Johto + Hoenn.
+const uint8_t pd_quetzal_order[3][3] = {{0, 1, 2}, {1, 2, 0}, {2, 1, 0}};
 
 const struct pd_area_thing* pd_areas_for(const struct pd_game* g, int* count) {
     switch (g->guide) {
@@ -67,6 +93,15 @@ const struct pd_area_thing* pd_areas_for(const struct pd_game* g, int* count) {
     case PD_GUIDE_GAIA: *count = pd_areas_gaia_count; return pd_areas_gaia;
     case PD_GUIDE_GHOST_GREY: *count = pd_areas_ghost_grey_count; return pd_areas_ghost_grey;
     case PD_GUIDE_CELIA: *count = pd_areas_celia_count; return pd_areas_celia;
+    case PD_GUIDE_AMETHYST: *count = pd_areas_amethyst_count; return pd_areas_amethyst;
+    case PD_GUIDE_RECHARGED_YELLOW: *count = pd_areas_recharged_yellow_count; return pd_areas_recharged_yellow;
+    case PD_GUIDE_HEART_AND_SOUL: *count = pd_areas_heart_and_soul_count; return pd_areas_heart_and_soul;
+    case PD_GUIDE_ULTRA_VIOLET: *count = pd_areas_ultra_violet_count; return pd_areas_ultra_violet;
+    case PD_GUIDE_AMETHYST_V141: *count = pd_areas_amethyst_v141_count; return pd_areas_amethyst_v141;
+    case PD_GUIDE_RECHARGED_YELLOW_V180: *count = pd_areas_recharged_yellow_v180_count; return pd_areas_recharged_yellow_v180;
+    case PD_GUIDE_RECHARGED_YELLOW_V190: *count = pd_areas_recharged_yellow_v190_count; return pd_areas_recharged_yellow_v190;
+    case PD_GUIDE_RECHARGED_YELLOW_V194: *count = pd_areas_recharged_yellow_v194_count; return pd_areas_recharged_yellow_v194;
+    case PD_GUIDE_EMERALD_KAIZO: *count = pd_areas_emerald_count; return pd_areas_emerald;
     default: *count = 0; return NULL;
     }
 }
@@ -144,13 +179,49 @@ bool pd_guide_rom_ok(const struct pd_game* g) {
     const struct pd_config* cfg = g->cfg;
     if (cfg && cfg->gb) return cfg->gb->teams != NULL;  // a Game Boy guide's teams are embedded, nothing to probe
     if (!cfg || !cfg->trainers || !cfg->probeName) return false;
-    const uint8_t* name = pd_rom_at(g, cfg->trainers + (uint32_t) cfg->probeTrainer * tr_stride(cfg) + (cfg->trainerStride ? cfg->trainerNameOff : 4),
-                                    (size_t) (cfg->trainerStride ? cfg->trainerNameLen : 12));
+    size_t len = (size_t) (cfg->trainerStride ? cfg->trainerNameLen : 12);
+    uint32_t at = cfg->trainers + (uint32_t) cfg->probeTrainer * tr_stride(cfg) + (cfg->trainerStride ? cfg->trainerNameOff : 4);
+    if (cfg->trainerNamePtr) {
+        const uint8_t* p = pd_rom_at(g, at, 4);
+        if (!p) return false;
+        at = u32(p);
+    }
+    const uint8_t* name = pd_rom_at(g, at, len);
     const uint8_t* wild = pd_rom_at(g, cfg->wildHeaders, 1);
     if (!name || !wild || *wild == 0xFF) return false;
-    char decoded[32];
-    pd_gen3_text(name, 12, decoded, sizeof(decoded));
+    char decoded[64];
+    pd_gen3_text(name, len, decoded, sizeof(decoded));
     return !strcmp(decoded, cfg->probeName);
+}
+
+bool pd_boss_done(const struct pd_boss* b, const struct pd_snapshot* s) {
+    if (b->doneFlag && pd_flag(s, b->doneFlag)) return true;
+    for (const uint16_t* f = b->doneAny; f && *f; f++)
+        if (pd_flag(s, *f)) return true;
+    return b->doneVar && s->flagsOk && pd_var(s, b->doneVar) >= b->doneVarMin;
+}
+
+const struct pd_variant* pd_boss_variants(const struct pd_guide* gd, const struct pd_boss* b, const struct pd_snapshot* s) {
+    if (!b->pickLabels) return b->variants;
+    static struct pd_variant picked[9];
+    uint32_t id = (uint32_t) pd_boss_trainer(gd, b, s) & 0xFFFF;
+    int n = 0;
+    for (; b->pickLabels[n] && n < 8; n++) picked[n] = (struct pd_variant) {b->pickLabels[n], id | (uint32_t) n << 16};
+    picked[n] = (struct pd_variant) {NULL, 0};
+    return picked;
+}
+
+int pd_boss_order(const struct pd_guide* gd, const struct pd_snapshot* s, int* out, int max) {
+    int n = 0;
+    if (!gd->regionOf) {
+        for (int b = 0; b < gd->bossCount && n < max; b++) out[n++] = b;
+        return n;
+    }
+    int here = gd->regionOf(s->posOk ? s->mapGroup : -1);
+    for (int r = 0; r < 3; r++)
+        for (int b = 0; b < gd->bossCount && n < max; b++)
+            if (gd->bosses[b].region == gd->regionOrder[here][r]) out[n++] = b;
+    return n;
 }
 
 int pd_boss_trainer(const struct pd_guide* gd, const struct pd_boss* b, const struct pd_snapshot* s) {
@@ -164,6 +235,16 @@ int pd_boss_trainer(const struct pd_guide* gd, const struct pd_boss* b, const st
         for (const uint16_t* p = b->alts; p && p[0]; p += 2)
             if (pd_flag(s, p[0])) return p[1];
         return b->a;
+    }
+    if (b->kind == PD_BOSS_BY_COUNT) {
+        int n = 0;
+        for (const uint16_t* p = b->alts; p && p[0]; p++) n += pd_flag(s, p[0]);
+        return (int) b->countTeams[n];
+    }
+    if (b->kind == PD_BOSS_VAR_IS) return pd_var(s, b->addVar) == b->addMax ? b->b : b->a;
+    if (b->kind == PD_BOSS_VAR_ADD) {
+        int v = pd_var(s, b->addVar);
+        return b->a + (v < 0 ? 0 : v > b->addMax ? b->addMax : v);
     }
     int id = b->kind == PD_BOSS_FIXED ? b->a : pd_flag(s, gd->leagueRematchFlag) ? b->b : b->a;
     if (b->kind == PD_BOSS_CHAMPION) {
@@ -286,7 +367,9 @@ static const uint8_t WATER_ODDS[5] = { 60, 30, 5, 4, 1 };
 static const uint8_t FISH_ODDS[10] = { 70, 30, 60, 20, 20, 40, 40, 15, 4, 1 };
 
 static void add_slot(struct pd_wild_set* w, int method, int species, int minLv, int maxLv, int pct) {
-    if (!species) return;
+    // A slot that can't be one (levels out of order or past 100) is dropped, as the app's merge(): TMT2 lists 11 land
+    // slots, so its 12th is the next table's pointer.
+    if (!species || minLv < 1 || minLv > 100 || maxLv < minLv || maxLv > 100) return;
     for (int i = 0; i < w->count[method]; i++) {
         struct pd_wild* m = &w->mons[method][i];
         if (m->species != species) continue;
@@ -317,19 +400,61 @@ static int cmp_wild(const void* a, const void* b) {
     return ((const struct pd_wild*) b)->pct - ((const struct pd_wild*) a)->pct;
 }
 
+// The app's GuideRomSource: a header is 4 + wildSets * a set (4 pointers, + a word when there are several), or the
+// game's own shape.
+#define WILD_SET_SIZE 16
+static int set_stride(const struct pd_config* c) { return c->wildSets > 1 ? WILD_SET_SIZE + 4 : WILD_SET_SIZE; }
+static int header_stride(const struct pd_config* c) {
+    return c->wildLayout ? c->wildLayout->stride : 4 + (c->wildSets > 1 ? c->wildSets : 1) * set_stride(c);
+}
+
+// Which of the map's back-to-back headers the game reads now (the app's wildSetOf): a var's value, or the clock's night.
+static int wild_set_of(const struct pd_config* c, const struct pd_snapshot* s, int group, int num) {
+    for (const uint32_t* p = c->wildSetVars; p && p[0] != 0xFFFFFFFFu; p += 2)
+        if (p[0] == (uint32_t) (group << 8 | num)) return pd_var(s, (int) p[1]);
+    const struct pd_night_wild* n = c->nightWild;
+    if (!n || group == n->skipGroup || num == n->skipNum) return 0;
+    return s->hour >= 0 && s->hour <= 23 && (s->hour < n->dayFrom || s->hour > n->dayTo) ? 1 : 0;
+}
+
 bool pd_wild_here(const struct pd_game* g, const struct pd_snapshot* s, struct pd_wild_set* out) {
     memset(out, 0, sizeof(*out));
     if (!s->posOk || !pd_guide_rom_ok(g)) return false;
+    const struct pd_config* c = g->cfg;
+    int stride = header_stride(c);
     for (int h = 0; h < MAX_HEADERS; h++) {
-        const uint8_t* hd = pd_rom_at(g, g->cfg->wildHeaders + (uint32_t) h * WILD_HEADER, WILD_HEADER);
+        uint32_t at = c->wildHeaders + (uint32_t) (h * stride);
+        const uint8_t* hd = pd_rom_at(g, at, (size_t) stride);
         if (!hd || hd[0] == 0xFF) return false;
         if (hd[0] != s->mapGroup || hd[1] != s->mapNum) continue;
-        read_table(g, u32(hd + 4), 0, 12, LAND_ODDS, out, 0);
-        read_table(g, u32(hd + 8), 0, 5, WATER_ODDS, out, 1);
-        read_table(g, u32(hd + 12), 0, 5, WATER_ODDS, out, 2);
-        read_table(g, u32(hd + 16), 0, 2, FISH_ODDS, out, 3);
-        read_table(g, u32(hd + 16), 2, 3, FISH_ODDS + 2, out, 4);
-        read_table(g, u32(hd + 16), 5, 5, FISH_ODDS + 5, out, 5);
+        // the set'th header after this one, while it's still this map's (else the first)
+        int set = wild_set_of(c, s, s->mapGroup, s->mapNum);
+        if (set > 0) {
+            const uint8_t* alt = pd_rom_at(g, at + (uint32_t) (set * stride), (size_t) stride);
+            if (alt && alt[0] == hd[0] && alt[1] == hd[1]) hd = alt;
+        }
+        uint32_t ptr[4];
+        for (int m = 0; m < 4; m++) {
+            if (c->wildLayout) {
+                const int slot[4] = { c->wildLayout->land, c->wildLayout->water, c->wildLayout->rockSmash, c->wildLayout->fishing };
+                ptr[m] = u32(hd + 4 + 4 * slot[m]);
+                continue;
+            }
+            // each method from the chosen time of day, or the first set that has it
+            ptr[m] = 0;
+            int sets = c->wildSets > 1 ? c->wildSets : 1;
+            for (int k = -1; k < sets && !ptr[m]; k++) {
+                int set = k < 0 ? c->wildSet : k;
+                if (k >= 0 && k == c->wildSet) continue;
+                ptr[m] = u32(hd + 4 + set * set_stride(c) + 4 * m);
+            }
+        }
+        read_table(g, ptr[0], 0, 12, LAND_ODDS, out, 0);
+        read_table(g, ptr[1], 0, 5, WATER_ODDS, out, 1);
+        read_table(g, ptr[2], 0, 5, WATER_ODDS, out, 2);
+        read_table(g, ptr[3], 0, 2, FISH_ODDS, out, 3);
+        read_table(g, ptr[3], 2, 3, FISH_ODDS + 2, out, 4);
+        read_table(g, ptr[3], 5, 5, FISH_ODDS + 5, out, 5);
         for (int m = 0; m < PD_WILD_METHODS; m++) {
             qsort(out->mons[m], (size_t) out->count[m], sizeof(struct pd_wild), cmp_wild);
         }

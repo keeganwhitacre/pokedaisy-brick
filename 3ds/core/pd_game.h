@@ -44,6 +44,26 @@ enum pd_guide_id {
     PD_GUIDE_GB_RED,
     PD_GUIDE_GB_BLUE,
     PD_GUIDE_GB_YELLOW,
+    PD_GUIDE_AMETHYST,
+    PD_GUIDE_SOULGOLD,
+    PD_GUIDE_QUETZAL_V084,
+    PD_GUIDE_QUETZAL,
+    PD_GUIDE_TMT2,
+    PD_GUIDE_SEAGLASS,
+    PD_GUIDE_LAZARUS,
+    PD_GUIDE_HEART_AND_SOUL,
+    PD_GUIDE_GLAZED,
+    PD_GUIDE_MARIOMON,
+    PD_GUIDE_DREAMSTONE,
+    PD_GUIDE_WISHES,
+    PD_GUIDE_TEAM_ROCKET,
+    PD_GUIDE_ELITE_REDUX,
+    PD_GUIDE_ULTRA_VIOLET,
+    PD_GUIDE_AMETHYST_V141,
+    PD_GUIDE_RECHARGED_YELLOW_V180,
+    PD_GUIDE_RECHARGED_YELLOW_V190,
+    PD_GUIDE_RECHARGED_YELLOW_V194,
+    PD_GUIDE_EMERALD_KAIZO,
 };
 
 // struct Pokemon's party fields (the app's PartyMonLayout): the party-only fields after the
@@ -100,6 +120,9 @@ struct pd_dex_x {
     int stride, catchRateOff, genderOff, eggGroupsOff, abilitiesOff, categoryOff, natDexOff, descriptionOff, frontPicOff,
         paletteOff, footprintOff, levelUpOff, teachableOff, evolutionsOff;
 };
+
+struct pd_wild_layout { int stride, land, water, rockSmash, fishing; };
+struct pd_night_wild { uint32_t hourAddr; int dayFrom, dayTo, skipGroup, skipNum; };
 
 struct pd_config {
     const struct pd_text* text; // the hack's own species / item / move names; NULL = retail's
@@ -205,6 +228,17 @@ struct pd_config {
     uint32_t altTrainers[3];
     int probeTrainer;     // checks the tables match the ROM ...
     const char* probeName; // ... by this trainer's name
+    bool trainerNamePtr;   // the record holds a pointer to the name, not the name (Elite Redux)
+    // HERE's wild headers when they aren't vanilla's 20 bytes (the app's GuideTables): wildSets time-of-day sets of 4
+    // pointers + a word each (wildSet = the one read first), or a header of its own shape (wildLayout); a map's
+    // back-to-back headers picked by a var (wildSetVars: {group << 8 | num, var} pairs, ~0u-terminated) or by the clock
+    // (nightWild).
+    int wildSets, wildSet;
+    const struct pd_wild_layout* wildLayout;
+    const uint32_t* wildSetVars;
+    const struct pd_night_wild* nightWild;
+    // Flags / vars past the main arrays, elsewhere in SaveBlock1 (Quetzal's 0x1000+ flags, 0x5000+ vars); count 0 = none.
+    struct pd_save_bank { uint32_t firstId, sb1Off, count; } flagBank, varBank;
 
     // TRAINER CARD (the app's TrainerCardSave): which card (PD_CARD_*, 0 =
     // none), SaveBlock1.gameStats, the badge / POKéDEX flags, what makes the

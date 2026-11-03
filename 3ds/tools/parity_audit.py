@@ -78,7 +78,8 @@ def c_known_roms():
 
 def c_guides():
     text = read(os.path.join(CORE, "pd_guide.c"))
-    guides = set(re.findall(r"case PD_GUIDE_(\w+): return &pd_guide_", text))
+    body = text[text.index("const struct pd_guide* pd_guide_for("):text.index("int pd_quetzal_region") if "int pd_quetzal_region" in text else None]
+    guides = set(re.findall(r"case PD_GUIDE_(\w+):", body))
     areas = set(re.findall(r"case PD_GUIDE_(\w+):(?: case PD_GUIDE_\w+:)* \*count = pd_areas_", text))
     # a fall-through case line (RUBY:) shares the next one's areas
     for m in re.finditer(r"case PD_GUIDE_(\w+):\n\s*case PD_GUIDE_\w+: \*count", text):
@@ -97,20 +98,16 @@ def android_areas():
 
 
 def c_mapsec_named(cfg_name):
-    """Whether C names this config's map sections (pd_mapsec_name returns "" for g->hackMaps)."""
-    text = read(os.path.join(CORE, "pd_game.c")) + read(os.path.join(CORE, "pd_snapshot.c"))
-    if "pd_mapsec_for" in text:  # per-hack name tables
-        gen = os.path.join(CORE, "pd_mapsec_gen.c")
-        return os.path.exists(gen) and f"PD_CONFIG_{cfg_name}" in read(gen) or cfg_name.startswith(("EMERALD", "FIRERED"))
+    """Whether C names this config's map sections: pd_text.mapsecs / mapsecsRom, else its engine's retail names
+    (`make -C 3ds test-roms` checks each ROM really gets 20+). Before those, only Emerald Legacy had names."""
+    if "mapsecsRom" in read(os.path.join(CORE, "pd_snapshot.c")):
+        return True
     return cfg_name == "EMERALD_LEGACY"
 
 
 ALIASES = {  # GuideId -> PD_GUIDE_ name where they differ
     "YELLOW": "GB_YELLOW", "RED": "GB_RED", "BLUE": "GB_BLUE", "CRYSTAL": "GB_CRYSTAL",
     "POLISHED_CRYSTAL": "GB_POLISHED",
-    # one guide text, each release its own area data (the areas column checks those)
-    "RECHARGED_YELLOW_V180": "RECHARGED_YELLOW", "RECHARGED_YELLOW_V190": "RECHARGED_YELLOW",
-    "RECHARGED_YELLOW_V194": "RECHARGED_YELLOW", "AMETHYST_V141": "AMETHYST",
 }
 
 
@@ -135,7 +132,8 @@ def per_rom():
             "dex": (bool(a.get("pokedex")), "dex" in parts),
             "card": (bool(a.get("trainerCard")), "card" in parts),
             "guide": (gid, ",".join(cguide) or "-"),
-            "guide_ok": gid is None or (ALIASES.get(gid, gid) in cguide and ALIASES.get(gid, gid) in cg),
+            # Kaizo: the app's EMERALD guide over Kaizo's own wild table (C's EMERALD_KAIZO id)
+            "guide_ok": gid is None or any(ALIASES.get(gid, gid) == c or (gid == "EMERALD" and c == "EMERALD_KAIZO") for c in cguide if c in cg),
             "areas": (gid in aa if gid else False, any(g in ca for g in cguide)),
             "names": (True, c_mapsec_named(name)),
         }

@@ -161,6 +161,7 @@ trainers = 'guideTables.trainers'
 trainerStride = 'guideTables.trainerStride'
 trainerNameOff = 'guideTables.trainerNameOff'
 trainerNameLen = 'guideTables.trainerNameLen'
+trainerNamePtr = 'guideTables.trainerNamePtr'
 trainerSizeOff = 'guideTables.trainerSizeOff'
 trainerPartyOff = 'guideTables.trainerPartyOff'
 trainerHardPartyOff = 'guideTables.trainerHardPartyOff'
@@ -171,6 +172,13 @@ learnsetPairs = 'guideTables.learnsetPairs'
 wildHeaders = 'guideTables.wildHeaders'
 probeTrainer = 'guideTables.probeTrainer'
 probeName = 'guideTables.probeName'
+wildSets = 'guideTables.wildSets'
+wildSet = 'guideTables.wildSet'
+wildLayout = 'guideTables.wildLayout'
+wildSetVars = 'guideTables.wildSetVars'
+nightWild = 'guideTables.nightWild'
+flagBank = 'guideTables.flagBanks'
+varBank = 'guideTables.varBanks'
 
 # TRAINER CARD.
 [part.card]
@@ -316,11 +324,11 @@ records = { items = 'FIELD_ITEMS_PORTS_AXPE0' }
 # the tabs that read the ROM (icons, POKéDEX, GUIDE, CARD, FLY) join once a ROM is there to check them against.
 [config.emerald_kaizo]
 name = 'EMERALD_KAIZO'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'guide']
 
 [config.glazed]
 name = 'GLAZED'
-parts = ['ram', 'foes', 'dex', 'card']
+parts = ['ram', 'foes', 'dex', 'card', 'guide']
 
 [config.celia]
 name = 'CELIA'
@@ -332,7 +340,7 @@ parts = ['ram', 'foes', 'dex', 'guide']
 
 [config.ultra_violet]
 name = 'ULTRA_VIOLET'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'guide']
 
 [config.rocket_edition]
 name = 'ROCKET_EDITION'
@@ -358,11 +366,11 @@ parts = ['ram', 'foes', 'dex', 'guide']
 
 [config.amethyst]
 name = 'AMETHYST'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'guide']
 
 [config.amethyst_v1_4_1]
 name = 'AMETHYST_V1_4_1'
-parts = ['ram', 'foes', 'dex']
+parts = ['ram', 'foes', 'dex', 'guide']
 
 [config.gs_chronicles]
 name = 'GS_CHRONICLES'
@@ -392,7 +400,7 @@ parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.tmt2]
 name = 'TMT2'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.recharged_yellow_v1_8_0]
 name = 'RECHARGED_YELLOW_V1_8_0'
@@ -412,35 +420,35 @@ parts = ['ram', 'foes', 'icons', 'dex', 'card', 'guide']
 
 [config.emerald_seaglass]
 name = 'SEAGLASS'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.lazarus]
 name = 'LAZARUS'
-parts = ['ram', 'foes', 'icons', 'dex', 'card']
+parts = ['ram', 'foes', 'icons', 'dex', 'card', 'guide']
 
 [config.wishes]
 name = 'WISHES'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.mariomon_v1_5_2]
 name = 'MARIOMON_V1_5_2'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.mariomon_v1_5_1]
 name = 'MARIOMON_V1_5_1'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.mariomon_v1_3]
 name = 'MARIOMON_V1_3'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.mariomon_v1_2_2]
 name = 'MARIOMON_V1_2_2'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.mariomon_v1_2_1]
 name = 'MARIOMON_V1_2_1'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.rowe]
 name = 'ROWE'
@@ -448,63 +456,63 @@ parts = ['ram', 'foes', 'icons', 'dex']
 
 [config.team_rocket]
 name = 'TEAM_ROCKET'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.dreamstone]
 name = 'DREAMSTONE'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.soulgold]
 name = 'SOULGOLD'
-parts = ['ram', 'foes', 'icons', 'dex', 'card']
+parts = ['ram', 'foes', 'icons', 'dex', 'card', 'guide']
 
 [config.soulgold_v1_2]
 name = 'SOULGOLD_V1_2'
-parts = ['ram', 'foes', 'icons', 'dex', 'card']
+parts = ['ram', 'foes', 'icons', 'dex', 'card', 'guide']
 
 [config.soulgold_v1_2b]
 name = 'SOULGOLD_V1_2B'
-parts = ['ram', 'foes', 'icons', 'dex', 'card']
+parts = ['ram', 'foes', 'icons', 'dex', 'card', 'guide']
 
 [config.soulgold_v1_2c]
 name = 'SOULGOLD_V1_2C'
-parts = ['ram', 'foes', 'icons', 'dex', 'card']
+parts = ['ram', 'foes', 'icons', 'dex', 'card', 'guide']
 
 [config.heart_and_soul]
 name = 'HEART_AND_SOUL'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.quetzal]
 name = 'QUETZAL_V9_0'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.quetzal_es]
 name = 'QUETZAL_V9_0_ES'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.quetzal_v1]
 name = 'QUETZAL_V9_1'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.quetzal_es_v1]
 name = 'QUETZAL_V9_1_ES'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.quetzal_v084]
 name = 'QUETZAL_V0_8_4'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.quetzal_v084_es]
 name = 'QUETZAL_V0_8_4_ES'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.quetzal_moemon_v084]
 name = 'MOEMON_QUETZAL_V0_8_4'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.quetzal_moemon_v084_es]
 name = 'MOEMON_QUETZAL_V0_8_4_ES'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 # pokeemerald-expansion family (and Recharged Yellow): PARTY / BAG / BATTLE from RAM, party and bag icons from the ROM.
 [config.recharged_emerald_v2_2_5]
@@ -528,11 +536,11 @@ set = { partyMonLayout = 'ROGUE_PARTY_MON' }
 # Elite Redux 2.65.3b / 2.65.4.1b: PARTY and BATTLE; its bag is a flag per item (not read yet).
 [config.elite_redux_v2_65_4_1b]
 name = 'ELITE_REDUX_V2_65_4_1B'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.elite_redux_v2_65_3b]
 name = 'ELITE_REDUX_V2_65_3B'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 # Other-language FireRed / LeafGreen / Ruby / Sapphire (German, French, Italian, Spanish): the app's RETAIL_PORTS, found by game code
 # and revision. PARTY / BAG / BATTLE and the POKéDEX from RAM and the ROM, with the cart's own species, move and item names.

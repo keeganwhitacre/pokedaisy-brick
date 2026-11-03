@@ -400,16 +400,18 @@ against the app's recorded cards (`make -C 3ds test-card`), the GUIDE's boss tea
 | Game | DEX | CARD | GUIDE |
 | ---- | :-: | :--: | :---: |
 | Unbound 2.1.1.1 (and the French fan translation) | ✅ | ✅ | ✅ ²⁶ |
-| Lazarus | ✅ | ✅ | — |
+| Lazarus | ✅ | ✅ | ✅ ²⁹ |
 | Recharged Yellow 1.8.0 | ✅ | ✅ | ✅ ²⁸ |
 | Recharged Yellow 1.9.x | ✅ | ✅ | ✅ ²⁸ |
-| SoulGold | ✅ | ✅ | — |
-| Glazed | ✅ | ✅ ²³ | — |
+| SoulGold | ✅ | ✅ | ✅ ²⁹ |
+| Glazed | ✅ | ✅ ²³ | ✅ |
 | Imperium | ✅ | — ²⁴ | ✅ |
-| Quetzal (Alpha 0.8.4 and 9.x, English and Spanish) | ✅ | — | — |
+| Quetzal (Alpha 0.8.4 and 9.x, English and Spanish) | ✅ | — | ✅ ²⁹ |
 | Rocket Edition, Ash Gray, GS Chronicles, Radical Red, Orange Islands | ✅ | — | ✅ |
 | Odyssey, Sword and Shield Ultimate Plus, Gaia, Recharged Emerald ²⁸ | ✅ | — | ✅ |
-| Dreamstone Mysteries, Wishes of Tomorrow, R.O.W.E., Amethyst, Heart and Soul, Seaglass, Too Many Types 2, Emerald Rogue (EX) | ✅ | — | — |
+| Amethyst, Heart and Soul, Seaglass, Too Many Types 2, Super Mariomon, Dreamstone Mysteries, Ultra Violet, Kaizo | ✅ | — | ✅ ²⁹ |
+| Wishes of Tomorrow, Team Rocket Edition, Elite Redux | ✅ | — | ◐ ³⁰ |
+| R.O.W.E., Emerald Rogue (EX) | ✅ | — | — |
 | Celia's Stupid Romhack | ◐ ²⁵ | — | ✅ |
 | Ghost Grey | ✅ | — | ✅ ²⁷ |
 
@@ -417,9 +419,17 @@ against the app's recorded cards (`make -C 3ds test-card`), the GUIDE's boss tea
 ²⁴ No reference render of Imperium's card exists to check against, so the tab stays off.
 ²⁵ The dex probe the C reader uses (the first entry's category) does not match this ROM; whether the app's own check passes was not tested.
 
-²⁶ Boss teams with several difficulties (Unbound's four, Odyssey's NORMAL / HARD) show one section per team. The guide's left out for hacks whose bosses are built by Kotlin helpers or lambdas (Amethyst, SoulGold, Quetzal: per-badge and variable-driven teams). Gaia's Elite Four count as beaten once the game is cleared; Celia's BLAINE shows his eight one-on-one battles.
+²⁶ Boss teams with several difficulties (Unbound's four, Odyssey's NORMAL / HARD) show one section per team. Gaia's Elite Four count as beaten once the game is cleared; Celia's BLAINE shows his eight one-on-one battles.
 
 ²⁸ Recharged Emerald / Yellow: every gym and Elite Four member lists NORMAL and HARD teams (the HARD party is a second pointer in the trainer record). Yellow's League shows the rematch teams once the game is cleared; Emerald's Elite Four count as beaten once champion.
+
+²⁹ The app's own rules for who comes next: Amethyst's RAINE and CHANCE by the badges held (four tables each), SoulGold's and
+Heart and Soul's CHUCK / JASMINE / PRYCE by how many of the other two are beaten and their League by its progress var,
+Lazarus's and Dreamstone's teams by the save's difficulty, Too Many Types 2's rival by the starter, Quetzal's three regions
+with the player's own first. HERE reads each game's own wild header shape, its time-of-day sets and Lazarus's night set by the
+game's clock. Kaizo uses retail Emerald's guide over its own wild table, Ultra Violet FireRed's bosses over its own maps.
+
+³⁰ HERE and TIPS only, as in the app (no NEXT BOSS: their stories don't follow the badge order).
 
 ²⁷ Ghost Grey's last boss, SUMMER, has a team that answers the starter; the guide shows all three (LITWICK, SPIRITLE, ROWLET) and counts her beaten when any of them is.
 

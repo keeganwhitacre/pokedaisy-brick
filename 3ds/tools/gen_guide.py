@@ -29,9 +29,14 @@ HACK_GUIDES = [
     ("unbound", "Unbound", "UNBOUND"), ("amethyst", "Amethyst", "AMETHYST"), ("soulgold", "SoulGold", "SOULGOLD"),
     ("imperium", "Imperium", "IMPERIUM"), ("quetzal", "Quetzal", "QUETZAL"),
     ("recharged_emerald", "RechargedEmerald", "RECHARGED_EMERALD"), ("recharged_yellow", "RechargedYellow", "RECHARGED_YELLOW"),
+    ("tmt2", "Tmt2", "TMT2"), ("seaglass", "Seaglass", "SEAGLASS"), ("lazarus", "Lazarus", "LAZARUS"),
+    ("heart_and_soul", "HeartAndSoul", "HEART_AND_SOUL"), ("glazed", "Glazed", "GLAZED"), ("mariomon", "Mariomon", "MARIOMON"),
+    ("dreamstone", "Dreamstone", "DREAMSTONE"), ("wishes", "Wishes", "WISHES"), ("team_rocket", "TeamRocket", "TEAM_ROCKET"),
+    ("elite_redux", "EliteRedux", "ELITE_REDUX"), ("ultra_violet", "UltraViolet", "ULTRA_VIOLET"),
 ]
 # Hacks whose guide has no area file in the app (their WHERE IS is empty here).
-AREAS_OPTIONAL = {"soulgold", "imperium", "quetzal", "recharged_emerald"}
+AREAS_OPTIONAL = {"soulgold", "imperium", "quetzal", "recharged_emerald", "tmt2", "seaglass", "lazarus", "glazed", "mariomon",
+                  "dreamstone", "wishes", "team_rocket", "elite_redux"}
 AREA_KINDS = ["ITEM", "HIDDEN", "GIFT", "KEY", "MON", "EGG", "TRADE"]
 
 
@@ -165,7 +170,21 @@ class Parser:
 
 
 def consts(text):
-    return {name: int(v, 0) for name, v in re.findall(r"const val (\w+) = (0x[0-9A-Fa-f]+|\d+)", text)}
+    """`const val X = 0x860` and sums over earlier ones (`SYS_FLAGS + 0x20`)."""
+    out = {}
+    for name, expr in re.findall(r"const val (\w+) = ([^\n/]+)", text):
+        total = 0
+        for term in expr.split("+"):
+            term = term.strip()
+            if re.fullmatch(r"0x[0-9A-Fa-f]+|\d+", term):
+                total += int(term, 0)
+            elif term in out:
+                total += out[term]
+            else:
+                break
+        else:
+            out[name] = total
+    return out
 
 
 def matching_paren(text, open_at):
@@ -309,26 +328,51 @@ def emit_guide(out, prefix, pages, bosses, verified, extra):
     for pi, (title, sections) in enumerate(pages):
         out.append(f"    {{ {c_str(title)}, {prefix}_p{pi}, {len(sections)} }},")
     out.append("};")
-    for bi, (title, where, flag, kind, a, b, alts, variants, done_any) in enumerate(bosses):
+    for bi, (title, where, flag, kind, a, b, alts, variants, done_any, *_) in enumerate(bosses):
         if variants:
             vs = ", ".join(f"{{ {c_str(l)}, {t} }}" for l, t in variants)
             out.append(f"static const struct pd_variant {prefix}_vars{bi}[] = {{ {vs}, {{ NULL, 0 }} }};")
         if done_any:
             out.append(f"static const uint16_t {prefix}_any{bi}[] = {{ {', '.join(f'0x{f:X}' for f in done_any)}, 0 }};")
         if alts:
-            pairs = ", ".join(f"0x{f:X}, {t}" for f, t in alts)
-            out.append(f"static const uint16_t {prefix}_alts{bi}[] = {{ {pairs}, 0 }};")
+            if kind == "BY_COUNT":
+                out.append(f"static const uint16_t {prefix}_alts{bi}[] = {{ {', '.join(f'0x{f:X}' for f in alts)}, 0 }};")
+            else:
+                pairs = ", ".join(f"0x{f:X}, {t}" for f, t in alts)
+                out.append(f"static const uint16_t {prefix}_alts{bi}[] = {{ {pairs}, 0 }};")
+        x = boss_extra(bosses[bi])
+        if x.get("countTeams"):
+            out.append(f"static const uint32_t {prefix}_count{bi}[] = {{ {', '.join(str(t) for t in x['countTeams'])} }};")
+        if x.get("pickLabels"):
+            out.append(f"static const char* const {prefix}_labels{bi}[] = {{ {', '.join(c_str(l) for l in x['pickLabels'])}, NULL }};")
     out.append(f"static const struct pd_boss {prefix}_bosses[] = {{")
-    for bi, (title, where, flag, kind, a, b, alts, variants, done_any) in enumerate(bosses):
+    for bi, (title, where, flag, kind, a, b, alts, variants, done_any, *_) in enumerate(bosses):
         alt = f"{prefix}_alts{bi}" if alts else "NULL"
         var = f"{prefix}_vars{bi}" if variants else "NULL"
         anyf = f"{prefix}_any{bi}" if done_any else "NULL"
-        out.append(f"    {{ {c_str(title)}, {c_str(where)}, 0x{flag:X}, PD_BOSS_{kind}, {a}, {b}, {alt}, {var}, {anyf} }},")
+        x = boss_extra(bosses[bi])
+        more = ""
+        if x.get("doneVar"):
+            more += f", .doneVar = 0x{x['doneVar']:X}, .doneVarMin = {x['doneVarMin']}"
+        if x.get("countTeams"):
+            more += f", .countTeams = {prefix}_count{bi}"
+        if "addVar" in x:
+            more += f", .addVar = 0x{x['addVar']:X}, .addMax = {x['addMax']}"
+        if x.get("pickLabels"):
+            more += f", .pickLabels = {prefix}_labels{bi}"
+        more += f", .region = {x.get('region', 0)}"  # a designator, so the fields after it start at zero
+        out.append(f"    {{ {c_str(title)}, {c_str(where)}, 0x{flag:X}, PD_BOSS_{kind}, {a}, {b}, {alt}, {var}, {anyf}{more} }},")
     out.append("};")
     out.append(f"const struct pd_guide {prefix} = {{")
+    if ".regionOf" not in extra:
+        extra += ", .regionOf = NULL"
     out.append(f"    {prefix}_pages, {len(pages)}, {prefix}_bosses, {len(bosses)}, {str(verified).lower()}, {extra},")
     out.append("};")
     out.append("")
+
+
+def boss_extra(boss):
+    return boss[9] if len(boss) > 9 else {}
 
 
 def emit_areas(out, prefix, things):
@@ -374,6 +418,211 @@ def expand_helpers(slug, text):
                       'doneAny = listOf(TRAINER_FLAGS_START + 436, TRAINER_FLAGS_START + 437), '
                       'variants = listOf("LITWICK" to 435, "SPIRITLE" to 436, "ROWLET" to 437)) { 437 },\n', text, flags=re.S)
     return text
+
+
+# --- hacks whose bosses come from Kotlin helpers / lambdas: their calls read straight into boss tuples ---
+# A boss tuple: (title, where, doneFlag, kind, a, b, alts, variants, doneAny, extra); extra = boss_extra()'s keys.
+HARD = 1 << 16
+
+
+def _ev(env, expr):
+    return Parser(tokenize(expr.strip()), env).expr()
+
+
+def _str(env, expr):
+    return _ev(env, expr)
+
+
+def _list_body(text, decl):
+    body = text[text.index(f"val {decl} = listOf("):]
+    return body[:matching_paren(body, body.index("(")) + 1]
+
+
+def _fixed(title, where, flag, trainer, done_any=(), variants=(), **extra):
+    return (title, where, flag, "FIXED", trainer, 0, [], list(variants), list(done_any), extra)
+
+
+def lambda_bosses(slug, text, env):
+    """Boss tuples for the guides lambda / helper shapes build, or None (bosses_of reads the rest)."""
+    E = lambda e: _ev(env, e)
+    c = env["consts"]
+    out = []
+    if slug == "tmt2":
+        body = _list_body(text, "BOSSES_TMT2")
+        for m in re.finditer(r'Boss\(("[^"]*"), ("[^"]*"), ([^)]+?)\) \{ (\d+) \}|elite\((\d+), ("[^"]*")\) \{ ([^}]*) \}', body):
+            if m.group(1):
+                out.append(_fixed(E(m.group(1)), E(m.group(2)), E(m.group(3)), int(m.group(4))))
+                continue
+            n, title, lam = int(m.group(5)), E(m.group(6)), m.group(7)
+            flag = c["FLAG_DEFEATED_ELITE_4_1"] + n
+            r = re.fullmatch(r"\s*p -> (\w+) \+ p\.variable\((\w+)\)\.coerceIn\(0, (\d+)\)\s*", lam)
+            if r:
+                out.append((title, "POKéMON LEAGUE", flag, "VAR_ADD", c[r.group(1)], 0, [], [], [c["FLAG_IS_CHAMPION"]],
+                            dict(addVar=c[r.group(2)], addMax=int(r.group(3)))))
+            else:
+                out.append(_fixed(title, "POKéMON LEAGUE", flag, int(lam), [c["FLAG_IS_CHAMPION"]]))
+        assert len(out) == body.count("Boss(") + body.count("elite("), "tmt2: a boss not read"
+        return out
+    if slug == "seaglass":
+        body = _list_body(text, "BOSSES_SEAGLASS")
+        for m in re.finditer(r'Boss\(("[^"]*"), ("[^"]*"), ([^)]+?)\) \{ (\d+) \}|elite\((\d+), ("[^"]*"), (\d+)\)|'
+                             r'Boss\(\s*("[^"]*"), ("[^"]*"), (\w+),\s*doneIf = \{ p -> p\.flag\((\w+)\) \|\| p\.flag\((\w+)\) \},\s*\) \{ (\d+) \}', body):
+            if m.group(1):
+                out.append(_fixed(E(m.group(1)), E(m.group(2)), E(m.group(3)), int(m.group(4))))
+            elif m.group(5):
+                out.append(_fixed(E(m.group(6)), "POKéMON LEAGUE", c["FLAG_DEFEATED_ELITE_4_SIDNEY"] + int(m.group(5)),
+                                  int(m.group(7)), [c["FLAG_IS_CHAMPION"]]))
+            else:
+                out.append(_fixed(E(m.group(8)), E(m.group(9)), c[m.group(10)], int(m.group(13)), [c[m.group(12)]]))
+        assert len(out) == body.count("Boss(") + body.count("elite("), "seaglass: a boss not read"
+        return out
+    if slug == "lazarus":
+        body = _list_body(text, "BOSSES_LAZARUS")
+        hard = c["FLAG_HARD_MODE"]
+        for m in re.finditer(r'gym\((\d+), ("[^"]*"), ("[^"]*"), (\d+), (\d+)\)|ruins\((\d+), ("[^"]*"), (\d+), (\d+)\)|'
+                             r'Boss\(\s*("[^"]*"), ("[^"]*"), (\w+),\s*doneIf = \{ p -> p\.flag\((\w+)\) \|\| p\.flag\((\w+)\) \}, trainer = pick\((\d+), (\d+)\),\s*\)', body):
+            if m.group(1):
+                t = (E(m.group(2)), E(m.group(3)), c["FLAG_BADGE01_GET"] + int(m.group(1)), int(m.group(4)), int(m.group(5)), [])
+            elif m.group(6):
+                t = (E(m.group(7)), "RUINS OF AHIYAWA", c["FLAG_BEAT_RUINS_1"] + int(m.group(6)), int(m.group(8)), int(m.group(9)),
+                     [c["FLAG_BEAT_ANYALIOS"], c["FLAG_IS_CHAMPION"]])
+            else:
+                t = (E(m.group(10)), E(m.group(11)), c[m.group(12)], int(m.group(15)), int(m.group(16)), [c[m.group(14)]])
+            title, where, flag, normal, hardId, any_ = t
+            out.append((title, where, flag, "BY_FLAGS", normal, 0, [(hard, hardId)], [], any_))
+        assert len(out) == body.count("Boss(") + body.count("gym(") + body.count("ruins("), "lazarus: a boss not read"
+        return out
+    if slug in ("soulgold", "heart_and_soul"):
+        up = "SOULGOLD" if slug == "soulgold" else "HEART_AND_SOUL"
+        body = _list_body(text, f"BOSSES_{up}")
+        middle = {}
+        for m in re.finditer(r"val (\w+) = middleGym\((\d+), (\d+), (\d+), (\w+), (\w+)\)", text):
+            middle[m.group(1)] = ([int(m.group(i)) for i in (2, 3, 4)], [c[m.group(5)], c[m.group(6)]])
+        league = re.search(r"fun league\(state: Int\).*?\{ p -> (.*?) \}", text, re.S).group(1)
+        lflags = [c[f] for f in re.findall(r"p\.flag\((\w+)\)", league)]
+        lvar = c[re.search(r"p\.variable\((\w+)\) >= state", league).group(1)]
+        nh = ["NORMAL", "HARD"]
+        pat = (r'johto\((\d+), ("[^"]*"), ("[^"]*"), (\d+)\)|middle\((\d+), ("[^"]*"), ("[^"]*"), (\w+)\)|'
+               r'elite\((\d+), ("[^"]*"), (\d+)\)|kanto\((\d+), ("[^"]*"), ("[^"]*"), (\d+)\)|'
+               r'Boss\(\s*("[^"]*"), ("[^"]*"), ([^,]+), variants = nh\((\d+)\),\s*doneIf = \{ (\w+ -> )?\w+\.flag\((\w+)\) \|\| \w+\.flag\(([^)]+)\) \},?\s*\) \{ \d+ \}|'
+               r'Boss\(("[^"]*"), ("[^"]*"), ([^,]+), variants = nh\((\d+)\)\) \{ \d+ \}|'
+               r'Boss\(("[^"]*"), ("[^"]*"), ([^,]+?)\) \{ (\d+) \}|'
+               r'Boss\(("[^"]*"), ("[^"]*"), ([^,]+?),\s*trainer = middleGym\((\d+), (\d+), (\d+), (\w+), (\w+)\)\)|'
+               r'Boss\(("[^"]*"), ("[^"]*"), 0, doneIf = league\((\d+)\)\) \{ (\d+) \}')
+        for m in re.finditer(pat, body):
+            g = m.groups()
+            if g[0]:
+                out.append(_fixed(E(g[1]), E(g[2]), c["FLAG_BADGE01_GET"] + int(g[0]), int(g[3]), pickLabels=nh))
+            elif g[4]:
+                teams, flags = middle[g[7]]
+                out.append((E(g[5]), E(g[6]), c["FLAG_BADGE01_GET"] + int(g[4]), "BY_COUNT", 0, 0, flags, [], [],
+                            dict(countTeams=teams, pickLabels=nh)))
+            elif g[8]:
+                out.append(_fixed(E(g[9]), "POKéMON LEAGUE", 0, int(g[10]), lflags, pickLabels=nh, doneVar=lvar, doneVarMin=int(g[8])))
+            elif g[11]:
+                out.append(_fixed(E(g[12]), E(g[13]), c["FLAG_DEFEATED_PEWTER_GYM"] + int(g[11]), int(g[14])))
+            elif g[15]:
+                out.append(_fixed(E(g[15]), E(g[16]), E(g[17]), int(g[18]), [E(g[21])], pickLabels=nh))
+            elif g[22]:
+                out.append(_fixed(E(g[22]), E(g[23]), E(g[24]), int(g[25]), pickLabels=nh))
+            elif g[26]:
+                out.append(_fixed(E(g[26]), E(g[27]), E(g[28]), int(g[29])))
+            elif g[30]:
+                out.append((E(g[30]), E(g[31]), E(g[32]), "BY_COUNT", 0, 0, [c[g[36]], c[g[37]]], [], [],
+                            dict(countTeams=[int(g[33]), int(g[34]), int(g[35])])))
+            else:
+                out.append(_fixed(E(g[38]), E(g[39]), 0, int(g[41]), lflags, doneVar=lvar, doneVarMin=int(g[40])))
+        n = body.count("Boss(") + body.count("johto(") + body.count("middle(") + body.count("elite(") + body.count("kanto(")
+        assert len(out) == n, f"{slug}: read {len(out)} of {n} bosses"
+        return out
+    if slug == "glazed":
+        names = re.findall(r'"(\w+)"', re.search(r"BOSSES_GLAZED = listOf\(([^)]*)\)", text).group(1))
+        m = re.search(r'Boss\("LEADER \$name", "TUNOD GYM \$\{i \+ 1\}", FLAG_BADGE01_GET \+ i\) \{ (\d+) \+ i \}', text)
+        return [_fixed(f"LEADER {n}", f"TUNOD GYM {i + 1}", c["FLAG_BADGE01_GET"] + i, int(m.group(1)) + i) for i, n in enumerate(names)]
+    if slug == "mariomon":
+        trip = re.findall(r'Triple\("([^"]*)", "([^"]*)", (\d+)\)', text)
+        assert 'Boss("STAR ${i + 1} $name", where, FLAG_BADGE01_GET + i) { id }' in text
+        return [_fixed(f"STAR {i + 1} {n}", w, c["FLAG_BADGE01_GET"] + i, int(t)) for i, (n, w, t) in enumerate(trip)]
+    if slug == "amethyst":
+        body = _list_body(text, "BOSSES_AMETHYST")
+        modes = re.findall(r'"([^"]*)"', re.search(r"MODES = listOf\(([^)]*)\)", text).group(1))
+        badges = [c["FLAG_BADGE01_GET"] + i for i in range(8)]
+        for m in re.finditer(r'gym\((\d+), ("[^"]*"), ("[^"]*"), (\d+)\)|byBadges\((\d+), ("[^"]*"), ("[^"]*")\) \{ b -> ([^}]*) \}', body):
+            if m.group(1):
+                out.append(_fixed(E(m.group(2)), E(m.group(3)), c["FLAG_BADGE01_GET"] + int(m.group(1)) - 1, int(m.group(4)), pickLabels=modes))
+                continue
+            # `if (b <= 2) 105 else if (b == 3) 256 else 257`: the team for each badge count 0..8
+            conds = re.findall(r"if \(b (<=|==) (\d+)\) (\d+)", m.group(8))
+            last = int(re.search(r"else (\d+)\s*$", m.group(8)).group(1))
+            def pick(b):
+                for op, n, t in conds:
+                    if (op == "<=" and b <= int(n)) or (op == "==" and b == int(n)):
+                        return int(t)
+                return last
+            out.append((E(m.group(6)), E(m.group(7)), c["FLAG_BADGE01_GET"] + int(m.group(5)) - 1, "BY_COUNT", 0, 0, badges, [], [],
+                        dict(countTeams=[pick(b) for b in range(9)], pickLabels=modes)))
+        assert len(out) == body.count("gym(") + body.count("byBadges("), "amethyst: a boss not read"
+        return out
+    if slug == "dreamstone":
+        body = _list_body(text, "BOSSES_DREAMSTONE")
+        var = c["VAR_DIFFICULTY"]
+        assert "if (p.variable(VAR_DIFFICULTY) == 0) id or (1 shl TRAINER_TABLE_SHIFT) else id" in text
+        for m in re.finditer(r'badge\(("[^"]*"), ("[^"]*"), (\d+), (\d+)\)|cape\(("[^"]*"), (\d+)\)', body):
+            if m.group(1):
+                title, where, flag, id_ = E(m.group(1)), E(m.group(2)), c["FLAG_BADGE01_GET"] + int(m.group(3)), int(m.group(4))
+            else:
+                title, where, flag, id_ = E(m.group(5)), "VICTORY CAPE", c["TRAINER_FLAGS_START"] + int(m.group(6)), int(m.group(6))
+            out.append((title, where, flag, "VAR_IS", id_, id_ | HARD, [], [], [], dict(addVar=var, addMax=0)))
+        assert len(out) == body.count("badge(") + body.count("cape("), "dreamstone: a boss not read"
+        return out
+    if slug == "quetzal":
+        johto = lambda i: HARD | (i - 0x1000)
+        kanto = lambda i: 2 * HARD | (i - 0x2000)
+        envq = dict(env)
+        def tid(e):
+            e = e.strip()
+            m = re.fullmatch(r"(johto|kanto)\((0x[0-9A-Fa-f]+)\)", e)
+            return (johto if m.group(1) == "johto" else kanto)(int(m.group(2), 16)) if m else int(e, 0)
+        def done_of(lam):
+            if not lam:
+                return [], {}
+            m = re.fullmatch(r"johtoLeague\((\d+)\)", lam)
+            if m:
+                return [c["FLAG_JOHTO_CHAMPION"]], dict(doneVar=c["VAR_JOHTO_LEAGUE"], doneVarMin=int(m.group(1)))
+            m = re.fullmatch(r"kantoLeague\((\w+)\)", lam)
+            if m:
+                f = m.group(1)
+                return [c[f] if f in c else int(f, 0), c["FLAG_KANTO_CHAMPION"]], {}
+            m = re.fullmatch(r"\{ p -> p\.flag\((\w+) \+ (\d+)\) \|\| p\.variable\((\w+)\) >= (\d+) \}", lam)
+            if m:
+                return [c[m.group(1)] + int(m.group(2))], dict(doneVar=c[m.group(3)], doneVarMin=int(m.group(4)))
+            raise SyntaxError(f"quetzal: doneIf {lam}")
+        def region_list(decl, region):
+            body = _list_body(text, decl)
+            res = []
+            for m in re.finditer(r'boss\(\s*("[^"]*"), ("[^"]*"), ([^,]+), ((?:johto|kanto)\(0x\w+\)|\d+), ((?:johto|kanto)\(0x\w+\)|\d+)(?:,\s*doneIf = (johtoLeague\(\d+\)|kantoLeague\(\w+\)|\{[^}]*\}))?,?\s*\)', body):
+                any_, x = done_of(m.group(6))
+                flag = E(m.group(3))
+                x["region"] = region
+                res.append(_fixed(E(m.group(1)), E(m.group(2)), flag, tid(m.group(4)), any_,
+                                  [("NORMAL", tid(m.group(4))), ("HARD", tid(m.group(5)))], **x))
+            return res, body
+        hoenn, hb = region_list("HOENN", 0)
+        # Hoenn's Elite Four (a mapIndexed over four names) and WALLACE come after its gyms' listOf
+        tail = text[text.index("val HOENN = listOf("):text.index("private fun johtoLeague")]
+        e4 = re.findall(r'"(\w+)" to (\d+)', re.search(r'\+ listOf\(("[A-Z]+" to \d+(?:, )?)+\)', tail).group(0))
+        base = int(re.search(r"id, (\d+) \+ n,", tail).group(1))
+        for n, (name, id_) in enumerate(e4):
+            hoenn.append(_fixed(f"ELITE FOUR {name}", "POKéMON LEAGUE", 0, int(id_), [c["FLAG_DEFEATED_SIDNEY"] + n, c["FLAG_DEFEATED_WALLACE"]],
+                                [("NORMAL", int(id_)), ("HARD", base + n)], region=0))
+        w = re.search(r'\} \+ boss\("CHAMPION WALLACE", "POKéMON LEAGUE", (\w+), (\d+), (\d+)\)', tail)
+        hoenn.append(_fixed("CHAMPION WALLACE", "POKéMON LEAGUE", c[w.group(1)], int(w.group(2)), [],
+                            [("NORMAL", int(w.group(2))), ("HARD", int(w.group(3)))], region=0))
+        johto_l, jb = region_list("JOHTO", 1)
+        kanto_l, kb = region_list("KANTO", 2)
+        assert len(johto_l) == jb.count("boss(") and len(kanto_l) == kb.count("boss(") and len(hoenn) == hb.count("boss(") + 5
+        return hoenn + johto_l + kanto_l
+    return None
 
 
 # --- Game Boy (Gen 1): GuideGen1Gen.kt's boss lines -> teams + bosses (RAM flags are packed into one array, see below) ---
@@ -427,9 +676,9 @@ def emit_gb(out):
             alts = f"pd_gb_{slug}_alts{bi}" if multi else "NULL"
             var = f"pd_gb_{slug}_vars{bi}" if multi else "NULL"
             anyf = f"pd_gb_{slug}_any{bi}" if len(done) > 1 else "NULL"
-            out.append(f"    {{ {c_str(title)}, {c_str(where)}, {done[0]}, {kind}, {ts[0][1]}, 0, {alts}, {var}, {anyf} }},")
+            out.append(f"    {{ {c_str(title)}, {c_str(where)}, {done[0]}, {kind}, {ts[0][1]}, 0, {alts}, {var}, {anyf}, .region = 0 }},")
         out.append("};")
-        out.append(f"const struct pd_guide pd_guide_gb_{slug} = {{ NULL, 0, pd_gb_{slug}_bosses, {len(bosses)}, false, 0, 0 }};")
+        out.append(f"const struct pd_guide pd_guide_gb_{slug} = {{ NULL, 0, pd_gb_{slug}_bosses, {len(bosses)}, false, 0, 0, .regionOf = NULL }};")
         out.append("")
 
 
@@ -492,11 +741,17 @@ def main():
         try:
             text = expand_helpers(slug, text)
             env = {"consts": consts(text), "template": no_template}
-            bosses = bosses_of(text, f"BOSSES_{up}", env)
-            lst = text[text.index(f"val BOSSES_{up}"):]
-            lst = lst[lst.index("\n"):lst.index("\n)\n")]
-            helpers = re.findall(r"^\s+(?!Boss\()([a-z]\w*)\(", lst, re.M)
-            assert not helpers, f"bosses built by helper {helpers[0]}()"
+            bosses = lambda_bosses(slug, text, env)
+            if bosses is None and "bosses = BOSSES_FIRERED" in text:
+                bosses = "FIRERED"  # FireRed's own (Ultra Violet), filled in below
+            elif bosses is None and f"val BOSSES_{up}" not in text:
+                bosses = []  # a guide with no NEXT BOSS (HERE and TIPS only)
+            if bosses is None:
+                bosses = bosses_of(text, f"BOSSES_{up}", env)
+                lst = text[text.index(f"val BOSSES_{up}"):]
+                lst = lst[lst.index("\n"):lst.index("\n)\n")]
+                helpers = re.findall(r"^\s+(?!Boss\()([a-z]\w*)\(", lst, re.M)
+                assert not helpers, f"bosses built by helper {helpers[0]}()"
             pages_of(text, env)
         except (AssertionError, SyntaxError, KeyError, ValueError) as e:
             print(f"gen_guide: {slug} left out: {e}")
@@ -523,11 +778,22 @@ def main():
     for slug, cls, up, text, env, bosses in hack_guides:
         # Recharged Yellow's League rematch teams come once the game is cleared (its own flag, no starter var).
         extra = f"0x{env['consts']['FLAG_SYS_GAME_CLEAR']:X}, 0" if slug == "recharged_yellow" else "0, 0"
-        emit_guide(out, f"pd_guide_{slug}", pages_of(text, env), bosses, "verified = false" not in text, extra)
+        if bosses == "FIRERED":
+            bosses, extra = fr_bosses, f"0x{league_flag:X}, 0x{starter_var:X}"
+        verified = "verified = false" not in text
+        if slug == "quetzal":  # three campaigns, the player's region's first; Alpha 0.8.4 is Hoenn's alone
+            emit_guide(out, "pd_guide_quetzal_v084", [], [b for b in bosses if not boss_extra(b).get("region")], verified, "0, 0")
+            extra = "0, 0, .regionOf = pd_quetzal_region, .regionOrder = pd_quetzal_order"
+        emit_guide(out, f"pd_guide_{slug}", pages_of(text, env), bosses, verified, extra)
         if os.path.exists(os.path.join(DATA, f"GuideAreas{cls}Gen.kt")):
             emit_areas(out, f"pd_areas_{slug}", areas_of(f"GuideAreas{cls}Gen.kt", f"GUIDE_AREAS_{up}_RAW"))
         else:
             assert slug in AREAS_OPTIONAL, slug
+    # Releases with the same guide text but their own area data (the app's AMETHYST_V141, RECHARGED_YELLOW_V1xx GuideIds).
+    for slug, cls, up in [("amethyst_v141", "AmethystV141", "AMETHYST_V141"), ("recharged_yellow_v180", "RechargedYellowV180", "RECHARGED_YELLOW_V180"),
+                          ("recharged_yellow_v190", "RechargedYellowV190", "RECHARGED_YELLOW_V190"),
+                          ("recharged_yellow_v194", "RechargedYellowV194", "RECHARGED_YELLOW_V194")]:
+        emit_areas(out, f"pd_areas_{slug}", areas_of(f"GuideAreas{cls}Gen.kt", f"GUIDE_AREAS_{up}_RAW"))
     emit_gb(out)
     emit_areas(out, "pd_areas_emerald_legacy", areas_of("GuideAreasEmeraldLegacyGen.kt", "GUIDE_AREAS_EMERALD_LEGACY_RAW"))
     emit_areas(out, "pd_areas_ruby_sapphire", areas_of("GuideAreasRubySapphireGen.kt", "GUIDE_AREAS_RUBY_SAPPHIRE_RAW"))

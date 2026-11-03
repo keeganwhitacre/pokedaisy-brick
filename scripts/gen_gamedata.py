@@ -812,6 +812,28 @@ def c_value(v, f, names, lists, where, none):
                 fail(where, "a gSpeciesInfo page is spelled out in full (no base)")
             return "&(const struct pd_dex_x){ " + ", ".join(
                 f".{n} = {kv[n] if n in kv else fl['default']}" for n, fl in schema["fields"].items()) + " }"
+        if expr in ("emptyList()", "emptyMap()", "null"):  # none: a NULL pointer, or an empty bank
+            return "{ 0 }" if "SaveBank" in str(f.get("kotlin", "")) else "0"
+        if expr.startswith("WildLayout("):  # a WildPokemonHeader of its own shape
+            kv = {k: int(n, 0) for k, n in re.findall(r"(\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)", expr)}
+            d = dict(land=0, water=1, rockSmash=2, fishing=3); d.update(kv)
+            return "&(const struct pd_wild_layout){ " + ", ".join(f".{k} = {d[k]}" for k in ("stride", "land", "water", "rockSmash", "fishing")) + " }"
+        if expr.startswith("NightWild("):
+            kv = {k: n for k, n in re.findall(r"(\w+)\s*=\s*(0x[0-9A-Fa-f]+L?|-?\d+)", expr)}
+            day = re.search(r"day\s*=\s*(\d+)\.\.(\d+)", expr)
+            lo, hi = (day.group(1), day.group(2)) if day else ("7", "19")
+            return (f"&(const struct pd_night_wild){{ .hourAddr = {kv['hourAddr'].rstrip('L')}, .dayFrom = {lo}, .dayTo = {hi}, "
+                    f".skipGroup = {kv.get('skipGroup', '-1')}, .skipNum = {kv.get('skipNum', '-1')} }}")
+        if expr.startswith("listOf(SaveBank("):  # one bank (the only shape so far)
+            banks = re.findall(r"SaveBank\(firstId = (0x[0-9A-Fa-f]+|\d+), sb1Off = (0x[0-9A-Fa-f]+|\d+), count = (0x[0-9A-Fa-f]+|\d+)\)", expr)
+            if len(banks) != 1:
+                fail(where, f"{expr}: the C reads one bank")
+            return "{ " + ", ".join(banks[0]) + " }"
+        if expr.startswith("mapOf("):  # wildSetVars: (group shl 8 or num) to var
+            pairs = re.findall(r"\((\d+) shl 8 or (\d+)\) to (0x[0-9A-Fa-f]+|\d+)", expr)
+            if expr.count(" to ") != len(pairs):
+                fail(where, f"{expr} has a part the C can't read")
+            return "(const uint32_t[]){ " + ", ".join(f"0x{int(g) << 8 | int(n):X}, {v}" for g, n, v in pairs) + ", 0xFFFFFFFF }"
         if expr.startswith("BaseStatsLayout("):  # a hack's gBaseStats shape, spelled out
             kv = dict(re.findall(r"(\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+|true|false)", expr))
             known = {"stride", "genderOff", "eggGroupsOff", "abilitiesOff", "abilityU16", "statsU16", "typesOff", "catchRateOff"}
