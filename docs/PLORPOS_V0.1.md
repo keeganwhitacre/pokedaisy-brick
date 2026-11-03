@@ -65,7 +65,6 @@ companion brought toward the Android app. aarch64, built for the TrimUI Brick; p
 
 ## Known limitations
 
-- Unbound's VANILLA-difficulty teams list no moves: there is no learnset table for the hack here.
 - Unbound's guide shows all four difficulties; Android narrows EXPERT by level.
 - The GUIDE's "before you read" notice is remembered per guide again: the settings file read only the first 16 bits, so the hack guides asked every launch.
 - A Game Boy save must be loaded in game (CONTINUE) before the companion has a party.

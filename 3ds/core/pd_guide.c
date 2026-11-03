@@ -182,12 +182,25 @@ static void default_moves(const struct pd_game* g, int species, int level, int* 
     if (!ptr) return;
     uint32_t at = u32(ptr);
     int n = 0;
+    const struct pd_config* cfg = g->cfg;
+    int stride = cfg->learnsetPairs ? 4 : cfg->learnsetCfru ? 3 : 2;
     for (int i = 0; i < 64; i++) {
-        const uint8_t* e = pd_rom_at(g, at + (uint32_t) i * 2, 2);
+        const uint8_t* e = pd_rom_at(g, at + (uint32_t) i * stride, (size_t) stride);
         if (!e) return;
-        uint16_t v = u16(e);
-        if (v == 0xFFFF || (v >> 9) > level) return;
-        int move = v & 0x1FF;
+        int move, lv;
+        if (cfg->learnsetPairs) {  // {u16 move, u16 level}, ending at move 0xFFFF
+            move = u16(e);
+            lv = u16(e + 2);
+            if (move == 0xFFFF || lv > level) return;
+        } else if (cfg->learnsetCfru) {  // {u16 move, u8 level}, ending at level 0xFF
+            move = u16(e);
+            lv = e[2];
+            if (lv == 0xFF || lv > level) return;
+        } else {
+            uint16_t v = u16(e);
+            if (v == 0xFFFF || (v >> 9) > level) return;
+            move = v & 0x1FF;
+        }
         bool dup = false;
         for (int k = 0; k < n; k++) dup |= moves[k] == move;
         if (dup) continue;

@@ -192,6 +192,8 @@ struct pd_config {
     // GUIDE (the app's GuideTables): ROM tables and SaveBlock1 offsets.
     uint32_t trainers;    // gTrainers, 0x28 bytes each
     uint32_t learnsets;   // gLevelUpLearnsets, a pointer per species
+    bool learnsetCfru;    // ... as {u16 move, u8 level} entries ending at level 0xFF (CFRU: Radical Red, Unbound, Amethyst)
+    bool learnsetPairs;   // ... as {u16 move, u16 level} entries ending at move 0xFFFF
     uint32_t wildHeaders; // gWildMonHeaders, 20 bytes each
     uint32_t flagsOff, varsOff, flagBytes; // in SaveBlock1
     // A hack's own struct TrainerMon (GuideTables.trainerMon), every field at a fixed offset; stride 0 = retail's.

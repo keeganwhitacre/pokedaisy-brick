@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
                 for (int m = 0; ok && m < cnt; m++) {
                     bool moves = false;
                     for (int q = 0; q < 4; q++) moves |= team[m].moves[q] != 0;
-                    ok = team[m].species > 0 && team[m].level >= 1 && team[m].level <= 100 && (moves || t->guide == PD_GUIDE_UNBOUND);  // Unbound has no learnset table here: default movesets stay empty
+                    ok = team[m].species > 0 && team[m].level >= 1 && team[m].level <= 100 && moves;
                 }
                 teams++;
                 if (!ok) { printf("FAIL %s %s (trainer %d: %d mons, first sp %d lv %d)\n", t->name, boss->title, ids[i], cnt, cnt ? team[0].species : 0, cnt ? team[0].level : 0); bad++; }
