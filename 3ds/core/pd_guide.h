@@ -41,6 +41,7 @@ enum pd_boss_kind {
     PD_BOSS_LEAGUE,   // a, or rematch b once the League has its rematch teams
     PD_BOSS_CHAMPION, // the rival: league(a, b) + an offset by the starter
     PD_BOSS_BY_FLAGS, // alts' first {flag, trainer} whose flag is set, else a (Emerald Legacy's BRAWLY)
+    PD_BOSS_TEAMVAR,  // Gen 1: alts' {value, team} for the champion's team byte (var 0x4000); no match = every variant
 };
 
 // A team the game picks at run time (difficulty, a double battle's partners): shown under its label. {NULL, 0} ends.
@@ -69,6 +70,19 @@ struct pd_guide {
     uint16_t leagueRematchFlag; // FireRed's FLAG_SYS_CAN_LINK_WITH_RS
     uint16_t starterVar;        // FireRed's VAR_STARTER_MON
 };
+
+// A Game Boy boss team, embedded (Gen 1's GuideGen1Gen.kt lines); a table ends in n == 0. var: the champion's team byte
+// value that picks it (-1 = always).
+struct pd_gb_mon {
+    uint16_t species, item; // species = the national Dex number
+    uint8_t level, moves[4];
+};
+struct pd_gb_team {
+    int var, n;
+    struct pd_gb_mon mons[6];
+};
+extern const struct pd_gb_team pd_gb_teams_yellow[], pd_gb_teams_red[], pd_gb_teams_blue[];
+extern const struct pd_guide pd_guide_gb_yellow, pd_guide_gb_red, pd_guide_gb_blue;
 
 extern const struct pd_guide pd_guide_firered, pd_guide_leafgreen, pd_guide_emerald, pd_guide_ruby, pd_guide_sapphire,
     pd_guide_emerald_legacy,

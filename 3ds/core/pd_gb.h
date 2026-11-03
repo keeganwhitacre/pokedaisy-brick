@@ -11,6 +11,13 @@
 
 #define PD_WRAMX(bank, addr) (((uint32_t) (bank) << 16) | (addr))
 
+// Where a Gen 1 game keeps what its GUIDE reads: event flags (320 bytes), the missable-object (32), hidden-item (14) and
+// trade (2) banks, the badge byte, the champion's team byte. The snapshot packs them into flags[] (gen_guide.py's GB_BANK_BIT).
+struct pd_gb_guide_ram {
+    uint32_t event, missable, hidden, trades, badges, teamVar;
+};
+struct pd_gb_team;
+
 struct pd_gb_config {
     int gen; // 1 or 2
     uint32_t partyCount, partyMons;
@@ -34,13 +41,15 @@ struct pd_gb_config {
     // POKéDEX flags: wPokedexOwned / wPokedexSeen, a bit per Dex number from 1 (Gen 2: by species id); dexCount 0 = no DEX.
     uint32_t dexCaught, dexSeen;
     int dexCount;
+    const struct pd_gb_guide_ram* guideRam; // Gen 1: the GUIDE's RAM (NULL = no guide)
+    const struct pd_gb_team* teams;         // the GUIDE's boss teams, by index
 };
 
 extern const uint32_t pd_gb_polished_variants[];
 extern const int pd_gb_polished_variants_count;
 
 extern const struct pd_gb_config pd_gb_yellow, pd_gb_red, pd_gb_pure_red, pd_gb_crystal, pd_gb_gold, pd_gb_prism,
-    pd_gb_polished, pd_gb_crystal_clear;
+    pd_gb_polished, pd_gb_crystal_clear, pd_gb_blue;
 
 struct pd_config;
 void pd_gb_snapshot_read(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx);

@@ -15,7 +15,7 @@ CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror
 CORE_SRC := $(wildcard core/*.c)
 DEVKITARM_IMAGE := devkitpro/devkitarm:latest
 
-.PHONY: preview test-gbdex test-dex test-font 3ds decomps fixture-roms azahar-test azahar-battle-test tables clean
+.PHONY: preview test-gbguide test-gbdex test-dex test-font 3ds decomps fixture-roms azahar-test azahar-battle-test tables clean
 
 $(BUILD)/pd_font_test: core/pd_canvas.c core/pd_canvas.h core/pd_font.h core/pd_font_gen.c test/font_test.c
 	@mkdir -p $(BUILD)
@@ -46,6 +46,14 @@ $(BUILD)/pd_gb_dex_test: $(CORE_SRC) $(wildcard core/*.h) test/gb_dex_test.c
 # make test-gbdex: the Game Boy POKéDEX flags vs the app's captured WRAM (fixtures dir = $(FIXTURES)).
 test-gbdex: $(BUILD)/pd_gb_dex_test
 	$(BUILD)/pd_gb_dex_test $(FIXTURES)
+
+$(BUILD)/pd_gb_guide_test: $(CORE_SRC) $(wildcard core/*.h) test/gb_guide_test.c
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(filter-out core/pd_game.c,$(CORE_SRC)) test/gb_guide_test.c -lm
+
+# make test-gbguide: Red / Blue / Yellow's NEXT BOSS vs the app's facts and fixtures.
+test-gbguide: $(BUILD)/pd_gb_guide_test
+	$(BUILD)/pd_gb_guide_test $(FIXTURES)
 
 $(BUILD)/pd_card_test: $(CORE_SRC) $(wildcard core/*.h) test/card_test.c
 	@mkdir -p $(BUILD)

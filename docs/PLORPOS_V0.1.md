@@ -41,7 +41,7 @@ companion brought toward the Android app. aarch64, built for the TrimUI Brick; p
 - Hack MAP tabs beyond "the art loads" (see Parity).
 - Everything on a device other than the Brick; the 3DS build (not compiled here; code size grew, see below).
 - On-device: any hack's CARD, DEX or GUIDE besides Unbound's GUIDE; the shiny star on screen (decode is unit-tested,
-  drawing is not seen on a real shiny); GB GUIDE tab (not built); the GB DEX list on a real save.
+  drawing is not seen on a real shiny); GB GUIDE besides Red / Blue / Yellow's NEXT BOSS (host-checked against the app's facts; not yet seen on the Brick); the GB DEX list on a real save.
 - Odyssey and Sword and Shield guides were checked from their ROMs on the host only.
 - The Windows/macOS Java app is untouched.
 
@@ -57,7 +57,8 @@ companion brought toward the Android app. aarch64, built for the TrimUI Brick; p
 | Shiny icons | recoloured icons + marks | `*` mark only; icons keep normal colours |
 | Game Boy look | the game's own ROM font and icons | black-on-white windows with the standard font; no ROM font, no ROM party icons (Pokéball) |
 | Game Boy DEX | list with entry pages (sprite, category, size, text) | the list only: seen / owned marks by Dex number (Red, Blue, Yellow, Pure Red/Blue, Gold, Silver, Crystal, Crystal Clear, Polished); no entry pages; none for Prism |
-| Game Boy GUIDE / MAP / CARD | yes | not available ("No guide") |
+| Game Boy GUIDE | HERE, NEXT BOSS, TIPS | Red, Blue, Yellow: NEXT BOSS only (13 bosses, the champion's team by the rival's pick). No HERE (wild by map) or tips; none for Gold, Silver, Crystal, Crystal Clear, Polished, Prism, PureRGB ("No guide") |
+| Game Boy MAP / CARD | yes | not available |
 | Battle input / party switch for GB; GB quick-menu items; hack item descriptions | yes | no |
 | European Yellow builds | yes | no (no ROMs here) |
 | DS | yes | out of scope on Linux |
@@ -66,6 +67,7 @@ companion brought toward the Android app. aarch64, built for the TrimUI Brick; p
 
 - Unbound's VANILLA-difficulty teams list no moves: there is no learnset table for the hack here.
 - Unbound's guide shows all four difficulties; Android narrows EXPERT by level.
+- The GUIDE's "before you read" notice is remembered per guide again: the settings file read only the first 16 bits, so the hack guides asked every launch.
 - A Game Boy save must be loaded in game (CONTINUE) before the companion has a party.
 - Code size: core objects grew from 0.47 MB to ~1.9 MB (generated text tables dominate); gate them before any 3DS upstream.
 - Never use in-game save-state tricks on real saves; saves were never written by tests.

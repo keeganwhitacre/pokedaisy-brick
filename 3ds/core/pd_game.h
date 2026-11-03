@@ -41,6 +41,9 @@ enum pd_guide_id {
     PD_GUIDE_IMPERIUM,
     PD_GUIDE_RECHARGED_YELLOW,
     PD_GUIDE_RECHARGED_EMERALD,
+    PD_GUIDE_GB_RED,
+    PD_GUIDE_GB_BLUE,
+    PD_GUIDE_GB_YELLOW,
 };
 
 // struct Pokemon's party fields (the app's PartyMonLayout): the party-only fields after the

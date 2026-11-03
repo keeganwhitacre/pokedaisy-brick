@@ -376,6 +376,63 @@ def expand_helpers(slug, text):
     return text
 
 
+# --- Game Boy (Gen 1): GuideGen1Gen.kt's boss lines -> teams + bosses (RAM flags are packed into one array, see below) ---
+GB_GAMES = [("yellow", "G1Y"), ("red", "G1R"), ("blue", "G1B")]
+# The snapshot's flags array for a Gen 1 game: event flags, then the missable-object, hidden-item, trade and badge banks.
+GB_BANK_BIT = {0: 0, 1: 320 * 8, 2: 320 * 8 + 256, 3: 320 * 8 + 256 + 112, 4: 320 * 8 + 256 + 112 + 16}
+
+
+def gb_flag(f):
+    return GB_BANK_BIT[f >> 16] + (f & 0xFFFF)
+
+
+def emit_gb(out):
+    text = read("GuideGen1Gen.kt")
+    for slug, pre in GB_GAMES:
+        m = re.search(rf'val {pre}_BOSSES_RAW: List<String> = listOf\(\s*"""(.*?)"""', text, re.S)
+        lines = [l for l in m.group(1).split("\n") if l.strip()]
+        teams, bosses = [], []  # bosses: [key, title, where, done, [(var or 0, team index)]]
+        for l in lines:
+            key, title, where, done, cond, mons = l.split("|")
+            var = int(cond.split("=")[1]) if cond else -1
+            ms = []
+            for mon in [x for x in mons.split(";") if x.strip()]:
+                p = mon.split(" ")
+                moves = [int(x) for x in (p[3].split(",") if len(p) > 3 else []) if x]
+                ms.append((int(p[0]), int(p[1]), int(p[2]), (moves + [0, 0, 0, 0])[:4]))
+            assert 1 <= len(ms) <= 6, l
+            teams.append((var, ms))
+            if bosses and bosses[-1][0] == key:
+                bosses[-1][4].append((var, len(teams) - 1))
+            else:
+                bosses.append([key, title, where, [gb_flag(int(x, 0)) for x in done.split("/") if x], [(var, len(teams) - 1)]])
+        out.append(f"const struct pd_gb_team pd_gb_teams_{slug}[] = {{")
+        for var, ms in teams:
+            mm = ", ".join(f"{{ {sp}, {it}, {lv}, {{ {', '.join(map(str, mv))} }} }}" for lv, sp, it, mv in ms)
+            out.append(f"    {{ {var}, {len(ms)}, {{ {mm} }} }},")
+        out.append("    { 0, 0, { { 0, 0, 0, { 0, 0, 0, 0 } } } },")
+        out.append("};")
+        for bi, (key, title, where, done, ts) in enumerate(bosses):
+            if len(ts) > 1:
+                vs = ", ".join(f'{{ "", {ti} }}' for _, ti in ts)
+                out.append(f"static const struct pd_variant pd_gb_{slug}_vars{bi}[] = {{ {vs}, {{ NULL, 0 }} }};")
+                al = ", ".join(f"{v}, {ti}" for v, ti in ts)
+                out.append(f"static const uint16_t pd_gb_{slug}_alts{bi}[] = {{ {al}, 0 }};")
+            if len(done) > 1:
+                out.append(f"static const uint16_t pd_gb_{slug}_any{bi}[] = {{ {', '.join(map(str, done[1:]))}, 0 }};")
+        out.append(f"static const struct pd_boss pd_gb_{slug}_bosses[] = {{")
+        for bi, (key, title, where, done, ts) in enumerate(bosses):
+            multi = len(ts) > 1
+            kind = "PD_BOSS_TEAMVAR" if multi else "PD_BOSS_FIXED"
+            alts = f"pd_gb_{slug}_alts{bi}" if multi else "NULL"
+            var = f"pd_gb_{slug}_vars{bi}" if multi else "NULL"
+            anyf = f"pd_gb_{slug}_any{bi}" if len(done) > 1 else "NULL"
+            out.append(f"    {{ {c_str(title)}, {c_str(where)}, {done[0]}, {kind}, {ts[0][1]}, 0, {alts}, {var}, {anyf} }},")
+        out.append("};")
+        out.append(f"const struct pd_guide pd_guide_gb_{slug} = {{ NULL, 0, pd_gb_{slug}_bosses, {len(bosses)}, false, 0, 0 }};")
+        out.append("")
+
+
 def main():
     fr_text = read("GuideFireRed.kt")
     em_text = read("GuideEmerald.kt")
@@ -471,6 +528,7 @@ def main():
             emit_areas(out, f"pd_areas_{slug}", areas_of(f"GuideAreas{cls}Gen.kt", f"GUIDE_AREAS_{up}_RAW"))
         else:
             assert slug in AREAS_OPTIONAL, slug
+    emit_gb(out)
     emit_areas(out, "pd_areas_emerald_legacy", areas_of("GuideAreasEmeraldLegacyGen.kt", "GUIDE_AREAS_EMERALD_LEGACY_RAW"))
     emit_areas(out, "pd_areas_ruby_sapphire", areas_of("GuideAreasRubySapphireGen.kt", "GUIDE_AREAS_RUBY_SAPPHIRE_RAW"))
     emit_areas(out, "pd_areas_firered", areas_of("GuideAreasFireRedGen.kt", "GUIDE_AREAS_FIRERED_RAW"))

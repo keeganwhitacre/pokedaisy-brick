@@ -82,7 +82,7 @@ static void build_pages(const struct pd_game* g, const struct pd_snapshot* s, co
     int areaCount;
     pd_areas_for(g, &areaCount);
     bool rom = pd_guide_rom_ok(g);
-    if (areaCount || rom) pages[pageCount++] = (struct page_ref) { PAGE_HERE, 0, "HERE" };
+    if ((areaCount || rom) && !g->cfg->gb) pages[pageCount++] = (struct page_ref) { PAGE_HERE, 0, "HERE" };
     if (rom && s->flagsOk && gd->bossCount) pages[pageCount++] = (struct page_ref) { PAGE_BOSS, 0, "NEXT BOSS" };
     bool whereIs = false;
     for (int i = 0; i < gd->pageCount && pageCount < MAX_PAGES; i++) {
@@ -325,19 +325,28 @@ static void build_bosses(const struct pd_game* g, const struct pd_snapshot* s, c
         bool done = pd_flag(s, boss->doneFlag);
         for (const uint16_t* f = boss->doneAny; f && *f && !done; f++) done = pd_flag(s, *f);
         if (done) continue;
+        const struct pd_variant* variants = boss->variants;
+        if (boss->kind == PD_BOSS_TEAMVAR) {  // Gen 1's champion: the save's team byte picks one, else every team shows
+            for (const uint16_t* p = boss->alts; p && p[0]; p += 2)
+                if (p[0] == pd_var(s, 0x4000)) variants = NULL;
+        }
         int nv = 1;
-        while (boss->variants && boss->variants[nv].label) nv++;
+        while (variants && variants[nv].label) nv++;
         for (int vi = 0; vi < nv; vi++) {
-        const struct pd_variant* var = boss->variants ? &boss->variants[vi] : NULL;
+        const struct pd_variant* var = variants ? &variants[vi] : NULL;
         struct pd_team_mon team[PD_TEAM_MAX];
         int n = pd_trainer_team(g, var ? (int) var->trainer : pd_boss_trainer(gd, boss, s), team);
-        int ace = 0;
-        for (int i = 0; i < n; i++) ace = team[i].level > ace ? team[i].level : ace;
+        int ace = 0, aceSpecies = 0;
+        for (int i = 0; i < n; i++) {
+            if (team[i].level > ace) { ace = team[i].level; aceSpecies = team[i].species; }
+        }
         char heading[56], note[120];
         snprintf(heading, sizeof(heading), shown || vi ? "%s" : "NEXT: %s", boss->title);
         if (var) {
             size_t hl = strlen(heading);
-            snprintf(heading + hl, sizeof(heading) - hl, " (%s)", var->label);
+            char with[40];
+            if (var->label[0]) snprintf(heading + hl, sizeof(heading) - hl, " (%s)", var->label);
+            else snprintf(heading + hl, sizeof(heading) - hl, " (WITH %s)", pd_species_name(g, aceSpecies, with, sizeof(with)));
         }
         snprintf(note, sizeof(note), "%s - %d POKéMON - UP TO LV%d - YOUR BEST LV%d", boss->where, n, ace, best);
         add_section(heading, note);
@@ -348,12 +357,14 @@ static void build_bosses(const struct pd_game* g, const struct pd_snapshot* s, c
             snprintf(e->detail, sizeof(e->detail), "LV%d", team[i].level);
             int t1, t2;
             pd_species_types(g, team[i].species, &t1, &t2);
-            if (t2 != t1 && t2 != PD_TYPE_NONE) {
+            if (t1 == 255) {  // no base stats to read (a Game Boy game): no types line
+            } else if (t2 != t1 && t2 != PD_TYPE_NONE) {
                 snprintf(e->hintBuf, sizeof(e->hintBuf), "%s / %s", pd_type_name(g, t1), pd_type_name(g, t2));
+                e->hint = e->hintBuf;
             } else {
                 snprintf(e->hintBuf, sizeof(e->hintBuf), "%s", pd_type_name(g, t1));
+                e->hint = e->hintBuf;
             }
-            e->hint = e->hintBuf;
             char name[40], move[32];
             int len = snprintf(e->answerBuf, sizeof(e->answerBuf), "%s:",
                                pd_species_name(g, team[i].species, name, sizeof(name)));
@@ -459,7 +470,7 @@ void ui_guide_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g
     }
     // The first visit per game: the notice first.
     // (A bit per game kind, as saved settings have it; the guides past Emerald's get their own.)
-    lastKindBit = g->guide >= PD_GUIDE_RUBY ? 1 << (8 + g->guide) : 1 << g->kind;
+    lastKindBit = g->guide >= PD_GUIDE_RUBY ? 1 << (3 + g->guide) : 1 << g->kind;  // kinds use bits 0-3, guides from 7 up (bit 26 at most)
     if (!(ui->settings->guideNotice & lastKindBit) && ui->overlay == PD_OVERLAY_NONE) {
         ui->overlay = PD_OVERLAY_GUIDE_NOTICE;
     }

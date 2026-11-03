@@ -1,3 +1,4 @@
+#include "pd_gb.h"
 #include "pd_guide.h"
 
 #include <ctype.h>
@@ -38,6 +39,9 @@ const struct pd_guide* pd_guide_for(const struct pd_game* g) {
     case PD_GUIDE_GHOST_GREY: return &pd_guide_ghost_grey;
     case PD_GUIDE_CELIA: return &pd_guide_celia;
     case PD_GUIDE_IMPERIUM: return &pd_guide_imperium;
+    case PD_GUIDE_GB_RED: return &pd_guide_gb_red;
+    case PD_GUIDE_GB_BLUE: return &pd_guide_gb_blue;
+    case PD_GUIDE_GB_YELLOW: return &pd_guide_gb_yellow;
     case PD_GUIDE_RECHARGED_YELLOW: return &pd_guide_recharged_yellow;
     case PD_GUIDE_RECHARGED_EMERALD: return &pd_guide_recharged_emerald;
     default: return NULL;
@@ -138,6 +142,7 @@ static const uint8_t* trainer_record(const struct pd_game* g, int id) {
 
 bool pd_guide_rom_ok(const struct pd_game* g) {
     const struct pd_config* cfg = g->cfg;
+    if (cfg && cfg->gb) return cfg->gb->teams != NULL;  // a Game Boy guide's teams are embedded, nothing to probe
     if (!cfg || !cfg->trainers || !cfg->probeName) return false;
     const uint8_t* name = pd_rom_at(g, cfg->trainers + (uint32_t) cfg->probeTrainer * tr_stride(cfg) + (cfg->trainerStride ? cfg->trainerNameOff : 4),
                                     (size_t) (cfg->trainerStride ? cfg->trainerNameLen : 12));
@@ -149,6 +154,12 @@ bool pd_guide_rom_ok(const struct pd_game* g) {
 }
 
 int pd_boss_trainer(const struct pd_guide* gd, const struct pd_boss* b, const struct pd_snapshot* s) {
+    if (b->kind == PD_BOSS_TEAMVAR) {  // the champion's team byte picks the team; none matching = the first
+        int v = pd_var(s, 0x4000);
+        for (const uint16_t* p = b->alts; p && p[0]; p += 2)
+            if (p[0] == v) return p[1];
+        return b->a;
+    }
     if (b->kind == PD_BOSS_BY_FLAGS) {
         for (const uint16_t* p = b->alts; p && p[0]; p += 2)
             if (pd_flag(s, p[0])) return p[1];
@@ -190,6 +201,18 @@ static void default_moves(const struct pd_game* g, int species, int level, int* 
 }
 
 int pd_trainer_team(const struct pd_game* g, int trainer, struct pd_team_mon* out) {
+    if (g->cfg->gb) {  // a Game Boy guide's embedded teams, by index
+        const struct pd_gb_team* t = g->cfg->gb->teams;
+        for (int i = 0; t && t[i].n && i <= trainer; i++) {
+            if (i != trainer) continue;
+            for (int m = 0; m < t[i].n; m++) {
+                const struct pd_gb_mon* src = &t[i].mons[m];
+                out[m] = (struct pd_team_mon) { src->species, src->level, src->item, { src->moves[0], src->moves[1], src->moves[2], src->moves[3] } };
+            }
+            return t[i].n;
+        }
+        return 0;
+    }
     const uint8_t* t = trainer_record(g, trainer);
     if (!t) return 0;
     const struct pd_config* cfg = g->cfg;

@@ -214,7 +214,7 @@ extern const struct pd_text pd_text_gb_yellow, pd_text_gb_pure_rgb, pd_text_gb_c
 #define PD_GB_CONFIG(NAME, GB, TEXT) \
     static const struct pd_config PD_GB_CONFIG_##NAME = { .text = &pd_text_##TEXT, .gb = &GB, .bagOrder = PD_GB_BAG, .bagCount = 5 };
 PD_GB_CONFIG(RED, pd_gb_red, gb_yellow)
-PD_GB_CONFIG(BLUE, pd_gb_red, gb_yellow)
+PD_GB_CONFIG(BLUE, pd_gb_blue, gb_yellow)
 PD_GB_CONFIG(YELLOW, pd_gb_yellow, gb_yellow)
 PD_GB_CONFIG(PURE_RED, pd_gb_pure_red, gb_pure_rgb)
 PD_GB_CONFIG(PURE_BLUE, pd_gb_pure_red, gb_pure_rgb)
@@ -496,7 +496,8 @@ void pd_game_identify(struct pd_game* g) {
             if (strcmp(r->sha1, g->sha1)) continue;
             g->cfg = r->cfg;
             g->title = r->title;
-            g->guide = PD_GUIDE_NONE;
+            g->guide = r->cfg == &PD_GB_CONFIG_RED ? PD_GUIDE_GB_RED : r->cfg == &PD_GB_CONFIG_BLUE ? PD_GUIDE_GB_BLUE :
+                       r->cfg == &PD_GB_CONFIG_YELLOW ? PD_GUIDE_GB_YELLOW : PD_GUIDE_NONE;
             g->hackMaps = true;
             g->unsupported = NULL;
             return;

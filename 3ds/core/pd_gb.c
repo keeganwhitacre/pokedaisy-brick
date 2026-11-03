@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "pd_game.h"
+#include "pd_guide.h"
 #include "pd_tables.h"
 
 // Gen 1 / Gen 2 structs are plaintext and big-endian (Gen1Reader.kt, Gen2Reader.kt).
@@ -28,12 +29,21 @@ const struct pd_gb_config pd_gb_yellow = {
     .battleMon = 0xD013, .enemyMon = 0xCFE4, .otPartyCount = 0xD89B, .otPartyMons = 0xD8A3, .curOTMon = 0xCFE7,
     .internalToDex = pd_gb_internal_to_dex_yellow, .bagSlots = 20,
     .dexCaught = 0xD2F6, .dexSeen = 0xD309, .dexCount = 151,
+    .guideRam = &(const struct pd_gb_guide_ram){ 0xD746, 0xD5A5, 0xD6EF, 0xD736, 0xD355, 0xD714 }, .teams = pd_gb_teams_yellow,
 };
+#define PD_GB_RED_BASE \
+    .gen = 1, .partyCount = 0xD163, .partyMons = 0xD16B, .numItems = 0xD31D, .money = 0xD347, .battleMode = 0xD057, \
+    .battleMon = 0xD014, .enemyMon = 0xCFE5, .otPartyCount = 0xD89C, .otPartyMons = 0xD8A4, .curOTMon = 0xCFE8, \
+    .internalToDex = pd_gb_internal_to_dex_yellow, .bagSlots = 20, \
+    .dexCaught = 0xD2F7, .dexSeen = 0xD30A, .dexCount = 151, \
+    .guideRam = &(const struct pd_gb_guide_ram){ 0xD747, 0xD5A6, 0xD6F0, 0xD737, 0xD356, 0xD715 },
 const struct pd_gb_config pd_gb_red = {
-    .gen = 1, .partyCount = 0xD163, .partyMons = 0xD16B, .numItems = 0xD31D, .money = 0xD347, .battleMode = 0xD057,
-    .battleMon = 0xD014, .enemyMon = 0xCFE5, .otPartyCount = 0xD89C, .otPartyMons = 0xD8A4, .curOTMon = 0xCFE8,
-    .internalToDex = pd_gb_internal_to_dex_yellow, .bagSlots = 20,
-    .dexCaught = 0xD2F7, .dexSeen = 0xD30A, .dexCount = 151,
+    PD_GB_RED_BASE
+    .teams = pd_gb_teams_red,
+};
+const struct pd_gb_config pd_gb_blue = {
+    PD_GB_RED_BASE
+    .teams = pd_gb_teams_blue,
 };
 const struct pd_gb_config pd_gb_pure_red = {
     .gen = 1, .partyCount = PD_WRAMX(1, 0xD16B), .partyMons = PD_WRAMX(1, 0xD173), .numItems = PD_WRAMX(1, 0xD542),
@@ -459,6 +469,19 @@ void pd_gb_snapshot_read(struct pd_snapshot* s, const struct pd_config* cfg, pd_
             s->money = v;
         } else {
             s->money = ((long) m3[0] << 16) | (m3[1] << 8) | m3[2];
+        }
+    }
+
+    // --- GUIDE (Gen 1): the event flags and the other banks packed into flags[] (gen_guide.py's GB_BANK_BIT) ---
+    if (g->guideRam) {
+        const struct pd_gb_guide_ram* r = g->guideRam;
+        uint8_t* f = s->flags;
+        uint8_t team = 0;
+        if (rd(read, ctx, r->event, f, 320) && rd(read, ctx, r->missable, f + 320, 32) &&
+            rd(read, ctx, r->hidden, f + 352, 14) && rd(read, ctx, r->trades, f + 366, 2) &&
+            rd(read, ctx, r->badges, f + 368, 1) && rd(read, ctx, r->teamVar, &team, 1)) {
+            s->vars[0] = team;
+            s->flagsOk = s->partyCount > 0;
         }
     }
 

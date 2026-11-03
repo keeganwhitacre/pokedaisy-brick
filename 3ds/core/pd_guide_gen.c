@@ -7163,6 +7163,132 @@ const struct pd_area_thing pd_areas_recharged_yellow[] = {
 };
 const int pd_areas_recharged_yellow_count = 448;
 
+const struct pd_gb_team pd_gb_teams_yellow[] = {
+    { -1, 2, { { 74, 0, 10, { 33, 0, 0, 0 } }, { 95, 0, 12, { 33, 103, 20, 117 } } } },
+    { -1, 2, { { 120, 0, 18, { 33, 55, 0, 0 } }, { 121, 0, 21, { 33, 55, 106, 61 } } } },
+    { -1, 1, { { 26, 0, 28, { 85, 5, 25, 45 } } } },
+    { -1, 3, { { 114, 0, 30, { 132, 20, 72, 22 } }, { 70, 0, 32, { 75, 79, 78, 51 } }, { 44, 0, 32, { 80, 78, 79, 51 } } } },
+    { -1, 4, { { 48, 0, 44, { 92, 33, 79, 94 } }, { 48, 0, 46, { 92, 60, 48, 94 } }, { 48, 0, 48, { 92, 38, 79, 94 } }, { 49, 0, 50, { 141, 104, 94, 92 } } } },
+    { -1, 3, { { 63, 0, 50, { 148, 0, 0, 0 } }, { 64, 0, 50, { 134, 105, 94, 149 } }, { 65, 0, 50, { 149, 105, 94, 115 } } } },
+    { -1, 3, { { 38, 0, 48, { 53, 39, 98, 109 } }, { 78, 0, 50, { 23, 45, 83, 36 } }, { 59, 0, 54, { 53, 126, 115, 36 } } } },
+    { -1, 5, { { 51, 0, 50, { 91, 28, 90, 89 } }, { 53, 0, 53, { 103, 104, 154, 163 } }, { 31, 0, 53, { 89, 39, 87, 24 } }, { 34, 0, 55, { 89, 43, 87, 24 } }, { 112, 0, 55, { 157, 31, 32, 89 } } } },
+    { -1, 5, { { 87, 0, 54, { 61, 62, 156, 36 } }, { 91, 0, 53, { 48, 128, 58, 131 } }, { 80, 0, 54, { 94, 57, 110, 133 } }, { 124, 0, 56, { 3, 8, 142, 37 } }, { 131, 0, 56, { 34, 109, 59, 56 } } } },
+    { -1, 5, { { 95, 0, 53, { 157, 103, 21, 91 } }, { 107, 0, 55, { 8, 9, 7, 104 } }, { 106, 0, 55, { 24, 25, 136, 104 } }, { 95, 0, 56, { 157, 103, 21, 89 } }, { 68, 0, 58, { 43, 2, 70, 66 } } } },
+    { -1, 5, { { 94, 0, 56, { 109, 164, 122, 72 } }, { 42, 0, 56, { 48, 92, 17, 141 } }, { 93, 0, 55, { 109, 122, 95, 138 } }, { 24, 0, 58, { 35, 137, 103, 51 } }, { 94, 0, 60, { 109, 94, 95, 138 } } } },
+    { -1, 5, { { 130, 0, 58, { 82, 43, 56, 63 } }, { 148, 0, 56, { 86, 21, 85, 63 } }, { 148, 0, 56, { 61, 35, 58, 63 } }, { 142, 0, 60, { 17, 129, 19, 63 } }, { 149, 0, 62, { 59, 126, 87, 63 } } } },
+    { 1, 6, { { 28, 0, 61, { 163, 40, 89, 154 } }, { 65, 0, 59, { 60, 105, 94, 134 } }, { 103, 0, 61, { 140, 95, 23, 73 } }, { 91, 0, 61, { 58, 128, 62, 131 } }, { 38, 0, 63, { 109, 39, 98, 83 } }, { 135, 0, 65, { 42, 86, 98, 87 } } } },
+    { 2, 6, { { 28, 0, 61, { 163, 40, 89, 154 } }, { 65, 0, 59, { 60, 105, 94, 134 } }, { 103, 0, 61, { 140, 95, 23, 73 } }, { 82, 0, 61, { 85, 86, 129, 103 } }, { 91, 0, 63, { 58, 128, 62, 131 } }, { 136, 0, 65, { 83, 115, 98, 53 } } } },
+    { 3, 6, { { 28, 0, 61, { 163, 40, 89, 154 } }, { 65, 0, 59, { 60, 105, 94, 134 } }, { 103, 0, 61, { 140, 95, 23, 73 } }, { 38, 0, 61, { 109, 39, 98, 83 } }, { 82, 0, 63, { 85, 86, 129, 103 } }, { 134, 0, 65, { 62, 54, 98, 56 } } } },
+    { 0, 0, { { 0, 0, 0, { 0, 0, 0, 0 } } } },
+};
+static const uint16_t pd_gb_yellow_any8[] = { 2569, 0 };
+static const uint16_t pd_gb_yellow_any9[] = { 2569, 0 };
+static const uint16_t pd_gb_yellow_any10[] = { 2569, 0 };
+static const uint16_t pd_gb_yellow_any11[] = { 2569, 0 };
+static const struct pd_variant pd_gb_yellow_vars12[] = { { "", 12 }, { "", 13 }, { "", 14 }, { NULL, 0 } };
+static const uint16_t pd_gb_yellow_alts12[] = { 1, 12, 2, 13, 3, 14, 0 };
+static const uint16_t pd_gb_yellow_any12[] = { 2569, 0 };
+static const struct pd_boss pd_gb_yellow_bosses[] = {
+    { "LEADER BROCK", "PEWTER CITY GYM", 2944, PD_BOSS_FIXED, 0, 0, NULL, NULL, NULL },
+    { "LEADER MISTY", "CERULEAN CITY GYM", 2945, PD_BOSS_FIXED, 1, 0, NULL, NULL, NULL },
+    { "LEADER LT. SURGE", "VERMILION CITY GYM", 2946, PD_BOSS_FIXED, 2, 0, NULL, NULL, NULL },
+    { "LEADER ERIKA", "CELADON CITY GYM", 2947, PD_BOSS_FIXED, 3, 0, NULL, NULL, NULL },
+    { "LEADER KOGA", "FUCHSIA CITY GYM", 2948, PD_BOSS_FIXED, 4, 0, NULL, NULL, NULL },
+    { "LEADER SABRINA", "SAFFRON CITY GYM", 2949, PD_BOSS_FIXED, 5, 0, NULL, NULL, NULL },
+    { "LEADER BLAINE", "CINNABAR ISLAND GYM", 2950, PD_BOSS_FIXED, 6, 0, NULL, NULL, NULL },
+    { "LEADER GIOVANNI", "VIRIDIAN CITY GYM", 2951, PD_BOSS_FIXED, 7, 0, NULL, NULL, NULL },
+    { "ELITE FOUR LORELEI", "INDIGO PLATEAU", 2273, PD_BOSS_FIXED, 8, 0, NULL, NULL, pd_gb_yellow_any8 },
+    { "ELITE FOUR BRUNO", "INDIGO PLATEAU", 2281, PD_BOSS_FIXED, 9, 0, NULL, NULL, pd_gb_yellow_any9 },
+    { "ELITE FOUR AGATHA", "INDIGO PLATEAU", 2289, PD_BOSS_FIXED, 10, 0, NULL, NULL, pd_gb_yellow_any10 },
+    { "ELITE FOUR LANCE", "INDIGO PLATEAU", 2297, PD_BOSS_FIXED, 11, 0, NULL, NULL, pd_gb_yellow_any11 },
+    { "CHAMPION, YOUR RIVAL", "INDIGO PLATEAU", 2305, PD_BOSS_TEAMVAR, 12, 0, pd_gb_yellow_alts12, pd_gb_yellow_vars12, pd_gb_yellow_any12 },
+};
+const struct pd_guide pd_guide_gb_yellow = { NULL, 0, pd_gb_yellow_bosses, 13, false, 0, 0 };
+
+const struct pd_gb_team pd_gb_teams_red[] = {
+    { -1, 2, { { 74, 0, 12, { 33, 111, 0, 0 } }, { 95, 0, 14, { 33, 103, 117, 0 } } } },
+    { -1, 2, { { 120, 0, 18, { 33, 55, 0, 0 } }, { 121, 0, 21, { 33, 55, 61, 0 } } } },
+    { -1, 3, { { 100, 0, 21, { 33, 103, 49, 0 } }, { 25, 0, 18, { 84, 45, 86, 98 } }, { 26, 0, 24, { 84, 45, 85, 0 } } } },
+    { -1, 3, { { 71, 0, 29, { 75, 35, 77, 79 } }, { 114, 0, 24, { 132, 20, 0, 0 } }, { 45, 0, 29, { 80, 77, 72, 79 } } } },
+    { -1, 4, { { 109, 0, 37, { 33, 123, 124, 108 } }, { 89, 0, 39, { 50, 139, 107, 124 } }, { 109, 0, 37, { 33, 123, 124, 108 } }, { 110, 0, 43, { 123, 124, 92, 120 } } } },
+    { -1, 4, { { 64, 0, 38, { 50, 60, 105, 94 } }, { 122, 0, 37, { 93, 112, 113, 3 } }, { 49, 0, 38, { 77, 141, 78, 60 } }, { 65, 0, 43, { 60, 105, 149, 115 } } } },
+    { -1, 4, { { 58, 0, 42, { 52, 43, 36, 97 } }, { 77, 0, 40, { 39, 23, 45, 83 } }, { 78, 0, 42, { 39, 23, 45, 83 } }, { 59, 0, 47, { 46, 52, 126, 36 } } } },
+    { -1, 5, { { 111, 0, 45, { 23, 39, 31, 32 } }, { 51, 0, 42, { 45, 91, 28, 163 } }, { 31, 0, 44, { 10, 39, 34, 40 } }, { 34, 0, 45, { 33, 30, 40, 37 } }, { 112, 0, 50, { 23, 39, 90, 32 } } } },
+    { -1, 5, { { 87, 0, 54, { 45, 62, 156, 36 } }, { 91, 0, 53, { 48, 128, 62, 131 } }, { 80, 0, 54, { 45, 55, 110, 133 } }, { 124, 0, 56, { 3, 8, 34, 37 } }, { 131, 0, 56, { 34, 109, 59, 56 } } } },
+    { -1, 5, { { 95, 0, 53, { 88, 99, 21, 106 } }, { 107, 0, 55, { 8, 9, 5, 68 } }, { 106, 0, 55, { 26, 116, 136, 25 } }, { 95, 0, 56, { 88, 99, 21, 106 } }, { 68, 0, 58, { 43, 116, 90, 66 } } } },
+    { -1, 5, { { 94, 0, 56, { 109, 101, 95, 138 } }, { 42, 0, 56, { 48, 109, 17, 114 } }, { 93, 0, 55, { 109, 101, 95, 138 } }, { 24, 0, 58, { 44, 137, 103, 51 } }, { 94, 0, 60, { 109, 101, 92, 138 } } } },
+    { -1, 5, { { 130, 0, 58, { 82, 43, 56, 63 } }, { 148, 0, 56, { 97, 21, 82, 63 } }, { 148, 0, 56, { 97, 21, 82, 63 } }, { 142, 0, 60, { 48, 44, 36, 63 } }, { 149, 0, 62, { 97, 21, 112, 63 } } } },
+    { 177, 6, { { 18, 0, 61, { 18, 17, 143, 119 } }, { 65, 0, 59, { 60, 105, 94, 115 } }, { 112, 0, 61, { 39, 31, 32, 43 } }, { 59, 0, 61, { 46, 52, 43, 36 } }, { 103, 0, 63, { 140, 95, 23, 0 } }, { 9, 0, 65, { 44, 110, 59, 56 } } } },
+    { 153, 6, { { 18, 0, 61, { 18, 17, 143, 119 } }, { 65, 0, 59, { 60, 105, 94, 115 } }, { 112, 0, 61, { 39, 31, 32, 43 } }, { 130, 0, 61, { 82, 43, 56, 63 } }, { 59, 0, 63, { 46, 52, 43, 36 } }, { 3, 0, 65, { 75, 74, 72, 76 } } } },
+    { 176, 6, { { 18, 0, 61, { 18, 17, 143, 119 } }, { 65, 0, 59, { 60, 105, 94, 115 } }, { 112, 0, 61, { 39, 31, 32, 43 } }, { 103, 0, 61, { 140, 95, 23, 0 } }, { 130, 0, 63, { 82, 43, 56, 63 } }, { 6, 0, 65, { 99, 163, 126, 83 } } } },
+    { 0, 0, { { 0, 0, 0, { 0, 0, 0, 0 } } } },
+};
+static const uint16_t pd_gb_red_any8[] = { 2568, 0 };
+static const uint16_t pd_gb_red_any9[] = { 2568, 0 };
+static const uint16_t pd_gb_red_any10[] = { 2568, 0 };
+static const uint16_t pd_gb_red_any11[] = { 2568, 0 };
+static const struct pd_variant pd_gb_red_vars12[] = { { "", 12 }, { "", 13 }, { "", 14 }, { NULL, 0 } };
+static const uint16_t pd_gb_red_alts12[] = { 177, 12, 153, 13, 176, 14, 0 };
+static const uint16_t pd_gb_red_any12[] = { 2568, 0 };
+static const struct pd_boss pd_gb_red_bosses[] = {
+    { "LEADER BROCK", "PEWTER CITY GYM", 2944, PD_BOSS_FIXED, 0, 0, NULL, NULL, NULL },
+    { "LEADER MISTY", "CERULEAN CITY GYM", 2945, PD_BOSS_FIXED, 1, 0, NULL, NULL, NULL },
+    { "LEADER LT. SURGE", "VERMILION CITY GYM", 2946, PD_BOSS_FIXED, 2, 0, NULL, NULL, NULL },
+    { "LEADER ERIKA", "CELADON CITY GYM", 2947, PD_BOSS_FIXED, 3, 0, NULL, NULL, NULL },
+    { "LEADER KOGA", "FUCHSIA CITY GYM", 2948, PD_BOSS_FIXED, 4, 0, NULL, NULL, NULL },
+    { "LEADER SABRINA", "SAFFRON CITY GYM", 2949, PD_BOSS_FIXED, 5, 0, NULL, NULL, NULL },
+    { "LEADER BLAINE", "CINNABAR ISLAND GYM", 2950, PD_BOSS_FIXED, 6, 0, NULL, NULL, NULL },
+    { "LEADER GIOVANNI", "VIRIDIAN CITY GYM", 2951, PD_BOSS_FIXED, 7, 0, NULL, NULL, NULL },
+    { "ELITE FOUR LORELEI", "INDIGO PLATEAU", 2273, PD_BOSS_FIXED, 8, 0, NULL, NULL, pd_gb_red_any8 },
+    { "ELITE FOUR BRUNO", "INDIGO PLATEAU", 2281, PD_BOSS_FIXED, 9, 0, NULL, NULL, pd_gb_red_any9 },
+    { "ELITE FOUR AGATHA", "INDIGO PLATEAU", 2289, PD_BOSS_FIXED, 10, 0, NULL, NULL, pd_gb_red_any10 },
+    { "ELITE FOUR LANCE", "INDIGO PLATEAU", 2297, PD_BOSS_FIXED, 11, 0, NULL, NULL, pd_gb_red_any11 },
+    { "CHAMPION, YOUR RIVAL", "INDIGO PLATEAU", 2305, PD_BOSS_TEAMVAR, 12, 0, pd_gb_red_alts12, pd_gb_red_vars12, pd_gb_red_any12 },
+};
+const struct pd_guide pd_guide_gb_red = { NULL, 0, pd_gb_red_bosses, 13, false, 0, 0 };
+
+const struct pd_gb_team pd_gb_teams_blue[] = {
+    { -1, 2, { { 74, 0, 12, { 33, 111, 0, 0 } }, { 95, 0, 14, { 33, 103, 117, 0 } } } },
+    { -1, 2, { { 120, 0, 18, { 33, 55, 0, 0 } }, { 121, 0, 21, { 33, 55, 61, 0 } } } },
+    { -1, 3, { { 100, 0, 21, { 33, 103, 49, 0 } }, { 25, 0, 18, { 84, 45, 86, 98 } }, { 26, 0, 24, { 84, 45, 85, 0 } } } },
+    { -1, 3, { { 71, 0, 29, { 75, 35, 77, 79 } }, { 114, 0, 24, { 132, 20, 0, 0 } }, { 45, 0, 29, { 80, 77, 72, 79 } } } },
+    { -1, 4, { { 109, 0, 37, { 33, 123, 124, 108 } }, { 89, 0, 39, { 50, 139, 107, 124 } }, { 109, 0, 37, { 33, 123, 124, 108 } }, { 110, 0, 43, { 123, 124, 92, 120 } } } },
+    { -1, 4, { { 64, 0, 38, { 50, 60, 105, 94 } }, { 122, 0, 37, { 93, 112, 113, 3 } }, { 49, 0, 38, { 77, 141, 78, 60 } }, { 65, 0, 43, { 60, 105, 149, 115 } } } },
+    { -1, 4, { { 58, 0, 42, { 52, 43, 36, 97 } }, { 77, 0, 40, { 39, 23, 45, 83 } }, { 78, 0, 42, { 39, 23, 45, 83 } }, { 59, 0, 47, { 46, 52, 126, 36 } } } },
+    { -1, 5, { { 111, 0, 45, { 23, 39, 31, 32 } }, { 51, 0, 42, { 45, 91, 28, 163 } }, { 31, 0, 44, { 10, 39, 34, 40 } }, { 34, 0, 45, { 33, 30, 40, 37 } }, { 112, 0, 50, { 23, 39, 90, 32 } } } },
+    { -1, 5, { { 87, 0, 54, { 45, 62, 156, 36 } }, { 91, 0, 53, { 48, 128, 62, 131 } }, { 80, 0, 54, { 45, 55, 110, 133 } }, { 124, 0, 56, { 3, 8, 34, 37 } }, { 131, 0, 56, { 34, 109, 59, 56 } } } },
+    { -1, 5, { { 95, 0, 53, { 88, 99, 21, 106 } }, { 107, 0, 55, { 8, 9, 5, 68 } }, { 106, 0, 55, { 26, 116, 136, 25 } }, { 95, 0, 56, { 88, 99, 21, 106 } }, { 68, 0, 58, { 43, 116, 90, 66 } } } },
+    { -1, 5, { { 94, 0, 56, { 109, 101, 95, 138 } }, { 42, 0, 56, { 48, 109, 17, 114 } }, { 93, 0, 55, { 109, 101, 95, 138 } }, { 24, 0, 58, { 44, 137, 103, 51 } }, { 94, 0, 60, { 109, 101, 92, 138 } } } },
+    { -1, 5, { { 130, 0, 58, { 82, 43, 56, 63 } }, { 148, 0, 56, { 97, 21, 82, 63 } }, { 148, 0, 56, { 97, 21, 82, 63 } }, { 142, 0, 60, { 48, 44, 36, 63 } }, { 149, 0, 62, { 97, 21, 112, 63 } } } },
+    { 177, 6, { { 18, 0, 61, { 18, 17, 143, 119 } }, { 65, 0, 59, { 60, 105, 94, 115 } }, { 112, 0, 61, { 39, 31, 32, 43 } }, { 59, 0, 61, { 46, 52, 43, 36 } }, { 103, 0, 63, { 140, 95, 23, 0 } }, { 9, 0, 65, { 44, 110, 59, 56 } } } },
+    { 153, 6, { { 18, 0, 61, { 18, 17, 143, 119 } }, { 65, 0, 59, { 60, 105, 94, 115 } }, { 112, 0, 61, { 39, 31, 32, 43 } }, { 130, 0, 61, { 82, 43, 56, 63 } }, { 59, 0, 63, { 46, 52, 43, 36 } }, { 3, 0, 65, { 75, 74, 72, 76 } } } },
+    { 176, 6, { { 18, 0, 61, { 18, 17, 143, 119 } }, { 65, 0, 59, { 60, 105, 94, 115 } }, { 112, 0, 61, { 39, 31, 32, 43 } }, { 103, 0, 61, { 140, 95, 23, 0 } }, { 130, 0, 63, { 82, 43, 56, 63 } }, { 6, 0, 65, { 99, 163, 126, 83 } } } },
+    { 0, 0, { { 0, 0, 0, { 0, 0, 0, 0 } } } },
+};
+static const uint16_t pd_gb_blue_any8[] = { 2568, 0 };
+static const uint16_t pd_gb_blue_any9[] = { 2568, 0 };
+static const uint16_t pd_gb_blue_any10[] = { 2568, 0 };
+static const uint16_t pd_gb_blue_any11[] = { 2568, 0 };
+static const struct pd_variant pd_gb_blue_vars12[] = { { "", 12 }, { "", 13 }, { "", 14 }, { NULL, 0 } };
+static const uint16_t pd_gb_blue_alts12[] = { 177, 12, 153, 13, 176, 14, 0 };
+static const uint16_t pd_gb_blue_any12[] = { 2568, 0 };
+static const struct pd_boss pd_gb_blue_bosses[] = {
+    { "LEADER BROCK", "PEWTER CITY GYM", 2944, PD_BOSS_FIXED, 0, 0, NULL, NULL, NULL },
+    { "LEADER MISTY", "CERULEAN CITY GYM", 2945, PD_BOSS_FIXED, 1, 0, NULL, NULL, NULL },
+    { "LEADER LT. SURGE", "VERMILION CITY GYM", 2946, PD_BOSS_FIXED, 2, 0, NULL, NULL, NULL },
+    { "LEADER ERIKA", "CELADON CITY GYM", 2947, PD_BOSS_FIXED, 3, 0, NULL, NULL, NULL },
+    { "LEADER KOGA", "FUCHSIA CITY GYM", 2948, PD_BOSS_FIXED, 4, 0, NULL, NULL, NULL },
+    { "LEADER SABRINA", "SAFFRON CITY GYM", 2949, PD_BOSS_FIXED, 5, 0, NULL, NULL, NULL },
+    { "LEADER BLAINE", "CINNABAR ISLAND GYM", 2950, PD_BOSS_FIXED, 6, 0, NULL, NULL, NULL },
+    { "LEADER GIOVANNI", "VIRIDIAN CITY GYM", 2951, PD_BOSS_FIXED, 7, 0, NULL, NULL, NULL },
+    { "ELITE FOUR LORELEI", "INDIGO PLATEAU", 2273, PD_BOSS_FIXED, 8, 0, NULL, NULL, pd_gb_blue_any8 },
+    { "ELITE FOUR BRUNO", "INDIGO PLATEAU", 2281, PD_BOSS_FIXED, 9, 0, NULL, NULL, pd_gb_blue_any9 },
+    { "ELITE FOUR AGATHA", "INDIGO PLATEAU", 2289, PD_BOSS_FIXED, 10, 0, NULL, NULL, pd_gb_blue_any10 },
+    { "ELITE FOUR LANCE", "INDIGO PLATEAU", 2297, PD_BOSS_FIXED, 11, 0, NULL, NULL, pd_gb_blue_any11 },
+    { "CHAMPION, YOUR RIVAL", "INDIGO PLATEAU", 2305, PD_BOSS_TEAMVAR, 12, 0, pd_gb_blue_alts12, pd_gb_blue_vars12, pd_gb_blue_any12 },
+};
+const struct pd_guide pd_guide_gb_blue = { NULL, 0, pd_gb_blue_bosses, 13, false, 0, 0 };
+
 const struct pd_area_thing pd_areas_emerald_legacy[] = {
     { 0, PD_AREA_GIFT, 4, 0, 5, 0, "PROFESSOR BIRCHS LAB" },
     { 0, PD_AREA_MON, 1, 0, 1, 0, "PROFESSOR BIRCHS LAB" },
