@@ -31,13 +31,16 @@ struct pd_gb_config {
     bool polished;           // Polished Crystal's own structs, pockets and charmap
     uint32_t numMedicine, numBerries;
     int medicineMax, berriesMax;
+    // POKéDEX flags: wPokedexOwned / wPokedexSeen, a bit per Dex number from 1 (Gen 2: by species id); dexCount 0 = no DEX.
+    uint32_t dexCaught, dexSeen;
+    int dexCount;
 };
 
 extern const uint32_t pd_gb_polished_variants[];
 extern const int pd_gb_polished_variants_count;
 
 extern const struct pd_gb_config pd_gb_yellow, pd_gb_red, pd_gb_pure_red, pd_gb_crystal, pd_gb_gold, pd_gb_prism,
-    pd_gb_polished;
+    pd_gb_polished, pd_gb_crystal_clear;
 
 struct pd_config;
 void pd_gb_snapshot_read(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx);

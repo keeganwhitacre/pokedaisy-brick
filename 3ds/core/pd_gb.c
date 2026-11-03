@@ -27,25 +27,36 @@ const struct pd_gb_config pd_gb_yellow = {
     .gen = 1, .partyCount = 0xD162, .partyMons = 0xD16A, .numItems = 0xD31C, .money = 0xD346, .battleMode = 0xD056,
     .battleMon = 0xD013, .enemyMon = 0xCFE4, .otPartyCount = 0xD89B, .otPartyMons = 0xD8A3, .curOTMon = 0xCFE7,
     .internalToDex = pd_gb_internal_to_dex_yellow, .bagSlots = 20,
+    .dexCaught = 0xD2F6, .dexSeen = 0xD309, .dexCount = 151,
 };
 const struct pd_gb_config pd_gb_red = {
     .gen = 1, .partyCount = 0xD163, .partyMons = 0xD16B, .numItems = 0xD31D, .money = 0xD347, .battleMode = 0xD057,
     .battleMon = 0xD014, .enemyMon = 0xCFE5, .otPartyCount = 0xD89C, .otPartyMons = 0xD8A4, .curOTMon = 0xCFE8,
     .internalToDex = pd_gb_internal_to_dex_yellow, .bagSlots = 20,
+    .dexCaught = 0xD2F7, .dexSeen = 0xD30A, .dexCount = 151,
 };
 const struct pd_gb_config pd_gb_pure_red = {
     .gen = 1, .partyCount = PD_WRAMX(1, 0xD16B), .partyMons = PD_WRAMX(1, 0xD173), .numItems = PD_WRAMX(1, 0xD542),
     .money = PD_WRAMX(1, 0xD34F), .battleMode = PD_WRAMX(1, 0xD057), .battleMon = PD_WRAMX(1, 0xD014),
     .enemyMon = 0xCFE3, .otPartyCount = PD_WRAMX(1, 0xD8A4), .otPartyMons = PD_WRAMX(1, 0xD8AC), .curOTMon = 0xCFE6,
     .internalToDex = pd_gb_internal_to_dex_pure_rgb, .bagSlots = 30,
+    .dexCaught = PD_WRAMX(1, 0xD2FF), .dexSeen = PD_WRAMX(1, 0xD312), .dexCount = 151,
 };
-const struct pd_gb_config pd_gb_crystal = {
-    .gen = 2, .partyCount = PD_WRAMX(1, 0xDCD7), .partyMons = PD_WRAMX(1, 0xDCDF), .numItems = PD_WRAMX(1, 0xD892),
-    .numKeyItems = PD_WRAMX(1, 0xD8BC), .numBalls = PD_WRAMX(1, 0xD8D7), .tmsHms = PD_WRAMX(1, 0xD859),
-    .money = PD_WRAMX(1, 0xD84E), .battleMode = PD_WRAMX(1, 0xD22D), .battleMon = 0xC62C,
-    .enemyMon = PD_WRAMX(1, 0xD206), .otPartyCount = PD_WRAMX(1, 0xD280), .otPartyMons = PD_WRAMX(1, 0xD288),
-    .curOTMon = 0xC663, .genderRatios = pd_gb_gender_crystal, .tmItems = pd_gb_tm_crystal, .speciesCount = 251,
+#define PD_GB_CRYSTAL_BASE \
+    .gen = 2, .partyCount = PD_WRAMX(1, 0xDCD7), .partyMons = PD_WRAMX(1, 0xDCDF), .numItems = PD_WRAMX(1, 0xD892), \
+    .numKeyItems = PD_WRAMX(1, 0xD8BC), .numBalls = PD_WRAMX(1, 0xD8D7), .tmsHms = PD_WRAMX(1, 0xD859), \
+    .money = PD_WRAMX(1, 0xD84E), .battleMode = PD_WRAMX(1, 0xD22D), .battleMon = 0xC62C, \
+    .enemyMon = PD_WRAMX(1, 0xD206), .otPartyCount = PD_WRAMX(1, 0xD280), .otPartyMons = PD_WRAMX(1, 0xD288), \
+    .curOTMon = 0xC663, .genderRatios = pd_gb_gender_crystal, .tmItems = pd_gb_tm_crystal, .speciesCount = 251, \
     .itemsMax = 20, .ballsMax = 12, .keyItemsMax = 25,
+const struct pd_gb_config pd_gb_crystal = {
+    PD_GB_CRYSTAL_BASE
+    .dexCaught = PD_WRAMX(1, 0xDE99), .dexSeen = PD_WRAMX(1, 0xDEB9), .dexCount = 251,
+};
+// Crystal Clear v2.6.0: Crystal's RAM with its own wPokedexCaught; the app keeps Crystal's wPokedexSeen (unverified on a save).
+const struct pd_gb_config pd_gb_crystal_clear = {
+    PD_GB_CRYSTAL_BASE
+    .dexCaught = PD_WRAMX(1, 0xDA0E), .dexSeen = PD_WRAMX(1, 0xDEB9), .dexCount = 251,
 };
 const struct pd_gb_config pd_gb_gold = {
     .gen = 2, .partyCount = PD_WRAMX(1, 0xDA22), .partyMons = PD_WRAMX(1, 0xDA2A), .numItems = PD_WRAMX(1, 0xD5B7),
@@ -54,6 +65,7 @@ const struct pd_gb_config pd_gb_gold = {
     .enemyMon = PD_WRAMX(1, 0xD0EF), .otPartyCount = PD_WRAMX(1, 0xDD55), .otPartyMons = PD_WRAMX(1, 0xDD5D),
     .curOTMon = 0xCB41, .genderRatios = pd_gb_gender_crystal, .tmItems = pd_gb_tm_crystal, .speciesCount = 251,
     .itemsMax = 20, .ballsMax = 12, .keyItemsMax = 25,
+    .dexCaught = PD_WRAMX(1, 0xDBE4), .dexSeen = PD_WRAMX(1, 0xDC04), .dexCount = 251,
 };
 // Prism: Crystal's RAM but the bag, and its own 254 species ids.
 const struct pd_gb_config pd_gb_prism = {
@@ -73,6 +85,7 @@ const struct pd_gb_config pd_gb_polished = {
     .speciesCount = POLISHED_NUM_SPECIES, .itemsMax = 75, .ballsMax = 25, .keyItemsMax = 38, .tmBits = true,
     .polished = true, .numMedicine = PD_WRAMX(1, 0xD8BF), .numBerries = PD_WRAMX(1, 0xD93F), .medicineMax = 37,
     .berriesMax = 31,
+    .dexCaught = PD_WRAMX(1, 0xDE7B), .dexSeen = PD_WRAMX(1, 0xDEAD), .dexCount = POLISHED_NUM_SPECIES,
 };
 
 static int be16(const uint8_t* b) {
@@ -446,6 +459,22 @@ void pd_gb_snapshot_read(struct pd_snapshot* s, const struct pd_config* cfg, pd_
             s->money = v;
         } else {
             s->money = ((long) m3[0] << 16) | (m3[1] << 8) | m3[2];
+        }
+    }
+
+    // --- POKéDEX: seen / owned bit arrays by Dex number; owned counts as seen (readGen1PokedexState) ---
+    if (g->dexCount) {
+        uint8_t owned[40], seen[40];
+        size_t nb = (size_t) (g->dexCount + 7) / 8;
+        if (nb <= sizeof owned && rd(read, ctx, g->dexCaught, owned, nb) && rd(read, ctx, g->dexSeen, seen, nb) &&
+            s->partyCount > 0) {
+            for (size_t i = 0; i < nb; i++) {
+                s->dexCaught[i] = owned[i];
+                s->dexSeen[i] = seen[i] | owned[i];
+            }
+            s->dexOk = true;
+            s->dexNational = true;
+            s->dexCount = g->dexCount;
         }
     }
 

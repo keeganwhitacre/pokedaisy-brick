@@ -15,7 +15,7 @@ CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror
 CORE_SRC := $(wildcard core/*.c)
 DEVKITARM_IMAGE := devkitpro/devkitarm:latest
 
-.PHONY: preview test-dex test-font 3ds decomps fixture-roms azahar-test azahar-battle-test tables clean
+.PHONY: preview test-gbdex test-dex test-font 3ds decomps fixture-roms azahar-test azahar-battle-test tables clean
 
 $(BUILD)/pd_font_test: core/pd_canvas.c core/pd_canvas.h core/pd_font.h core/pd_font_gen.c test/font_test.c
 	@mkdir -p $(BUILD)
@@ -38,6 +38,14 @@ $(BUILD)/pd_stats_test: $(CORE_SRC) $(wildcard core/*.h) test/stats_test.c deskt
 $(BUILD)/pd_dex_test: $(CORE_SRC) $(wildcard core/*.h) test/dex_test.c
 	@mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) -o $@ $(filter-out core/pd_game.c,$(CORE_SRC)) test/dex_test.c -lm
+
+$(BUILD)/pd_gb_dex_test: $(CORE_SRC) $(wildcard core/*.h) test/gb_dex_test.c
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(filter-out core/pd_game.c,$(CORE_SRC)) test/gb_dex_test.c -lm
+
+# make test-gbdex: the Game Boy POKéDEX flags vs the app's captured WRAM (fixtures dir = $(FIXTURES)).
+test-gbdex: $(BUILD)/pd_gb_dex_test
+	$(BUILD)/pd_gb_dex_test $(FIXTURES)
 
 $(BUILD)/pd_card_test: $(CORE_SRC) $(wildcard core/*.h) test/card_test.c
 	@mkdir -p $(BUILD)

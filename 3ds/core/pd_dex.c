@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "pd_gb.h"
 #include "pd_map.h"
 #include "pd_romart.h"
 #include "pd_smol.h"
@@ -121,11 +122,13 @@ static void build(const struct pd_game* g) {
 }
 
 bool pd_dex_available(const struct pd_game* g) {
+    if (g->cfg->gb) return g->cfg->gb->dexCount > 0;  // a Game Boy game: the list from the save's flags only
     build(g);
     return available;
 }
 
 int pd_dex_species(const struct pd_game* g, int national) {
+    if (g->cfg->gb) return national >= 1 && national <= g->cfg->gb->dexCount ? national : 0;  // species ids are Dex numbers
     build(g);
     return available && national >= 1 && national <= g->cfg->nationalCount ? toSpecies[national] : 0;
 }

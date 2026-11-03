@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "pd_dex.h"
+#include "pd_gb.h"
 #include "pd_tables.h"
 #include "pd_ui_internal.h"
 
@@ -21,7 +22,9 @@ static bool national_view(const struct pd_ui* ui, const struct pd_snapshot* s) {
 // The list: national numbers in the order shown; returns how many.
 static int dex_list(const struct pd_game* g, bool national, int* out) {
     int n = 0;
-    if (national) {
+    if (g->cfg->gb) {  // a Game Boy game: its one Dex, in order
+        for (int i = 1; i <= g->cfg->gb->dexCount; i++) out[n++] = i;
+    } else if (national) {
         for (int i = 1; i <= g->cfg->nationalCount; i++) {
             if (pd_dex_species(g, i)) out[n++] = i;
         }
@@ -45,7 +48,7 @@ static int shown_number(const struct pd_game* g, bool national, int nat) {
 
 static void title(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g, const struct pd_snapshot* s,
                   const int* list, int n, bool national) {
-    int x = MARGIN, w = c->w - 2 * MARGIN - TOGGLE_W - 4;
+    int x = MARGIN, w = c->w - 2 * MARGIN - (g->cfg->gb ? 0 : TOGGLE_W + 4);
     int f = pd_title_box(c, x, CONTENT_Y, w, TITLE_H, PD_TITLE_FILL);
     int ty = pd_text_y(CONTENT_Y, TITLE_H);
     pd_text(c, x + f + 6, ty, "POKéDEX", PD_TITLE_TEXT, PD_TITLE_SHADOW);
@@ -57,7 +60,8 @@ static void title(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g
     char counts[40];
     snprintf(counts, sizeof(counts), "SEEN %d  OWN %d", seen, caught);
     pd_text_right(c, x + w - f - 6, ty, counts, PD_VALUE, PD_VALUE_SHADOW);
-    // Which dex: tap for the other one.
+    // Which dex: tap for the other one (a Game Boy game has just the one).
+    if (g->cfg->gb) return;
     char other[24];
     snprintf(other, sizeof(other), "%s", national ? g->cfg->regionName : "NATIONAL");
     ui_button(ui, c, x + w + 4, CONTENT_Y, TOGGLE_W, TITLE_H, other, HIT_DEX_TOGGLE);
@@ -95,7 +99,7 @@ static void list_view(struct pd_ui* ui, struct pd_canvas* c, const struct pd_gam
         pd_text(c, ix + 74, ty, name, seen ? PD_LABEL : PD_MUTED, seen ? PD_LABEL_SHADOW : PD_MUTED_SHADOW);
         int top = ry < iy ? iy : ry;
         int bottom = ry + DEX_ROW > iy + ih ? iy + ih : ry + DEX_ROW;
-        ui_add_scroll_hit(ui, ix, top, iw, bottom - top, HIT_DEX_ROW + nat);
+        if (!g->cfg->gb) ui_add_scroll_hit(ui, ix, top, iw, bottom - top, HIT_DEX_ROW + nat);  // no pages for a GB game
     }
     pd_unclip(c);
     ui_scroll_bar(c, ix + iw - 4, iy, ih, ui->dexScroll, n * DEX_ROW, PD_MUTED);

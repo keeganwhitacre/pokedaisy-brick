@@ -41,7 +41,7 @@ companion brought toward the Android app. aarch64, built for the TrimUI Brick; p
 - Hack MAP tabs beyond "the art loads" (see Parity).
 - Everything on a device other than the Brick; the 3DS build (not compiled here; code size grew, see below).
 - On-device: any hack's CARD, DEX or GUIDE besides Unbound's GUIDE; the shiny star on screen (decode is unit-tested,
-  drawing is not seen on a real shiny); GB DEX/GUIDE tabs (not built).
+  drawing is not seen on a real shiny); GB GUIDE tab (not built); the GB DEX list on a real save.
 - Odyssey and Sword and Shield guides were checked from their ROMs on the host only.
 - The Windows/macOS Java app is untouched.
 
@@ -56,7 +56,8 @@ companion brought toward the Android app. aarch64, built for the TrimUI Brick; p
 | Hack MAP | town maps | Region art loads from the ROM for Radical Red, Rocket Edition, Recharged Yellow, Ultra Violet, Kaizo, Emerald Legacy, Quetzal, Emerald Rogue, Too Many Types 2 (host probe over my ROMs; cursor, labels and player head not checked per hack, nothing seen on a device). Every other hack shows "NO MAP" |
 | Shiny icons | recoloured icons + marks | `*` mark only; icons keep normal colours |
 | Game Boy look | the game's own ROM font and icons | black-on-white windows with the standard font; no ROM font, no ROM party icons (Pokéball) |
-| Game Boy DEX / GUIDE / MAP / CARD | yes | not available ("No guide"/"No Pokédex yet") |
+| Game Boy DEX | list with entry pages (sprite, category, size, text) | the list only: seen / owned marks by Dex number (Red, Blue, Yellow, Pure Red/Blue, Gold, Silver, Crystal, Crystal Clear, Polished); no entry pages; none for Prism |
+| Game Boy GUIDE / MAP / CARD | yes | not available ("No guide") |
 | Battle input / party switch for GB; GB quick-menu items; hack item descriptions | yes | no |
 | European Yellow builds | yes | no (no ROMs here) |
 | DS | yes | out of scope on Linux |
