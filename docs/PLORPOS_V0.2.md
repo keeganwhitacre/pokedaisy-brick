@@ -23,7 +23,7 @@ own tests assert where they assert something; a feature without a reference was 
 | Hack CARD | per hack | the same, but Imperium: Unbound, Lazarus, Recharged Yellow (1.8.0, 1.9.x), SoulGold, Glazed, Kaizo (retail Emerald's, as the app gives it). Imperium stays off: no reference render to check its card against |
 | Hack GUIDE | every hack with a guide | the same set: all 54 hack configs the app gives one. NEXT BOSS with the app's rules (badge counts, middle gyms, League progress vars, difficulty, the starter, Quetzal's three regions), HERE with each game's wild header shape and time-of-day / night sets, WHERE IS from the area data, TIPS |
 | Place names (WHERE IS, HERE, MAP label) | every hack | every hack (its ROM's sMapNames for FireRed 1.0 hacks, the app's tables for the rest) |
-| Hack MAP | town maps | unchanged from v0.1: region art from the ROM for Radical Red, Rocket Edition, Recharged Yellow, Ultra Violet, Kaizo, Emerald Legacy, Quetzal, Emerald Rogue, Too Many Types 2; "NO MAP" elsewhere. Cursor, labels and player head not checked per hack (no saves for them) |
+| Hack MAP | town maps; every FireRed 1.0 hack's own map read from its ROM (RomRegionMap) | unchanged from v0.1: region art where the ROM's blobs match the fingerprints (Radical Red, Rocket Edition, Recharged Yellow, Ultra Violet, Kaizo, Emerald Legacy, Quetzal, Emerald Rogue, Too Many Types 2); "NO MAP" elsewhere, including the FireRed 1.0 hacks the app reads its own map for (Unbound, Odyssey, Gaia, Amethyst, GS Chronicles, Sword and Shield, Orange Islands, Ash Gray). Their place names are read the app's way already. Cursor, labels and player head not checked per hack (no saves) |
 | Shiny icons | recoloured icons + marks | the same: the shiny check by ROM hash (every retail cart, 44 hacks), icons recoloured from the shiny palette, gold frame and mark |
 | Hack item descriptions | from each ROM | the same (every verified build) |
 | Game Boy look | the game's own font and icons | the game's font on every Game Boy game, Red / Blue's Super Game Boy colours, own party icons on Red, Blue, Yellow, Crystal, Gold, Silver. Not yet: Crystal Clear, Prism, Polished Crystal, PureRGB icons (Poké Ball) |
@@ -40,7 +40,7 @@ own tests assert where they assert something; a feature without a reference was 
   Kaizo, Quetzal, Emerald Rogue, Too Many Types 2) to check each map's cursor, labels and head; saves for Yume Blue, Crystal
   Legacy, Ambrosia, Scorched Silver, Delta Emerald and Royal Sapphire (their configs stay guesses, Scorched Silver unmapped);
   a reference render of Imperium's card; the European Yellow ROMs.
-- **Left for later**: Polished Crystal's GUIDE (badge-scaled levels, rematch rules, faithful teams), Gen 2 DEX pages, Prism's
+- **Left for later**: the FireRed 1.0 hacks' own region maps (RomRegionMap's images and cursor grids), Polished Crystal's GUIDE (badge-scaled levels, rematch rules, faithful teams), Gen 2 DEX pages, Prism's
   DEX, the LZ / sheet party icons (Crystal Clear, Prism, Polished, PureRGB), Crystal's headbutt trees, Game Boy MAP / CARD,
   the Game Boy battle switch and quick-menu items, Elite Redux / R.O.W.E. foe shiny marks in wild battles.
 
