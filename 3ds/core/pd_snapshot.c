@@ -5,6 +5,7 @@
 
 #include "pd_dex.h"
 #include "pd_gb.h"
+#include "pd_romart.h"
 #include "pd_tables.h"
 
 #define MON_SIZE_MAX 128
@@ -651,12 +652,86 @@ const char* pd_pocket_name(int pocket) {
     }
 }
 
+// A FireRed 1.0 hack's own map-section names, read where its region_map.c loads them (the app's RomRegionMap.read):
+// the literal pools of rev 0's code, each pointer landing on data of the right shape, or none at all.
+#define RRM_FIRST 0x58    // MAPSEC_PALLET_TOWN, where sMapNames starts
+#define RRM_SECTIONS 109  // sMapNames' length
+#define RRM_NAME_LEN 24
+
+static bool rrm_ptr(const struct pd_game* g, uint32_t lit, uint32_t* out) {
+    uint8_t b[4];
+    if (!pd_rom_read(g, 0x08000000u + lit, b, 4)) return false;
+    uint32_t p = b[0] | b[1] << 8 | b[2] << 16 | (uint32_t) b[3] << 24;
+    if (p < 0x08000000u || p - 0x08000000u >= g->romSize) return false;
+    *out = p;
+    return true;
+}
+
+// An LZ77 blob at the pointer the literal holds, whose decoded size passes ok(size).
+static bool rrm_lz(const struct pd_game* g, uint32_t lit, size_t minSize, size_t maxSize, size_t align) {
+    static uint8_t buf[0x12000];
+    uint32_t p;
+    if (!rrm_ptr(g, lit, &p)) return false;
+    const uint8_t* src = pd_rom_at(g, p, 4);
+    if (!src || src[0] != 0x10) return false;
+    size_t size = src[1] | (size_t) src[2] << 8 | (size_t) src[3] << 16;
+    if (size < minSize || size > maxSize || size > sizeof buf || size % align) return false;
+    size_t avail = g->romSize - (p - 0x08000000u);
+    return pd_lz77(src, avail < 0x12000 ? avail : 0x12000, buf, size) == size;
+}
+
+static const char* rom_mapsec_name(const struct pd_game* g, int mapsec) {
+    static unsigned cachedFor;
+    static bool ok;
+    static char names[RRM_SECTIONS][RRM_NAME_LEN];
+    if (cachedFor != pd_rom_id(g)) {
+        cachedFor = pd_rom_id(g);
+        ok = false;
+        memset(names, 0, sizeof names);
+        uint8_t rev = 0;
+        uint32_t namesPtr, p;
+        static const uint32_t TILEMAPS[] = {0xC035C, 0xC0370, 0xC0388, 0xC03A4};
+        bool shaped = g->rom && !strcmp(g->code, "BPRE") && pd_rom_read(g, 0x080000BC, &rev, 1) && rev != 1 &&
+                      rrm_lz(g, 0xC0330, 32, 0x12000, 32) && rrm_ptr(g, 0xC02EC, &p) && rrm_ptr(g, 0xC3D3C, &p) &&
+                      rrm_ptr(g, 0xC3D38, &p) && rrm_ptr(g, 0xC00BC, &p) && rrm_ptr(g, 0xC0C94, &namesPtr);
+        for (int i = 0; shaped && i < 4; i++) shaped = rrm_lz(g, TILEMAPS[i], 30 * 20, 0x800, 2);
+        for (int i = 0; shaped && i < RRM_SECTIONS; i++) {
+            uint32_t at;
+            if (!rrm_ptr(g, namesPtr - 0x08000000u + (uint32_t) i * 4, &at)) break;
+            const uint8_t* src = pd_rom_at(g, at, 1);
+            if (!src) break;
+            size_t avail = g->romSize - (at - 0x08000000u);
+            pd_gen3_text(src, avail < 32 ? avail : 32, names[i], RRM_NAME_LEN);
+            // titleCase: an all-capitals name in the app's casing ("PALLET TOWN" -> "Pallet Town")
+            bool lower = false;
+            for (char* c = names[i]; *c; c++) lower |= *c >= 'a' && *c <= 'z';
+            if (!lower) {
+                bool start = true;
+                for (char* c = names[i]; *c; c++) {
+                    if (*c >= 'A' && *c <= 'Z' && !start) *c = (char) (*c - 'A' + 'a');
+                    bool letter = (*c >= 'A' && *c <= 'Z') || (*c >= 'a' && *c <= 'z') || (unsigned char) *c >= 0x80;
+                    start = !letter && *c != '\'';
+                }
+            }
+            if (names[i][0]) ok = true;
+        }
+    }
+    int i = mapsec - RRM_FIRST;
+    return ok && i >= 0 && i < RRM_SECTIONS && names[i][0] ? names[i] : NULL;
+}
+
 const char* pd_mapsec_name(const struct pd_game* g, int mapsec) {
     if (g->hackMaps) return "";
+    const struct pd_text* t = g->cfg ? g->cfg->text : NULL;
+    if (t && t->mapsecsRom) {
+        const char* n = rom_mapsec_name(g, mapsec);
+        if (n) return n;
+    }
+    if (t && t->mapsecs) return mapsec >= 0 && mapsec < t->mapsecsCount && t->mapsecs[mapsec] ? t->mapsecs[mapsec] : "";
     // Emerald's map sections start at 0 (Littleroot); FireRed's Kanto ones at 88.
-    const char* const* t = g->kind == PD_GAME_EMERALD ? pd_mapsec_emerald : pd_mapsec_firered;
+    const char* const* tb = g->kind == PD_GAME_EMERALD ? pd_mapsec_emerald : pd_mapsec_firered;
     int n = g->kind == PD_GAME_EMERALD ? pd_mapsec_emerald_count : pd_mapsec_firered_count;
-    if (mapsec >= 0 && mapsec < n && t[mapsec]) return t[mapsec];
+    if (mapsec >= 0 && mapsec < n && tb[mapsec]) return tb[mapsec];
     return "";
 }
 

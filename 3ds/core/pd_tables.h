@@ -3,6 +3,7 @@
 #ifndef PD_TABLES_H
 #define PD_TABLES_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -35,6 +36,11 @@ struct pd_text {
     // GetMonGender's ratio byte by species id (Gen 3 games); NULL = retail's pd_gender_ratios.
     const uint8_t* genderRatios;
     int genderRatiosCount;
+    // Its map sections' names (the app's activeMapSecData for the game), by id; NULL = retail's names for its engine.
+    const char* const* mapsecs;
+    int mapsecsCount;
+    // A FireRed 1.0 hack whose region_map.c reads its own sMapNames (the app's RomRegionMap): those names first.
+    bool mapsecsRom;
 };
 
 struct pd_game;

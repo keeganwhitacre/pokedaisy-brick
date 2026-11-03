@@ -638,65 +638,81 @@ parts = ['ram', 'foes', 'icons', 'dex']
 
 [text.gaia_v3_2]
 species = 'speciesNamesGaia'
+mapsecsRom = true
 
 [text.sword_shield]
 species = 'speciesNamesSwordShield'
 items = 'itemNamesSwordShield'
 moves = 'moveDataSwordShield'
 genderRatios = 'genderRatiosSwordShield'
+mapsecs = 'mapSecDataSwordShield'
+mapsecsRom = true
 
 [text.amethyst]
 species = 'speciesNamesAmethyst'
 items = 'itemNamesAmethyst'
 moves = 'moveDataAmethyst'
 genderRatios = 'genderRatiosAmethyst'
+mapsecsRom = true
 
 [text.amethyst_v1_4_1]
 species = 'speciesNamesAmethystV141'
 items = 'itemNamesAmethystV141'
 moves = 'moveDataAmethyst'
 genderRatios = 'genderRatiosAmethystV141'
+mapsecsRom = true
 
 [text.gs_chronicles]
 species = 'speciesNamesGsChronicles'
 items = 'itemNamesGsChronicles'
 moves = 'moveDataGsChronicles'
 genderRatios = 'genderRatiosGsChronicles'
+mapsecs = 'mapSecDataGsChronicles'
+mapsecsRom = true
 
 [text.radical_red_v4_1]
 species = 'speciesNamesRadicalRed'
 items = 'itemNamesRadicalRed'
 moves = 'moveDataRadicalRed'
 genderRatios = 'genderRatiosRadicalRed'
+mapsecsRom = true
 
 [text.unbound_with_dex]
 species = 'speciesNamesUnbound'
 items = 'itemNamesUnbound'
 moves = 'moveDataUnbound'
 genderRatios = 'genderRatiosUnbound'
+mapsecs = 'mapSecDataUnbound'
+mapsecsRom = true
 
 [text.unbound_fr]
 species = 'speciesNamesUnbound'
 items = 'itemNamesUnbound'
 moves = 'moveDataUnbound'
 genderRatios = 'genderRatiosUnbound'
+mapsecs = 'mapSecDataUnbound'
+mapsecsRom = true
 
 [text.celia]
 species = 'speciesNamesCelia'
 items = 'itemNamesCelia'
 moves = 'moveDataCelia'
+mapsecsRom = true
 
 [text.glazed]
 species = 'speciesNamesGlazed'
 items = 'itemNamesGlazed'
 moves = 'moveDataGlazed'
 genderRatios = 'genderRatiosGlazed'
+mapsecs = 'mapSecDataGlazed'
 
 [text.orange_islands]
 species = 'speciesNamesOrangeIslands'
 items = 'itemNamesOrangeIslands'
 moves = 'moveDataOrangeIslands'
 genderRatios = 'genderRatiosOrangeIslands'
+mapsecs = 'mapSecDataOrangeIslands'
+mapsecsRom = true
 
 [text.imperium]
 species = 'speciesNamesImperium'
@@ -706,6 +722,7 @@ typeNames = 'typeNamesImperium'
 typeChart = 'typeEffectivenessImperium'
 speciesTypes = 'speciesTypeDataImperium'
 genderRatios = 'genderRatiosImperium'
+mapsecs = 'mapSecDataImperium'
 
 [text.tmt2]
 species = 'speciesNamesTmt2'
@@ -719,21 +736,25 @@ speciesTypes = 'speciesTypeDataTmt2'
 species = 'speciesNamesRechargedYellow'
 items = 'itemNamesRechargedYellow'
 moves = 'moveDataRechargedYellow'
+mapsecs = 'mapSecData + mapSecNamesRechargedYellow'
 
 [text.recharged_yellow_v1_9_0]
 species = 'speciesNamesRechargedYellow'
 items = 'itemNamesRechargedYellow'
 moves = 'moveDataRechargedYellow'
+mapsecs = 'mapSecData + mapSecNamesRechargedYellow'
 
 [text.recharged_yellow_v1_9_4]
 species = 'speciesNamesRechargedYellow'
 items = 'itemNamesRechargedYellow'
 moves = 'moveDataRechargedYellow'
+mapsecs = 'mapSecData + mapSecNamesRechargedYellow'
 
 [text.recharged_yellow_v1_9_7]
 species = 'speciesNamesRechargedYellow'
 items = 'itemNamesRechargedYellow'
 moves = 'moveDataRechargedYellow'
+mapsecs = 'mapSecData + mapSecNamesRechargedYellow'
 
 [text.emerald_seaglass]
 species = 'speciesNamesNationalDex'
@@ -752,6 +773,7 @@ typeNames = 'typeNamesLazarus'
 typeChart = 'typeEffectivenessLazarus'
 speciesTypes = 'speciesTypeDataLazarus'
 genderRatios = 'genderRatiosLazarus'
+mapsecs = 'mapSecDataLazarus'
 
 [text.wishes]
 species = 'speciesNamesWishes'
@@ -761,6 +783,7 @@ typeNames = 'typeNamesWishes'
 typeChart = 'typeEffectivenessWishes'
 speciesTypes = 'speciesTypeDataWishes'
 genderRatios = 'genderRatiosWishes'
+mapsecs = 'mapSecDataWishes'
 
 [text.mariomon_v1_5_2]
 species = 'speciesNamesMariomon'
@@ -770,6 +793,7 @@ typeNames = 'typeNamesMariomon'
 typeChart = 'typeEffectivenessMariomon'
 speciesTypes = 'speciesTypeDataMariomon'
 genderRatios = 'genderRatiosMariomon'
+mapsecs = 'mapSecDataMariomon'
 
 [text.mariomon_v1_5_1]
 species = 'speciesNamesMariomon'
@@ -779,6 +803,7 @@ typeNames = 'typeNamesMariomon'
 typeChart = 'typeEffectivenessMariomon'
 speciesTypes = 'speciesTypeDataMariomon'
 genderRatios = 'genderRatiosMariomon'
+mapsecs = 'mapSecDataMariomon'
 
 [text.mariomon_v1_3]
 species = 'speciesNamesMariomonV13'
@@ -788,6 +813,7 @@ typeNames = 'typeNamesMariomon'
 typeChart = 'typeEffectivenessMariomon'
 speciesTypes = 'speciesTypeDataMariomonV13'
 genderRatios = 'genderRatiosMariomonV13'
+mapsecs = 'mapSecDataMariomonV13'
 
 [text.mariomon_v1_2_2]
 species = 'speciesNamesMariomonV13'
@@ -797,6 +823,7 @@ typeNames = 'typeNamesMariomon'
 typeChart = 'typeEffectivenessMariomon'
 speciesTypes = 'speciesTypeDataMariomonV13'
 genderRatios = 'genderRatiosMariomonV13'
+mapsecs = 'mapSecDataMariomonV13'
 
 [text.mariomon_v1_2_1]
 species = 'speciesNamesMariomonV13'
@@ -806,6 +833,7 @@ typeNames = 'typeNamesMariomon'
 typeChart = 'typeEffectivenessMariomon'
 speciesTypes = 'speciesTypeDataMariomonV13'
 genderRatios = 'genderRatiosMariomonV13'
+mapsecs = 'mapSecDataMariomonV13'
 
 [text.rowe]
 species = 'speciesNamesRowe'
@@ -815,6 +843,7 @@ typeNames = 'typeNamesRowe'
 typeChart = 'typeEffectivenessRowe'
 speciesTypes = 'speciesTypeDataRowe'
 genderRatios = 'genderRatiosRowe'
+mapsecs = 'mapSecDataRowe'
 
 [text.team_rocket]
 species = 'speciesNamesTeamRocket'
@@ -824,6 +853,7 @@ typeNames = 'typeNamesTeamRocket'
 typeChart = 'typeEffectivenessTeamRocket'
 speciesTypes = 'speciesTypeDataTeamRocket'
 genderRatios = 'genderRatiosTeamRocket'
+mapsecs = 'mapSecDataTeamRocket'
 
 [text.dreamstone]
 species = 'speciesNamesDreamstone'
@@ -833,6 +863,7 @@ typeNames = 'typeNamesDreamstone'
 typeChart = 'typeEffectivenessDreamstone'
 speciesTypes = 'speciesTypeDataDreamstone'
 genderRatios = 'genderRatiosDreamstone'
+mapsecs = 'mapSecDataDreamstone'
 
 [text.soulgold]
 species = 'speciesNamesSoulGold'
@@ -842,6 +873,7 @@ typeNames = 'typeNamesSoulGold'
 typeChart = 'typeEffectivenessSoulGold'
 speciesTypes = 'speciesTypeDataSoulGold'
 genderRatios = 'genderRatiosSoulGold'
+mapsecs = 'mapSecDataSoulGold'
 
 [text.soulgold_v1_2]
 species = 'speciesNamesSoulGold'
@@ -851,6 +883,7 @@ typeNames = 'typeNamesSoulGold'
 typeChart = 'typeEffectivenessSoulGold'
 speciesTypes = 'speciesTypeDataSoulGold'
 genderRatios = 'genderRatiosSoulGold'
+mapsecs = 'mapSecDataSoulGold'
 
 [text.soulgold_v1_2b]
 species = 'speciesNamesSoulGold'
@@ -860,6 +893,7 @@ typeNames = 'typeNamesSoulGold'
 typeChart = 'typeEffectivenessSoulGold'
 speciesTypes = 'speciesTypeDataSoulGold'
 genderRatios = 'genderRatiosSoulGold'
+mapsecs = 'mapSecDataSoulGold'
 
 [text.soulgold_v1_2c]
 species = 'speciesNamesSoulGold'
@@ -869,6 +903,7 @@ typeNames = 'typeNamesSoulGold'
 typeChart = 'typeEffectivenessSoulGold'
 speciesTypes = 'speciesTypeDataSoulGold'
 genderRatios = 'genderRatiosSoulGold'
+mapsecs = 'mapSecDataSoulGold'
 
 [text.heart_and_soul]
 species = 'speciesNamesHns'
@@ -878,6 +913,7 @@ typeNames = 'typeNamesHns'
 typeChart = 'typeEffectivenessHns'
 speciesTypes = 'speciesTypeDataHns'
 genderRatios = 'genderRatiosHns'
+mapsecs = 'mapSecDataHns'
 
 [text.quetzal]
 species = 'speciesNamesQuetzal'
@@ -887,6 +923,7 @@ typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
 genderRatios = 'genderRatiosQuetzal'
+mapsecs = 'mapSecDataQuetzal'
 
 [text.quetzal_es]
 species = 'speciesNamesQuetzal + speciesNamesQuetzalEs'
@@ -896,6 +933,7 @@ typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
 genderRatios = 'genderRatiosQuetzal'
+mapsecs = 'mapSecDataQuetzal + mapSecNamesQuetzalEs'
 
 [text.quetzal_v1]
 species = 'speciesNamesQuetzal'
@@ -905,6 +943,7 @@ typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
 genderRatios = 'genderRatiosQuetzal'
+mapsecs = 'mapSecDataQuetzal'
 
 [text.quetzal_es_v1]
 species = 'speciesNamesQuetzal + speciesNamesQuetzalEs'
@@ -914,6 +953,7 @@ typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
 genderRatios = 'genderRatiosQuetzal'
+mapsecs = 'mapSecDataQuetzal + mapSecNamesQuetzalEs'
 
 [text.quetzal_v084]
 species = 'speciesNamesQuetzal'
@@ -923,6 +963,7 @@ typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
 genderRatios = 'genderRatiosQuetzal'
+mapsecs = 'mapSecDataQuetzal'
 
 [text.quetzal_v084_es]
 species = 'speciesNamesQuetzal + speciesNamesQuetzalEs'
@@ -932,6 +973,7 @@ typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
 genderRatios = 'genderRatiosQuetzal'
+mapsecs = 'mapSecDataQuetzal + mapSecNamesQuetzalEs'
 
 [text.quetzal_moemon_v084]
 species = 'speciesNamesQuetzal'
@@ -941,6 +983,7 @@ typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
 genderRatios = 'genderRatiosQuetzal'
+mapsecs = 'mapSecDataQuetzal'
 
 [text.quetzal_moemon_v084_es]
 species = 'speciesNamesQuetzal + speciesNamesQuetzalEs'
@@ -950,6 +993,7 @@ typeNames = 'typeNamesQuetzal'
 typeChart = 'typeEffectivenessQuetzal'
 speciesTypes = 'speciesTypeDataQuetzal'
 genderRatios = 'genderRatiosQuetzal'
+mapsecs = 'mapSecDataQuetzal + mapSecNamesQuetzalEs'
 
 [text.emerald_rogue]
 species = 'speciesNamesRogue'
@@ -958,6 +1002,7 @@ moves = 'moveDataRogue'
 typeNames = 'typeNamesRogue'
 typeChart = 'typeEffectivenessRogue'
 speciesTypes = 'speciesTypeDataRogue'
+mapsecs = 'mapSecDataRogue'
 
 [text.elite_redux_v2_65_4_1b]
 species = 'speciesNamesEliteRedux'
@@ -967,6 +1012,7 @@ typeNames = 'typeNamesEliteRedux'
 typeChart = 'typeEffectivenessEliteRedux'
 speciesTypes = 'speciesTypeDataEliteRedux'
 genderRatios = 'genderRatiosEliteRedux'
+mapsecs = 'mapSecDataEliteRedux'
 
 # (2.65.3b's few differing names are not applied: its tables are 4.1b's.)
 [text.elite_redux_v2_65_3b]
@@ -977,6 +1023,7 @@ typeNames = 'typeNamesEliteRedux'
 typeChart = 'typeEffectivenessEliteRedux'
 speciesTypes = 'speciesTypeDataEliteRedux'
 genderRatios = 'genderRatiosEliteRedux'
+mapsecs = 'mapSecDataEliteRedux'
 
 # FireRed hacks edited in place: their own names and types over retail's (Ash Gray's few renames in capitals, like the game).
 [text.ash_gray]
@@ -987,6 +1034,8 @@ typeNames = 'typeNames + fireRedHackAshGray.typeNames'
 typeChart = 'typeEffectiveness + fireRedHackAshGray.typeChart'
 speciesTypes = 'speciesTypeData + fireRedHackAshGray.types'
 genderRatios = 'fireRedHackAshGray.genderRatios'
+mapsecs = 'mapSecData + fireRedHackAshGray.mapSecs'
+mapsecsRom = true
 
 [text.rocket_edition]
 species = 'fireRedHackRocketEdition.species'
@@ -995,6 +1044,7 @@ moves = 'fireRedHackRocketEdition.moves'
 typeNames = 'typeNames + fireRedHackRocketEdition.typeNames'
 typeChart = 'typeEffectiveness + fireRedHackRocketEdition.typeChart'
 speciesTypes = 'speciesTypeData + fireRedHackRocketEdition.types'
+mapsecs = 'mapSecData + fireRedHackRocketEdition.mapSecs'
 
 [text.ghost_grey]
 species = 'fireRedHackGhostGrey.species'
@@ -1004,6 +1054,7 @@ typeNames = 'typeNames + fireRedHackGhostGrey.typeNames'
 typeChart = 'typeEffectiveness + fireRedHackGhostGrey.typeChart'
 speciesTypes = 'speciesTypeData + fireRedHackGhostGrey.types'
 genderRatios = 'fireRedHackGhostGrey.genderRatios'
+mapsecs = 'mapSecData + fireRedHackGhostGrey.mapSecs'
 
 [text.odyssey]
 species = 'fireRedHackOdyssey.species'
@@ -1013,6 +1064,7 @@ typeNames = 'typeNames + fireRedHackOdyssey.typeNames'
 typeChart = 'typeEffectiveness + fireRedHackOdyssey.typeChart'
 speciesTypes = 'speciesTypeData + fireRedHackOdyssey.types'
 genderRatios = 'genderRatiosOdyssey'
+mapsecsRom = true
 
 [text.ultra_violet]
 species = 'UPPER speciesNames + speciesNamesUltraViolet'
@@ -1021,6 +1073,7 @@ moves = 'UPPER moveData + moveDataUltraViolet'
 typeNames = 'typeNames'
 typeChart = 'typeEffectiveness'
 speciesTypes = 'speciesTypeData + speciesTypesUltraViolet'
+mapsecs = 'mapSecData + mapSecNamesUltraViolet'
 
 # Recharged Emerald lays its renamed species / moves / items and re-typed species over Emerald's (ActiveTables' emeraldHackFor).
 [text.recharged_emerald_v2_2_5]
@@ -1045,119 +1098,143 @@ speciesTypes = 'speciesTypeData + hackTextRechargedEmeraldRebalanced.types'
 species = 'speciesNamesAxpd'
 items = 'itemNamesAxpd'
 moves = 'moveData RENAMED moveNamesAxpd'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxpd'
 
 [text.port_axpd1]
 species = 'speciesNamesAxpd'
 items = 'itemNamesAxpd'
 moves = 'moveData RENAMED moveNamesAxpd'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxpd'
 
 [text.port_axpf0]
 species = 'speciesNamesAxpf'
 items = 'itemNamesAxpf'
 moves = 'moveData RENAMED moveNamesAxpf'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxpf'
 
 [text.port_axpf1]
 species = 'speciesNamesAxpf'
 items = 'itemNamesAxpf'
 moves = 'moveData RENAMED moveNamesAxpf'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxpf'
 
 [text.port_axpi0]
 species = 'speciesNamesAxpi'
 items = 'itemNamesAxpi'
 moves = 'moveData RENAMED moveNamesAxpi'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxpi'
 
 [text.port_axpi1]
 species = 'speciesNamesAxpi'
 items = 'itemNamesAxpi'
 moves = 'moveData RENAMED moveNamesAxpi'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxpi'
 
 [text.port_axps0]
 species = 'speciesNamesAxps'
 items = 'itemNamesAxps'
 moves = 'moveData RENAMED moveNamesAxps'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxps'
 
 [text.port_axps1]
 species = 'speciesNamesAxps'
 items = 'itemNamesAxps'
 moves = 'moveData RENAMED moveNamesAxps'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxps'
 
 [text.port_axvd0]
 species = 'speciesNamesAxvd'
 items = 'itemNamesAxvd'
 moves = 'moveData RENAMED moveNamesAxvd'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxvd'
 
 [text.port_axvd1]
 species = 'speciesNamesAxvd'
 items = 'itemNamesAxvd'
 moves = 'moveData RENAMED moveNamesAxvd'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxvd'
 
 [text.port_axvf0]
 species = 'speciesNamesAxvf'
 items = 'itemNamesAxvf'
 moves = 'moveData RENAMED moveNamesAxvf'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxvf'
 
 [text.port_axvf1]
 species = 'speciesNamesAxvf'
 items = 'itemNamesAxvf'
 moves = 'moveData RENAMED moveNamesAxvf'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxvf'
 
 [text.port_axvi0]
 species = 'speciesNamesAxvi'
 items = 'itemNamesAxvi'
 moves = 'moveData RENAMED moveNamesAxvi'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxvi'
 
 [text.port_axvi1]
 species = 'speciesNamesAxvi'
 items = 'itemNamesAxvi'
 moves = 'moveData RENAMED moveNamesAxvi'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxvi'
 
 [text.port_axvs0]
 species = 'speciesNamesAxvs'
 items = 'itemNamesAxvs'
 moves = 'moveData RENAMED moveNamesAxvs'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxvs'
 
 [text.port_axvs1]
 species = 'speciesNamesAxvs'
 items = 'itemNamesAxvs'
 moves = 'moveData RENAMED moveNamesAxvs'
+mapsecs = 'mapSecDataEmerald + mapSecNamesAxvs'
 
 [text.port_bpgd0]
 species = 'speciesNamesBpgd'
 items = 'itemNamesBpgd'
 moves = 'moveData RENAMED moveNamesBpgd'
+mapsecs = 'mapSecData + mapSecNamesBpgd'
 
 [text.port_bpgf0]
 species = 'speciesNamesBpgf'
 items = 'itemNamesBpgf'
 moves = 'moveData RENAMED moveNamesBpgf'
+mapsecs = 'mapSecData + mapSecNamesBpgf'
 
 [text.port_bpgi0]
 species = 'speciesNamesBpgi'
 items = 'itemNamesBpgi'
 moves = 'moveData RENAMED moveNamesBpgi'
+mapsecs = 'mapSecData + mapSecNamesBpgi'
 
 [text.port_bpgs0]
 species = 'speciesNamesBpgs'
 items = 'itemNamesBpgs'
 moves = 'moveData RENAMED moveNamesBpgs'
+mapsecs = 'mapSecData + mapSecNamesBpgs'
 
 [text.port_bprd0]
 species = 'speciesNamesBprd'
 items = 'itemNamesBprd'
 moves = 'moveData RENAMED moveNamesBprd'
+mapsecs = 'mapSecData + mapSecNamesBprd'
 
 [text.port_bprf0]
 species = 'speciesNamesBprf'
 items = 'itemNamesBprf'
 moves = 'moveData RENAMED moveNamesBprf'
+mapsecs = 'mapSecData + mapSecNamesBprf'
 
 [text.port_bpri0]
 species = 'speciesNamesBpri'
 items = 'itemNamesBpri'
 moves = 'moveData RENAMED moveNamesBpri'
+mapsecs = 'mapSecData + mapSecNamesBpri'
 
 [text.port_bprs0]
 species = 'speciesNamesBprs'
 items = 'itemNamesBprs'
 moves = 'moveData RENAMED moveNamesBprs'
+mapsecs = 'mapSecData + mapSecNamesBprs'
 

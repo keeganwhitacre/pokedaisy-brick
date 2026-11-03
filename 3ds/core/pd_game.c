@@ -553,7 +553,7 @@ void pd_game_identify(struct pd_game* g) {
         g->kind = k->kind;
         g->title = k->title;
         g->guide = k->guide;
-        g->hackMaps = k->cfg != &PD_CONFIG_EMERALD_LEGACY; // Legacy keeps Emerald's names (+ its own three)
+        g->hackMaps = false; // its names: pd_text.mapsecs / mapsecsRom, else its engine's retail ones (the app's activeMapSecData)
         g->unsupported = NULL;
         return;
     }

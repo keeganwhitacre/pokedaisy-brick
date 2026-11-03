@@ -296,7 +296,7 @@ struct pd_game {
     size_t romSize;
     unsigned loadId; // new on every pd_game_detect (see pd_rom_id)
     char sha1[41];   // the whole ROM's, once pd_game_identify ran ("" before)
-    // A hack with its own map sections: retail's names would be wrong, so none are given (until its ROM's sMapNames is read).
+    // A Game Boy game: no map-section names yet (the GBA hacks' come from pd_text.mapsecs / the ROM).
     bool hackMaps;
 };
 

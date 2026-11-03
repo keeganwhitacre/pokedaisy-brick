@@ -6,6 +6,8 @@
 #include <string.h>
 
 #include "../core/pd_game.h"
+#include "../core/pd_snapshot.h"
+#include "../core/pd_tables.h"
 
 static uint8_t rom[33 << 20];
 
@@ -22,6 +24,21 @@ static int check(const char* path, const char* name, int* ok, int* unsupported) 
     pd_game_identify(&g);
     bool generic = !g.title || strstr(g.title, "Unknown") || strstr(g.title, "ROM hack") || strstr(g.title, "Game Boy ROM");
     if (generic) { printf("FAIL %s: not recognised (%s: %s)\n", name, g.title ? g.title : "?", g.unsupported ? g.unsupported : ""); return 1; }
+    // A GBA game the companion reads names its map sections (WHERE IS, HERE, MAP): its own table, its ROM's
+    // sMapNames or its engine's retail names - the app's activeMapSecData.
+    if (g.cfg && g.kind != PD_GAME_GB) {
+        int named = 0;
+        const char* first = NULL;
+        for (int m = 0; m < 0x200; m++) {
+            const char* n = pd_mapsec_name(&g, m);
+            if (n[0]) { named++; if (!first) first = n; }
+        }
+        const struct pd_text* t = g.cfg->text;
+        if (getenv("PD_ROMS_NAMES"))
+            printf("  %s: %d place names (%s), first %s\n", name, named,
+                   t && t->mapsecsRom ? "ROM" : t && t->mapsecs ? "own table" : "retail", first ? first : "-");
+        if (named < 20) { printf("FAIL %s: %d place names\n", name, named); return 1; }
+    }
     if (g.cfg) (*ok)++;
     else { (*unsupported)++; printf("  %s: %s (%s)\n", name, g.title, g.unsupported ? g.unsupported : "?"); }
     return 0;

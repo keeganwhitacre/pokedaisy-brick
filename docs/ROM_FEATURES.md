@@ -423,4 +423,12 @@ against the app's recorded cards (`make -C 3ds test-card`), the GUIDE's boss tea
 
 ²⁷ Ghost Grey's last boss, SUMMER, has a team that answers the starter; the guide shows all three (LITWICK, SPIRITLE, ROWLET) and counts her beaten when any of them is.
 
+**Place names** (WHERE IS, HERE, the MAP's label): every hack the companion reads names its map sections as the app does.
+FireRed 1.0 hacks (Unbound, Radical Red, Odyssey, Gaia, Amethyst, GS Chronicles, Sword and Shield Ultimate Plus, Orange Islands,
+Ash Gray, Celia) read their own names from the ROM's region map code, where it keeps them (Celia's doesn't: FireRed's names);
+the others use the app's tables for them (Glazed, Imperium, Lazarus, SoulGold, Heart and Soul, Quetzal in English and Spanish,
+R.O.W.E., Emerald Rogue, Elite Redux, Team Rocket, Wishes, Dreamstone, Super Mariomon, Recharged Yellow, Rocket Edition, Ghost
+Grey, Ultra Violet) or their engine's retail names (Kaizo, Seaglass, Too Many Types 2, Recharged Emerald, Emerald Legacy). The
+other-language retail carts use their own language's names. `make -C 3ds test-roms` checks every ROM names at least 20 sections.
+
 Hacks that are not in the table have no DEX, CARD or GUIDE yet. The MAP tab draws a hack's region map only where the ROM's art is found (Radical Red, Rocket Edition, Recharged Yellow, Ultra Violet, Kaizo, Emerald Legacy, Quetzal, Emerald Rogue, Too Many Types 2); elsewhere it says "NO MAP".
