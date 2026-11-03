@@ -127,7 +127,8 @@ static void where_text(const struct pd_area_thing* t, const char* place, char* o
     if (t->where && *t->where) {
         snprintf(out, len, "in the %s", t->where);
     } else {
-        snprintf(out, len, "around %s", place);
+        if (*place) snprintf(out, len, "around %s", place);
+        else snprintf(out, len, "nearby");  // a hack's map sections have no names here
     }
 }
 
@@ -290,7 +291,7 @@ static void build_where(const struct pd_game* g, const struct pd_snapshot* s) {
                 if (sec == 2 || (sec == 0 && !hm) || (sec == 1 && (hm || t->kind != PD_AREA_KEY))) continue;
                 snprintf(name, sizeof(name), "%s", item);
             }
-            if (name[0] == '#' || !strncmp(name, "Item#", 5)) continue;  // no name to show
+            if (!name[0] || name[0] == '#' || !strncmp(name, "Item#", 5)) continue;  // no name to show
             bool dup = false;
             for (int k = first; k < entryCount && !dup; k++) dup = !strcmp(entries[k].title, name);
             if (dup) continue;
@@ -298,14 +299,20 @@ static void build_where(const struct pd_game* g, const struct pd_snapshot* s) {
             if (!e) break;
             const char* area = pd_mapsec_name(g, t->mapsec);
             snprintf(e->title, sizeof(e->title), "%s", name);
-            snprintf(e->hintBuf, sizeof(e->hintBuf), "In %s.", area);
-            e->hint = e->hintBuf;
-            if (t->kind == PD_AREA_ITEM)
-                snprintf(e->answerBuf, sizeof(e->answerBuf), t->where[0] ? "Lying in the %s (%s)." : "Lying around %s.",
-                         t->where[0] ? t->where : area, area);
-            else
-                snprintf(e->answerBuf, sizeof(e->answerBuf), t->where[0] ? "Someone in the %s (%s)." : "Someone around %s.",
-                         t->where[0] ? t->where : area, area);
+            const char* lying = t->kind == PD_AREA_ITEM ? "Lying" : "Someone";
+            if (!area[0]) {  // a hack's map sections have no names here: say only what the data knows
+                if (t->where[0]) snprintf(e->answerBuf, sizeof(e->answerBuf), "%s in the %s.", lying, t->where);
+                else snprintf(e->answerBuf, sizeof(e->answerBuf), t->kind == PD_AREA_ITEM ? "Lying around." : "Someone has it.");
+            } else {
+                snprintf(e->hintBuf, sizeof(e->hintBuf), "In %s.", area);
+                e->hint = e->hintBuf;
+                if (t->kind == PD_AREA_ITEM)
+                    snprintf(e->answerBuf, sizeof(e->answerBuf), t->where[0] ? "Lying in the %s (%s)." : "Lying around %s.",
+                             t->where[0] ? t->where : area, area);
+                else
+                    snprintf(e->answerBuf, sizeof(e->answerBuf), t->where[0] ? "Someone in the %s (%s)." : "Someone around %s.",
+                             t->where[0] ? t->where : area, area);
+            }
             e->answer = e->answerBuf;
             e->owned = pd_area_done(g, s, t);
         }

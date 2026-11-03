@@ -67,6 +67,7 @@ companion brought toward the Android app. aarch64, built for the TrimUI Brick; p
 
 - Unbound's guide shows all four difficulties; Android narrows EXPERT by level.
 - The GUIDE's "before you read" notice is remembered per guide again: the settings file read only the first 16 bits, so the hack guides asked every launch.
+- A hack's WHERE IS and HERE give no town names (its map sections aren't named here): "Lying in the GYM", "Lying around", "nearby".
 - A Game Boy save must be loaded in game (CONTINUE) before the companion has a party.
 - Code size: core objects grew from 0.47 MB to ~1.9 MB (generated text tables dominate); gate them before any 3DS upstream.
 - Never use in-game save-state tricks on real saves; saves were never written by tests.
