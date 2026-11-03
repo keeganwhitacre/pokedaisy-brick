@@ -67,6 +67,7 @@ companion brought toward the Android app. aarch64, built for the TrimUI Brick; p
 
 - Unbound's guide shows all four difficulties; Android narrows EXPERT by level.
 - The GUIDE's "before you read" notice is remembered per guide again: the settings file read only the first 16 bits, so the hack guides asked every launch.
+- ROMs the companion has no layout for are named instead of "unknown": Altered Emerald 4.2c, Delta Emerald 1.1.5 (retail Emerald's addresses) and Royal Sapphire 1.6 (Sapphire's) run on that guess, marked "(unverified)" - their code references those addresses as often as retail's does. Only Altered Emerald was tried on a save (PARTY and BAG read right; no DEX, GUIDE or MAP). Scorched Silver, Crystal Legacy, Ambrosia and Yume Blue reference none of any known layout: "memory layout isn't mapped yet". Pinball, Mystery Dungeon, POKeDUEL, Puzzle Challenge and the TCG games: "not a game the companion can read". `make -C 3ds test-roms ROMS=<dir>` checks a folder of ROMs.
 - A hack's WHERE IS and HERE give no town names (its map sections aren't named here): "Lying in the GYM", "Lying around", "nearby".
 - A Game Boy save must be loaded in game (CONTINUE) before the companion has a party.
 - Code size: core objects grew from 0.47 MB to ~1.9 MB (generated text tables dominate); gate them before any 3DS upstream.

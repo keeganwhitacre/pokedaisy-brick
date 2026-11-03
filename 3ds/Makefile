@@ -15,7 +15,7 @@ CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror
 CORE_SRC := $(wildcard core/*.c)
 DEVKITARM_IMAGE := devkitpro/devkitarm:latest
 
-.PHONY: preview test-gbguide test-gbdex test-dex test-font 3ds decomps fixture-roms azahar-test azahar-battle-test tables clean
+.PHONY: preview test-roms test-gbguide test-gbdex test-dex test-font 3ds decomps fixture-roms azahar-test azahar-battle-test tables clean
 
 $(BUILD)/pd_font_test: core/pd_canvas.c core/pd_canvas.h core/pd_font.h core/pd_font_gen.c test/font_test.c
 	@mkdir -p $(BUILD)
@@ -54,6 +54,14 @@ $(BUILD)/pd_gb_guide_test: $(CORE_SRC) $(wildcard core/*.h) test/gb_guide_test.c
 # make test-gbguide: Red / Blue / Yellow's NEXT BOSS vs the app's facts and fixtures.
 test-gbguide: $(BUILD)/pd_gb_guide_test
 	$(BUILD)/pd_gb_guide_test $(FIXTURES)
+
+$(BUILD)/pd_rom_ids_test: $(CORE_SRC) $(wildcard core/*.h) test/rom_ids_test.c
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(CORE_SRC) test/rom_ids_test.c -lm
+
+# make test-roms ROMS=<dir>: every ROM in the folders under <dir> is recognised.
+test-roms: $(BUILD)/pd_rom_ids_test
+	$(BUILD)/pd_rom_ids_test $(ROMS)
 
 $(BUILD)/pd_card_test: $(CORE_SRC) $(wildcard core/*.h) test/card_test.c
 	@mkdir -p $(BUILD)

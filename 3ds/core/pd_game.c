@@ -226,6 +226,30 @@ PD_GB_CONFIG(PRISM, pd_gb_prism, gb_prism)
 PD_GB_CONFIG(POLISHED, pd_gb_polished, gb_polished)
 PD_GB_CONFIG(POLISHED_FAITHFUL, pd_gb_polished, gb_polished_faithful)
 
+#define PD_NOT_A_GAME "Not a game the companion can read"
+#define PD_NO_LAYOUT "Recognised, but its memory layout isn't mapped yet"
+// Recognised, but nothing to read: games that aren't party games, and hacks whose memory layout isn't mapped.
+struct unsupported_rom {
+    const char* sha1;
+    const char* title;
+    const char* why;
+};
+static const struct unsupported_rom UNSUPPORTED_ROMS[] = {
+    {"74a6727e4406c35bc2d4f81347a5c5fdb8970663", "Pokémon Crystal Legacy", PD_NO_LAYOUT},
+    {"0d96cd8447788dd72392e4983df2115bf40e9315", "Pokémon Ambrosia", PD_NO_LAYOUT},
+    {"65f409e0677cdb0cfefeb2f981136cc84ba45a1c", "Pokémon Yume Blue", PD_NO_LAYOUT},
+    {"9402014d14969432142abfde728c6f1a10ee4dac", "Pokémon Pinball", PD_NOT_A_GAME},
+    {"e40d6a7f78b449e5a55baaaea7e227ab19d510e4", "Pokémon Puzzle Challenge", PD_NOT_A_GAME},
+    {"bd9227a3f7e4b600990d904e5e5b33021ede77f9", "Pokémon TCG Neo", PD_NOT_A_GAME},
+    {"34ca3f54ea2dbec907a4d9af92befe2771f7649c", "Pokémon Trading Card Game 2", PD_NOT_A_GAME},
+    {"0f8670a583255cff3e5b7ca71b5d7454d928fc48", "Pokémon Trading Card Game", PD_NOT_A_GAME},
+    {"67949d03fd3dbfcec7903857560128ae6438110b", "Pokémon Scorched Silver", PD_NO_LAYOUT},
+    {"b8b7881eaa9856b5ada99078ad1053d31cb79827", "Pokémon Pinball: Ruby & Sapphire", PD_NOT_A_GAME},
+    {"afee3b060dd5fd4a68afb1b003456aef3a2af073", "Pokémon Mystery Dungeon: Red Rescue Team", PD_NOT_A_GAME},
+    {"e596e713051ca40621e028ee839fdcbe8cc8b77d", "Pokémon POKeDUEL", PD_NOT_A_GAME},
+    {NULL, NULL, NULL},
+};
+
 struct gb_rom {
     const char* sha1;
     const struct pd_config* cfg;
@@ -311,6 +335,14 @@ struct known_rom {
     enum pd_guide_id guide;
 };
 static const struct known_rom KNOWN_ROMS[] = {
+    // Guessed from the retail layout: the ROM's code reads the same addresses as often as retail's does (unverified on a save,
+    // except Altered Emerald). Scorched Silver, below, reads none of them.
+    {"b1d5feccdf9f1b2b025c5ff6062ce97134b1d0e7", &PD_CONFIG_EMERALD, PD_GAME_EMERALD, "Pokémon Altered Emerald (unverified)",
+     PD_GUIDE_NONE},
+    {"6650b2f7f2b7aa0c880061e0e362bbdb9ab999c6", &PD_CONFIG_EMERALD, PD_GAME_EMERALD, "Pokémon Delta Emerald (unverified)",
+     PD_GUIDE_NONE},
+    {"186449f6208675af4d8cfe4ace5afbf5186cea6d", &PD_CONFIG_SAPPHIRE, PD_GAME_EMERALD, "Pokémon Royal Sapphire (unverified)",
+     PD_GUIDE_NONE},
     {"cbd71af65ee3dcd53280a6a12014bfb11e8f626a", &PD_CONFIG_EMERALD_LEGACY, PD_GAME_EMERALD, "Pokémon Emerald Legacy",
      PD_GUIDE_EMERALD_LEGACY},
     {"a7c4e34fafb53f2d5283eb6d43dad285c0dd40a8", &PD_CONFIG_EMERALD_KAIZO, PD_GAME_EMERALD, "Pokémon Emerald Kaizo",
@@ -491,6 +523,14 @@ void pd_game_identify(struct pd_game* g) {
     pd_sha1_hex(&s, g->sha1);
 
     pd_gb_look = g->kind == PD_GAME_GB;
+    for (const struct unsupported_rom* u = UNSUPPORTED_ROMS; u->sha1; u++) {
+        if (strcmp(u->sha1, g->sha1)) continue;
+        g->cfg = NULL;
+        g->guide = PD_GUIDE_NONE;
+        g->title = u->title;
+        g->unsupported = u->why;
+        return;
+    }
     if (g->kind == PD_GAME_GB) {
         for (const struct gb_rom* r = GB_ROMS; r->sha1; r++) {
             if (strcmp(r->sha1, g->sha1)) continue;
