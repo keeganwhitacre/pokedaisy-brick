@@ -27,3 +27,4 @@ straight from the sources; the table below is written from its output.
 - **Item descriptions from each game's ROM**, as the app's RomItemText: the bag shows a hack's own text (Unbound's,
   Radical Red's, every expansion hack's), read from the item table its config names (checked against item 1's id where
   the records carry one). v0.1 showed none for hacks with their own items.
+- **Kaizo's CARD**: retail Emerald's card from Kaizo's ROM, as the app gives it (not checked against a recorded render).

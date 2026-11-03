@@ -1842,7 +1842,7 @@ static const struct pd_config PD_CONFIG_SAPPHIRE_REV0 = {
 
 // The retail-struct hacks whose ROMs aren't to hand: RAM-only (PARTY / BATTLE / foes, checked on the app's captured RAM);
 // the tabs that read the ROM (icons, POKéDEX, GUIDE, CARD, FLY) join once a ROM is there to check them against.
-// gamedata/gen3/hacks/emerald_kaizo.toml: emerald_kaizo (ram, foes, dex, guide)
+// gamedata/gen3/hacks/emerald_kaizo.toml: emerald_kaizo (ram, foes, dex, card, guide)
 static const struct pd_config PD_CONFIG_EMERALD_KAIZO = {
     .itemDescs = &(const struct pd_item_descs){ .base = 139999648, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x020244EC,
@@ -1920,6 +1920,32 @@ static const struct pd_config PD_CONFIG_EMERALD_KAIZO = {
     .probeWeight = 69,
     .probeSpecies = 1,
     .regionName = "HOENN",
+    .cardStyle = PD_CARD_HOENN,
+    .gameStatsOff = 0x159C,
+    .badgeFlag = 0x867,
+    .pokedexFlag = 0x861,
+    .cardMagicOff = 0x1A,
+    .cardFlagsOff = 0x1270,
+    .cardVarsOff = 0x139C,
+    .cardFlagBytes = 0x12C,
+    .nationalFlagOnly = false,
+    .linkLines = true,
+    .allRegionalDrop = 2,
+    .iconVar = 0,
+    .tintVar = 0,
+    .cardIconTable = 0,
+    .cardPaletteTable = 0,
+    .achievementBitsOff = 0,
+    .achievementMagicOff = 0,
+    .achievementsNeeded = 80,
+    .nationalVar = 0x4046,
+    .nationalVarValue = 0x302,
+    .nationalFlag = 0x896,
+    .stickerVar = 0,
+    .frontierSymbolFlag = 0x8C4,
+    .extraStarFlag = 0,
+    .museumWinnersOff = 0x2F90,
+    .frontierBpOff = 0xEBA,
     .trainerMonStride = 0,
     .trainerMonMovesOff = 0,
     .trainerMonSpeciesOff = 0,

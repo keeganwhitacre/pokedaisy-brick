@@ -328,7 +328,7 @@ records = { items = 'FIELD_ITEMS_PORTS_AXPE0' }
 # the tabs that read the ROM (icons, POKéDEX, GUIDE, CARD, FLY) join once a ROM is there to check them against.
 [config.emerald_kaizo]
 name = 'EMERALD_KAIZO'
-parts = ['ram', 'foes', 'dex', 'guide']
+parts = ['ram', 'foes', 'dex', 'card', 'guide']
 
 [config.glazed]
 name = 'GLAZED'

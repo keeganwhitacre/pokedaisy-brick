@@ -409,7 +409,8 @@ against the app's recorded cards (`make -C 3ds test-card`), the GUIDE's boss tea
 | Quetzal (Alpha 0.8.4 and 9.x, English and Spanish) | ✅ | — | ✅ ²⁹ |
 | Rocket Edition, Ash Gray, GS Chronicles, Radical Red, Orange Islands | ✅ | — | ✅ |
 | Odyssey, Sword and Shield Ultimate Plus, Gaia, Recharged Emerald ²⁸ | ✅ | — | ✅ |
-| Amethyst, Heart and Soul, Seaglass, Too Many Types 2, Super Mariomon, Dreamstone Mysteries, Ultra Violet, Kaizo | ✅ | — | ✅ ²⁹ |
+| Kaizo | ✅ | ✅ ³¹ | ✅ ²⁹ |
+| Amethyst, Heart and Soul, Seaglass, Too Many Types 2, Super Mariomon, Dreamstone Mysteries, Ultra Violet | ✅ | — | ✅ ²⁹ |
 | Wishes of Tomorrow, Team Rocket Edition, Elite Redux | ✅ | — | ◐ ³⁰ |
 | R.O.W.E., Emerald Rogue (EX) | ✅ | — | — |
 | Celia's Stupid Romhack | ◐ ²⁵ | — | ✅ |
@@ -428,6 +429,9 @@ Heart and Soul's CHUCK / JASMINE / PRYCE by how many of the other two are beaten
 Lazarus's and Dreamstone's teams by the save's difficulty, Too Many Types 2's rival by the starter, Quetzal's three regions
 with the player's own first. HERE reads each game's own wild header shape, its time-of-day sets and Lazarus's night set by the
 game's clock. Kaizo uses retail Emerald's guide over its own wild table, Ultra Violet FireRed's bosses over its own maps.
+
+³¹ Retail Emerald's card, which the app gives Kaizo too (its config is retail's); drawn from Kaizo's ROM, not checked
+against a recorded render.
 
 ³⁰ HERE and TIPS only, as in the app (no NEXT BOSS: their stories don't follow the badge order).
 
