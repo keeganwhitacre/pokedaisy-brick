@@ -65,7 +65,6 @@ companion brought toward the Android app. aarch64, built for the TrimUI Brick; p
 
 - Unbound's VANILLA-difficulty teams list no moves: there is no learnset table for the hack here.
 - Unbound's guide shows all four difficulties; Android narrows EXPERT by level.
-- The Desktop copy of Unbound v2.1.1.1 (sha1 7c5b9d0d) is a different build and is not recognised; b4776b82 is.
 - A Game Boy save must be loaded in game (CONTINUE) before the companion has a party.
 - Code size: core objects grew from 0.47 MB to ~1.9 MB (generated text tables dominate); gate them before any 3DS upstream.
 - Never use in-game save-state tricks on real saves; saves were never written by tests.
