@@ -674,7 +674,48 @@ const char* pd_item_name(const struct pd_game* g, int item) {
     return item_entry(pd_item_names_firered, pd_item_names_firered_count, item);
 }
 
+// RomItemText.read: the description pointer in the game's item table, the text one line (breaks and runs of spaces
+// collapsed). NULL = not readable here (no ROM, no table, an id outside it, a pointer off the ROM).
+static const char* rom_item_description(const struct pd_game* g, int item) {
+    const struct pd_item_descs* t = g->cfg ? g->cfg->itemDescs : NULL;
+    if (!t || !g->rom || item <= 0) return NULL;
+    static struct { unsigned rom; int item; char text[200]; } cache[8];
+    static int next;
+    for (int i = 0; i < 8; i++)
+        if (cache[i].rom == pd_rom_id(g) && cache[i].item == item) return cache[i].text;
+    // The table must be where the config says: item 1's record holds id 1 (where records carry their id).
+    if (t->idOff >= 0) {
+        uint8_t id[2];
+        if (!pd_rom_read(g, t->base + (uint32_t) t->stride + (uint32_t) t->idOff, id, 2) || (id[0] | id[1] << 8) != 1) return NULL;
+    }
+    while (t && (item < t->first || (t->count && item - t->first >= t->count))) t = t->next;
+    if (!t) return NULL;
+    uint8_t p[4];
+    if (!pd_rom_read(g, t->base + (uint32_t) ((item - t->first) * t->stride + t->descOff), p, 4)) return NULL;
+    uint32_t ptr = u32(p);
+    const uint8_t* src = pd_rom_at(g, ptr, 1);
+    if (!src) return NULL;
+    size_t avail = g->romSize - (ptr - 0x08000000u);
+    char raw[256];
+    pd_gen3_text(src, avail < 200 ? avail : 200, raw, sizeof raw);
+    char* out = cache[next].text;
+    size_t n = 0;
+    for (const char* c = raw; *c && n + 1 < sizeof cache[0].text; c++) {
+        if (*c == ' ' && (n == 0 || out[n - 1] == ' ')) continue;
+        out[n++] = *c;
+    }
+    while (n && out[n - 1] == ' ') n--;
+    out[n] = 0;
+    cache[next].rom = pd_rom_id(g);
+    cache[next].item = item;
+    next = (next + 1) % 8;
+    return out;
+}
+
 const char* pd_item_description(const struct pd_game* g, int item) {
+    // The game's own text from its ROM, as the app's RomItemText (no ROM: retail's bundled text below, by retail's ids).
+    const char* rom = rom_item_description(g, item);
+    if (rom) return rom;
     // Retail's texts are by retail's ids: a hack with its own item names has none of its own (none shown, none faked).
     if (g->cfg && g->cfg->text && g->cfg->text->items) return "";
     if (g->kind == PD_GAME_EMERALD) return item_entry(pd_item_desc_emerald, pd_item_desc_emerald_count, item);

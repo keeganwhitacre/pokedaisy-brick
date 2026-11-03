@@ -122,6 +122,13 @@ struct pd_dex_x {
         paletteOff, footprintOff, levelUpOff, teachableOff, evolutionsOff;
 };
 
+// Item id's description pointer: base + (id - first) * stride + descOff, for ids first..first+count-1 (count 0 = no
+// end); idOff = the record's u16 item id where it has one (checked on item 1), -1 = none; next = a second range.
+struct pd_item_descs {
+    uint32_t base;
+    int stride, descOff, idOff, first, count;
+    const struct pd_item_descs* next;
+};
 struct pd_wild_layout { int stride, land, water, rockSmash, fishing; };
 struct pd_night_wild { uint32_t hourAddr; int dayFrom, dayTo, skipGroup, skipNum; };
 
@@ -167,6 +174,8 @@ struct pd_config {
     // shiny Pokemon (its party layout's shinyBelow) recolours the shared ones from its battle palettes: the dex's
     // gMonPaletteTable (dexPalettes), else monPalettes (the app's IconTables.battlePalettes).
     uint32_t monIconPalettes, dexPalettes, monPalettes;
+    // Where the ROM keeps the item descriptions (the app's ItemDescTable, RomItemText.kt); NULL = none in this game.
+    const struct pd_item_descs* itemDescs;
     // The game's own egg species (0 = retail's 412) and how many species its tables hold (with the egg).
     int eggSpecies, speciesCount;
     // Bits an expansion game packs above the species / move / PP words (0xFFFF / 0xFFFF / 0xFF = none).

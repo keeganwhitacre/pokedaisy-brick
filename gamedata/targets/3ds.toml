@@ -54,6 +54,7 @@ RECHARGED_YELLOW_V1_9 = 'PD_CARD_RECHARGED_YELLOW_V1_9'
 
 # The RAM globals and the save offsets every tab reads.
 [part.ram]
+itemDescs = 'itemDescs'
 playerParty = 'playerParty'
 partyLayout = 'partyMonLayout'
 playerPartyCount = 'playerPartyCount'

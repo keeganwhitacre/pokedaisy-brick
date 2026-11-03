@@ -24,3 +24,6 @@ straight from the sources; the table below is written from its output.
   party Pokémon, foe or battler gets its icon in its shiny colours (the shiny battle palette mapped onto the icon's, as
   the app does; SoulGold's own shiny icon palettes), a gold frame on the battle cards and the gold `*`. v0.1 marked
   only SoulGold, R.O.W.E. and Elite Redux, with normal icons.
+- **Item descriptions from each game's ROM**, as the app's RomItemText: the bag shows a hack's own text (Unbound's,
+  Radical Red's, every expansion hack's), read from the item table its config names (checked against item 1's id where
+  the records carry one). v0.1 showed none for hacks with their own items.

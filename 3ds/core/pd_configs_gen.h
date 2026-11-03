@@ -89,6 +89,7 @@ extern const struct pd_text pd_text_port_bprs0;
 // quick menu from FIELD_ITEMS_PORTS["BPRE0"] (fieldItemsFor).
 // gamedata/gen3/retail/firered.toml: firered_rev1 (ram, foes, icons, dex, guide, card, fly, field)
 static const struct pd_config PD_CONFIG_FIRERED_REV1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138260632, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -277,6 +278,7 @@ static const struct pd_config PD_CONFIG_FIRERED_REV1 = {
 
 // gamedata/gen3/retail/firered.toml: firered_rev0 (ram, icons, dex, card, fly, field)
 static const struct pd_config PD_CONFIG_FIRERED_REV0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138260520, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -433,6 +435,7 @@ static const struct pd_config PD_CONFIG_FIRERED_REV0 = {
 
 // gamedata/gen3/retail/leafgreen.toml: leafgreen_rev0 (ram, icons, dex, guide, card, fly, field)
 static const struct pd_config PD_CONFIG_LEAFGREEN_REV0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138260068, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -616,6 +619,7 @@ static const struct pd_config PD_CONFIG_LEAFGREEN_REV0 = {
 
 // gamedata/gen3/retail/leafgreen.toml: leafgreen_rev1 (ram, foes, icons, dex, guide, card, fly, field)
 static const struct pd_config PD_CONFIG_LEAFGREEN_REV1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138260180, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -804,6 +808,7 @@ static const struct pd_config PD_CONFIG_LEAFGREEN_REV1 = {
 
 // gamedata/gen3/retail/emerald.toml: emerald_retail (ram, foes, icons, dex, guide, card, fly, field)
 static const struct pd_config PD_CONFIG_EMERALD = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 139999648, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x020244EC,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020244E9,
@@ -994,6 +999,7 @@ static const struct pd_config PD_CONFIG_EMERALD = {
 // structs with its own addresses, its own TrainerMon (guideTables.trainerMon).
 // gamedata/gen3/hacks/emerald_legacy.toml: emerald_legacy (ram, foes, icons, dex, guide, card, fly, field)
 static const struct pd_config PD_CONFIG_EMERALD_LEGACY = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 140206608, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x020244EC,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020244E9,
@@ -1184,6 +1190,7 @@ static const struct pd_config PD_CONFIG_EMERALD_LEGACY = {
 // (RETAIL_PORTS' AXVE0 / AXPE0). Read like Emerald (the same species / item / map-section ids); no trainer card.
 // gamedata/gen3/retail/ruby_sapphire.toml: ruby (ram, foes, icons, dex, guide, fly, field)
 static const struct pd_config PD_CONFIG_RUBY = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138171776, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004360,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004350,
@@ -1346,6 +1353,7 @@ static const struct pd_config PD_CONFIG_RUBY = {
 
 // gamedata/gen3/retail/ruby_sapphire.toml: sapphire (ram, foes, icons, dex, guide, fly, field)
 static const struct pd_config PD_CONFIG_SAPPHIRE = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138171868, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004360,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004350,
@@ -1508,6 +1516,7 @@ static const struct pd_config PD_CONFIG_SAPPHIRE = {
 
 // gamedata/gen3/ports/ruby.toml: port_axve0 (ram, foes, icons, dex, guide, fly, field)
 static const struct pd_config PD_CONFIG_RUBY_REV0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138171748, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004360,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004350,
@@ -1670,6 +1679,7 @@ static const struct pd_config PD_CONFIG_RUBY_REV0 = {
 
 // gamedata/gen3/ports/sapphire.toml: port_axpe0 (ram, foes, icons, dex, guide, fly, field)
 static const struct pd_config PD_CONFIG_SAPPHIRE_REV0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138171836, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004360,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004350,
@@ -1834,6 +1844,7 @@ static const struct pd_config PD_CONFIG_SAPPHIRE_REV0 = {
 // the tabs that read the ROM (icons, POKéDEX, GUIDE, CARD, FLY) join once a ROM is there to check them against.
 // gamedata/gen3/hacks/emerald_kaizo.toml: emerald_kaizo (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_EMERALD_KAIZO = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 139999648, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x020244EC,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020244E9,
@@ -1940,6 +1951,7 @@ static const struct pd_config PD_CONFIG_EMERALD_KAIZO = {
 
 // gamedata/gen3/hacks/glazed.toml: glazed (ram, foes, dex, card, guide)
 static const struct pd_config PD_CONFIG_GLAZED = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 139999648, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x020244EC,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020244E9,
@@ -2073,6 +2085,7 @@ static const struct pd_config PD_CONFIG_GLAZED = {
 
 // gamedata/gen3/hacks/celia.toml: celia (ram, dex, guide)
 static const struct pd_config PD_CONFIG_CELIA = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 146919612, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x0202433C,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020240E1,
@@ -2175,6 +2188,7 @@ static const struct pd_config PD_CONFIG_CELIA = {
 
 // gamedata/gen3/hacks/orange_islands.toml: orange_islands (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_ORANGE_ISLANDS = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138260520, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -2282,6 +2296,7 @@ static const struct pd_config PD_CONFIG_ORANGE_ISLANDS = {
 
 // gamedata/gen3/hacks/ultra_violet.toml: ultra_violet (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_ULTRA_VIOLET = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138260520, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -2389,6 +2404,7 @@ static const struct pd_config PD_CONFIG_ULTRA_VIOLET = {
 
 // gamedata/gen3/hacks/rocket_edition.toml: rocket_edition (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_ROCKET_EDITION = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138260520, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -2496,6 +2512,7 @@ static const struct pd_config PD_CONFIG_ROCKET_EDITION = {
 
 // gamedata/gen3/hacks/ash_gray.toml: ash_gray (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_ASH_GRAY = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138260520, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -2603,6 +2620,7 @@ static const struct pd_config PD_CONFIG_ASH_GRAY = {
 
 // gamedata/gen3/hacks/gaia.toml: gaia_v3_2 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_GAIA = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138260520, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -2724,6 +2742,7 @@ static const struct pd_config PD_CONFIG_GAIA = {
 
 // gamedata/gen3/hacks/sword_shield.toml: sword_shield (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_SWORD_SHIELD = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 154927104, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -2845,6 +2864,7 @@ static const struct pd_config PD_CONFIG_SWORD_SHIELD = {
 
 // gamedata/gen3/hacks/odyssey.toml: odyssey (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_ODYSSEY = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138260520, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -2952,6 +2972,7 @@ static const struct pd_config PD_CONFIG_ODYSSEY = {
 
 // gamedata/gen3/hacks/amethyst.toml: amethyst (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_AMETHYST = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 141744908, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -3059,6 +3080,7 @@ static const struct pd_config PD_CONFIG_AMETHYST = {
 
 // gamedata/gen3/hacks/amethyst.toml: amethyst_v1_4_1 (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_AMETHYST_V1_4_1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 141744908, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -3166,6 +3188,7 @@ static const struct pd_config PD_CONFIG_AMETHYST_V1_4_1 = {
 
 // gamedata/gen3/hacks/gs_chronicles.toml: gs_chronicles (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_GS_CHRONICLES = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 150405120, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -3273,6 +3296,7 @@ static const struct pd_config PD_CONFIG_GS_CHRONICLES = {
 
 // gamedata/gen3/hacks/ghost_grey.toml: ghost_grey (ram, foes, dex, guide)
 static const struct pd_config PD_CONFIG_GHOST_GREY = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138260520, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -3381,6 +3405,7 @@ static const struct pd_config PD_CONFIG_GHOST_GREY = {
 // CFRU (plaintext party boxes): Radical Red 4.1 (ROM checked: party icons, POKéDEX) and Unbound (RAM only, no ROM to hand).
 // gamedata/gen3/hacks/radical_red.toml: radical_red_v4_1 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_RADICAL_RED = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 154927104, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -3502,6 +3527,7 @@ static const struct pd_config PD_CONFIG_RADICAL_RED = {
 
 // gamedata/gen3/hacks/unbound.toml: unbound_with_dex (ram, foes, dex, card, guide)
 static const struct pd_config PD_CONFIG_UNBOUND = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 143090176, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -3635,6 +3661,7 @@ static const struct pd_config PD_CONFIG_UNBOUND = {
 
 // gamedata/gen3/hacks/unbound.toml: unbound_fr (ram, foes, dex, card, guide)
 static const struct pd_config PD_CONFIG_UNBOUND_FR = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 143090176, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -3769,6 +3796,7 @@ static const struct pd_config PD_CONFIG_UNBOUND_FR = {
 // pokeemerald-expansion family (and Recharged Yellow): PARTY / BAG / BATTLE from RAM, party and bag icons from the ROM.
 // gamedata/gen3/hacks/imperium.toml: imperium (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_IMPERIUM = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 141326968, .stride = 80, .descOff = -8, .idOff = -1 },
     .playerParty = 0x020375F8,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020375F5,
@@ -3890,6 +3918,7 @@ static const struct pd_config PD_CONFIG_IMPERIUM = {
 
 // gamedata/gen3/hacks/tmt2.toml: tmt2 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_TMT2 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 141269424, .stride = 84, .descOff = -8, .idOff = -1 },
     .playerParty = 0x02032C94,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02032715,
@@ -4011,6 +4040,7 @@ static const struct pd_config PD_CONFIG_TMT2 = {
 
 // gamedata/gen3/hacks/recharged_yellow.toml: recharged_yellow_v1_8_0 (ram, foes, icons, dex, card, guide)
 static const struct pd_config PD_CONFIG_RECHARGED_YELLOW_V1_8_0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 142637624, .stride = 48, .descOff = 24, .count = 409, .idOff = -1 },
     .playerParty = 0x02038554,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02038551,
@@ -4158,6 +4188,7 @@ static const struct pd_config PD_CONFIG_RECHARGED_YELLOW_V1_8_0 = {
 
 // gamedata/gen3/hacks/recharged_yellow.toml: recharged_yellow_v1_9_0 (ram, foes, icons, dex, card, guide)
 static const struct pd_config PD_CONFIG_RECHARGED_YELLOW_V1_9_0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 142636204, .stride = 48, .descOff = 24, .count = 409, .idOff = -1 },
     .playerParty = 0x0203855C,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02038559,
@@ -4305,6 +4336,7 @@ static const struct pd_config PD_CONFIG_RECHARGED_YELLOW_V1_9_0 = {
 
 // gamedata/gen3/hacks/recharged_yellow.toml: recharged_yellow_v1_9_4 (ram, foes, icons, dex, card, guide)
 static const struct pd_config PD_CONFIG_RECHARGED_YELLOW_V1_9_4 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 143553712, .stride = 48, .descOff = 24, .count = 409, .idOff = -1 },
     .playerParty = 0x0203855C,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02038559,
@@ -4452,6 +4484,7 @@ static const struct pd_config PD_CONFIG_RECHARGED_YELLOW_V1_9_4 = {
 
 // gamedata/gen3/hacks/recharged_yellow.toml: recharged_yellow_v1_9_7 (ram, foes, icons, dex, card, guide)
 static const struct pd_config PD_CONFIG_RECHARGED_YELLOW_V1_9_7 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 143718752, .stride = 48, .descOff = 24, .count = 409, .idOff = -1 },
     .playerParty = 0x0203855C,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02038559,
@@ -4599,6 +4632,7 @@ static const struct pd_config PD_CONFIG_RECHARGED_YELLOW_V1_9_7 = {
 
 // gamedata/gen3/hacks/seaglass.toml: emerald_seaglass (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_SEAGLASS = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 141027196, .stride = 84, .descOff = -8, .idOff = -1 },
     .playerParty = 0x02019C20,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02019C1D,
@@ -4720,6 +4754,7 @@ static const struct pd_config PD_CONFIG_SEAGLASS = {
 
 // gamedata/gen3/hacks/lazarus.toml: lazarus (ram, foes, icons, dex, card, guide)
 static const struct pd_config PD_CONFIG_LAZARUS = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 143033692, .stride = 80, .descOff = -8, .idOff = -1 },
     .playerParty = 0x0201B960,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x0201B95D,
@@ -4867,6 +4902,7 @@ static const struct pd_config PD_CONFIG_LAZARUS = {
 
 // gamedata/gen3/hacks/wishes.toml: wishes (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_WISHES = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 141227912, .stride = 44, .descOff = -8, .idOff = -1 },
     .playerParty = 0x02031EBC,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02031C5D,
@@ -4988,6 +5024,7 @@ static const struct pd_config PD_CONFIG_WISHES = {
 
 // gamedata/gen3/hacks/mariomon.toml: mariomon_v1_5_2 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_MARIOMON_V1_5_2 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 142658960, .stride = 40, .descOff = 20, .count = 824, .idOff = -1 },
     .playerParty = 0x02025158,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02025155,
@@ -5109,6 +5146,7 @@ static const struct pd_config PD_CONFIG_MARIOMON_V1_5_2 = {
 
 // gamedata/gen3/hacks/mariomon.toml: mariomon_v1_5_1 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_MARIOMON_V1_5_1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 142657756, .stride = 40, .descOff = 20, .count = 824, .idOff = -1 },
     .playerParty = 0x02025158,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02025155,
@@ -5230,6 +5268,7 @@ static const struct pd_config PD_CONFIG_MARIOMON_V1_5_1 = {
 
 // gamedata/gen3/hacks/mariomon.toml: mariomon_v1_3 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_MARIOMON_V1_3 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 142533064, .stride = 40, .descOff = 20, .count = 821, .idOff = -1 },
     .playerParty = 0x02025038,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02025035,
@@ -5351,6 +5390,7 @@ static const struct pd_config PD_CONFIG_MARIOMON_V1_3 = {
 
 // gamedata/gen3/hacks/mariomon.toml: mariomon_v1_2_2 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_MARIOMON_V1_2_2 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 142533092, .stride = 40, .descOff = 20, .count = 821, .idOff = -1 },
     .playerParty = 0x02025038,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02025035,
@@ -5472,6 +5512,7 @@ static const struct pd_config PD_CONFIG_MARIOMON_V1_2_2 = {
 
 // gamedata/gen3/hacks/mariomon.toml: mariomon_v1_2_1 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_MARIOMON_V1_2_1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 142533120, .stride = 40, .descOff = 20, .count = 821, .idOff = -1 },
     .playerParty = 0x02025038,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02025035,
@@ -5593,6 +5634,7 @@ static const struct pd_config PD_CONFIG_MARIOMON_V1_2_1 = {
 
 // gamedata/gen3/hacks/rowe.toml: rowe (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_ROWE = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 150433144, .stride = 56, .descOff = 28, .idOff = -1 },
     .playerParty = 0x02025128,
     .partyLayout = &pd_party_layout_rowe,
     .playerPartyCount = 0x02025125,
@@ -5687,6 +5729,7 @@ static const struct pd_config PD_CONFIG_ROWE = {
 
 // gamedata/gen3/hacks/team_rocket.toml: team_rocket (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_TEAM_ROCKET = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 147338160, .stride = 44, .descOff = 20, .idOff = 14, .count = 923 },
     .playerParty = 0x02025170,
     .partyLayout = &pd_party_layout_team_rocket,
     .playerPartyCount = 0x0202516D,
@@ -5808,6 +5851,7 @@ static const struct pd_config PD_CONFIG_TEAM_ROCKET = {
 
 // gamedata/gen3/hacks/dreamstone.toml: dreamstone (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_DREAMSTONE = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 141752012, .stride = 80, .descOff = -8, .idOff = -1 },
     .playerParty = 0x02032314,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020320B5,
@@ -5929,6 +5973,7 @@ static const struct pd_config PD_CONFIG_DREAMSTONE = {
 
 // gamedata/gen3/hacks/soulgold.toml: soulgold (ram, foes, icons, dex, card, guide)
 static const struct pd_config PD_CONFIG_SOULGOLD = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 141893792, .stride = 44, .descOff = -8, .idOff = -1 },
     .playerParty = 0x0203901C,
     .partyLayout = &pd_party_layout_soulgold,
     .playerPartyCount = 0x02038DD5,
@@ -6076,6 +6121,7 @@ static const struct pd_config PD_CONFIG_SOULGOLD = {
 
 // gamedata/gen3/hacks/soulgold.toml: soulgold_v1_2 (ram, foes, icons, dex, card, guide)
 static const struct pd_config PD_CONFIG_SOULGOLD_V1_2 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 141899828, .stride = 44, .descOff = -8, .idOff = -1 },
     .playerParty = 0x02039024,
     .partyLayout = &pd_party_layout_soulgold,
     .playerPartyCount = 0x02038DDD,
@@ -6223,6 +6269,7 @@ static const struct pd_config PD_CONFIG_SOULGOLD_V1_2 = {
 
 // gamedata/gen3/hacks/soulgold.toml: soulgold_v1_2b (ram, foes, icons, dex, card, guide)
 static const struct pd_config PD_CONFIG_SOULGOLD_V1_2B = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 141899676, .stride = 44, .descOff = -8, .idOff = -1 },
     .playerParty = 0x02039024,
     .partyLayout = &pd_party_layout_soulgold,
     .playerPartyCount = 0x02038DDD,
@@ -6370,6 +6417,7 @@ static const struct pd_config PD_CONFIG_SOULGOLD_V1_2B = {
 
 // gamedata/gen3/hacks/soulgold.toml: soulgold_v1_2c (ram, foes, icons, dex, card, guide)
 static const struct pd_config PD_CONFIG_SOULGOLD_V1_2C = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 141900072, .stride = 44, .descOff = -8, .idOff = -1 },
     .playerParty = 0x02039024,
     .partyLayout = &pd_party_layout_soulgold,
     .playerPartyCount = 0x02038DDD,
@@ -6517,6 +6565,7 @@ static const struct pd_config PD_CONFIG_SOULGOLD_V1_2C = {
 
 // gamedata/gen3/hacks/heart_and_soul.toml: heart_and_soul (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_HEART_AND_SOUL = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 142143444, .stride = 44, .descOff = -8, .idOff = -1 },
     .playerParty = 0x02034764,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020342A4,
@@ -6638,6 +6687,7 @@ static const struct pd_config PD_CONFIG_HEART_AND_SOUL = {
 
 // gamedata/gen3/hacks/quetzal.toml: quetzal (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_QUETZAL_V9_0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 152962452, .stride = 28, .descOff = 12, .idOff = -1 },
     .playerParty = 0x020235CC,
     .partyLayout = &pd_party_layout_quetzal,
     .playerPartyCount = 0x020235C9,
@@ -6759,6 +6809,7 @@ static const struct pd_config PD_CONFIG_QUETZAL_V9_0 = {
 
 // gamedata/gen3/hacks/quetzal.toml: quetzal_es (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_QUETZAL_V9_0_ES = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 152974748, .stride = 28, .descOff = 12, .idOff = -1 },
     .playerParty = 0x020235CC,
     .partyLayout = &pd_party_layout_quetzal,
     .playerPartyCount = 0x020235C9,
@@ -6880,6 +6931,7 @@ static const struct pd_config PD_CONFIG_QUETZAL_V9_0_ES = {
 
 // gamedata/gen3/hacks/quetzal.toml: quetzal_v1 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_QUETZAL_V9_1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 153001068, .stride = 28, .descOff = 12, .idOff = -1 },
     .playerParty = 0x020235CC,
     .partyLayout = &pd_party_layout_quetzal,
     .playerPartyCount = 0x020235C9,
@@ -7001,6 +7053,7 @@ static const struct pd_config PD_CONFIG_QUETZAL_V9_1 = {
 
 // gamedata/gen3/hacks/quetzal.toml: quetzal_es_v1 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_QUETZAL_V9_1_ES = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 153013424, .stride = 28, .descOff = 12, .idOff = -1 },
     .playerParty = 0x020235CC,
     .partyLayout = &pd_party_layout_quetzal,
     .playerPartyCount = 0x020235C9,
@@ -7122,6 +7175,7 @@ static const struct pd_config PD_CONFIG_QUETZAL_V9_1_ES = {
 
 // gamedata/gen3/hacks/quetzal.toml: quetzal_v084 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_QUETZAL_V0_8_4 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 150557220, .stride = 28, .descOff = 12, .idOff = -1 },
     .playerParty = 0x020235CC,
     .partyLayout = &pd_party_layout_quetzal,
     .playerPartyCount = 0x020235C9,
@@ -7243,6 +7297,7 @@ static const struct pd_config PD_CONFIG_QUETZAL_V0_8_4 = {
 
 // gamedata/gen3/hacks/quetzal.toml: quetzal_v084_es (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_QUETZAL_V0_8_4_ES = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 150554948, .stride = 28, .descOff = 12, .idOff = -1 },
     .playerParty = 0x020235CC,
     .partyLayout = &pd_party_layout_quetzal,
     .playerPartyCount = 0x020235C9,
@@ -7364,6 +7419,7 @@ static const struct pd_config PD_CONFIG_QUETZAL_V0_8_4_ES = {
 
 // gamedata/gen3/hacks/quetzal.toml: quetzal_moemon_v084 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_MOEMON_QUETZAL_V0_8_4 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 150557192, .stride = 28, .descOff = 12, .idOff = -1 },
     .playerParty = 0x020235CC,
     .partyLayout = &pd_party_layout_quetzal,
     .playerPartyCount = 0x020235C9,
@@ -7485,6 +7541,7 @@ static const struct pd_config PD_CONFIG_MOEMON_QUETZAL_V0_8_4 = {
 
 // gamedata/gen3/hacks/quetzal.toml: quetzal_moemon_v084_es (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_MOEMON_QUETZAL_V0_8_4_ES = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 150554920, .stride = 28, .descOff = 12, .idOff = -1 },
     .playerParty = 0x020235CC,
     .partyLayout = &pd_party_layout_quetzal,
     .playerPartyCount = 0x020235C9,
@@ -7607,6 +7664,7 @@ static const struct pd_config PD_CONFIG_MOEMON_QUETZAL_V0_8_4_ES = {
 // pokeemerald-expansion family (and Recharged Yellow): PARTY / BAG / BATTLE from RAM, party and bag icons from the ROM.
 // gamedata/gen3/hacks/recharged_emerald.toml: recharged_emerald_v2_2_5 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_RECHARGED_EMERALD_V2_2_5 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 143308880, .stride = 48, .descOff = 24, .count = 409, .idOff = -1 },
     .playerParty = 0x020373C8,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020373C5,
@@ -7728,6 +7786,7 @@ static const struct pd_config PD_CONFIG_RECHARGED_EMERALD_V2_2_5 = {
 
 // gamedata/gen3/hacks/recharged_emerald.toml: recharged_emerald_v2_2_8 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_RECHARGED_EMERALD_V2_2_8 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 143316712, .stride = 48, .descOff = 24, .count = 409, .idOff = -1 },
     .playerParty = 0x020373C8,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020373C5,
@@ -7849,6 +7908,7 @@ static const struct pd_config PD_CONFIG_RECHARGED_EMERALD_V2_2_8 = {
 
 // gamedata/gen3/hacks/recharged_emerald.toml: recharged_emerald_rebalanced_v2_2_8 (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_RECHARGED_EMERALD_REBALANCED_V2_2_8 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 143318568, .stride = 48, .descOff = 24, .count = 409, .idOff = -1 },
     .playerParty = 0x020373DC,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x020373D9,
@@ -7971,6 +8031,7 @@ static const struct pd_config PD_CONFIG_RECHARGED_EMERALD_REBALANCED_V2_2_8 = {
 // Emerald Rogue (v2.2.1 EX): vanilla's party struct grown to 104 bytes, expansion's battle struct, nine bag views.
 // gamedata/gen3/hacks/emerald_rogue.toml: emerald_rogue (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_EMERALD_ROGUE = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 146355628, .stride = 40, .descOff = 12, .count = 827, .idOff = -1, .next = &(const struct pd_item_descs){ .base = 146398548, .stride = 48, .descOff = 16, .first = 827, .count = 201, .idOff = -1 } },
     .playerParty = 0x02036C7C,
     .partyLayout = &pd_party_layout_rogue,
     .playerPartyCount = 0x02036C79,
@@ -8066,6 +8127,7 @@ static const struct pd_config PD_CONFIG_EMERALD_ROGUE = {
 // Elite Redux 2.65.3b / 2.65.4.1b: PARTY and BATTLE; its bag is a flag per item (not read yet).
 // gamedata/gen3/hacks/elite_redux.toml: elite_redux_v2_65_4_1b (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_ELITE_REDUX_V2_65_4_1B = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 145517348, .stride = 40, .descOff = 16, .idOff = 4, .count = 440 },
     .playerParty = 0x02039910,
     .partyLayout = &pd_party_layout_elite_redux,
     .playerPartyCount = 0x0203990D,
@@ -8187,6 +8249,7 @@ static const struct pd_config PD_CONFIG_ELITE_REDUX_V2_65_4_1B = {
 
 // gamedata/gen3/hacks/elite_redux.toml: elite_redux_v2_65_3b (ram, foes, icons, dex, guide)
 static const struct pd_config PD_CONFIG_ELITE_REDUX_V2_65_3B = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 145462848, .stride = 40, .descOff = 16, .idOff = 4, .count = 440 },
     .playerParty = 0x02039908,
     .partyLayout = &pd_party_layout_elite_redux,
     .playerPartyCount = 0x02039905,
@@ -8310,6 +8373,7 @@ static const struct pd_config PD_CONFIG_ELITE_REDUX_V2_65_3B = {
 // and revision. PARTY / BAG / BATTLE and the POKéDEX from RAM and the ROM, with the cart's own species, move and item names.
 // gamedata/gen3/ports/sapphire.toml: port_axpd0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXPD0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138220360, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -8404,6 +8468,7 @@ static const struct pd_config PD_CONFIG_PORT_AXPD0 = {
 
 // gamedata/gen3/ports/sapphire.toml: port_axpd1 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXPD1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138220360, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -8498,6 +8563,7 @@ static const struct pd_config PD_CONFIG_PORT_AXPD1 = {
 
 // gamedata/gen3/ports/sapphire.toml: port_axpf0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXPF0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138201844, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -8592,6 +8658,7 @@ static const struct pd_config PD_CONFIG_PORT_AXPF0 = {
 
 // gamedata/gen3/ports/sapphire.toml: port_axpf1 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXPF1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138201844, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -8686,6 +8753,7 @@ static const struct pd_config PD_CONFIG_PORT_AXPF1 = {
 
 // gamedata/gen3/ports/sapphire.toml: port_axpi0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXPI0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138173596, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -8780,6 +8848,7 @@ static const struct pd_config PD_CONFIG_PORT_AXPI0 = {
 
 // gamedata/gen3/ports/sapphire.toml: port_axpi1 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXPI1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138173596, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -8874,6 +8943,7 @@ static const struct pd_config PD_CONFIG_PORT_AXPI1 = {
 
 // gamedata/gen3/ports/sapphire.toml: port_axps0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXPS0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138186040, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -8968,6 +9038,7 @@ static const struct pd_config PD_CONFIG_PORT_AXPS0 = {
 
 // gamedata/gen3/ports/sapphire.toml: port_axps1 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXPS1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138186040, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -9062,6 +9133,7 @@ static const struct pd_config PD_CONFIG_PORT_AXPS1 = {
 
 // gamedata/gen3/ports/ruby.toml: port_axvd0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXVD0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138220508, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -9156,6 +9228,7 @@ static const struct pd_config PD_CONFIG_PORT_AXVD0 = {
 
 // gamedata/gen3/ports/ruby.toml: port_axvd1 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXVD1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138220508, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -9250,6 +9323,7 @@ static const struct pd_config PD_CONFIG_PORT_AXVD1 = {
 
 // gamedata/gen3/ports/ruby.toml: port_axvf0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXVF0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138203076, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -9344,6 +9418,7 @@ static const struct pd_config PD_CONFIG_PORT_AXVF0 = {
 
 // gamedata/gen3/ports/ruby.toml: port_axvf1 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXVF1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138203076, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -9438,6 +9513,7 @@ static const struct pd_config PD_CONFIG_PORT_AXVF1 = {
 
 // gamedata/gen3/ports/ruby.toml: port_axvi0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXVI0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138174456, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -9532,6 +9608,7 @@ static const struct pd_config PD_CONFIG_PORT_AXVI0 = {
 
 // gamedata/gen3/ports/ruby.toml: port_axvi1 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXVI1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138174456, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -9626,6 +9703,7 @@ static const struct pd_config PD_CONFIG_PORT_AXVI1 = {
 
 // gamedata/gen3/ports/ruby.toml: port_axvs0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXVS0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138186748, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -9720,6 +9798,7 @@ static const struct pd_config PD_CONFIG_PORT_AXVS0 = {
 
 // gamedata/gen3/ports/ruby.toml: port_axvs1 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_AXVS1 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138186748, .stride = 44, .descOff = 20, .idOff = 14, .count = 349 },
     .playerParty = 0x03004370,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x03004360,
@@ -9814,6 +9893,7 @@ static const struct pd_config PD_CONFIG_PORT_AXVS1 = {
 
 // gamedata/gen3/ports/leafgreen.toml: port_bpgd0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_BPGD0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138257236, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -9908,6 +9988,7 @@ static const struct pd_config PD_CONFIG_PORT_BPGD0 = {
 
 // gamedata/gen3/ports/leafgreen.toml: port_bpgf0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_BPGF0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138228064, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -10002,6 +10083,7 @@ static const struct pd_config PD_CONFIG_PORT_BPGF0 = {
 
 // gamedata/gen3/ports/leafgreen.toml: port_bpgi0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_BPGI0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138222884, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -10096,6 +10178,7 @@ static const struct pd_config PD_CONFIG_PORT_BPGI0 = {
 
 // gamedata/gen3/ports/leafgreen.toml: port_bpgs0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_BPGS0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138235276, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -10190,6 +10273,7 @@ static const struct pd_config PD_CONFIG_PORT_BPGS0 = {
 
 // gamedata/gen3/ports/firered.toml: port_bprd0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_BPRD0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138257688, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -10284,6 +10368,7 @@ static const struct pd_config PD_CONFIG_PORT_BPRD0 = {
 
 // gamedata/gen3/ports/firered.toml: port_bprf0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_BPRF0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138228516, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -10378,6 +10463,7 @@ static const struct pd_config PD_CONFIG_PORT_BPRF0 = {
 
 // gamedata/gen3/ports/firered.toml: port_bpri0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_BPRI0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138223336, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,
@@ -10472,6 +10558,7 @@ static const struct pd_config PD_CONFIG_PORT_BPRI0 = {
 
 // gamedata/gen3/ports/firered.toml: port_bprs0 (ram, foes, icons, dex)
 static const struct pd_config PD_CONFIG_PORT_BPRS0 = {
+    .itemDescs = &(const struct pd_item_descs){ .base = 138235728, .stride = 44, .descOff = 20, .idOff = 14 },
     .playerParty = 0x02024284,
     .partyLayout = &pd_party_layout_vanilla,
     .playerPartyCount = 0x02024029,

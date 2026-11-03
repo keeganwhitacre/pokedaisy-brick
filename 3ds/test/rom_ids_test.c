@@ -34,6 +34,11 @@ static int check(const char* path, const char* name, int* ok, int* unsupported) 
             if (n[0]) { named++; if (!first) first = n; }
         }
         const struct pd_text* t = g.cfg->text;
+        // its items' descriptions come from its ROM (the app's RomItemText): item 4's (a POKé BALL in every game so far)
+        const char* desc = pd_item_description(&g, 4);
+        if (getenv("PD_ROMS_NAMES")) printf("  %s: item 4 '%s'\n", name, desc);
+        // (a build guessed onto a neighbour's config may keep its table elsewhere: the app has none for it either)
+        if (!desc[0] && !strstr(g.title, "unverified")) { printf("FAIL %s: no item description\n", name); return 1; }
         if (getenv("PD_ROMS_NAMES"))
             printf("  %s: %d place names (%s), first %s\n", name, named,
                    t && t->mapsecsRom ? "ROM" : t && t->mapsecs ? "own table" : "retail", first ? first : "-");

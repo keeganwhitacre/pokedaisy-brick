@@ -797,6 +797,23 @@ def c_value(v, f, names, lists, where, none):
     if f["type"] in ("long_list", "int_list", "int_set", "long_set", "int_map") and isinstance(v, list):
         return "{ " + ", ".join(c_value(i, {"type": "int"}, names, lists, where, None) if not isinstance(i, list)
                                 else "{ " + ", ".join(str(int(x)) for x in i) + " }" for i in v) + " }"
+    if f["type"] == "item_descs" and isinstance(v, dict) and "kotlin" not in v:  # RomItemText's ItemDescTable
+        def num(x):
+            if isinstance(x, dict):
+                n = kotlin_const_expr(x.get("ref") or x.get("kotlin") or "")
+                if n is None:
+                    fail(where, f"{x} is Kotlin; the C needs the value in gamedata/")
+                return str(n)
+            return str(int(x))
+        d = dict({"vanilla": dict(stride=44, descOff=0x14, idOff=0x0E), "japanese": dict(stride=40, descOff=0x10, idOff=0x0A)}
+                 .get(v.get("preset"), {}))
+        d.update({k: x for k, x in v.items() if k not in ("preset", "next")})
+        fields = ", ".join(f".{k} = {num(d[k])}" for k in ("base", "stride", "descOff", "idOff", "first", "count") if k in d)
+        if "idOff" not in d:
+            fields += ", .idOff = -1"
+        if v.get("next"):
+            fields += ", .next = " + c_value(v["next"], f, names, lists, where, None)
+        return "&(const struct pd_item_descs){ " + fields + " }"
     if isinstance(v, dict):
         expr = v.get("kotlin") or ""
         if expr.startswith("BattleMonLayout("):  # a hack's own struct BattlePokemon, spelled out
