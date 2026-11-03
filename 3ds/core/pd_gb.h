@@ -49,7 +49,7 @@ extern const uint32_t pd_gb_polished_variants[];
 extern const int pd_gb_polished_variants_count;
 
 extern const struct pd_gb_config pd_gb_yellow, pd_gb_red, pd_gb_pure_red, pd_gb_crystal, pd_gb_gold, pd_gb_prism,
-    pd_gb_polished, pd_gb_crystal_clear, pd_gb_blue;
+    pd_gb_polished, pd_gb_crystal_clear, pd_gb_blue, pd_gb_yume_blue, pd_gb_crystal_legacy, pd_gb_ambrosia;
 
 struct pd_config;
 void pd_gb_snapshot_read(struct pd_snapshot* s, const struct pd_config* cfg, pd_read_fn read, void* ctx);

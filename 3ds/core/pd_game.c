@@ -223,6 +223,9 @@ PD_GB_CONFIG(GOLD, pd_gb_gold, gb_gold_silver)
 PD_GB_CONFIG(SILVER, pd_gb_gold, gb_gold_silver)
 PD_GB_CONFIG(CRYSTAL_CLEAR, pd_gb_crystal_clear, gb_crystal_clear)
 PD_GB_CONFIG(PRISM, pd_gb_prism, gb_prism)
+PD_GB_CONFIG(YUME_BLUE, pd_gb_yume_blue, gb_yellow)
+PD_GB_CONFIG(CRYSTAL_LEGACY, pd_gb_crystal_legacy, gb_crystal)
+PD_GB_CONFIG(AMBROSIA, pd_gb_ambrosia, gb_crystal)
 PD_GB_CONFIG(POLISHED, pd_gb_polished, gb_polished)
 PD_GB_CONFIG(POLISHED_FAITHFUL, pd_gb_polished, gb_polished_faithful)
 
@@ -235,9 +238,6 @@ struct unsupported_rom {
     const char* why;
 };
 static const struct unsupported_rom UNSUPPORTED_ROMS[] = {
-    {"74a6727e4406c35bc2d4f81347a5c5fdb8970663", "Pokémon Crystal Legacy", PD_NO_LAYOUT},
-    {"0d96cd8447788dd72392e4983df2115bf40e9315", "Pokémon Ambrosia", PD_NO_LAYOUT},
-    {"65f409e0677cdb0cfefeb2f981136cc84ba45a1c", "Pokémon Yume Blue", PD_NO_LAYOUT},
     {"9402014d14969432142abfde728c6f1a10ee4dac", "Pokémon Pinball", PD_NOT_A_GAME},
     {"e40d6a7f78b449e5a55baaaea7e227ab19d510e4", "Pokémon Puzzle Challenge", PD_NOT_A_GAME},
     {"bd9227a3f7e4b600990d904e5e5b33021ede77f9", "Pokémon TCG Neo", PD_NOT_A_GAME},
@@ -256,6 +256,9 @@ struct gb_rom {
     const char* title;
 };
 static const struct gb_rom GB_ROMS[] = {
+    {"65f409e0677cdb0cfefeb2f981136cc84ba45a1c", &PD_GB_CONFIG_YUME_BLUE, "Pokémon Yume Blue (unverified)"},
+    {"74a6727e4406c35bc2d4f81347a5c5fdb8970663", &PD_GB_CONFIG_CRYSTAL_LEGACY, "Pokémon Crystal Legacy (unverified)"},
+    {"0d96cd8447788dd72392e4983df2115bf40e9315", &PD_GB_CONFIG_AMBROSIA, "Pokémon Ambrosia (unverified)"},
     {"ea9bcae617fdf159b045185467ae58b2e4a48b9a", &PD_GB_CONFIG_RED, "Pokémon Red"},
     {"d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", &PD_GB_CONFIG_BLUE, "Pokémon Blue"},
     {"cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", &PD_GB_CONFIG_YELLOW, "Pokémon Yellow"},

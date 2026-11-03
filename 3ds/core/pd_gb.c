@@ -68,6 +68,35 @@ const struct pd_gb_config pd_gb_crystal_clear = {
     PD_GB_CRYSTAL_BASE
     .dexCaught = PD_WRAMX(1, 0xDA0E), .dexSeen = PD_WRAMX(1, 0xDEB9), .dexCount = 251,
 };
+// Hacks whose RAM is Blue's / Crystal's, moved: found by 3ds/tools/gb_addr_map.py (votes of 20-170 code references per
+// address, a constant shift per block). Unverified on a save: a wrong address reads as an empty party or bag, not garbage.
+// Yume Blue: party +0xEA, battle +0xEC, money / badges +0x1A4, Dex flags +0xEA; no guide (its bosses and flags differ).
+const struct pd_gb_config pd_gb_yume_blue = {
+    .gen = 1, .partyCount = 0xD24D, .partyMons = 0xD255, .numItems = 0xD407, .money = 0xD4EB, .battleMode = 0xD143,
+    .battleMon = 0xD100, .enemyMon = 0xD0D1, .otPartyCount = 0xD8C6, .otPartyMons = 0xD8CE, .curOTMon = 0xD0D4,
+    .internalToDex = pd_gb_internal_to_dex_yellow, .bagSlots = 30,
+    .dexCaught = 0xD3E1, .dexSeen = 0xD3F4, .dexCount = 151,
+};
+// Crystal Legacy 1.3.1: party / battle / items +0xB, money +0xB, its bag pockets elsewhere (key items D947, balls D9CC).
+const struct pd_gb_config pd_gb_crystal_legacy = {
+    .gen = 2, .partyCount = PD_WRAMX(1, 0xDCE2), .partyMons = PD_WRAMX(1, 0xDCEA), .numItems = PD_WRAMX(1, 0xD89D),
+    .numKeyItems = PD_WRAMX(1, 0xD947), .numBalls = PD_WRAMX(1, 0xD9CC), .tmsHms = PD_WRAMX(1, 0xD864),
+    .money = PD_WRAMX(1, 0xD859), .battleMode = PD_WRAMX(1, 0xD238), .battleMon = 0xC62C,
+    .enemyMon = PD_WRAMX(1, 0xD211), .otPartyCount = PD_WRAMX(1, 0xD28B), .otPartyMons = PD_WRAMX(1, 0xD293),
+    .curOTMon = 0xC663, .genderRatios = pd_gb_gender_crystal, .tmItems = pd_gb_tm_crystal, .speciesCount = 251,
+    .itemsMax = 80, .ballsMax = 25, .keyItemsMax = 50,
+    .dexCaught = PD_WRAMX(1, 0xDEA4), .dexSeen = PD_WRAMX(1, 0xDEC4), .dexCount = 251,
+};
+// Ambrosia 1.9.0: party / battle +0xB; bag pockets of 40 items and 30 key items (D884, D8D6, D8F6), TMs D84B, money D840.
+const struct pd_gb_config pd_gb_ambrosia = {
+    .gen = 2, .partyCount = PD_WRAMX(1, 0xDCE2), .partyMons = PD_WRAMX(1, 0xDCEA), .numItems = PD_WRAMX(1, 0xD884),
+    .numKeyItems = PD_WRAMX(1, 0xD8D6), .numBalls = PD_WRAMX(1, 0xD8F6), .tmsHms = PD_WRAMX(1, 0xD84B),
+    .money = PD_WRAMX(1, 0xD840), .battleMode = PD_WRAMX(1, 0xD238), .battleMon = 0xC62C,
+    .enemyMon = PD_WRAMX(1, 0xD211), .otPartyCount = PD_WRAMX(1, 0xD28B), .otPartyMons = PD_WRAMX(1, 0xD293),
+    .curOTMon = 0xC663, .genderRatios = pd_gb_gender_crystal, .tmItems = pd_gb_tm_crystal, .speciesCount = 251,
+    .itemsMax = 40, .ballsMax = 25, .keyItemsMax = 30,
+    .dexCaught = PD_WRAMX(1, 0xDEA4), .dexSeen = PD_WRAMX(1, 0xDEC4), .dexCount = 251,
+};
 const struct pd_gb_config pd_gb_gold = {
     .gen = 2, .partyCount = PD_WRAMX(1, 0xDA22), .partyMons = PD_WRAMX(1, 0xDA2A), .numItems = PD_WRAMX(1, 0xD5B7),
     .numKeyItems = PD_WRAMX(1, 0xD5E1), .numBalls = PD_WRAMX(1, 0xD5FC), .tmsHms = PD_WRAMX(1, 0xD57E),
