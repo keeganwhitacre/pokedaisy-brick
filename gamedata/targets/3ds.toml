@@ -158,6 +158,13 @@ trainerMonSpeciesOff = 'guideTables.trainerMon.speciesOff'
 trainerMonItemOff = 'guideTables.trainerMon.itemOff'
 trainerMonLevelOff = 'guideTables.trainerMon.levelOff'
 trainers = 'guideTables.trainers'
+trainerStride = 'guideTables.trainerStride'
+trainerNameOff = 'guideTables.trainerNameOff'
+trainerNameLen = 'guideTables.trainerNameLen'
+trainerSizeOff = 'guideTables.trainerSizeOff'
+trainerPartyOff = 'guideTables.trainerPartyOff'
+trainerHardPartyOff = 'guideTables.trainerHardPartyOff'
+altTrainers = 'guideTables.altTrainers'
 learnsets = 'guideTables.learnsets'
 wildHeaders = 'guideTables.wildHeaders'
 probeTrainer = 'guideTables.probeTrainer'
@@ -379,7 +386,7 @@ parts = ['ram', 'foes', 'dex', 'card', 'guide']
 # pokeemerald-expansion family (and Recharged Yellow): PARTY / BAG / BATTLE from RAM, party and bag icons from the ROM.
 [config.imperium]
 name = 'IMPERIUM'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.tmt2]
 name = 'TMT2'
@@ -387,19 +394,19 @@ parts = ['ram', 'foes', 'icons', 'dex']
 
 [config.recharged_yellow_v1_8_0]
 name = 'RECHARGED_YELLOW_V1_8_0'
-parts = ['ram', 'foes', 'icons', 'dex', 'card']
+parts = ['ram', 'foes', 'icons', 'dex', 'card', 'guide']
 
 [config.recharged_yellow_v1_9_0]
 name = 'RECHARGED_YELLOW_V1_9_0'
-parts = ['ram', 'foes', 'icons', 'dex', 'card']
+parts = ['ram', 'foes', 'icons', 'dex', 'card', 'guide']
 
 [config.recharged_yellow_v1_9_4]
 name = 'RECHARGED_YELLOW_V1_9_4'
-parts = ['ram', 'foes', 'icons', 'dex', 'card']
+parts = ['ram', 'foes', 'icons', 'dex', 'card', 'guide']
 
 [config.recharged_yellow_v1_9_7]
 name = 'RECHARGED_YELLOW_V1_9_7'
-parts = ['ram', 'foes', 'icons', 'dex', 'card']
+parts = ['ram', 'foes', 'icons', 'dex', 'card', 'guide']
 
 [config.emerald_seaglass]
 name = 'SEAGLASS'
@@ -500,15 +507,15 @@ parts = ['ram', 'foes', 'icons', 'dex']
 # pokeemerald-expansion family (and Recharged Yellow): PARTY / BAG / BATTLE from RAM, party and bag icons from the ROM.
 [config.recharged_emerald_v2_2_5]
 name = 'RECHARGED_EMERALD_V2_2_5'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.recharged_emerald_v2_2_8]
 name = 'RECHARGED_EMERALD_V2_2_8'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 [config.recharged_emerald_rebalanced_v2_2_8]
 name = 'RECHARGED_EMERALD_REBALANCED_V2_2_8'
-parts = ['ram', 'foes', 'icons', 'dex']
+parts = ['ram', 'foes', 'icons', 'dex', 'guide']
 
 # Emerald Rogue (v2.2.1 EX): vanilla's party struct grown to 104 bytes, expansion's battle struct, nine bag views.
 [config.emerald_rogue]

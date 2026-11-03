@@ -38,6 +38,9 @@ enum pd_guide_id {
     PD_GUIDE_GAIA,
     PD_GUIDE_GHOST_GREY,
     PD_GUIDE_CELIA,
+    PD_GUIDE_IMPERIUM,
+    PD_GUIDE_RECHARGED_YELLOW,
+    PD_GUIDE_RECHARGED_EMERALD,
 };
 
 // struct Pokemon's party fields (the app's PartyMonLayout): the party-only fields after the
@@ -190,6 +193,11 @@ struct pd_config {
     uint32_t flagsOff, varsOff, flagBytes; // in SaveBlock1
     // A hack's own struct TrainerMon (GuideTables.trainerMon), every field at a fixed offset; stride 0 = retail's.
     int trainerMonStride, trainerMonMovesOff, trainerMonSpeciesOff, trainerMonItemOff, trainerMonLevelOff;
+    // struct Trainer's shape (GuideTables.trainerStride ...): size, where the name / party size byte / party pointer sit.
+    // trainerHardPartyOff >= 0: a second party pointer in the record (size in the size byte's high nibble).
+    // altTrainers: more tables a trainer id picks with (k + 1) << 16 (0 = none); an empty record falls back to `trainers`.
+    int trainerStride, trainerNameOff, trainerNameLen, trainerSizeOff, trainerPartyOff, trainerHardPartyOff;
+    uint32_t altTrainers[3];
     int probeTrainer;     // checks the tables match the ROM ...
     const char* probeName; // ... by this trainer's name
 

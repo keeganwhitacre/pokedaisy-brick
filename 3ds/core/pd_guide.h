@@ -46,7 +46,7 @@ enum pd_boss_kind {
 // A team the game picks at run time (difficulty, a double battle's partners): shown under its label. {NULL, 0} ends.
 struct pd_variant {
     const char* label;
-    uint16_t trainer;
+    uint32_t trainer; // a trainer id; bits 16+ pick an alternate table / the HARD party
 };
 
 struct pd_boss {
@@ -73,7 +73,7 @@ struct pd_guide {
 extern const struct pd_guide pd_guide_firered, pd_guide_leafgreen, pd_guide_emerald, pd_guide_ruby, pd_guide_sapphire,
     pd_guide_emerald_legacy,
     pd_guide_rocket_edition, pd_guide_ash_gray, pd_guide_gs_chronicles, pd_guide_radical_red, pd_guide_orange_islands,
-    pd_guide_odyssey, pd_guide_sword_shield, pd_guide_unbound, pd_guide_gaia, pd_guide_ghost_grey, pd_guide_celia;
+    pd_guide_odyssey, pd_guide_sword_shield, pd_guide_unbound, pd_guide_gaia, pd_guide_ghost_grey, pd_guide_celia, pd_guide_imperium, pd_guide_recharged_yellow, pd_guide_recharged_emerald;
 
 enum pd_area_kind { PD_AREA_ITEM, PD_AREA_HIDDEN, PD_AREA_GIFT, PD_AREA_KEY, PD_AREA_MON, PD_AREA_EGG, PD_AREA_TRADE };
 

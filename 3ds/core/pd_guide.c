@@ -37,6 +37,9 @@ const struct pd_guide* pd_guide_for(const struct pd_game* g) {
     case PD_GUIDE_GAIA: return &pd_guide_gaia;
     case PD_GUIDE_GHOST_GREY: return &pd_guide_ghost_grey;
     case PD_GUIDE_CELIA: return &pd_guide_celia;
+    case PD_GUIDE_IMPERIUM: return &pd_guide_imperium;
+    case PD_GUIDE_RECHARGED_YELLOW: return &pd_guide_recharged_yellow;
+    case PD_GUIDE_RECHARGED_EMERALD: return &pd_guide_recharged_emerald;
     default: return NULL;
     }
 }
@@ -117,10 +120,27 @@ bool pd_area_done(const struct pd_game* g, const struct pd_snapshot* s, const st
     return false;
 }
 
+// The trainer's record (GuideRom.party): its id's top bits pick an alternate table, an empty record there falls back
+// to the main one. A config without the layout fields reads retail's struct Trainer.
+static int tr_stride(const struct pd_config* c) { return c->trainerStride ? c->trainerStride : TRAINER_STRIDE; }
+static int tr_size_off(const struct pd_config* c) { return c->trainerStride ? c->trainerSizeOff : 0x20; }
+static int tr_party_off(const struct pd_config* c) { return c->trainerStride ? c->trainerPartyOff : 0x24; }
+
+static const uint8_t* trainer_record(const struct pd_game* g, int id) {
+    const struct pd_config* c = g->cfg;
+    int stride = tr_stride(c), local = id & 0xFFFF, table = id >> 16;
+    if (table >= 1 && table <= 3 && c->altTrainers[table - 1]) {
+        const uint8_t* r = pd_rom_at(g, c->altTrainers[table - 1] + (uint32_t) local * stride, (size_t) stride);
+        if (r && (r[0] || u32(r + tr_party_off(c)))) return r;
+    }
+    return pd_rom_at(g, c->trainers + (uint32_t) local * stride, (size_t) stride);
+}
+
 bool pd_guide_rom_ok(const struct pd_game* g) {
     const struct pd_config* cfg = g->cfg;
     if (!cfg || !cfg->trainers || !cfg->probeName) return false;
-    const uint8_t* name = pd_rom_at(g, cfg->trainers + (uint32_t) cfg->probeTrainer * TRAINER_STRIDE + 4, 12);
+    const uint8_t* name = pd_rom_at(g, cfg->trainers + (uint32_t) cfg->probeTrainer * tr_stride(cfg) + (cfg->trainerStride ? cfg->trainerNameOff : 4),
+                                    (size_t) (cfg->trainerStride ? cfg->trainerNameLen : 12));
     const uint8_t* wild = pd_rom_at(g, cfg->wildHeaders, 1);
     if (!name || !wild || *wild == 0xFF) return false;
     char decoded[32];
@@ -170,13 +190,16 @@ static void default_moves(const struct pd_game* g, int species, int level, int* 
 }
 
 int pd_trainer_team(const struct pd_game* g, int trainer, struct pd_team_mon* out) {
-    const uint8_t* t = pd_rom_at(g, g->cfg->trainers + (uint32_t) trainer * TRAINER_STRIDE, TRAINER_STRIDE);
+    const uint8_t* t = trainer_record(g, trainer);
     if (!t) return 0;
-    int flags = t[0], size = t[0x20];
-    if (size < 1 || size > PD_TEAM_MAX) return 0;
     const struct pd_config* cfg = g->cfg;
+    bool hard = cfg->trainerStride && cfg->trainerHardPartyOff >= 0 && (trainer >> 16) == 1;
+    int flags = t[0], size = t[tr_size_off(cfg)];
+    if (cfg->trainerStride && cfg->trainerHardPartyOff >= 0) size = hard ? size >> 4 : size & 0x0F;
+    if (size < 1 || size > PD_TEAM_MAX) return 0;
+    uint32_t partyPtr = u32(t + (hard ? cfg->trainerHardPartyOff : tr_party_off(cfg)));
     if (cfg->trainerMonStride) {  // a hack's own TrainerMon (Emerald Legacy's 0x2C), whatever the flags
-        const uint8_t* party = pd_rom_at(g, u32(t + 0x24), (size_t) (size * cfg->trainerMonStride));
+        const uint8_t* party = pd_rom_at(g, partyPtr, (size_t) (size * cfg->trainerMonStride));
         if (!party) return 0;
         for (int i = 0; i < size; i++) {
             const uint8_t* m = party + i * cfg->trainerMonStride;
@@ -193,7 +216,7 @@ int pd_trainer_team(const struct pd_game* g, int trainer, struct pd_team_mon* ou
     }
     bool customMoves = flags & 1, heldItem = flags & 2;
     int stride = customMoves ? 16 : 8;
-    const uint8_t* party = pd_rom_at(g, u32(t + 0x24), (size_t) (size * stride));
+    const uint8_t* party = pd_rom_at(g, partyPtr, (size_t) (size * stride));
     if (!party) return 0;
     for (int i = 0; i < size; i++) {
         const uint8_t* m = party + i * stride;

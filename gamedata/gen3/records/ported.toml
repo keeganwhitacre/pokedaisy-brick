@@ -773,7 +773,7 @@ probeName = 'Terrence'
 guide = 'GuideId.AMETHYST'
 trainerMon = 'GUIDE_TABLES_AMETHYST_TRAINER_MON'
 learnsetCfru = true
-altTrainers = { kotlin = 'listOf(0x089CECCCL, 0x089B8A34L, 0x089C63B8L)' }  # HARD, DIVERGENT, DIVERGENT + HARD
+altTrainers = [0x089CECCC, 0x089B8A34, 0x089C63B8]  # HARD, DIVERGENT, DIVERGENT + HARD
 mapGroups = 0x083526A8
 
 # Amethyst v1.4.1: the same loader and flags (0x93C / 0x945), the tables moved; the gym leaders'
@@ -788,7 +788,7 @@ trainers = 0x08A25A14
 learnsets = 0x09ADB8D0
 guide = 'GuideId.AMETHYST_V141'
 mapGroups = 0x083526A8
-altTrainers = { kotlin = 'listOf(0x08A1861CL, 0x08A02384L, 0x08A0FD08L)' }
+altTrainers = [0x08A1861C, 0x08A02384, 0x08A0FD08]
 
 #
 # Pokémon Ultra Violet: retail FireRed rev 0's gTrainers (FireRed's gyms and League, one
@@ -858,7 +858,7 @@ trainerNameLen = 11
 trainerSizeOff = 0x20
 trainerPartyOff = 4
 trainerMon = 'GUIDE_TABLES_DREAMSTONE_TRAINER_MON'
-altTrainers = { kotlin = 'listOf(0x085837E4L)' }
+altTrainers = [0x085837E4]
 wildLayout = { kotlin = 'WildLayout(stride = 24)' }
 mapGroups = 0x09186E6C
 
@@ -1315,7 +1315,7 @@ trainerNameLen = 11
 trainerSizeOff = 0x1F
 trainerPartyOff = 4
 trainerMon = 'GUIDE_TABLES_QUETZAL_TRAINER_MON'
-altTrainers = { kotlin = 'listOf(0x09985F94L, 0x099914E8L)' }
+altTrainers = [0x09985F94, 0x099914E8]
 wildLayout = { kotlin = 'WildLayout(stride = 28, rockSmash = 3, fishing = 4)' }
 flagBanks = { kotlin = 'listOf(SaveBank(firstId = 0x1000, sb1Off = 0x2F2C, count = 0x2000))' }
 varBanks = { kotlin = 'listOf(SaveBank(firstId = 0x5000, sb1Off = 0x332C, count = 0x100))' }
@@ -1333,7 +1333,7 @@ kotlin = false
 trainers = 0x085086C0
 wildHeaders = 0x09186278
 probeName = 'PETRA'
-altTrainers = { kotlin = 'listOf(0x0998AE7CL, 0x099963D0L)' }
+altTrainers = [0x0998AE7C, 0x099963D0]
 mapGroups = 0x08934070
 
 # From app/src/main/kotlin/com/pokedaisy/app/companion/data/GuideRom.kt.
@@ -1343,7 +1343,7 @@ base = 'GUIDE_TABLES_QUETZAL_ES'
 kotlin = false
 trainers = 0x0851C23C
 wildHeaders = 0x09196024
-altTrainers = { kotlin = 'listOf(0x09996218L, 0x099A176CL)' }
+altTrainers = [0x09996218, 0x099A176C]
 mapGroups = 0x08947E24
 
 # Quetzal Alpha 0.8.4 (English / Spanish, and their Moemon Hotfix builds): Alpha 9's record shapes for Hoenn alone - no
@@ -1358,7 +1358,7 @@ kotlin = false
 trainers = 0x08406948
 wildHeaders = 0x08F34160
 guide = 'GuideId.QUETZAL_V084'
-altTrainers = { kotlin = 'emptyList()' }
+altTrainers = []
 mapGroups = 0x0861310C
 altMapSecGroups = 'none'
 
@@ -1400,7 +1400,7 @@ base = 'GUIDE_TABLES_QUETZAL'
 kotlin = false
 trainers = 0x085107FC
 wildHeaders = 0x0918A638
-altTrainers = { kotlin = 'listOf(0x09991270L, 0x0999C7C4L)' }
+altTrainers = [0x09991270, 0x0999C7C4]
 mapGroups = 0x0893C438
 
 #
@@ -1662,7 +1662,7 @@ trainerPartyOff = 8
 trainerMon = 'GUIDE_TABLES_SOULGOLD_TRAINER_MON'
 wildSets = 4
 wildSet = 0
-altTrainers = { kotlin = 'listOf(0x084B394CL)' }  # HARD
+altTrainers = [0x084B394C]  # HARD
 mapGroups = 0x09587364
 mapSecWide = true
 
@@ -1675,7 +1675,7 @@ base = 'GUIDE_TABLES_SOULGOLD'
 kotlin = false
 trainers = 0x084A5800
 wildHeaders = 0x09420BA8
-altTrainers = { kotlin = 'listOf(0x084B4470L)' }
+altTrainers = [0x084B4470]
 mapGroups = 0x09592634
 
 # From app/src/main/kotlin/com/pokedaisy/app/companion/data/GuideRom.kt.
@@ -1685,7 +1685,7 @@ base = 'GUIDE_TABLES_SOULGOLD'
 kotlin = false
 trainers = 0x084A5768
 wildHeaders = 0x09420B04
-altTrainers = { kotlin = 'listOf(0x084B43D8L)' }
+altTrainers = [0x084B43D8]
 mapGroups = 0x09592590
 
 # From app/src/main/kotlin/com/pokedaisy/app/companion/data/GuideRom.kt.
@@ -1695,7 +1695,7 @@ base = 'GUIDE_TABLES_SOULGOLD'
 kotlin = false
 trainers = 0x084A58F4
 wildHeaders = 0x0944EA34
-altTrainers = { kotlin = 'listOf(0x084B4564L)' }
+altTrainers = [0x084B4564]
 mapGroups = 0x095C04C0
 
 #

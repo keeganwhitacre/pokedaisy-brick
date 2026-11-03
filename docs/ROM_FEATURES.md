@@ -401,14 +401,14 @@ against the app's recorded cards (`make -C 3ds test-card`), the GUIDE's boss tea
 | ---- | :-: | :--: | :---: |
 | Unbound 2.1.1.1 (and the French fan translation) | ✅ | ✅ | ✅ ²⁶ |
 | Lazarus | ✅ | ✅ | — |
-| Recharged Yellow 1.8.0 | ✅ | ✅ | — |
-| Recharged Yellow 1.9.x | ✅ | ✅ | — |
+| Recharged Yellow 1.8.0 | ✅ | ✅ | ✅ ²⁸ |
+| Recharged Yellow 1.9.x | ✅ | ✅ | ✅ ²⁸ |
 | SoulGold | ✅ | ✅ | — |
 | Glazed | ✅ | ✅ ²³ | — |
-| Imperium | ✅ | — ²⁴ | — |
+| Imperium | ✅ | — ²⁴ | ✅ |
 | Quetzal (Alpha 0.8.4 and 9.x, English and Spanish) | ✅ | — | — |
 | Rocket Edition, Ash Gray, GS Chronicles, Radical Red, Orange Islands | ✅ | — | ✅ |
-| Odyssey, Sword and Shield Ultimate Plus, Gaia | ✅ | — | ✅ |
+| Odyssey, Sword and Shield Ultimate Plus, Gaia, Recharged Emerald ²⁸ | ✅ | — | ✅ |
 | Dreamstone Mysteries, Wishes of Tomorrow, R.O.W.E., Amethyst, Heart and Soul, Seaglass, Too Many Types 2, Emerald Rogue (EX) | ✅ | — | — |
 | Celia's Stupid Romhack | ◐ ²⁵ | — | ✅ |
 | Ghost Grey | ✅ | — | ✅ ²⁷ |
@@ -417,7 +417,9 @@ against the app's recorded cards (`make -C 3ds test-card`), the GUIDE's boss tea
 ²⁴ No reference render of Imperium's card exists to check against, so the tab stays off.
 ²⁵ The dex probe the C reader uses (the first entry's category) does not match this ROM; whether the app's own check passes was not tested.
 
-²⁶ Boss teams with several difficulties (Unbound's four, Odyssey's NORMAL / HARD) show one section per team. Unbound has no learnset table here, so a VANILLA team's moves are blank. The guide's left out for hacks whose bosses are built by Kotlin helpers or lambdas (Amethyst, SoulGold, Imperium, Quetzal, Recharged Emerald / Yellow). Gaia's Elite Four count as beaten once the game is cleared; Celia's BLAINE shows his eight one-on-one battles.
+²⁶ Boss teams with several difficulties (Unbound's four, Odyssey's NORMAL / HARD) show one section per team. Unbound has no learnset table here, so a VANILLA team's moves are blank. The guide's left out for hacks whose bosses are built by Kotlin helpers or lambdas (Amethyst, SoulGold, Quetzal: per-badge and variable-driven teams). Gaia's Elite Four count as beaten once the game is cleared; Celia's BLAINE shows his eight one-on-one battles.
+
+²⁸ Recharged Emerald / Yellow: every gym and Elite Four member lists NORMAL and HARD teams (the HARD party is a second pointer in the trainer record). Yellow's League shows the rematch teams once the game is cleared; Emerald's Elite Four count as beaten once champion.
 
 ²⁷ Ghost Grey's last boss, SUMMER, has a team that answers the starter; the guide shows all three (LITWICK, SPIRITLE, ROWLET) and counts her beaten when any of them is.
 

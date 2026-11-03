@@ -330,7 +330,7 @@ static void build_bosses(const struct pd_game* g, const struct pd_snapshot* s, c
         for (int vi = 0; vi < nv; vi++) {
         const struct pd_variant* var = boss->variants ? &boss->variants[vi] : NULL;
         struct pd_team_mon team[PD_TEAM_MAX];
-        int n = pd_trainer_team(g, var ? var->trainer : pd_boss_trainer(gd, boss, s), team);
+        int n = pd_trainer_team(g, var ? (int) var->trainer : pd_boss_trainer(gd, boss, s), team);
         int ace = 0;
         for (int i = 0; i < n; i++) ace = team[i].level > ace ? team[i].level : ace;
         char heading[56], note[120];

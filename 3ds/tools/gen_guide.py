@@ -350,6 +350,21 @@ def expand_helpers(slug, text):
         text = re.sub(r'elite\((\d+), ("[^"]*"), (\d+)\)',
                       lambda m: f'Boss({m.group(2)}, "POKéMON LEAGUE", FLAG_DEFEATED_E4_1 + {m.group(1)}, doneAny = listOf(FLAG_SYS_GAME_CLEAR)) {{ {m.group(3)} }}',
                       text.replace("private fun elite(", "private fun elite_unused("))
+    elif slug == "imperium":  # elite(n, title, "LABEL" to id, ...): done by its own flag or once champion
+        text = re.sub(r'(?m)^    elite\((\d+), ("[^"]*"), ((?:"[^"]*" to \d+(?:, )?)+)\),',
+                      lambda m: f'    Boss({m.group(2)}, "POKéMON LEAGUE", 0, doneAny = listOf(FLAG_DEFEATED_ELITE_4_SIDNEY + {m.group(1)}, FLAG_IS_CHAMPION), variants = listOf({m.group(3)})) {{ {re.search(r"to (\d+)", m.group(3)).group(1)} }},',
+                      text)
+    elif slug in ("recharged_emerald", "recharged_yellow"):  # gym / elite / league helpers; HARD = the record's second party
+        hard = lambda i: int(i) + 65536
+        nh = lambda i: f'listOf("NORMAL" to {i}, "HARD" to {hard(i)})'
+        text = re.sub(r'(?m)^    gym\((\d+), ("[^"]*"), ("[^"]*"), (\d+)\),',
+                      lambda m: f'    Boss({m.group(2)}, {m.group(3)}, FLAG_BADGE01_GET + {m.group(1)}, variants = {nh(m.group(4))}) {{ {m.group(4)} }},', text)
+        text = re.sub(r'(?m)^    elite\((\d+), ("[^"]*"), (\d+)\),',
+                      lambda m: f'    Boss({m.group(2)}, "POKéMON LEAGUE", FLAG_DEFEATED_ELITE_4_SIDNEY + {m.group(1)}, doneAny = listOf(FLAG_IS_CHAMPION), variants = {nh(m.group(3))}) {{ {m.group(3)} }},', text)
+        text = re.sub(r'Boss\(\s*"CHAMPION WALLACE", "POKéMON LEAGUE", FLAG_IS_CHAMPION, variants = nh\((\d+)\),\s*doneIf = [^\n]*\n\s*\) \{ \d+ \},',
+                      lambda m: f'Boss("CHAMPION WALLACE", "POKéMON LEAGUE", FLAG_IS_CHAMPION, doneAny = listOf(FLAG_SYS_GAME_CLEAR), variants = {nh(m.group(1))}) {{ {m.group(1)} }},', text)
+        text = re.sub(r'(?m)^    league\((\d+), ("[^"]*"), (\d+), (\d+)\),',
+                      lambda m: f'    Boss({m.group(2)}, "POKéMON LEAGUE", FLAG_DEFEATED_LORELEI + {m.group(1)}, trainer = league({m.group(3)}, {m.group(4)})) {{ {m.group(3)} }},', text)
     elif slug == "celia":  # BLAINE's eight one-on-one battles
         text = text.replace('(1..8).map { "BATTLE $it" to 502 + it }',
                             "listOf(" + ", ".join(f'"BATTLE {i}" to {502 + i}' for i in range(1, 9)) + ")")
@@ -449,7 +464,9 @@ def main():
     emit_guide(out, "pd_guide_emerald_legacy", pages_of(el_text, el_env), el_bosses,
                "verified = false" not in el_text, "0, 0")
     for slug, cls, up, text, env, bosses in hack_guides:
-        emit_guide(out, f"pd_guide_{slug}", pages_of(text, env), bosses, "verified = false" not in text, "0, 0")
+        # Recharged Yellow's League rematch teams come once the game is cleared (its own flag, no starter var).
+        extra = f"0x{env['consts']['FLAG_SYS_GAME_CLEAR']:X}, 0" if slug == "recharged_yellow" else "0, 0"
+        emit_guide(out, f"pd_guide_{slug}", pages_of(text, env), bosses, "verified = false" not in text, extra)
         if os.path.exists(os.path.join(DATA, f"GuideAreas{cls}Gen.kt")):
             emit_areas(out, f"pd_areas_{slug}", areas_of(f"GuideAreas{cls}Gen.kt", f"GUIDE_AREAS_{up}_RAW"))
         else:
