@@ -41,6 +41,7 @@ const struct pd_guide* pd_guide_for(const struct pd_game* g) {
     case PD_GUIDE_GB_RED: return &pd_guide_gb_red;
     case PD_GUIDE_GB_BLUE: return &pd_guide_gb_blue;
     case PD_GUIDE_GB_YELLOW: return &pd_guide_gb_yellow;
+    case PD_GUIDE_GB_CRYSTAL: return &pd_guide_gb_crystal;
     case PD_GUIDE_RECHARGED_YELLOW: return &pd_guide_recharged_yellow;
     case PD_GUIDE_RECHARGED_EMERALD: return &pd_guide_recharged_emerald;
     case PD_GUIDE_AMETHYST: return &pd_guide_amethyst;
@@ -102,6 +103,10 @@ const struct pd_area_thing* pd_areas_for(const struct pd_game* g, int* count) {
     case PD_GUIDE_RECHARGED_YELLOW_V190: *count = pd_areas_recharged_yellow_v190_count; return pd_areas_recharged_yellow_v190;
     case PD_GUIDE_RECHARGED_YELLOW_V194: *count = pd_areas_recharged_yellow_v194_count; return pd_areas_recharged_yellow_v194;
     case PD_GUIDE_EMERALD_KAIZO: *count = pd_areas_emerald_count; return pd_areas_emerald;
+    case PD_GUIDE_GB_YELLOW: *count = pd_areas_gb_yellow_count; return pd_areas_gb_yellow;
+    case PD_GUIDE_GB_RED: *count = pd_areas_gb_red_count; return pd_areas_gb_red;
+    case PD_GUIDE_GB_BLUE: *count = pd_areas_gb_blue_count; return pd_areas_gb_blue;
+    case PD_GUIDE_GB_CRYSTAL: *count = pd_areas_gb_crystal_count; return pd_areas_gb_crystal;
     default: *count = 0; return NULL;
     }
 }
@@ -198,6 +203,11 @@ bool pd_boss_done(const struct pd_boss* b, const struct pd_snapshot* s) {
     if (b->doneFlag && pd_flag(s, b->doneFlag)) return true;
     for (const uint16_t* f = b->doneAny; f && *f; f++)
         if (pd_flag(s, *f)) return true;
+    if (b->doneAll && b->doneAll[0]) {
+        bool all = true;
+        for (const uint16_t* f = b->doneAll; *f && all; f++) all = pd_flag(s, *f);
+        if (all) return true;
+    }
     return b->doneVar && s->flagsOk && pd_var(s, b->doneVar) >= b->doneVarMin;
 }
 
@@ -417,8 +427,93 @@ static int wild_set_of(const struct pd_config* c, const struct pd_snapshot* s, i
     return s->hour >= 0 && s->hour <= 23 && (s->hour < n->dayFrom || s->hour > n->dayTo) ? 1 : 0;
 }
 
+// Gen 1 (Gen1World.encounters): the map's grass and surfing slots, its super rod and, where it has water, the old and good
+// rods; slots of one species merged, odds summed and rounded.
+static void gb_add(struct pd_wild_set* w, int method, int species, int level, double pct, double* sums) {
+    if (!species) return;
+    for (int i = 0; i < w->count[method]; i++) {
+        struct pd_wild* m = &w->mons[method][i];
+        if (m->species != species) continue;
+        if (level < m->minLv) m->minLv = level;
+        if (level > m->maxLv) m->maxLv = level;
+        sums[method * PD_WILD_MAX + i] += pct;
+        return;
+    }
+    if (w->count[method] >= PD_WILD_MAX) return;
+    sums[method * PD_WILD_MAX + w->count[method]] = pct;
+    w->mons[method][w->count[method]++] = (struct pd_wild) { species, level, level, 0 };
+}
+
+// Crystal (CrystalWorld.encounters): the time of day's grass slots, surfing (levels up to +4), the map's rods (a
+// time-of-day slot by the clock) and rock smash; headbutt trees aren't listed here.
+static bool crystal_wild_here(const struct pd_snapshot* s, struct pd_wild_set* out) {
+    static const uint8_t GRASS[7] = { 30, 30, 20, 10, 5, 4, 1 }, WATER[3] = { 60, 30, 10 };
+    if (!s->posOk) return false;
+    int key = s->mapGroup << 8 | s->mapNum, tod = s->hour >= 0 && s->hour <= 2 ? s->hour : 1;
+    const struct pd_gb2_wild* t = pd_gb_wild_crystal;
+    for (; t->key >= 0 && t->key != key; t++) {}
+    if (t->key < 0) return true;
+    double sums[PD_WILD_METHODS * PD_WILD_MAX] = { 0 };
+    if (t->rates[tod])
+        for (int i = 0; i < 7; i++) gb_add(out, 0, t->grass[tod * 7 + i][1], t->grass[tod * 7 + i][0], GRASS[i], sums);
+    if (t->waterRate)
+        for (int i = 0; i < 3; i++) {
+            gb_add(out, 1, t->water[i][1], t->water[i][0], WATER[i], sums);
+            gb_add(out, 1, t->water[i][1], t->water[i][0] + 4, 0, sums);
+        }
+    for (const struct pd_gb2_fish* f = pd_gb_fish_crystal; t->fishGroup >= 0 && f->group >= 0; f++) {
+        if (f->group != t->fishGroup) continue;
+        for (int r = 0; r < 3; r++)
+            for (int i = 0; i < f->count[r]; i++) {
+                int sp = f->rows[r][i][1], lv = f->rows[r][i][2];
+                if (!sp) {  // a time-of-day slot: its group's day or night Pokémon
+                    if (lv >= pd_gb_time_fish_crystal_count) continue;
+                    const uint8_t* tf = pd_gb_time_fish_crystal[lv];
+                    sp = tod == 2 ? tf[2] : tf[0];
+                    lv = tod == 2 ? tf[3] : tf[1];
+                }
+                gb_add(out, 3 + r, sp, lv, f->rows[r][i][0] * 100.0 / 256, sums);
+            }
+    }
+    for (const struct pd_gb2_rocks* r = pd_gb_rocks_crystal; t->rockSet >= 0 && r->set >= 0; r++)
+        if (r->set == t->rockSet)
+            for (int i = 0; i < r->count; i++) gb_add(out, 2, r->rows[i][1], r->rows[i][2], r->rows[i][0], sums);
+    for (int m = 0; m < PD_WILD_METHODS; m++) {
+        for (int i = 0; i < out->count[m]; i++) out->mons[m][i].pct = (int) (sums[m * PD_WILD_MAX + i] + 0.5);
+        qsort(out->mons[m], (size_t) out->count[m], sizeof(struct pd_wild), cmp_wild);
+    }
+    return true;
+}
+
+static bool gb_wild_here(const struct pd_game* g, const struct pd_snapshot* s, struct pd_wild_set* out) {
+    if (g->guide == PD_GUIDE_GB_CRYSTAL) return crystal_wild_here(s, out);
+    static const uint8_t SLOT_ODDS[10] = { 51, 51, 39, 25, 25, 25, 13, 13, 11, 3 };
+    const struct pd_gb_wild* t = g->guide == PD_GUIDE_GB_YELLOW ? pd_gb_wild_yellow : g->guide == PD_GUIDE_GB_RED ? pd_gb_wild_red :
+                                 g->guide == PD_GUIDE_GB_BLUE ? pd_gb_wild_blue : NULL;
+    const struct pd_gb_fish* old = g->guide == PD_GUIDE_GB_YELLOW ? &pd_gb_old_rod_yellow : g->guide == PD_GUIDE_GB_RED ? &pd_gb_old_rod_red : &pd_gb_old_rod_blue;
+    const struct pd_gb_fish* good = g->guide == PD_GUIDE_GB_YELLOW ? &pd_gb_good_rod_yellow : g->guide == PD_GUIDE_GB_RED ? &pd_gb_good_rod_red : &pd_gb_good_rod_blue;
+    if (!t || !s->posOk) return false;
+    double sums[PD_WILD_METHODS * PD_WILD_MAX] = { 0 };
+    for (; t->map >= 0 && t->map != s->mapNum; t++) {}
+    if (t->map >= 0) {
+        for (int i = 0; i < t->grassCount; i++) gb_add(out, 0, t->grass[i][1], t->grass[i][0], SLOT_ODDS[i] * 100.0 / 256, sums);
+        for (int i = 0; i < t->waterCount; i++) gb_add(out, 1, t->water[i][1], t->water[i][0], SLOT_ODDS[i] * 100.0 / 256, sums);
+        for (int i = 0; i < t->superCount; i++) gb_add(out, 5, t->super[i][1], t->super[i][2], t->super[i][0], sums);
+        if (t->waterCount || t->superCount) {
+            for (int i = 0; i < old->count; i++) gb_add(out, 3, old->rows[i][1], old->rows[i][2], old->rows[i][0], sums);
+            for (int i = 0; i < good->count; i++) gb_add(out, 4, good->rows[i][1], good->rows[i][2], good->rows[i][0], sums);
+        }
+    }
+    for (int m = 0; m < PD_WILD_METHODS; m++) {
+        for (int i = 0; i < out->count[m]; i++) out->mons[m][i].pct = (int) (sums[m * PD_WILD_MAX + i] + 0.5);
+        qsort(out->mons[m], (size_t) out->count[m], sizeof(struct pd_wild), cmp_wild);
+    }
+    return true;
+}
+
 bool pd_wild_here(const struct pd_game* g, const struct pd_snapshot* s, struct pd_wild_set* out) {
     memset(out, 0, sizeof(*out));
+    if (g->cfg && g->cfg->gb) return gb_wild_here(g, s, out);
     if (!s->posOk || !pd_guide_rom_ok(g)) return false;
     const struct pd_config* c = g->cfg;
     int stride = header_stride(c);

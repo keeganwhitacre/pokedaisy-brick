@@ -194,6 +194,7 @@ static bool expansion_entry(const struct pd_game* g, int national, int species, 
 bool pd_dex_entry(const struct pd_game* g, int national, struct pd_dex_entry* out) {
     memset(out, 0, sizeof(*out));
     const struct pd_config* cfg = g->cfg;
+    if (cfg && cfg->gb) return pd_gb_dex_entry(g, national, out);
     if (!pd_dex_available(g)) return false;
     int species = pd_dex_species(g, national);
     if (!species) return false;
@@ -243,6 +244,7 @@ bool pd_dex_entry(const struct pd_game* g, int national, struct pd_dex_entry* ou
 
 bool pd_dex_sprite(const struct pd_game* g, int species, uint32_t* out) {
     const struct pd_config* cfg = g->cfg;
+    if (cfg && cfg->gb) return pd_gb_dex_sprite(g, species, out);
     if (!pd_dex_available(g) || species < 1 || species >= species_count(cfg)) return false;
     uint32_t picPtr, palPtr;
     if (cfg->expansion) {

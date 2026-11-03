@@ -437,6 +437,12 @@ against a recorded render.
 
 ²⁷ Ghost Grey's last boss, SUMMER, has a team that answers the starter; the guide shows all three (LITWICK, SPIRITLE, ROWLET) and counts her beaten when any of them is.
 
+**Game Boy**: Red, Blue and Yellow have DEX pages (sprite, category, size, text, stats from the cart), GUIDE HERE / WHERE IS
+(GuideGen1Gen.kt's wild tables and area things, regrouped by town map name) and NEXT BOSS; every Game Boy game draws in its
+own font, Red / Blue in their Super Game Boy colours, and Red, Blue, Yellow, Crystal, Gold and Silver with their own party
+icons. Crystal has the GUIDE too (NEXT BOSS incl. RED, HERE by time of day without headbutt trees, TIPS, WHERE IS). `make -C
+3ds test-gbdex ROMS=...` reads all 151 pages and sprites of each Gen 1 cart, `test-gbguide` Route 1's and Crystal's HERE.
+
 **Item descriptions**: from each game's own ROM through its config's `itemDescs` (the app's RomItemText); `make -C 3ds
 test-roms` checks every verified build gives one.
 

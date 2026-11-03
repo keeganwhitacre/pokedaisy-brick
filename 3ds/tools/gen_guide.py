@@ -680,6 +680,223 @@ def emit_gb(out):
         out.append("};")
         out.append(f"const struct pd_guide pd_guide_gb_{slug} = {{ NULL, 0, pd_gb_{slug}_bosses, {len(bosses)}, false, 0, 0, .regionOf = NULL }};")
         out.append("")
+        emit_gb_wild(out, slug, pre, text)
+        # HERE / WHERE IS's things (G1x_AREAS_RAW, keyed by wCurMap), each under its gen1Area: the first map with its town
+        # map name, so a town's houses count with the town; flags packed like the bosses'.
+        m = re.search(rf'val {pre}_AREAS_RAW: List<String> = listOf\(\s*"""(.*?)"""', text, re.S)
+        things = []
+        for line in [l for l in m.group(1).split("\n") if l.strip()]:
+            mp, kind, id_, flag, qty, wants, where = line.split("|", 6)
+            f = int(flag)
+            things.append((gen1_area(int(mp)), kind, int(id_), gb_flag(f) if f else 0, int(qty), int(wants), where))
+        things.sort(key=lambda t: t[0])
+        emit_areas(out, f"pd_areas_gb_{slug}", things)
+    # gen1Area for the snapshot: every wCurMap's area
+    out.append("const uint8_t pd_gb_gen1_area[256] = {")
+    out.append("    " + ", ".join(str(gen1_area(m)) for m in range(256)) + ",")
+    out.append("};")
+    out.append("")
+
+
+def gen1_names():
+    """mapSecDataYellow: wCurMap -> its town map name (the app's gen1Area reads Yellow's for all three)."""
+    text = read("MapSecDataYellow.kt")
+    body = text[text.index("val mapSecDataYellow"):]
+    body = body[:body.index("\n)\n")]
+    return {int(k): n for k, n in re.findall(r'(\d+) to MapSecInfo\("([^"]*)"', body)}
+
+
+def gen1_area(mp):
+    names = gen1_names()
+    if mp not in names:
+        return mp
+    return min(k for k, n in names.items() if n == names[mp])
+
+
+def emit_gb_wild(out, slug, pre, text):
+    """G1x_WILD_RAW: G|map|rate|lv:sp x10, W|map|rate|lv:sp x10, S|map|odds:sp:lv ..., OLD|..., GOOD|... (Gen1World)."""
+    m = re.search(rf'val {pre}_WILD_RAW: List<String> = listOf\(\s*"""(.*?)"""', text, re.S)
+    maps, old, good = {}, [], []
+    def rows(sv):
+        return [tuple(int(x) for x in p.split(":")) for p in sv.split(" ") if p]
+    for line in [l for l in m.group(1).split("\n") if l.strip()]:
+        f = line.split("|")
+        if f[0] in ("G", "W"):
+            if int(f[2]) > 0:
+                maps.setdefault(int(f[1]), {})[f[0]] = [tuple(int(x) for x in p.split(":")) for p in f[3].split(" ") if p]
+        elif f[0] == "S":
+            maps.setdefault(int(f[1]), {})["S"] = rows(f[2])
+        elif f[0] == "OLD":
+            old = rows(f[1])
+        elif f[0] == "GOOD":
+            good = rows(f[1])
+    def slots(sl):  # {level, species} x10
+        sl = (sl + [(0, 0)] * 10)[:10]
+        return "{ " + ", ".join(f"{{ {lv}, {sp} }}" for lv, sp in sl) + " }"
+    def fish(sl):  # {odds, species, level}
+        sl = (sl + [(0, 0, 0)] * 10)[:10]
+        return "{ " + ", ".join(f"{{ {o}, {sp}, {lv} }}" for o, sp, lv in sl) + " }"
+    out.append(f"const struct pd_gb_wild pd_gb_wild_{slug}[] = {{")
+    for mp in sorted(maps):
+        e = maps[mp]
+        out.append(f"    {{ {mp}, {len(e.get('G', []))}, {len(e.get('W', []))}, {len(e.get('S', []))}, "
+                   f"{slots(e.get('G', []))}, {slots(e.get('W', []))}, {fish(e.get('S', []))} }},")
+    out.append("    { -1, 0, 0, 0, { { 0, 0 } }, { { 0, 0 } }, { { 0, 0, 0 } } },")
+    out.append("};")
+    out.append(f"const struct pd_gb_fish pd_gb_old_rod_{slug} = {{ {len(old)}, {fish(old)} }};")
+    out.append(f"const struct pd_gb_fish pd_gb_good_rod_{slug} = {{ {len(good)}, {fish(good)} }};")
+
+
+# --- Crystal (GuideCrystal.kt over GuideCrystalGen.kt, the app's CrystalWorld) ---
+# The snapshot's flags for Crystal: wEventFlags (2048), then the badge bank (0x10000+, 16) and the trade bank (0x20000+).
+CR_BANK_BIT = {0: 0, 1: 2048, 2: 2048 + 16}
+
+
+def cr_flag(f):
+    return CR_BANK_BIT[f >> 16] + (f & 0xFFFF)
+
+
+def emit_crystal(out):
+    gen = read("GuideCrystalGen.kt")
+    text = read("GuideCrystal.kt")
+    c = consts(gen)
+
+    def raw(decl):
+        m = re.search(rf'val {decl}: List<String> = listOf\(\s*"""(.*?)"""', gen, re.S)
+        return [l for l in m.group(1).split("\n") if l.strip()]
+    # teams: KEY|class|party|Name|lv sp item m,m,m,m;...
+    keys, teams = {}, []
+    for line in raw("CR_BOSSES_RAW"):
+        f = line.split("|")
+        ms = []
+        for mon in [x for x in f[4].split(";") if x.strip()]:
+            p = mon.split(" ")
+            moves = [int(x) for x in (p[3].split(",") if len(p) > 3 else []) if x]
+            ms.append((int(p[0]), int(p[1]), int(p[2]), (moves + [0, 0, 0, 0])[:4]))
+        keys[f[0]] = len(teams)
+        teams.append(ms[:6])
+    out.append("const struct pd_gb_team pd_gb_teams_crystal[] = {")
+    for ms in teams:
+        mm = ", ".join(f"{{ {sp}, {it}, {lv}, {{ {', '.join(map(str, mv))} }} }}" for lv, sp, it, mv in ms)
+        out.append(f"    {{ -1, {len(ms)}, {{ {mm} }} }},")
+    out.append("    { 0, 0, { { 0, 0, 0, { 0, 0, 0, 0 } } } },")
+    out.append("};")
+    # bosses: crBoss("TITLE", "WHERE", FLAG or 0, "KEY"[, crLeague(OWN)]) and RED's lambda (both flags)
+    body = text[text.index("val BOSSES_CRYSTAL = listOf("):]
+    body = body[:matching_paren(body, body.index("(")) + 1]
+    bosses = []
+    for m in re.finditer(r'crBoss\(("[^"]*"), ("[^"]*"), (\w+), "(\w+)"(?:, crLeague\((\w+)\))?\)(?: \{ p -> p\.flag\((\w+)\) && p\.flag\((\w+)\) \})?', body):
+        title, where = Parser(tokenize(m.group(1)), {"consts": {}}).expr(), Parser(tokenize(m.group(2)), {"consts": {}}).expr()
+        flag = 0 if m.group(3) == "0" else c[m.group(3)]
+        any_ = [c["CR_EVENT_BEAT_ELITE_FOUR"], c[m.group(5)]] if m.group(5) else []
+        all_ = [c[m.group(6)], c[m.group(7)]] if m.group(6) else []
+        bosses.append((title, where, flag, keys[m.group(4)], any_, all_))
+    assert len(bosses) == body.count("crBoss("), "crystal: a boss not read"
+    for bi, (title, where, flag, team, any_, all_) in enumerate(bosses):
+        if any_:
+            out.append(f"static const uint16_t pd_gb_crystal_any{bi}[] = {{ {', '.join(str(cr_flag(f)) for f in any_)}, 0 }};")
+        if all_:
+            out.append(f"static const uint16_t pd_gb_crystal_all{bi}[] = {{ {', '.join(str(cr_flag(f)) for f in all_)}, 0 }};")
+    out.append("static const struct pd_boss pd_gb_crystal_bosses[] = {")
+    for bi, (title, where, flag, team, any_, all_) in enumerate(bosses):
+        more = f", .doneAll = pd_gb_crystal_all{bi}" if all_ else ""
+        anyf = f"pd_gb_crystal_any{bi}" if any_ else "NULL"
+        out.append(f"    {{ {c_str(title)}, {c_str(where)}, {cr_flag(flag) if flag else 0}, PD_BOSS_FIXED, {team}, 0, NULL, NULL, {anyf}, .region = 0{more} }},")
+    out.append("};")
+    env = {"consts": {}, "template": lambda e: (_ for _ in ()).throw(SyntaxError(e))}
+    pages = pages_of(text, env)
+    emit_guide_pages(out, "pd_gb_crystal", pages)
+    out.append(f"const struct pd_guide pd_guide_gb_crystal = {{ pd_gb_crystal_pages, {len(pages)}, pd_gb_crystal_bosses, {len(bosses)}, false, 0, 0, .regionOf = NULL }};")
+    out.append("")
+    # wild: G|g|n|m,d,n rates|lv:sp x21; W|g|n|rate|lv:sp x3; F|g|n|group; R|g|n|set; FG|group|old|good|super; TG|group|d|n; TS|set|common|rare
+    grass, water, fishMap, rockMap, fish, timeFish, trees = {}, {}, {}, {}, {}, {}, {}
+    for line in raw("CR_WILD_RAW"):
+        f = line.split("|")
+        k = lambda: int(f[1]) << 8 | int(f[2])
+        if f[0] == "G":
+            grass[k()] = ([int(x) for x in f[3].split(",")], [tuple(int(y) for y in p.split(":")) for p in f[4].split(" ") if p])
+        elif f[0] == "W":
+            water[k()] = (int(f[3]), [tuple(int(y) for y in p.split(":")) for p in f[4].split(" ") if p])
+        elif f[0] == "F":
+            fishMap[k()] = int(f[3])
+        elif f[0] == "R":
+            rockMap[k()] = int(f[3])
+        elif f[0] == "FG":
+            fish[int(f[1])] = [[tuple(int(y) for y in p.split(":")) for p in r.split(" ") if p] for r in f[2:]]
+        elif f[0] == "TG":
+            timeFish[int(f[1])] = [tuple(int(y) for y in x.split(":")) for x in f[2:4]]
+        elif f[0] == "TS":
+            trees[int(f[1])] = [tuple(int(y) for y in p.split(":")) for p in f[2].split(" ") if p]
+    mapkeys = sorted(set(grass) | set(water) | set(fishMap) | set(rockMap))
+    def pairs(sl, n):
+        sl = (sl + [(0, 0)] * n)[:n]
+        return "{ " + ", ".join(f"{{ {a}, {b} }}" for a, b in sl) + " }"
+    def triples(sl, n):
+        sl = (sl + [(0, 0, 0)] * n)[:n]
+        return "{ " + ", ".join(f"{{ {a}, {b}, {cc} }}" for a, b, cc in sl) + " }"
+    out.append("const struct pd_gb2_wild pd_gb_wild_crystal[] = {")
+    for k in mapkeys:
+        gr = grass.get(k, ([0, 0, 0], []))
+        wa = water.get(k, (0, []))
+        out.append(f"    {{ 0x{k:04X}, {{ {', '.join(map(str, gr[0]))} }}, {pairs(gr[1], 21)}, {wa[0]}, {pairs(wa[1], 3)}, "
+                   f"{fishMap.get(k, -1)}, {rockMap.get(k, -1)} }},")
+    out.append("    { -1, { 0, 0, 0 }, { { 0, 0 } }, 0, { { 0, 0 } }, -1, -1 },")
+    out.append("};")
+    out.append("const struct pd_gb2_fish pd_gb_fish_crystal[] = {")
+    for g in sorted(fish):
+        rods = (fish[g] + [[], [], []])[:3]
+        out.append(f"    {{ {g}, {{ {', '.join(triples(r, 4) for r in rods)} }}, {{ {', '.join(str(len(r)) for r in rods)} }} }},")
+    out.append("    { -1, { { { 0, 0, 0 } } }, { 0 } },")
+    out.append("};")
+    out.append("const uint8_t pd_gb_time_fish_crystal[][4] = {  // day species, level; night species, level")
+    for g in range(max(timeFish) + 1 if timeFish else 0):
+        d, n = timeFish.get(g, [(0, 0), (0, 0)])
+        out.append(f"    {{ {d[0]}, {d[1]}, {n[0]}, {n[1]} }},")
+    out.append("};")
+    out.append(f"const int pd_gb_time_fish_crystal_count = {len(timeFish)};")
+    out.append("const struct pd_gb2_rocks pd_gb_rocks_crystal[] = {")
+    for t in sorted(trees):
+        out.append(f"    {{ {t}, {len(trees[t])}, {triples(trees[t], 6)} }},")
+    out.append("    { -1, 0, { { 0, 0, 0 } } },")
+    out.append("};")
+    # landmarks: wMapGroup * 256 + wMapNumber -> landmark (MapSecDataCrystal.kt mapLandmarksCrystal)
+    ml = read("MapSecDataCrystal.kt")
+    b = ml[ml.index("val mapLandmarksCrystal"):]
+    b = b[:b.index("\n)\n")]
+    marks = sorted((int(k, 0), int(v)) for k, v in re.findall(r"(0x[0-9A-Fa-f]+|\d+) to (\d+)", b))
+    out.append("const uint16_t pd_gb_landmarks_crystal[][2] = {")
+    out += [f"    {{ 0x{k:04X}, {v} }}," for k, v in marks]
+    out.append("};")
+    out.append(f"const int pd_gb_landmarks_crystal_count = {len(marks)};")
+    # areas by landmark, flags packed
+    things = []
+    for line in raw("GUIDE_AREAS_CRYSTAL_RAW"):
+        mp, kind, id_, flag, qty, wants, where = line.split("|", 6)
+        f = int(flag)
+        things.append((int(mp), kind, int(id_), cr_flag(f) if f else 0, int(qty), int(wants), where))
+    things.sort(key=lambda t: t[0])
+    emit_areas(out, "pd_areas_gb_crystal", things)
+
+
+def emit_guide_pages(out, prefix, pages):
+    """The page arrays of emit_guide, alone (a Game Boy guide's TIPS)."""
+    for pi, (title, sections) in enumerate(pages):
+        for si, (heading, note, entries) in enumerate(sections):
+            out.append(f"static const struct pd_guide_entry {prefix}_p{pi}_s{si}[] = {{")
+            for e in entries:
+                kind, vals = e["have"]
+                vals = (vals + [0, 0, 0])[:3]
+                out.append(f"    {{ {c_str(e['title'])}, {c_str(e['answer'])}, {c_str(e['hint'])}, PD_HAVE_{kind}, "
+                           f"{{ {vals[0]}, {vals[1]}, {vals[2]} }}, NULL }},")
+            out.append("};")
+        out.append(f"static const struct pd_guide_section {prefix}_p{pi}[] = {{")
+        for si, (heading, note, entries) in enumerate(sections):
+            out.append(f"    {{ {c_str(heading)}, {c_str(note)}, {prefix}_p{pi}_s{si}, {len(entries)} }},")
+        out.append("};")
+    out.append(f"static const struct pd_guide_page {prefix}_pages[] = {{")
+    for pi, (title, sections) in enumerate(pages):
+        out.append(f"    {{ {c_str(title)}, {prefix}_p{pi}, {len(sections)} }},")
+    out.append("};")
 
 
 def main():
@@ -795,6 +1012,7 @@ def main():
                           ("recharged_yellow_v194", "RechargedYellowV194", "RECHARGED_YELLOW_V194")]:
         emit_areas(out, f"pd_areas_{slug}", areas_of(f"GuideAreas{cls}Gen.kt", f"GUIDE_AREAS_{up}_RAW"))
     emit_gb(out)
+    emit_crystal(out)
     emit_areas(out, "pd_areas_emerald_legacy", areas_of("GuideAreasEmeraldLegacyGen.kt", "GUIDE_AREAS_EMERALD_LEGACY_RAW"))
     emit_areas(out, "pd_areas_ruby_sapphire", areas_of("GuideAreasRubySapphireGen.kt", "GUIDE_AREAS_RUBY_SAPPHIRE_RAW"))
     emit_areas(out, "pd_areas_firered", areas_of("GuideAreasFireRedGen.kt", "GUIDE_AREAS_FIRERED_RAW"))

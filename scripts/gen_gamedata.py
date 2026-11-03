@@ -1259,6 +1259,10 @@ GB_TEXTS = {
                              "typeNamesPolishedCrystal", "typeEffectivenessPolishedCrystal",
                              "speciesTypeDataPolishedCrystal + speciesTypeDataPolishedCrystalFaithfulChanges"),
 }
+# Their place names (ActiveTables' activeMapSecData): Gen 1 by wCurMap, Gen 2 by landmark.
+GB_MAPSECS = {"gb_yellow": "mapSecDataYellow", "gb_pure_rgb": "mapSecDataPureRgb", "gb_crystal": "mapSecDataCrystal",
+              "gb_gold_silver": "mapSecDataGoldSilver", "gb_crystal_clear": "mapSecDataCrystalClear", "gb_prism": "mapSecDataPrism",
+              "gb_polished": "mapSecDataPolishedCrystal", "gb_polished_faithful": "mapSecDataPolishedCrystal"}
 GB_INT_TABLES = {  # C name: (Kotlin intArrayOf val, C element type)
     "pd_gb_internal_to_dex_yellow": "gen1InternalToDexYellow",
     "pd_gb_internal_to_dex_pure_rgb": "gen1InternalToDexPureRgb",
@@ -1287,7 +1291,8 @@ def kotlin_int_array(name):
 
 def gb_output():
     texts = {k: ({"species": v[0], "items": v[1], "moves": v[2], "typeNames": v[3], "typeChart": v[4],
-                  "speciesTypes": v[5]}, "scripts/gen_gamedata.py GB_TEXTS") for k, v in GB_TEXTS.items()}
+                  "speciesTypes": v[5], **({"mapsecs": GB_MAPSECS[k]} if k in GB_MAPSECS else {})},
+                 "scripts/gen_gamedata.py GB_TEXTS") for k, v in GB_TEXTS.items()}
     text = c_text(texts, "scripts/gen_gamedata.py's GB_TEXTS")
     out = [text.rstrip("\n"), ""]
     for cname, kname in GB_INT_TABLES.items():

@@ -70,6 +70,7 @@ struct pd_boss {
     // The picked trainer's teams in each table, all shown: label i reads id | i << 16 (NORMAL / HARD); NULL-terminated.
     const char* const* pickLabels;
     uint8_t region;  // the campaign it's in (Quetzal's Hoenn 0 / Johto 1 / Kanto 2); see pd_guide.regionOf
+    const uint16_t* doneAll; // done once every one of these flags is set too (Crystal's RED), 0-terminated
 };
 
 struct pd_guide {
@@ -104,7 +105,42 @@ struct pd_gb_team {
     struct pd_gb_mon mons[6];
 };
 extern const struct pd_gb_team pd_gb_teams_yellow[], pd_gb_teams_red[], pd_gb_teams_blue[];
-extern const struct pd_guide pd_guide_gb_yellow, pd_guide_gb_red, pd_guide_gb_blue;
+// Gen 1's wild Pokémon by wCurMap (GuideGen1Gen.kt's WILD tables, the app's Gen1World): grass / cave and surfing slots
+// (level, species; WildMonEncounterSlotChances' odds by slot), the super rod's (percent of a cast, species, level); the old
+// and good rods are the same everywhere there's water. map -1 ends.
+struct pd_gb_wild {
+    int16_t map;
+    uint8_t grassCount, waterCount, superCount;
+    uint8_t grass[10][2], water[10][2], super[10][3];
+};
+struct pd_gb_fish { int count; uint8_t rows[10][3]; };
+extern const struct pd_gb_wild pd_gb_wild_yellow[], pd_gb_wild_red[], pd_gb_wild_blue[];
+extern const struct pd_gb_fish pd_gb_old_rod_yellow, pd_gb_good_rod_yellow, pd_gb_old_rod_red, pd_gb_good_rod_red,
+    pd_gb_old_rod_blue, pd_gb_good_rod_blue;
+// Crystal (GuideCrystalGen.kt, the app's CrystalWorld), by wMapGroup << 8 | wMapNumber: grass / cave slots per time of day
+// (morning, day, night: 7 each, rates apiece), surfing (3 slots, levels up to +4), the map's fish group and rock smash
+// set; the fish groups' OLD / GOOD / SUPER ROD rows (odds of 256, species, level; species 0 = a time-of-day group whose
+// day / night Pokémon pd_gb_time_fish_crystal holds, by the level byte), the rock sets' rows (percent, species, level).
+struct pd_gb2_wild {
+    int32_t key;
+    uint8_t rates[3], grass[21][2];
+    uint8_t waterRate, water[3][2];
+    int8_t fishGroup, rockSet;
+};
+struct pd_gb2_fish { int group; uint8_t rows[3][4][3]; uint8_t count[3]; };
+struct pd_gb2_rocks { int set, count; uint8_t rows[6][3]; };
+extern const struct pd_gb2_wild pd_gb_wild_crystal[];
+extern const struct pd_gb2_fish pd_gb_fish_crystal[];
+extern const struct pd_gb2_rocks pd_gb_rocks_crystal[];
+extern const uint8_t pd_gb_time_fish_crystal[][4];
+extern const int pd_gb_time_fish_crystal_count;
+extern const uint16_t pd_gb_landmarks_crystal[][2];
+extern const int pd_gb_landmarks_crystal_count;
+extern const struct pd_gb_team pd_gb_teams_crystal[];
+
+// The app's gen1Area: the first wCurMap with the same town map name (a town's houses count with the town).
+extern const uint8_t pd_gb_gen1_area[256];
+extern const struct pd_guide pd_guide_gb_yellow, pd_guide_gb_red, pd_guide_gb_blue, pd_guide_gb_crystal;
 
 extern const struct pd_guide pd_guide_firered, pd_guide_leafgreen, pd_guide_emerald, pd_guide_ruby, pd_guide_sapphire,
     pd_guide_emerald_legacy,
@@ -136,6 +172,11 @@ extern const int pd_areas_firered_count, pd_areas_leafgreen_count, pd_areas_emer
 // Quetzal's campaigns: a map group's region (34-35 Johto, 36-39 Kanto / Sevii, else Hoenn) and each region's order.
 int pd_quetzal_region(int mapGroup);
 extern const uint8_t pd_quetzal_order[3][3];
+
+extern const struct pd_area_thing pd_areas_gb_yellow[], pd_areas_gb_red[], pd_areas_gb_blue[];
+extern const int pd_areas_gb_yellow_count, pd_areas_gb_red_count, pd_areas_gb_blue_count;
+extern const struct pd_area_thing pd_areas_gb_crystal[];
+extern const int pd_areas_gb_crystal_count;
 
 // The guide and area data for g (NULL / 0 if none).
 const struct pd_guide* pd_guide_for(const struct pd_game* g);

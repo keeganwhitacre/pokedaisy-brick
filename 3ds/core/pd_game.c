@@ -298,6 +298,51 @@ static const struct gb_rom GB_ROMS[] = {
     {NULL, NULL, NULL},
 };
 
+// The game's own font (Gen1Art / Gen2Art's font = bank to address, as a ROM offset), for the carts the app builds it for.
+// Their party icons (Gen1Art / Gen2Art's YELLOW, RED_BLUE, CRYSTAL, GOLD_SILVER tables, as ROM offsets).
+#define GB_OFF(bank, addr) ((uint32_t) ((bank) * 0x4000 + ((addr) - 0x4000)))
+static const struct pd_gb_icons GB_ICONS_YELLOW = { .gen = 1, .pointers = GB_OFF(0x1C, 0x584D), .data = GB_OFF(0x1C, 0x59BA),
+    .pointerCount = 30, .colors = { 0xFFFFFF, 0xFFFF00, 0x181818 } };
+static const struct pd_gb_icons GB_ICONS_RED_BLUE = { .gen = 1, .pointers = GB_OFF(0x1C, 0x57C0), .data = GB_OFF(0x1C, 0x590D),
+    .pointerCount = 28, .colors = { 0xFFEFFF, 0xF7B58C, 0x181010 } };
+static const struct pd_gb_icons GB_ICONS_CRYSTAL = { .gen = 2, .pointers = GB_OFF(0x23, 0x6BBF), .data = GB_OFF(0x23, 0x6AC4),
+    .bank = 0x23, .menuPal = GB_OFF(0x02, 0x7681), .eggIcon = 0x1C };
+static const struct pd_gb_icons GB_ICONS_GOLD_SILVER = { .gen = 2, .pointers = GB_OFF(0x23, 0x6A70), .data = GB_OFF(0x23, 0x6975),
+    .bank = 0x23, .menuPal = GB_OFF(0x02, 0x7AC6), .eggIcon = 0x1C };
+
+// Gen 1's DEX pages (Gen1Dex.kt's GEN1_DEX_YELLOW / GEN1_DEX_RED, as ROM offsets).
+static const struct pd_gb_dex1 GB_DEX_YELLOW = { .baseStats = GB_OFF(0x0E, 0x43DE), .dexEntryPointers = GB_OFF(0x10, 0x450B),
+    .monsterPalettes = GB_OFF(0x1C, 0x6921), .cgbPalettes = GB_OFF(0x1C, 0x6AF9), .dexBank = 0x10, .picsBank = 0x09,
+    .picsBankBreaks = { 0x1F, 0x4A, 0x74, 0x99 }, .fossilKabutops = 0xB6, .fossilKabutopsBank = 0x0B };
+static const struct pd_gb_dex1 GB_DEX_RED = { .baseStats = GB_OFF(0x0E, 0x43DE), .dexEntryPointers = GB_OFF(0x10, 0x447E),
+    .monsterPalettes = GB_OFF(0x1C, 0x65C8), .cgbPalettes = GB_OFF(0x1C, 0x6660), .dexBank = 0x10, .picsBank = 0x09,
+    .picsBankBreaks = { 0x1F, 0x4A, 0x74, 0x99 }, .fossilKabutops = 0xB6, .fossilKabutopsBank = 0x0B,
+    .mewBaseStats = GB_OFF(0x01, 0x425B), .mewPicsBank = 0x01 };
+
+static void gb_font(const struct pd_game* g, const struct pd_config* cfg) {
+    pd_gb_dex_use(cfg == &PD_GB_CONFIG_YELLOW ? &GB_DEX_YELLOW : cfg == &PD_GB_CONFIG_RED || cfg == &PD_GB_CONFIG_BLUE ? &GB_DEX_RED : NULL);
+    pd_gb_icons_use(cfg == &PD_GB_CONFIG_YELLOW ? &GB_ICONS_YELLOW : cfg == &PD_GB_CONFIG_RED || cfg == &PD_GB_CONFIG_BLUE ? &GB_ICONS_RED_BLUE :
+                    cfg == &PD_GB_CONFIG_CRYSTAL ? &GB_ICONS_CRYSTAL : cfg == &PD_GB_CONFIG_GOLD || cfg == &PD_GB_CONFIG_SILVER ? &GB_ICONS_GOLD_SILVER :
+                    NULL);
+    uint32_t off = 0;
+    enum pd_gb_charset cs = PD_GB_CHARS_GEN1;
+    if (cfg == &PD_GB_CONFIG_YELLOW) off = 0x04 * 0x4000 + (0x4600 - 0x4000);
+    else if (cfg == &PD_GB_CONFIG_RED || cfg == &PD_GB_CONFIG_BLUE) off = 0x04 * 0x4000 + (0x5A80 - 0x4000);
+    else if (cfg == &PD_GB_CONFIG_PURE_RED || cfg == &PD_GB_CONFIG_PURE_BLUE) { off = 0x04 * 0x4000 + (0x5F00 - 0x4000); cs = PD_GB_CHARS_PURE; }
+    else if (cfg == &PD_GB_CONFIG_CRYSTAL || cfg == &PD_GB_CONFIG_CRYSTAL_CLEAR) { off = 0x3E * 0x4000 + (0x4200 - 0x4000); cs = PD_GB_CHARS_GEN2; }
+    else if (cfg == &PD_GB_CONFIG_GOLD || cfg == &PD_GB_CONFIG_SILVER) { off = 0x3E * 0x4000 + (0x42F2 - 0x4000); cs = PD_GB_CHARS_GEN2; }
+    else if (cfg == &PD_GB_CONFIG_PRISM) { off = 0x3D * 0x4000 + (0x720D - 0x4000); cs = PD_GB_CHARS_GEN2; }
+    else if (cfg == &PD_GB_CONFIG_POLISHED || cfg == &PD_GB_CONFIG_POLISHED_FAITHFUL) {
+        cs = PD_GB_CHARS_POLISHED;
+        for (const struct pd_gb_font_at* p = pd_gb_polished_fonts; p->sha1; p++)
+            if (!strcmp(p->sha1, g->sha1)) off = p->off;
+    }
+    pd_gb_font_use(g, off, cs);
+    bool redBlue = cfg == &PD_GB_CONFIG_RED || cfg == &PD_GB_CONFIG_BLUE;
+    pd_gb_ink = redBlue ? 0x181010 : cs == PD_GB_CHARS_PURE ? 0x000000 : 0x181818;
+    pd_gb_paper = redBlue ? 0xFFEFFF : 0xFFFFFF;
+}
+
 // The retail carts (USA / Europe) detect's configs are for: GameTitles.RETAIL.
 static const char* const RETAIL_SHA1S[] = {
     "41cb23d8dccc8ebd7c649cd8fbb58eeace6e2fdc", // FireRed rev 0
@@ -510,6 +555,9 @@ static bool retail_dump(const struct pd_game* g) {
 
 void pd_game_identify(struct pd_game* g) {
     pd_gb_look = 0;
+    pd_gb_font_use(NULL, 0, PD_GB_CHARS_GEN1);
+    pd_gb_icons_use(NULL);
+    pd_gb_dex_use(NULL);
     if (!g->rom) return;
     // A Game Boy cart (the Nintendo logo at 0x104, and no GBA header's 0x96 at 0xB2): which one waits for its hash.
     // The logo is past the 0xC0 header pd_game_detect gets, so it is tested here, with the whole ROM.
@@ -543,9 +591,10 @@ void pd_game_identify(struct pd_game* g) {
             g->cfg = r->cfg;
             g->title = r->title;
             g->guide = r->cfg == &PD_GB_CONFIG_RED ? PD_GUIDE_GB_RED : r->cfg == &PD_GB_CONFIG_BLUE ? PD_GUIDE_GB_BLUE :
-                       r->cfg == &PD_GB_CONFIG_YELLOW ? PD_GUIDE_GB_YELLOW : PD_GUIDE_NONE;
+                       r->cfg == &PD_GB_CONFIG_YELLOW ? PD_GUIDE_GB_YELLOW : r->cfg == &PD_GB_CONFIG_CRYSTAL ? PD_GUIDE_GB_CRYSTAL : PD_GUIDE_NONE;
             g->hackMaps = true;
             g->unsupported = NULL;
+            gb_font(g, r->cfg);
             return;
         }
         return;

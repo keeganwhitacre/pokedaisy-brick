@@ -802,8 +802,8 @@ static const char* rom_mapsec_name(const struct pd_game* g, int mapsec) {
 }
 
 const char* pd_mapsec_name(const struct pd_game* g, int mapsec) {
-    if (g->hackMaps) return "";
     const struct pd_text* t = g->cfg ? g->cfg->text : NULL;
+    if (g->hackMaps && !(t && t->mapsecs)) return "";
     if (t && t->mapsecsRom) {
         const char* n = rom_mapsec_name(g, mapsec);
         if (n) return n;

@@ -99,7 +99,8 @@ static void list_view(struct pd_ui* ui, struct pd_canvas* c, const struct pd_gam
         pd_text(c, ix + 74, ty, name, seen ? PD_LABEL : PD_MUTED, seen ? PD_LABEL_SHADOW : PD_MUTED_SHADOW);
         int top = ry < iy ? iy : ry;
         int bottom = ry + DEX_ROW > iy + ih ? iy + ih : ry + DEX_ROW;
-        if (!g->cfg->gb) ui_add_scroll_hit(ui, ix, top, iw, bottom - top, HIT_DEX_ROW + nat);  // no pages for a GB game
+        // a Game Boy game's pages where its cart's are read (Gen 1: Red, Blue, Yellow)
+        if (!g->cfg->gb || pd_gb_dex_pages(g)) ui_add_scroll_hit(ui, ix, top, iw, bottom - top, HIT_DEX_ROW + nat);
     }
     pd_unclip(c);
     ui_scroll_bar(c, ix + iw - 4, iy, ih, ui->dexScroll, n * DEX_ROW, PD_MUTED);
@@ -154,6 +155,8 @@ static void entry_view(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
     char ht[16], wt[20];
     pd_dex_height(e.heightDm, ht, sizeof(ht));
     pd_dex_weight(e.weightHg, wt, sizeof(wt));
+    if (e.heightIn) snprintf(ht, sizeof(ht), "%d'%02d\"", e.heightIn / 12, e.heightIn % 12);  // the cart's own numbers
+    if (e.weightLbs10) snprintf(wt, sizeof(wt), "%d.%d lbs.", e.weightLbs10 / 10, e.weightLbs10 % 10);
     snprintf(buf, sizeof(buf), "HT %s   WT %s", ht, wt);
     pd_text_fit(c, tx, top + 54, tw, buf, PD_LABEL, PD_LABEL_SHADOW);
 
@@ -162,13 +165,21 @@ static void entry_view(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
     pd_text_wrap(c, ix, dy, iw, 16, 3, e.description, PD_LABEL, PD_LABEL_SHADOW);
     dy += 3 * 16 + 2;
     static const char* const STAT[6] = { "HP", "ATK", "DEF", "SPA", "SPD", "SPE" };
+    static const char* const STAT1[5] = { "HP", "ATK", "DEF", "SPE", "SPC" };  // Gen 1's own five, its order
     int sx = ix;
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < (e.gen1Stats ? 5 : 6); i++) {
+        if (e.gen1Stats) {
+            sx += pd_text(c, sx, dy, STAT1[i], PD_MUTED, PD_MUTED_SHADOW) + 3;
+            snprintf(buf, sizeof(buf), "%d", e.stats[i]);
+            sx += pd_text(c, sx, dy, buf, PD_LABEL, PD_LABEL_SHADOW) + 9;
+            continue;
+        }
         sx += pd_text(c, sx, dy, STAT[i], PD_MUTED, PD_MUTED_SHADOW) + 3;
         snprintf(buf, sizeof(buf), "%d", e.stats[i]);
         sx += pd_text(c, sx, dy, buf, PD_LABEL, PD_LABEL_SHADOW) + 9;
     }
     dy += 18;
+    if (e.gen1Stats) goto buttons;  // no abilities in Gen 1
     if (e.ability2[0]) {
         snprintf(buf, sizeof(buf), "%s / %s", e.ability1, e.ability2);
     } else {
@@ -177,6 +188,7 @@ static void entry_view(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
     int aw = pd_text(c, ix, dy, "ABILITY", PD_MUTED, PD_MUTED_SHADOW);
     pd_text_fit(c, ix + aw + 6, dy, iw - aw - 150, buf, PD_LABEL, PD_LABEL_SHADOW);
 
+buttons:;
     // Step through the list (wrapping) or go back to it.
     int byBtn = y + h - f - 26;
     ui_button(ui, c, x + w - f - 70 - 2 * 40, byBtn, 36, 22, "", HIT_DEX_PREV);

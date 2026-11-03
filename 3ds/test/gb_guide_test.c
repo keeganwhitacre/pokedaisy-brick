@@ -100,11 +100,75 @@ static void game(const char* fixtures, const char* fixture, const struct pd_conf
     printf("  %s ok\n", fixture);
 }
 
+// HERE on Route 1 (wCurMap 12): Gen1World's merge - Yellow PIDGEY 70 % / RATTATA 30 %, Red and Blue 50 / 50.
+static int here_route1(void) {
+    int bad = 0;
+    struct { enum pd_guide_id id; int pidgey; const char* name; } C[] = {
+        { PD_GUIDE_GB_YELLOW, 70, "Yellow" }, { PD_GUIDE_GB_RED, 50, "Red" }, { PD_GUIDE_GB_BLUE, 50, "Blue" } };
+    for (size_t i = 0; i < 3; i++) {
+        struct pd_game g;
+        memset(&g, 0, sizeof g);
+        g.cfg = &PD_GB_CONFIG_RED;  // any Game Boy config: the tables go by guide
+        g.guide = C[i].id;
+        static struct pd_snapshot s;
+        memset(&s, 0, sizeof s);
+        s.posOk = true; s.mapNum = 12;
+        struct pd_wild_set w;
+        int pid = 0, rat = 0;
+        if (pd_wild_here(&g, &s, &w))
+            for (int k = 0; k < w.count[0]; k++) { if (w.mons[0][k].species == 16) pid = w.mons[0][k].pct; if (w.mons[0][k].species == 19) rat = w.mons[0][k].pct; }
+        if (pid != C[i].pidgey || rat != 100 - C[i].pidgey) { printf("FAIL %s Route 1: PIDGEY %d %% RATTATA %d %%\n", C[i].name, pid, rat); bad++; }
+    }
+    return bad;
+}
+
+// Crystal: HERE on Route 29 (map 24.3) by day - PIDGEY 50 %, SENTRET 40, RATTATA 5, HOPPIP 5 (data/wild/johto_grass.asm's
+// day slots at 30 30 20 10 5 4 1) and by night (HOOTHOOT); RED is done only with both his flags.
+static int crystal(void) {
+    int bad = 0;
+    struct pd_game g;
+    memset(&g, 0, sizeof g);
+    g.cfg = &PD_GB_CONFIG_CRYSTAL;
+    g.guide = PD_GUIDE_GB_CRYSTAL;
+    static struct pd_snapshot s;
+    memset(&s, 0, sizeof s);
+    s.posOk = true; s.mapGroup = 24; s.mapNum = 3; s.hour = 1;
+    struct pd_wild_set w;
+    int want[4][2] = { { 16, 50 }, { 161, 40 }, { 19, 5 }, { 187, 5 } };
+    if (!pd_wild_here(&g, &s, &w) || w.count[0] != 4) { printf("FAIL Crystal Route 29: %d grass\n", w.count[0]); return 1; }
+    for (int i = 0; i < 4; i++) {
+        int got = -1;
+        for (int k = 0; k < w.count[0]; k++) if (w.mons[0][k].species == want[i][0]) got = w.mons[0][k].pct;
+        if (got != want[i][1]) { printf("FAIL Crystal Route 29 species %d: %d %%\n", want[i][0], got); bad++; }
+    }
+    s.hour = 2;
+    bool hoot = false;
+    if (pd_wild_here(&g, &s, &w)) for (int k = 0; k < w.count[0]; k++) hoot |= w.mons[0][k].species == 163;
+    if (!hoot) { printf("FAIL Crystal Route 29 at night: no HOOTHOOT\n"); bad++; }
+    const struct pd_guide* gd = &pd_guide_gb_crystal;
+    const struct pd_boss* red = &gd->bosses[gd->bossCount - 1];
+    if (strcmp(red->title, "RED") || !red->doneAll || !red->doneAll[1]) { printf("FAIL Crystal's RED\n"); bad++; }
+    s.flagsOk = true;
+    s.flags[red->doneAll[0] / 8] |= (uint8_t) (1 << (red->doneAll[0] % 8));
+    if (pd_boss_done(red, &s)) { printf("FAIL Crystal's RED done with one flag\n"); bad++; }
+    s.flags[red->doneAll[1] / 8] |= (uint8_t) (1 << (red->doneAll[1] % 8));
+    if (!pd_boss_done(red, &s)) { printf("FAIL Crystal's RED not done with both\n"); bad++; }
+    for (int b = 0; b < gd->bossCount; b++) {
+        struct pd_team_mon team[PD_TEAM_MAX];
+        int n = pd_trainer_team(&g, pd_boss_trainer(gd, &gd->bosses[b], &s), team);
+        if (n < 1 || n > 6 || team[0].level < 1) { printf("FAIL Crystal %s's team\n", gd->bosses[b].title); bad++; }
+    }
+    if (!bad) printf("  crystal ok (%d bosses)\n", gd->bossCount);
+    return bad;
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) return 2;
     game(argv[1], "yellow", &PD_GB_CONFIG_YELLOW, &pd_guide_gb_yellow, 74, 10, 12, 1, 3, 135, 134, 1, false);
     game(argv[1], "red", &PD_GB_CONFIG_RED, &pd_guide_gb_red, 74, 12, 14, 177, 176, 9, 6, 0, true);
     game(argv[1], "blue", &PD_GB_CONFIG_BLUE, &pd_guide_gb_blue, 74, 12, 14, 177, 176, 9, 6, 0, true);
+    bad += here_route1();
+    bad += crystal();
     printf("%s\n", bad ? "FAILED" : "PASS gb guide");
     return bad != 0;
 }

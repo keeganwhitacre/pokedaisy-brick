@@ -82,7 +82,8 @@ static void build_pages(const struct pd_game* g, const struct pd_snapshot* s, co
     int areaCount;
     pd_areas_for(g, &areaCount);
     bool rom = pd_guide_rom_ok(g);
-    if ((areaCount || rom) && !g->cfg->gb) pages[pageCount++] = (struct page_ref) { PAGE_HERE, 0, "HERE" };
+    // a Game Boy game: HERE where its wild tables and area data are generated (Gen 1)
+    if ((areaCount || rom) && (!g->cfg->gb || areaCount)) pages[pageCount++] = (struct page_ref) { PAGE_HERE, 0, "HERE" };
     if (rom && s->flagsOk && gd->bossCount) pages[pageCount++] = (struct page_ref) { PAGE_BOSS, 0, "NEXT BOSS" };
     bool whereIs = false;
     for (int i = 0; i < gd->pageCount && pageCount < MAX_PAGES; i++) {

@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "pd_gb.h"
 #include "pd_romart.h"
 #include "pd_tables.h"
 
@@ -66,6 +67,16 @@ static bool shiny_icon_pal(const struct pd_game* g, uint32_t battle, int species
 
 static bool decode(const struct pd_game* g, int species, bool shiny, uint32_t* out) {
     const struct pd_config* cfg = g->cfg;
+    if (cfg && cfg->gb) {  // a Game Boy cart's own 16x16 icon, at twice its size like the GBA's 32x32
+        uint32_t small[16 * 16];
+        if (!pd_gb_icon(g, species, small)) return false;
+        for (int y = 0; y < PD_ICON; y++)
+            for (int x = 0; x < PD_ICON; x++) {
+                uint32_t v = small[(y / 2) * 16 + x / 2];
+                out[y * PD_ICON + x] = v ? v & 0xFFFFFF : CLEAR;
+            }
+        return true;
+    }
     if (!cfg || !cfg->monIconTable || species <= 0) return false;
     if (species == PD_SPECIES_EGG) species = cfg->eggSpecies ? cfg->eggSpecies : 412;
     else if (species >= (cfg->speciesCount ? cfg->speciesCount : cfg->eggSpecies ? cfg->eggSpecies + 1 : 412)) return false;

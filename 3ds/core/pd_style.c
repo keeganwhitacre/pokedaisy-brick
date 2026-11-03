@@ -7,6 +7,7 @@ static const struct pd_layer LIST_LAYERS[] = {
 // A Game Boy window: ink outline, a paper gap, ink again (the games' double-line box).
 static const struct pd_layer GB_LAYERS[] = { { 0x181818, 1 }, { 0xFFFFFF, 1 }, { 0x181818, 1 } };
 int pd_gb_look;
+uint32_t pd_gb_ink = 0x181818, pd_gb_paper = 0xFFFFFF;
 #define N_LAYERS(a) ((int) (sizeof(a) / sizeof((a)[0])))
 
 int pd_title_box(struct pd_canvas* c, int x, int y, int w, int h, uint32_t fill) {

@@ -45,7 +45,7 @@ $(BUILD)/pd_gb_dex_test: $(CORE_SRC) $(wildcard core/*.h) test/gb_dex_test.c
 
 # make test-gbdex: the Game Boy POKéDEX flags vs the app's captured WRAM (fixtures dir = $(FIXTURES)).
 test-gbdex: $(BUILD)/pd_gb_dex_test
-	$(BUILD)/pd_gb_dex_test $(FIXTURES)
+	$(BUILD)/pd_gb_dex_test $(FIXTURES) $(ROMS)
 
 $(BUILD)/pd_gb_guide_test: $(CORE_SRC) $(wildcard core/*.h) test/gb_guide_test.c
 	@mkdir -p $(BUILD)

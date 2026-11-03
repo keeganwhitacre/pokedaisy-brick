@@ -4,6 +4,8 @@
 #ifndef PD_STYLE_H
 #define PD_STYLE_H
 
+#include <stdint.h>
+
 #include "pd_canvas.h"
 #include "pd_font.h"
 
@@ -11,8 +13,11 @@
 // pd_game_identify. PD_GB(fireRed, gb) picks per game.
 extern int pd_gb_look;
 #define PD_GB(a, b) (pd_gb_look ? (b) : (a))
-#define PD_GB_INK 0x181818
-#define PD_GB_PAPER 0xFFFFFF
+// The Game Boy look's ink and paper (the app's OptionColors.gbInk / gbPaper): Red / Blue's Super Game Boy colours
+// (0x181010 on 0xFFEFFF), PureRGB's black, else 0x181818 on white. Set with pd_gb_look.
+extern uint32_t pd_gb_ink, pd_gb_paper;
+#define PD_GB_INK pd_gb_ink
+#define PD_GB_PAPER pd_gb_paper
 
 #define PD_TITLE_FILL PD_GB(0xFFFFFF, PD_GB_PAPER)
 #define PD_TITLE_TEXT PD_GB(0x636363, PD_GB_INK)
