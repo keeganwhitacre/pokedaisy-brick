@@ -152,8 +152,8 @@ def c_sources():
 
 
 FEATURES = [
-    ("Shiny icons", "recoloured party icons from the ROM's shiny palette (MonArt shiny pal)", r"pd_icon_shiny|shinyPal"),
-    ("Hack item descriptions", "each hack's item descriptions read from its ROM (RomItemText)", r"pd_rom_item_desc"),
+    ("Shiny icons", "recoloured party icons from the ROM's shiny palette (MonArt shiny pal)", r"pd_draw_mon_icon_shiny"),
+    ("Hack item descriptions", "each hack's item descriptions read from its ROM (RomItemText)", r"rom_item_description"),
     ("GB DEX entry pages", "sprite, category, size, text, stats (Gen1Dex / Gen2Dex, DexDetails)", r"pd_gb_dex_entry"),
     ("GB DEX: Prism", "Prism's list (Gen2SpeciesPrism)", r"PRISM[^\n]*dex|dex[^\n]*PRISM"),
     ("GB GUIDE: Gen 1 HERE", "wild Pokémon and things by map (GuideGen1Gen)", r"pd_gb_wild_here"),
