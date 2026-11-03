@@ -132538,6 +132538,7 @@ const struct pd_text pd_text_ghost_grey = {
     .speciesTypes = pd_speciesTypeData_fireRedHackGhostGrey_types, .speciesTypesCount = 412,
     .genderRatios = pd_fireRedHackGhostGrey_genderRatios, .genderRatiosCount = 412,
     .mapsecs = pd_mapSecData_fireRedHackGhostGrey_mapSecs, .mapsecsCount = 199,
+    .mapsecsRom = true,
 };
 
 const struct pd_text pd_text_odyssey = {

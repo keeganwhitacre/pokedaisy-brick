@@ -2,10 +2,12 @@
 // companion says it can't read. "Unknown game" and "ROM hack" titles fail. Folders starting with _ or . are skipped.
 #include <dirent.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "../core/pd_game.h"
+#include "../core/pd_map.h"
 #include "../core/pd_snapshot.h"
 #include "../core/pd_tables.h"
 
@@ -43,6 +45,34 @@ static int check(const char* path, const char* name, int* ok, int* unsupported) 
             printf("  %s: %d place names (%s), first %s\n", name, named,
                    t && t->mapsecsRom ? "ROM" : t && t->mapsecs ? "own table" : "retail", first ? first : "-");
         if (named < 20) { printf("FAIL %s: %d place names\n", name, named); return 1; }
+        // The FireRed 1.0 hacks the app reads its own region map for (RomRegionMap): the map is drawn from the ROM.
+        static const char* const OWN_MAP[] = { "Unbound", "Gaia", "Odyssey", "Radical Red", "Amethyst", "GS Chronicles",
+                                               "Sword and Shield", "Orange Islands", "Ash Gray", "Ghost Grey" };
+        for (size_t k = 0; k < sizeof OWN_MAP / sizeof *OWN_MAP; k++) {
+            if (!strstr(g.title, OWN_MAP[k]) || strstr(g.title, "unverified")) continue;
+            const struct pd_map_art* art = pd_map_art(&g);
+            int page, onMap = 0;
+            struct pd_tile_rect r[4];
+            for (int m = 0; m < 0x100; m++) onMap += pd_map_tiles(&g, m, &page, r, 4) > 0;
+            if (getenv("PD_ROMS_NAMES")) printf("  %s: own map %d page(s), %d sections on it\n", name, art ? art->pages : 0, onMap);
+            if (!art || onMap < 10) { printf("FAIL %s: its own region map isn't read\n", name); return 1; }
+            // RomRegionMapTest's pins: pages, and sections' size / page / placement
+            struct { const char* t; int pages, sec, page, w, h; } PIN[] = {
+                { "Unbound", 1, 89, 0, 1, 1 }, { "Unbound", 1, 98, 0, 1, 3 }, { "Unbound", 1, 134, 0, 0, 0 },
+                { "Odyssey", 1, 89, 0, 1, 1 }, { "Sword and Shield", 1, 0x58, 0, 1, 1 }, { "Sword and Shield", 1, 0x8F, 0, 0, 0 },
+                { "Orange Islands", 4, 0x65, 1, 1, 1 }, { "Orange Islands", 4, 147, 2, -1, -1 },
+                { "Ash Gray", 2, 88, 0, 1, 1 }, { "Ash Gray", 2, 171, 1, 1, 3 }, { "Ghost Grey", 4, -1, 0, 0, 0 },
+            };
+            for (size_t q = 0; q < sizeof PIN / sizeof *PIN; q++) {
+                if (!strstr(g.title, PIN[q].t)) continue;
+                int pg = -1, n = PIN[q].sec >= 0 ? pd_map_tiles(&g, PIN[q].sec, &pg, r, 4) : 0;
+                bool okPin = art->pages == PIN[q].pages;
+                if (PIN[q].sec >= 0 && PIN[q].w > 0) okPin = okPin && n == 1 && pg == PIN[q].page && r[0].w == PIN[q].w && r[0].h == PIN[q].h;
+                if (PIN[q].sec >= 0 && PIN[q].w == 0) okPin = okPin && (n == 0 || r[0].w == 1);  // not placed: grid cells only
+                if (PIN[q].sec >= 0 && PIN[q].w < 0) okPin = okPin && n > 0 && pg == PIN[q].page;
+                if (!okPin) { printf("FAIL %s: map pin %d (pages %d, page %d, n %d)\n", name, PIN[q].sec, art->pages, pg, n); return 1; }
+            }
+        }
     }
     if (g.cfg) (*ok)++;
     else { (*unsupported)++; printf("  %s: %s (%s)\n", name, g.title, g.unsupported ? g.unsupported : "?"); }

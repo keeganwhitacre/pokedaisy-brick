@@ -1067,6 +1067,7 @@ typeChart = 'typeEffectiveness + fireRedHackGhostGrey.typeChart'
 speciesTypes = 'speciesTypeData + fireRedHackGhostGrey.types'
 genderRatios = 'fireRedHackGhostGrey.genderRatios'
 mapsecs = 'mapSecData + fireRedHackGhostGrey.mapSecs'
+mapsecsRom = true
 
 [text.odyssey]
 species = 'fireRedHackOdyssey.species'

@@ -283,11 +283,13 @@ int main(int argc, char** argv) {
 
     // A stylus held on the second slot (the cursor's colours), then let go:
     // its summary opens.
-    press(&p, HIT_SLOT + 1, 0);
-    shot(out, name, "pressed", px);
-    release(&p);
-    shot(out, name, "summary", px);
-    tap(&p, HIT_BACK, 0);
+    if (has_hit(&p, HIT_SLOT + 1)) {  // a save with one Pokémon has no second slot
+        press(&p, HIT_SLOT + 1, 0);
+        shot(out, name, "pressed", px);
+        release(&p);
+        shot(out, name, "summary", px);
+        tap(&p, HIT_BACK, 0);
+    }
 
     // BATTLE has a chip only while a battle is on.
     ui.tab = PD_TAB_BATTLE;
