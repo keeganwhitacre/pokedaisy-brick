@@ -36,14 +36,15 @@ struct mon_view {
     uint32_t status;
     const int* moves;
     const int* pp;
+    bool shiny;
 };
 
 static struct mon_view from_battler(const struct pd_battle_mon* b) {
-    return (struct mon_view) { b->species, b->level, b->hp, b->maxHp, b->type1, b->type2, b->status, b->moves, b->pp };
+    return (struct mon_view) { b->species, b->level, b->hp, b->maxHp, b->type1, b->type2, b->status, b->moves, b->pp, b->shiny };
 }
 
 static struct mon_view from_party(const struct pd_game* g, const struct pd_mon* m) {
-    struct mon_view v = { m->species, m->level, m->hp, m->maxHp, PD_TYPE_NONE, PD_TYPE_NONE, m->status, m->moves, m->pp };
+    struct mon_view v = { m->species, m->level, m->hp, m->maxHp, PD_TYPE_NONE, PD_TYPE_NONE, m->status, m->moves, m->pp, m->shiny };
     pd_species_type_pair(g, m->species, &v.type1, &v.type2);
     return v;
 }
@@ -62,10 +63,18 @@ static int pill(struct pd_canvas* c, int x, int y, const char* text, uint32_t fi
     return w;
 }
 
-// The icon on the window's grey, or a ball when the ROM has no icon for it.
-static void icon(struct pd_canvas* c, const struct pd_game* g, int species, int x, int y, bool faded) {
-    pd_round_rect(c, x, y, PD_ICON + 2, PD_ICON + 2, 3, PD_LIST_FILL);
-    if (!pd_draw_mon_icon(c, g, species, x + 1, y + 1, faded)) ui_ball(c, x + 12, y + 12, true);
+// The icon on the window's grey (a shiny one in its own colours, on pale gold in a gold frame: the app's monIconBox), or a
+// ball when the ROM has no icon for it.
+#define SHINY_FRAME 0xE0A820
+#define SHINY_FILL 0xFFF4C8
+static void icon(struct pd_canvas* c, const struct pd_game* g, int species, bool shiny, int x, int y, bool faded) {
+    if (shiny) {
+        pd_round_rect(c, x, y, PD_ICON + 2, PD_ICON + 2, 3, SHINY_FRAME);
+        pd_round_rect(c, x + 1, y + 1, PD_ICON, PD_ICON, 2, SHINY_FILL);
+    } else {
+        pd_round_rect(c, x, y, PD_ICON + 2, PD_ICON + 2, 3, PD_LIST_FILL);
+    }
+    if (!pd_draw_mon_icon_shiny(c, g, species, shiny, x + 1, y + 1, 1, faded)) ui_ball(c, x + 12, y + 12, true);
 }
 
 // A card across w: icon, then [side] name ... [state] Lv on the first line,
@@ -73,7 +82,7 @@ static void icon(struct pd_canvas* c, const struct pd_game* g, int species, int 
 static void card(struct pd_canvas* c, const struct pd_game* g, int x, int y, int w, const struct mon_view* m,
                  const char* side, const char* state) {
     char buf[40];
-    icon(c, g, m->species, x, y, false);
+    icon(c, g, m->species, m->shiny, x, y, false);
     int tx = x + PD_ICON + 8, right = x + w;
     int ty = y + 1;
     int nx = tx;
@@ -87,6 +96,7 @@ static void card(struct pd_canvas* c, const struct pd_game* g, int x, int y, int
     int statusW = *status ? pd_text_width(status) + 6 + 4 : 0;
     int nameEnd = nx + pd_text_fit(c, nx, ty, lvx - 6 - stateW - statusW - nx,
                                    pd_species_name(g, m->species, buf, sizeof(buf)), PD_LABEL, PD_LABEL_SHADOW);
+    if (m->shiny) nameEnd += pd_text(c, nameEnd + 2, ty, "*", SHINY_FRAME, PD_LABEL_SHADOW) + 2;  // the app's ShinySparkle
     if (*status) {
         ui_status_badge(c, nameEnd + 4, ty + 1, m->status);
         nameEnd += statusW;
@@ -173,8 +183,8 @@ static void foe_strip(struct pd_ui* ui, struct pd_canvas* c, const struct pd_gam
         const struct pd_mon* m = &s->foes[i];
         if (!shown) {
             ui_ball(c, sx + (cell - 10) / 2, y + (cell - 10) / 2, true);
-        } else if (!pd_draw_mon_icon(c, g, m->species, sx + (cell - PD_ICON) / 2, y + (cell - PD_ICON) / 2,
-                                     m->hp == 0)) {
+        } else if (!pd_draw_mon_icon_shiny(c, g, m->species, m->shiny, sx + (cell - PD_ICON) / 2, y + (cell - PD_ICON) / 2, 1,
+                                           m->hp == 0)) {
             char lv[8];
             snprintf(lv, sizeof(lv), "%d", m->level);
             pd_text(c, sx + (cell - pd_text_width(lv)) / 2, pd_text_y(y, cell), lv,
@@ -287,7 +297,7 @@ static void suggestions(struct pd_canvas* c, const struct pd_game* g, const stru
         int ry = y + (rowH - ROW) / 2;
         // The Pokémon: rank and name, then its level, HP and OUT when it's in battle.
         char buf[40];
-        icon(c, g, p->mon->species, ix, ry, false);
+        icon(c, g, p->mon->species, p->mon->shiny, ix, ry, false);
         int tx = ix + PD_ICON + 8, right = ix + half;
         int nx = tx + pd_text(c, tx, ry + 1, RANKS[i], PD_VALUE, PD_VALUE_SHADOW) + 5;
         pd_text_fit(c, nx, ry + 1, right - nx, pd_species_name(g, p->mon->species, buf, sizeof(buf)), PD_LABEL,

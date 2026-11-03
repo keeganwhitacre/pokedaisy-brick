@@ -128,12 +128,17 @@ bool pd_decode_party_mon(const uint8_t* raw, struct pd_mon* m) {
 }
 
 // Shininess per the layout (Gen3Mon.kt: shinyBelow > 0 && (bits set, or shiny value < shinyBelow, flipped by the modifier)).
+// The running game's own check where its layout has none (pd_game.shinyBelow, the app's NativeConfig.monLayout), for the
+// pd_snapshot_read in progress.
+static int gameShinyBelow;
+
 static bool mon_shiny(const uint8_t* raw, const struct pd_party_layout* l) {
-    if (l->shinyBelow <= 0) return false;
+    int below0 = l->shinyBelow > 0 ? l->shinyBelow : gameShinyBelow;
+    if (below0 <= 0) return false;
     if (l->shinyBitsMask) return (raw[l->shinyBits] & l->shinyBitsMask) != 0;
     uint32_t pid = u32(raw), ot = u32(raw + 4);
     unsigned v = ((ot >> 16) ^ (ot & 0xFFFF) ^ (pid >> 16) ^ (pid & 0xFFFF)) & 0xFFFF;
-    bool below = (int) v < l->shinyBelow;
+    bool below = (int) v < below0;
     bool flip = l->shinyModifier > 0 && (raw[l->shinyModifier] & 0x40) != 0;
     return below != flip;
 }
@@ -307,6 +312,8 @@ bool pd_decode_party_mon_c(const uint8_t* raw, const struct pd_party_layout* l, 
     return true;
 }
 
+static int battleShinyBelow; // the app's pidShiny, for the pd_snapshot_read in progress
+
 static void decode_battle_mon(const uint8_t* raw, const struct pd_battle_layout* l, struct pd_battle_mon* b) {
     memset(b, 0, sizeof(*b));
     b->species = u16(raw + l->species) & l->speciesMask;
@@ -322,7 +329,12 @@ static void decode_battle_mon(const uint8_t* raw, const struct pd_battle_layout*
     b->maxHp = u16(raw + l->maxHp);
     b->status = u32(raw + l->status);
     // A wrong guess at the game's addresses reads bytes that are not a battler: show nothing rather than garbage.
-    if (b->level < 1 || b->level > 100 || b->maxHp < 1 || b->maxHp > 9999 || b->hp > b->maxHp) memset(b, 0, sizeof(*b));
+    if (b->level < 1 || b->level > 100 || b->maxHp < 1 || b->maxHp > 9999 || b->hp > b->maxHp) { memset(b, 0, sizeof(*b)); return; }
+    // the app's decodeBattleMon: a game that keeps shininess in bits of its own never tells by the battler's personality
+    if (l->personality && l->otId && battleShinyBelow > 0) {
+        uint32_t pid = u32(raw + l->personality), ot = u32(raw + l->otId);
+        b->shiny = (((ot >> 16) ^ (ot & 0xFFFF) ^ (pid >> 16) ^ (pid & 0xFFFF)) & 0xFFFF) < (unsigned) battleShinyBelow;
+    }
 }
 
 static void read_save_fields(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn read, void* ctx,
@@ -353,6 +365,11 @@ void pd_snapshot_read(struct pd_snapshot* s, const struct pd_game* g, pd_read_fn
     memset(s, 0, sizeof(*s));
     s->cfg = g->cfg;
     s->hour = -1;
+    gameShinyBelow = g->shinyBelow;
+    {
+        const struct pd_party_layout* pl = g->cfg && g->cfg->partyLayout ? g->cfg->partyLayout : &pd_party_layout_vanilla;
+        battleShinyBelow = pl->shinyBitsMask ? 0 : g->shinyBelow > 0 ? g->shinyBelow : pl->shinyBelow;
+    }
     s->partyActive = -1;
     s->money = -1;
     const struct pd_config* cfg = g->cfg;

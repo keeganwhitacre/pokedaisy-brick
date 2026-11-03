@@ -19,3 +19,8 @@ straight from the sources; the table below is written from its output.
   Quetzal's regions with the player's first). HERE reads each game's own wild header shape, time-of-day sets and Lazarus's
   night set by the game's clock. WHERE IS for Heart and Soul, Ultra Violet, Amethyst and each Recharged Yellow release's own
   items.
+- **Shiny marks and shiny icons as in the app.** The game's shiny check comes by ROM hash, like the app's: every retail
+  cart (vanilla's 8) and 44 checked hacks (their own value: Glazed 16, Imperium 36, Odyssey 255, SoulGold 256, ...). A shiny
+  party Pokémon, foe or battler gets its icon in its shiny colours (the shiny battle palette mapped onto the icon's, as
+  the app does; SoulGold's own shiny icon palettes), a gold frame on the battle cards and the gold `*`. v0.1 marked
+  only SoulGold, R.O.W.E. and Elite Redux, with normal icons.

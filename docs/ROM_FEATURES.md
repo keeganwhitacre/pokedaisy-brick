@@ -433,6 +433,10 @@ game's clock. Kaizo uses retail Emerald's guide over its own wild table, Ultra V
 
 ²⁷ Ghost Grey's last boss, SUMMER, has a team that answers the starter; the guide shows all three (LITWICK, SPIRITLE, ROWLET) and counts her beaten when any of them is.
 
+**Shiny** marks and icons: by ROM hash as in the app (`3ds/tools/gen_shiny.py` from `ShinyOdds.kt`: every retail cart and
+the checked hacks, each with its own shiny value); icons recoloured from the shiny battle palette (SoulGold: its own). `make -C
+3ds test-shiny` checks retail Emerald's on the `emerald_shiny_battle` fixture.
+
 **Place names** (WHERE IS, HERE, the MAP's label): every hack the companion reads names its map sections as the app does.
 FireRed 1.0 hacks (Unbound, Radical Red, Odyssey, Gaia, Amethyst, GS Chronicles, Sword and Shield Ultimate Plus, Orange Islands,
 Ash Gray, Celia) read their own names from the ROM's region map code, where it keeps them (Celia's doesn't: FireRed's names);

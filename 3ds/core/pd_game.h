@@ -100,6 +100,7 @@ extern const struct pd_party_layout pd_party_layout_vanilla, pd_party_layout_que
 struct pd_battle_layout {
     int size, species, moves, type1, type2, pp, hp, level, maxHp, status;
     unsigned speciesMask;
+    int personality, otId; // u32s for the SHINY marks; 0 = not mapped
 };
 extern const struct pd_battle_layout pd_battle_layout_vanilla, pd_battle_layout_expansion, pd_battle_layout_tmt2,
     pd_battle_layout_team_rocket, pd_battle_layout_wishes, pd_battle_layout_rowe, pd_battle_layout_soulgold,
@@ -162,6 +163,10 @@ struct pd_config {
     // and palette indices (masked), and whether the item palette is LZ77 (else raw).
     int monIconStride, monPalIdxStride, monPalIdxMask;
     bool itemPalCompressed;
+    // Icon palettes per species (SoulGold's gSpeciesInfo: the shiny one 4 bytes on); 0 = the shared six. A game that marks
+    // shiny Pokemon (its party layout's shinyBelow) recolours the shared ones from its battle palettes: the dex's
+    // gMonPaletteTable (dexPalettes), else monPalettes (the app's IconTables.battlePalettes).
+    uint32_t monIconPalettes, dexPalettes, monPalettes;
     // The game's own egg species (0 = retail's 412) and how many species its tables hold (with the egg).
     int eggSpecies, speciesCount;
     // Bits an expansion game packs above the species / move / PP words (0xFFFF / 0xFFFF / 0xFF = none).
@@ -330,9 +335,16 @@ struct pd_game {
     size_t romSize;
     unsigned loadId; // new on every pd_game_detect (see pd_rom_id)
     char sha1[41];   // the whole ROM's, once pd_game_identify ran ("" before)
+    // The game's shiny check (the app's NativeConfig.shinyBelow, set by hash): shiny when the shiny value is below it;
+    // 0 = the party layout's own rule, if any.
+    int shinyBelow;
     // A Game Boy game: no map-section names yet (the GBA hacks' come from pd_text.mapsecs / the ROM).
     bool hackMaps;
 };
+
+// The ROMs whose shiny check is known (pd_shiny_gen.c, from ShinyOdds.kt), NULL-terminated.
+struct pd_shiny_rom { const char* sha1; int below; };
+extern const struct pd_shiny_rom pd_shiny_roms[];
 
 // Which ROM the tabs' caches were built from: 0 = none, else new for every
 // game loaded. Not the ROM pointer - mGBA's 3DS build loads every game into

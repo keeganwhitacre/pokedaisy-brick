@@ -113,7 +113,7 @@ static void status_chip(struct pd_canvas *c, int cx, int y, const char *label) {
 // One member's icon at (x, y) in a TILE-wide slot: faded when fainted, its status chip over the top.
 static void mon_icon(struct hud *u, const struct pd_mon *m, int x, int y) {
   bool egg = m->species == PD_SPECIES_EGG, fainted = !egg && m->hp == 0;
-  pd_draw_mon_icon(u->c, u->g, m->species, x + (TILE - PD_ICON) / 2, y - 5, fainted);
+  pd_draw_mon_icon_shiny(u->c, u->g, m->species, m->shiny, x + (TILE - PD_ICON) / 2, y - 5, 1, fainted);
   const char *status = egg ? "" : fainted ? "FNT" : pd_status_label(m->status);
   if (*status)
     status_chip(u->c, x + TILE / 2, y - 3, status);

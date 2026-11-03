@@ -17,31 +17,31 @@ const struct pd_party_layout pd_party_layout_vanilla = {
 // struct BattlePokemon layouts (Gen3Mon.kt): retail's / CFRU's, pokeemerald-expansion's and the hacks' variants of it.
 const struct pd_battle_layout pd_battle_layout_vanilla = {
     .size = 88, .species = 0, .moves = 12, .type1 = 33, .type2 = 34, .pp = 36, .hp = 40, .level = 42,
-    .maxHp = 44, .status = 76, .speciesMask = 0xFFFF,
+    .maxHp = 44, .status = 76, .speciesMask = 0xFFFF, .personality = 0x48, .otId = 0x54,
 };
 const struct pd_battle_layout pd_battle_layout_expansion = {
     .size = 96, .species = 0, .moves = 12, .type1 = 34, .type2 = 35, .pp = 37, .hp = 42, .level = 44,
-    .maxHp = 46, .status = 80, .speciesMask = 0xFFFF,
+    .maxHp = 46, .status = 80, .speciesMask = 0xFFFF, .personality = 0x4C, .otId = 0x58,
 };
 const struct pd_battle_layout pd_battle_layout_tmt2 = {
     .size = 96, .species = 0, .moves = 12, .type1 = 34, .type2 = 35, .pp = 38, .hp = 42, .level = 44,
-    .maxHp = 46, .status = 80, .speciesMask = 0xFFFF,
+    .maxHp = 46, .status = 80, .speciesMask = 0xFFFF, .personality = 0x4C, .otId = 0x58,
 };
 const struct pd_battle_layout pd_battle_layout_team_rocket = {
     .size = 92, .species = 0, .moves = 12, .type1 = 34, .type2 = 35, .pp = 37, .hp = 42, .level = 44,
-    .maxHp = 46, .status = 80, .speciesMask = 0xFFFF,
+    .maxHp = 46, .status = 80, .speciesMask = 0xFFFF, .personality = 0x4C, .otId = 0x58,
 };
 const struct pd_battle_layout pd_battle_layout_wishes = {
     .size = 136, .species = 0, .moves = 12, .type1 = 34, .type2 = 35, .pp = 37, .hp = 42, .level = 44,
-    .maxHp = 46, .status = 80, .speciesMask = 0xFFFF,
+    .maxHp = 46, .status = 80, .speciesMask = 0xFFFF, .personality = 0x4C, .otId = 0x58,
 };
 const struct pd_battle_layout pd_battle_layout_rowe = {
     .size = 96, .species = 0, .moves = 12, .type1 = 34, .type2 = 35, .pp = 37, .hp = 42, .level = 44,
-    .maxHp = 46, .status = 80, .speciesMask = 0x7FF,
+    .maxHp = 46, .status = 80, .speciesMask = 0x7FF, .personality = 0x4C, .otId = 0x58,
 };
 const struct pd_battle_layout pd_battle_layout_soulgold = {
     .size = 152, .species = 0, .moves = 12, .type1 = 34, .type2 = 35, .pp = 37, .hp = 42, .level = 44,
-    .maxHp = 46, .status = 84, .speciesMask = 0xFFFF,
+    .maxHp = 46, .status = 84, .speciesMask = 0xFFFF, .personality = 0x50, .otId = 0x88,
 };
 const struct pd_battle_layout pd_battle_layout_elite_redux = {
     .size = 104, .species = 20, .moves = 32, .type1 = 68, .type2 = 69, .pp = 71, .hp = 54, .level = 75,
@@ -524,6 +524,9 @@ void pd_game_identify(struct pd_game* g) {
     pd_sha1_init(&s);
     pd_sha1_update(&s, g->rom, g->romSize);
     pd_sha1_hex(&s, g->sha1);
+    g->shinyBelow = 0;
+    for (const struct pd_shiny_rom* r = pd_shiny_roms; r->sha1; r++)
+        if (!strcmp(r->sha1, g->sha1)) g->shinyBelow = r->below;
 
     pd_gb_look = g->kind == PD_GAME_GB;
     for (const struct unsupported_rom* u = UNSUPPORTED_ROMS; u->sha1; u++) {
@@ -561,9 +564,10 @@ void pd_game_identify(struct pd_game* g) {
     // LeafGreen, Ruby and Sapphire are read by code and revision alone, like the app (OTHER_RETAIL_CODES):
     // only FireRed and Emerald, which most hacks build on, need a retail hash.
     if (strcmp(g->code, "BPRE") && strcmp(g->code, "BPEE")) return;
+    // English FireRed / Emerald: retail's shiny check once the hash (or a collection's dump of it) checks out (Poller.kt).
     for (size_t i = 0; i < sizeof RETAIL_SHA1S / sizeof *RETAIL_SHA1S; i++)
-        if (!strcmp(RETAIL_SHA1S[i], g->sha1)) return;
-    if (retail_dump(g)) return;
+        if (!strcmp(RETAIL_SHA1S[i], g->sha1)) { g->shinyBelow = 8; return; }
+    if (retail_dump(g)) { g->shinyBelow = 8; return; }
     g->cfg = NULL;
     g->guide = PD_GUIDE_NONE;
     g->title = g->kind == PD_GAME_FIRERED ? "FireRed ROM hack" : "Emerald ROM hack";

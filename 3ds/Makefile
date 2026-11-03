@@ -15,7 +15,7 @@ CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror
 CORE_SRC := $(wildcard core/*.c)
 DEVKITARM_IMAGE := devkitpro/devkitarm:latest
 
-.PHONY: preview test-roms test-gbguide test-gbdex test-dex test-font 3ds decomps fixture-roms azahar-test azahar-battle-test tables clean
+.PHONY: preview test-shiny test-roms test-gbguide test-gbdex test-dex test-font 3ds decomps fixture-roms azahar-test azahar-battle-test tables clean
 
 $(BUILD)/pd_font_test: core/pd_canvas.c core/pd_canvas.h core/pd_font.h core/pd_font_gen.c test/font_test.c
 	@mkdir -p $(BUILD)
@@ -62,6 +62,14 @@ $(BUILD)/pd_rom_ids_test: $(CORE_SRC) $(wildcard core/*.h) test/rom_ids_test.c
 # make test-roms ROMS=<dir>: every ROM in the folders under <dir> is recognised.
 test-roms: $(BUILD)/pd_rom_ids_test
 	$(BUILD)/pd_rom_ids_test $(ROMS)
+
+$(BUILD)/pd_shiny_test: $(CORE_SRC) $(wildcard core/*.h) test/shiny_test.c
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(CORE_SRC) test/shiny_test.c -lm
+
+# make test-shiny ROMS=<dir with the ROMs>: retail Emerald's shiny marks and icons on the emerald_shiny_battle fixture.
+test-shiny: $(BUILD)/pd_shiny_test
+	$(BUILD)/pd_shiny_test $(FIXTURES) $(ROMS)
 
 $(BUILD)/pd_card_test: $(CORE_SRC) $(wildcard core/*.h) test/card_test.c
 	@mkdir -p $(BUILD)

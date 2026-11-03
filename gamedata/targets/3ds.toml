@@ -118,6 +118,9 @@ monIconStride = 'monIconStride'
 monPalIdxStride = 'monPalIdxStride'
 monPalIdxMask = 'monPalIdxMask'
 itemPalCompressed = 'itemPalCompressed'
+monIconPalettes = 'monIconPalettes'
+dexPalettes = 'pokedex.palettes'
+monPalettes = 'monPalettes'
 
 # POKéDEX.
 [part.dex]

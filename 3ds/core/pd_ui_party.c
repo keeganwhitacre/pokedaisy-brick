@@ -205,7 +205,7 @@ static void party_slot(struct pd_ui* ui, struct pd_canvas* c, const struct pd_ga
     // The Poke Ball, then the icon over it, resting 4 px up.
     static const uint32_t BALL_COLORS[4] = { 0x4A4A63, 0xB54200, 0xC65200, 0xB5BDCE };
     char_bitmap(c, BALL, 20, x + geo.fx - 6 * u, y + geo.fy - 4 * u, u, "KRHW", BALL_COLORS);
-    pd_draw_mon_icon_scaled(c, g, m->species, x + geo.fx - 8 * u, y + geo.fy - 4 * u, u, false);
+    pd_draw_mon_icon_shiny(c, g, m->species, m->shiny, x + geo.fx - 8 * u, y + geo.fy - 4 * u, u, false);
 
     int textW = geo.fx + geo.fw - 4 * u - geo.textX;
     pd_text_fit(c, x + geo.textX, y + geo.nameMid - 8, textW, mon_display_name(g, m, buf, sizeof(buf)), SLOT_TEXT,
@@ -349,7 +349,7 @@ static void summary(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game*
     int ix = x + f + 6, iw = w - 2 * (f + 6);
     int ty = y + f + 2;
     // The icon left of the first two lines (name, HP).
-    if (pd_draw_mon_icon(c, g, m->species, ix - 2, ty + 2, m->species != PD_SPECIES_EGG && m->hp == 0)) {
+    if (pd_draw_mon_icon_shiny(c, g, m->species, m->shiny, ix - 2, ty + 2, 1, m->species != PD_SPECIES_EGG && m->hp == 0)) {
         ix += PD_ICON + 2;
         iw -= PD_ICON + 2;
     }
