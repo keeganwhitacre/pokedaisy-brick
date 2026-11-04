@@ -425,7 +425,17 @@ static inline uint32_t gbOpaque(uint32_t c, uint32_t alpha) { return (c & 0x00FF
 static uint32_t gbFieldPal[64];
 static bool gbUseFieldPal;
 
+#ifdef COLOR_16_BIT
+// The libretro build's renderer keeps 16-bit colours (5-6-5 with red high); everything here draws 32-bit XBGR like the
+// frame it sits beside, rounded as the frame's own conversion is (green's low bit from its top).
+static inline uint32_t gbLive(int i) {
+    uint32_t c = gbR->palette[gbR->lookup[i]], r = (c >> 11) & 31, g = (c >> 5) & 63, b = c & 31;
+    g |= g >> 5;
+    return ((b << 3 | b >> 2) << 16) | ((g << 2 | g >> 4) << 8) | (r << 3 | r >> 2);
+}
+#else
 static inline uint32_t gbLive(int i) { return gbR->palette[gbR->lookup[i]]; }
+#endif
 
 static inline uint32_t gbWorldColor(int i) { return gbUseFieldPal ? gbFieldPal[i] : gbLive(i); }
 
