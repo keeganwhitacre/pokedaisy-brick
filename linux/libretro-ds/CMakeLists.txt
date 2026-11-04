@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 project(pokedaisy_ds_libretro LANGUAGES C CXX)
+set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -13,15 +14,52 @@ foreach(feature DSPERATE_SDL DSPERATE_HEADLESS DSPERATE_TESTS DSPERATE_CHEEVOS D
   set(${feature} OFF CACHE BOOL "" FORCE)
 endforeach()
 add_subdirectory(${DS} dsperate EXCLUDE_FROM_ALL)
+# The TrimUI SDK has no lto1; this path deliberately uses no release PGO.
 set_property(TARGET dsperate_core PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
-add_library(pokedaisy_ds_libretro SHARED ${LR}/src/libretro.cpp)
+set(APP ${ROOT}/app/src/main/cpp/nds)
+file(GLOB PD_CORE CONFIGURE_DEPENDS ${ROOT}/3ds/core/*.c)
+add_library(pokedaisy_ds_libretro SHARED pd_ds_libretro.cpp ${PD_CORE}
+  ${ROOT}/linux/hud.c
+  ${ROOT}/linux/dsperate/companion.cpp
+  ${ROOT}/linux/dsperate/party_view.cpp
+  ${ROOT}/linux/dsperate/bag_view.cpp
+  ${ROOT}/linux/dsperate/dex_view.cpp
+  ${ROOT}/linux/dsperate/map_art.cpp
+  ${ROOT}/linux/dsperate/map_view.cpp
+  ${APP}/pk_nds_field.cpp)
 set_target_properties(pokedaisy_ds_libretro PROPERTIES PREFIX "")
-target_include_directories(pokedaisy_ds_libretro PRIVATE ${LR}/include ${DS}/src)
+target_include_directories(pokedaisy_ds_libretro PRIVATE ${LR}/include ${LR} ${DS}/src
+  ${ROOT}/3ds/core ${ROOT}/linux/dsperate ${APP})
 target_link_libraries(pokedaisy_ds_libretro PRIVATE dsperate_core pthread dl m)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
   target_link_libraries(pokedaisy_ds_libretro PRIVATE stdc++fs)
 endif()
+target_link_options(pokedaisy_ds_libretro PRIVATE -Wl,--version-script=${LR}/src/link.T -Wl,--no-undefined)
+
+# A self-contained pak should not depend on firmware C++ runtime versions.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_link_options(pokedaisy_ds_libretro PRIVATE -static-libstdc++ -static-libgcc)
 endif()
-target_link_options(pokedaisy_ds_libretro PRIVATE -Wl,--version-script=${LR}/src/link.T -Wl,--no-undefined)
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(ds-libretro-host test/host.c)
+  target_include_directories(ds-libretro-host PRIVATE ${LR}/include)
+  target_link_libraries(ds-libretro-host PRIVATE dl)
+  target_compile_options(ds-libretro-host PRIVATE -UNDEBUG)
+  # Run this target with either the stock wrapper or the enhanced core.
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
+  set(DIAGNOSTIC ${CMAKE_CURRENT_BINARY_DIR}/diagnostic.nds)
+  add_test(NAME ds-diagnostic-generate COMMAND ${Python3_EXECUTABLE} ${ROOT}/linux/dsperate/make_diagnostic.py ${DIAGNOSTIC})
+  set_tests_properties(ds-diagnostic-generate PROPERTIES FIXTURES_SETUP diagnostic)
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/validation)
+  add_test(NAME ds-libretro-contract COMMAND ds-libretro-host $<TARGET_FILE:pokedaisy_ds_libretro> ${DIAGNOSTIC} ${CMAKE_CURRENT_BINARY_DIR}/validation)
+  set_tests_properties(ds-libretro-contract PROPERTIES FIXTURES_REQUIRED diagnostic TIMEOUT 90)
+  get_target_property(PRESENTATION_SOURCES pokedaisy_ds_libretro SOURCES)
+  list(REMOVE_ITEM PRESENTATION_SOURCES pd_ds_libretro.cpp)
+  add_executable(ds-companion-fixture test/fixture.cpp ${PRESENTATION_SOURCES})
+  target_include_directories(ds-companion-fixture PRIVATE ${ROOT}/3ds/core ${ROOT}/linux/dsperate ${APP})
+  target_compile_options(ds-companion-fixture PRIVATE -UNDEBUG)
+  target_link_libraries(ds-companion-fixture PRIVATE m)
+  add_test(NAME ds-companion-fixture COMMAND ds-companion-fixture ${ROOT}/app/src/test/resources/fixtures/platinum/mainram.bin)
+endif()
