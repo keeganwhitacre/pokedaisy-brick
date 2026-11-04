@@ -2851,6 +2851,32 @@ void pk_wide_skip(struct mCore* core, const uint32_t* frame) {
     pk_wide_view(core, frame, NULL, v, NULL);
 }
 
+int pk_wide_glow(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView v) {
+    pk_wide_skip(core, frame);   // the RAM history, as for any frame nobody sees the window of
+    if (gbGame || !core || core->platform(core) != mPLATFORM_GBA || !configured || !out) return 0;
+    if (v.w > PK_WIDE_MAX_VIEW_W) v.w = PK_WIDE_MAX_VIEW_W;
+    if (v.h > PK_WIDE_MAX_VIEW_H) v.h = PK_WIDE_MAX_VIEW_H;
+    if (v.w < 1 || v.h < 1) return 0;
+    uint32_t alpha = frame[0] & 0xFF000000;
+    ambientPrepare(frame);
+    int reach[4] = { -v.x, v.x + v.w - PK_WIDE_W, -v.y, v.y + v.h - PK_WIDE_H };
+    for (int j = 0; j < v.h; j++) {
+        int Y = v.y + j;
+        uint32_t* row = out + j * v.w;
+        for (int i = 0; i < v.w; i++) {
+            int X = v.x + i;
+            if (onFrame(X, Y)) {
+                int n = (PK_WIDE_W - X) < (v.w - i) ? PK_WIDE_W - X : v.w - i;
+                memcpy(row + i, frame + Y * PK_WIDE_W + X, (size_t) n * sizeof(uint32_t));
+                i += n - 1;
+            } else {
+                row[i] = glowAt(frame, X, Y, reach, alpha);
+            }
+        }
+    }
+    return 1;
+}
+
 void pk_wide_probe(struct mCore* core, const uint32_t* frame, int skip) {
     static uint32_t px;
     struct PkWideView v = { 0, 0, 1, 1 };

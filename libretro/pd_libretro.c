@@ -551,6 +551,27 @@ static void wide_window(int aspect, unsigned fw, unsigned fh, unsigned *w, unsig
   *h = y - ((y - fh) & 1);
 }
 
+/* The window for this frame, in the game frame's pixels (and wideW x wideH set). */
+static struct PkWideView wide_rect(unsigned fw, unsigned fh) {
+  int last = pk_wide_scene();
+  int aspect = settings.aspect == PD_ASPECT_ZOOM_OUT && settings.autoZoom && last != PK_WIDE_SCENE_FIELD
+                   ? PD_ASPECT_EXPAND : settings.aspect;
+  wide_window(aspect, fw, fh, &wideW, &wideH);
+  return (struct PkWideView){((int)fw - (int)wideW) / 2, ((int)fh - (int)wideH) / 2, (int)wideW, (int)wideH};
+}
+
+/* A fast-forwarded frame: no window rebuild (that is the cost), but the picture over pk_wide's ambient glow, as rewind and
+ * the menus show it, rather than over black. Not for a Game Boy game, which has no glow in the core: it keeps the plain frame. */
+static void wide_glow_tick(void) {
+  unsigned fw = (unsigned)pk_wide_frame_w(), fh = (unsigned)pk_wide_frame_h();
+  for (unsigned y = 0; y < fh; y++)
+    for (unsigned x = 0; x < fw; x++)
+      wideSource[y * fw + x] = to_xbgr(outputBuffer[y * 256 + x]);
+  struct PkWideView v = wide_rect(fw, fh);
+  wideReady = pk_wide_glow(core, wideSource, wideFrame, v) && !pk_wide_fault();
+  wideHave = false;   // not a rebuilt window: the next full frame starts from the map again
+}
+
 /* After every game frame: pk_wide's RAM history, and (wideReady) this frame's window. */
 static void wide_tick(void) {
   wideReady = wideHave = false;
@@ -569,11 +590,7 @@ static void wide_tick(void) {
     pk_wide_view(core, wideSource, &px, (struct PkWideView){0, 0, 1, 1}, NULL);
     return;
   }
-  int last = pk_wide_scene();
-  int aspect = settings.aspect == PD_ASPECT_ZOOM_OUT && settings.autoZoom && last != PK_WIDE_SCENE_FIELD
-                   ? PD_ASPECT_EXPAND : settings.aspect;
-  wide_window(aspect, fw, fh, &wideW, &wideH);
-  struct PkWideView v = {((int)fw - (int)wideW) / 2, ((int)fh - (int)wideH) / 2, (int)wideW, (int)wideH};
+  struct PkWideView v = wide_rect(fw, fh);
   PF_T(vw0);
   pk_wide_view(core, wideSource, wideFrame, v, NULL);
   PF_T(vw1);
@@ -1046,7 +1063,9 @@ RETRO_API void retro_run(void) {
       pk_rest_note(core);
     if (fieldKnown)
       fieldFlags = pk_field_state(core, settings.runIndoors, wildSwitch && settings.wildOff ? 0 : 100);
-    if ((late || ff) && wideSupported && settings.aspect != PD_ASPECT_ORIGINAL) {
+    if (ff && wideSupported && settings.aspect != PD_ASPECT_ORIGINAL) {
+      wide_glow_tick();
+    } else if (late && wideSupported && settings.aspect != PD_ASPECT_ORIGINAL) {
       // Behind schedule: only the RAM history EXPAND needs (as for a fast-forwarded frame), no window, and the frame below
       // repeats the last picture whole (a stale margin around a live middle showed as a seam).
       pk_wide_skip(core, wideSource);
