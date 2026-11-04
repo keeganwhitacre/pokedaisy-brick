@@ -19,7 +19,8 @@ v0.2 SDL host (`docs/PLORPOS_V0.2.md`) and the list of intentional differences.
   companion and menus look the same in every aspect. A change of frame is a `SET_GEOMETRY`; diatom re-fits the picture.
   The less the frame, the less the core draws: EXPAND at 4x costs about 8.5 ms a frame on the Brick, ZOOM OUT about 11.
   AUTO ZOOM switches between the two as the scene changes (field = ZOOM OUT frame, elsewhere the EXPAND frame).
-- Core options: `pokedaisy_quick_button` (Y), `pokedaisy_companion_button` (X), `pokedaisy_hud_button` (R2).
+- Buttons: the quick menu (Y), companion (X) and HUD cursor (R2) buttons are rows of PokeDaisy's own SETTINGS, saved in `settings.ini` (a core option is out of reach in plorpOS). The launcher keeps L2 and R2 for this core on GBA (it clears them for the other GBA cores).
+- Off the map (menus, fast-forward, rewind) the window past the frame is the ambient glow, blurred from the frame's own edges, for GBA and for Game Boy games. Fast-forward skips the map rebuild and draws only the glow (`pk_wide_glow`) and plays no audio. Rewind (`RETRO_THROTTLE_REWINDING`) holds the chosen aspect: AUTO ZOOM IN does not step in on rewound frames.
 - Settings: `<save directory>/pokedaisy/settings.ini`.
 
 ## Intentional differences from v0.2
@@ -49,7 +50,7 @@ preview byte-identical (80 PNGs); NC = not checked.
 | The same tabs on Emerald, Emerald Legacy, Unbound, Crystal, Blue | `pd_ui_draw` | PARTY, BAG, MAP, GUIDE draw with each save's own team and bag, in ORIGINAL, EXPAND and ZOOM OUT (Crystal and Blue: "NO MAP", as the ROM has no region map art; Unbound GUIDE says its guide is not checked in-game yet). Polished Crystal NC (no save). Not compared frame by frame with v0.2 | H: the owner's saves from the Brick card, 1024x768 panel |
 | Summary, STATS, INFO, shiny marks, icons | `3ds/core` | NC in the core | P |
 | HUD parts | B2 | same as v0.2 (balls, BAG, MAP, COMPANION; PC after B3) | D: G2, core and v0.2 side by side |
-| HUD hotkey cursor | B2 | NC | needs hands (R2 on the Brick) |
+| HUD hotkey cursor | B2 | opens on R2 and on L2 (the setting row); it did nothing on GBA until the launcher stopped clearing L2/R2 for this core | D, owner on the Brick |
 | Quick menu PC | B3 | works | D |
 | Quick menu FLY | B3 | list of visited towns, flight to Pallet Town; indoors "You can't FLY from here." | D |
 | Quick menu REPEL | B3 | dimmed "No REPEL in your bag"; use NC (the save has none) | D |
@@ -57,8 +58,9 @@ preview byte-identical (80 PNGs); NC = not checked.
 | Quick menu WILD ENCOUNTERS | B3 | OFF tag, notice, persisted; no battle in 96 grass steps, a battle with it on | D, with the control |
 | EXPAND, ORIGINAL on FireRed | B4 | same scene and window as v0.2 | D, Vermilion City, side by side |
 | ZOOM OUT on FireRed | B4 | 341x256 frame (3x), against EXPAND's 256x192 (4x); the owner checked it on the Brick ("looks good") | H, D |
-| EXPAND, ZOOM OUT on Crystal | B4 | the overworld widens past the game's edges (canvas 204x153 in EXPAND, 256x192 in ZOOM OUT); the Crystal clock prompt appears because the desktop host has no RTC | H |
-| AUTO ZOOM IN, Yellow | B4 | NC | the Yellow community save does not load as a game; follow-up bead. AUTO ZOOM was off in the H runs |
+| EXPAND, ZOOM OUT on Crystal | B4 | the overworld widens past the game's edges (canvas 204x153 in EXPAND, 256x192 in ZOOM OUT); the border drew in the wrong colours until the 16-bit palette was converted (rebuilt window 360 of 360 cells differed from the frame before, 0 after); the Crystal clock prompt appears because the desktop host has no RTC | H, D (border colours, owner) |
+| Fast-forward and rewind edges (GBA and Game Boy) | pk_wide | the picture over the blurred glow, not black or flat bars; rewind keeps ZOOM OUT; fast-forward is silent | H, D (owner) |
+| AUTO ZOOM IN | B4 | steps ZOOM OUT in to the EXPAND frame on menus, the START menu, battles and text (Crystal start/select, owner); building interiors are the overworld, so nothing steps in there (by design, as v0.2); Yellow NC (the community save does not load as a game; follow-up bead) | D |
 | GB look, Gen 1 DEX pages, GB GUIDE | `3ds/core` | Blue: DEX lists all 151 (SEEN 151, OWN 151); GB tabs and GUIDE notice draw on Blue and Crystal. SGB colours NC; Gen 2 DEX pages not opened | H (Blue, Crystal saves) |
 | Place names, item descriptions, hack maps, guides, cards | `3ds/core` | place name and GUIDE HERE shown on FireRed; hacks NC | H, D |
 | Save states, fast-forward, rewind | diatom | the in-game menu has Save, Load; state resume works; fast-forward measured at 1.8x on EXPAND (104 / 112 fps at 2x / 3x); rewind works (owner). FF audio discard untested on device | D |
