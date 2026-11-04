@@ -132,9 +132,8 @@ void draw_companion() {
   else if(tab==1)ds_bag_view(&body,snapshot,pocket,scroll,details);
   else if(tab==2)ds_dex_view(&body,snapshot,filter,scroll);
   else ds_map_view(&body,snapshot,map,map_x,map_y);
-  const char* hints[]={"D-pad Pokemon  A summary  B back","Up/Down item  Left/Right pocket  A info","SELECT filter  Left/Right page","D-pad map  A player"};
+  const char* hints[]={"L/R tabs  L2 game  A summary  B back","L/R tabs  L2 game  Left/Right pocket","L/R tabs  L2 game  SELECT filter","L/R tabs  L2 game  D-pad move"};
   pd_text_fit(&c,9,236,323,hints[tab],0xffffff,PD_NO_SHADOW);
-  pd_text(&c,9,247,"L/R tabs  L2 game",0xffffff,PD_NO_SHADOW);
   geometry(341,256);
   for(unsigned i=0;i<341*256;++i)pixels[i]=rgb565(ui_pixels[i]);
   video(pixels,width,height,width*2);
