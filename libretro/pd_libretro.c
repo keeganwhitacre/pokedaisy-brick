@@ -306,6 +306,27 @@ static uint32_t hudDrawnKey;
 static int hudW, hudH;
 static int fieldFlags, hudFieldFrames;
 
+/* the quick menu and the game-code jobs: PC, FLY, REPEL, BIKE (fly.c, field_items.c) */
+static bool quickOpen;
+static int quickSel;
+static const struct pd_config *flyCfg;
+static struct fly_targets flyT;
+static const char *flyNames[FLY_MAX_TOWNS];
+static int flyAsk, flySel, flyStage, flyMapsec, flyWait;
+static bool flyList;
+static uint32_t flyCallback;
+static bool itemsOk, pcOk, bikeOk;
+static enum { JOB_NONE, JOB_PC, JOB_REPEL, JOB_BIKE, JOB_BIKE_WAIT, JOB_BIKE_RESTORE } job;
+static int jobItem, jobFrames, jobTries, repelSel, repelKinds[REPEL_KINDS], repelKindCount;
+static bool repelList, bikeWasRiding, bikeTook;
+static uint16_t bikeOld;
+static char repelRows[REPEL_KINDS][48];
+static const char *repelNames[REPEL_KINDS];
+static uint32_t *ovPixels; // the quick menu's canvas, see-through where nothing is drawn
+static const unsigned char *romData;
+static size_t romLen;
+
+
 static void snapshot(void) { pd_snapshot_read(&snap, &game, pd_lr_read_memory, core); }
 
 static int hud_wild_uncaught(const struct pd_game *g, const struct pd_snapshot *s) {
@@ -479,6 +500,18 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
     pk_field_wild(wildSwitch, settings.wildOff);
   pk_rest_reset();
   fieldFlags = 0;
+  romData = rom;
+  romLen = len;
+  bool gba = core->platform(core) == mPLATFORM_GBA;
+  flyCfg = game.cfg && gba && fly_supported(game.cfg, rom, len) ? game.cfg : NULL;
+  itemsOk = game.cfg && gba && field_items_supported(game.cfg, rom, len);
+  pcOk = itemsOk && pc_supported(game.cfg, rom, len);
+  bikeOk = itemsOk && bike_supported(game.cfg);
+  quickOpen = flyList = repelList = false;
+  flyAsk = flyStage = 0;
+  job = JOB_NONE;
+  quick_set_grid(settings.quickGrid);
+  ovPixels = calloc((size_t)CW * CH, sizeof *ovPixels);
   pd_ui_init(&ui, &settings);
   memset(&host, 0, sizeof host);
   host.hideScreenMode = true;
@@ -513,6 +546,8 @@ RETRO_API void retro_unload_game(void) {
   free(cvs);
   free(out565);
   free(hudPixels);
+  free(ovPixels);
+  ovPixels = NULL;
   cvs = NULL;
   out565 = NULL;
   hudPixels = NULL;
@@ -532,6 +567,8 @@ RETRO_API void retro_run(void) {
   bool wasCompanion = companion;
   if (down(companionBtn) && !hudFocus) {
     companion = !companion;
+    quickOpen = flyList = repelList = false;
+    flyAsk = 0;
   }
   // The HUD button: the cursor goes onto the HUD, the D-pad moves it, A presses what it is on, B / the button leave.
   if (hudFocus && (companion || !hudShown)) {
@@ -583,6 +620,124 @@ RETRO_API void retro_run(void) {
     }
   }
 
+
+  // The QUICK MENU over the paused game, in the app's order (QuickAction): PC, FLY, REPEL, BIKE, WILD, COMPANION;
+  // each only where the game can, dimmed with why when not now.
+  struct quick_item quick[QUICK_COUNT];
+  int quickN = 0;
+  char repelWhy[32] = "";
+  if (pcOk)
+    quick[quickN++] = (struct quick_item){QUICK_PC, false, false, NULL, 0, 0, NULL};
+  if (flyCfg) {
+    int flyer = fly_flyer(&snap);
+    quick[quickN++] = (struct quick_item){QUICK_FLY, false, false, flyer < 0 ? "No one in your party knows FLY" : NULL,
+                                          flyer < 0 ? 0 : snap.party[flyer].species, 0, NULL};
+  }
+  if (itemsOk) {
+    repelKindCount = 0;
+    for (int k = 0; k < REPEL_KINDS; k++)
+      if (bag_count(&snap, repel_kinds[k][0]) > 0)
+        repelKinds[repelKindCount++] = repel_kinds[k][0];
+    int left = repel_steps(core, game.cfg);
+    if (left)
+      snprintf(repelWhy, sizeof repelWhy, "%d steps left", left);
+    quick[quickN++] = (struct quick_item){QUICK_REPEL, false, false,
+                                          left ? repelWhy : repelKindCount ? NULL : "No REPEL in your bag", 0,
+                                          repelKindCount ? repelKinds[repelKindCount - 1] : repel_kinds[0][0], NULL};
+  }
+  if (bikeOk) {
+    int bike = bag_bike(&snap);
+    bool riding = (fieldFlags & PK_FIELD_AVATAR) && (fieldFlags & PK_FIELD_BIKE);
+    quick[quickN++] = (struct quick_item){QUICK_BIKE, false, false, bike ? NULL : "No bike in your bag", 0, bike ? bike : 360,
+                                          riding ? "GET OFF" : NULL};
+  }
+  quick[quickN++] = (struct quick_item){QUICK_WILD, settings.wildOff, false, wildSwitch ? NULL : "Not in this game", 0, 0, NULL};
+  quick[quickN++] = (struct quick_item){QUICK_COMPANION, false, false, NULL, 0, 0, NULL};
+  if (quickSel >= quickN)
+    quickSel = 0;
+  quick_set_grid(settings.quickGrid);
+  if (down(quickBtn) && !companion && !hudFocus) {
+    quickOpen = !quickOpen;
+    flyList = repelList = false;
+    flyAsk = 0;
+  } else if (quickOpen && repelList) {
+    if (down(UP))
+      repelSel = (repelSel + repelKindCount - 1) % repelKindCount;
+    if (down(DOWN))
+      repelSel = (repelSel + 1) % repelKindCount;
+    if (down(B))
+      repelList = false;
+    else if (down(A)) {
+      quickOpen = repelList = false;
+      job = JOB_REPEL;
+      jobItem = repelKinds[repelSel];
+      jobFrames = 0;
+    }
+  } else if (quickOpen && flyList) {
+    if (down(UP) && flyT.count)
+      flySel = (flySel + flyT.count - 1) % flyT.count;
+    if (down(DOWN) && flyT.count)
+      flySel = (flySel + 1) % flyT.count;
+    if (down(B))
+      flyList = false;
+    else if (down(A) && flyT.count) {
+      quickOpen = flyList = false;
+      flyMapsec = flyT.towns[flySel];
+      flyStage = 1;
+      flyWait = 0;
+    }
+  } else if (quickOpen && down(B)) {
+    quickOpen = false;
+  } else if (quickOpen) {
+    int dx = down(RIGHT) - down(LEFT), dy = down(DOWN) - down(UP);
+    if (dx || dy)
+      quickSel = quick_step(quickN, quickSel, dx, dy, CW, CH);
+    if (down(A) && !quick[quickSel].why && quick[quickSel].action == QUICK_FLY) {
+      flyAsk = 1; // answered below, between two frames
+    } else if (down(A) && !quick[quickSel].why && quick[quickSel].action == QUICK_REPEL && repelKindCount > 1) {
+      for (int k = 0; k < repelKindCount; k++) {
+        int steps = 0;
+        for (int r = 0; r < REPEL_KINDS; r++)
+          if (repel_kinds[r][0] == repelKinds[k])
+            steps = repel_kinds[r][1];
+        snprintf(repelRows[k], sizeof repelRows[k], "%s x%d  %d steps", pd_item_name(&game, repelKinds[k]),
+                 bag_count(&snap, repelKinds[k]), steps);
+        repelNames[k] = repelRows[k];
+      }
+      repelList = true;
+      repelSel = repelKindCount - 1;
+    } else if (down(A) && !quick[quickSel].why) {
+      quickOpen = false;
+      switch (quick[quickSel].action) {
+      case QUICK_PC:
+        job = JOB_PC;
+        jobFrames = 0;
+        break;
+      case QUICK_REPEL:
+        job = JOB_REPEL;
+        jobItem = repelKinds[0];
+        jobFrames = 0;
+        break;
+      case QUICK_BIKE:
+        job = JOB_BIKE;
+        jobItem = bag_bike(&snap);
+        jobFrames = 0;
+        jobTries = 15; // PokeDaisyActivity's SELECT_TRIES
+        break;
+      case QUICK_WILD:
+        settings.wildOff = !settings.wildOff;
+        pd_settings_save(&settings, settingsPath);
+        notice(settings.wildOff ? "Wild encounters off" : "Wild encounters on");
+        break;
+      case QUICK_COMPANION:
+        companion = true;
+        break;
+      default:
+        break;
+      }
+    }
+  }
+
   if (companion) {
     if (down(B) && !map_cursor_back(&ui) && !pd_ui_back(&ui))
       companion = false;
@@ -603,7 +758,7 @@ RETRO_API void retro_run(void) {
     }
   }
 
-  bool paused = companion || hudFocus;
+  bool paused = companion || hudFocus || (quickOpen && !flyAsk);
   maskGame = paused;
   if (!paused) {
     mgba_retro_run();
@@ -624,6 +779,99 @@ RETRO_API void retro_run(void) {
   companionWas = companion;
   frames++;
 
+  // FLY's steps and the field-item jobs, each between two frames the game's own code can be called in.
+  bool flyBattle = snap.inBattle || (fieldFlags & PK_FIELD_BATTLE);
+  bool flyBusy = companion || (fieldFlags & PK_FIELD_LOCKED) || (wideSupported && pk_wide_scene() != PK_WIDE_SCENE_FIELD);
+  if (flyCfg && flyAsk && quickOpen && !companion) {
+    if (pk_call_safe(core)) {
+      snapshot();
+      fly_targets(core, flyCfg, romData, romLen, &snap, flyBusy, flyBattle, &flyT);
+      flyAsk = 0;
+      if (flyT.result == FLY_OK && flyT.count) {
+        for (int i = 0; i < flyT.count; i++) {
+          const char *name = pd_mapsec_name(&game, flyT.towns[i]);
+          flyNames[i] = name && *name ? name : "?";
+        }
+        flyList = true;
+        flySel = 0;
+      } else {
+        quickOpen = false;
+        notice(flyT.result == FLY_OK ? "You haven't been anywhere to FLY to yet." : fly_reason(flyT.result));
+      }
+    } else if (++flyAsk > 120) {
+      flyAsk = 0;
+      quickOpen = false;
+      notice(fly_reason(FLY_FAILED));
+    }
+  }
+  if (flyCfg && flyStage == 1 && !companion && pk_call_safe(core)) {
+    snapshot();
+    enum fly_result r = fly_start(core, flyCfg, romData, romLen, &snap, flyMapsec, &flyT, flyBusy, flyBattle);
+    if (r == FLY_OK) {
+      flyStage = 2;
+      flyWait = 0;
+      flyCallback = fly_main_callback(core, flyCfg);
+    } else {
+      flyStage = 0;
+      notice(fly_reason(r));
+    }
+  } else if (flyCfg && flyStage == 2 && !companion && ++flyWait >= FLY_FADE_FRAMES && pk_call_safe(core)) {
+    flyStage = 0;
+    if (!fly_finish(core, flyCfg, romData, romLen, flyMapsec, &flyT, fly_main_callback(core, flyCfg) != flyCallback))
+      notice(fly_reason(FLY_FAILED));
+  }
+  bool safe = job != JOB_NONE && !companion && pk_call_safe(core);
+  if (job == JOB_PC && safe) {
+    job = JOB_NONE;
+    enum item_result r = pc_open(core, game.cfg, romData, romLen, flyBusy, flyBattle);
+    if (r != ITEM_USED)
+      notice(item_reason(r));
+  } else if (job == JOB_REPEL && safe) {
+    job = JOB_NONE;
+    int steps = 0;
+    enum item_result r = repel_use(core, game.cfg, romData, romLen, jobItem, flyBusy, flyBattle, &steps);
+    if (r == ITEM_USED) {
+      char msg[48];
+      snprintf(msg, sizeof msg, "Used! It lasts %d steps.", steps);
+      notice(msg);
+    } else
+      notice(item_reason(r));
+  } else if (job == JOB_BIKE && safe) {
+    enum item_result r = bike_register(core, game.cfg, romData, romLen, jobItem, flyBusy, flyBattle, &bikeOld);
+    if (r == ITEM_USED) {
+      gameKeys = 1u << SELECT;
+      gameKeyFrames = 2;
+      bikeWasRiding = fieldFlags & PK_FIELD_BIKE;
+      bikeTook = false;
+      job = JOB_BIKE_WAIT;
+      jobFrames = 0;
+    } else {
+      job = JOB_NONE;
+      notice(item_reason(r));
+    }
+  } else if (job == JOB_BIKE_WAIT && !companion) {
+    // SELECT again if the game dropped it (a bike rolling at full speed ignores it), but only where taking it shows
+    // for sure: the riding state flips, or the field's controls stay held.
+    if (((fieldFlags & PK_FIELD_BIKE) != 0) != bikeWasRiding || (fieldFlags & PK_FIELD_LOCKED))
+      bikeTook = true;
+    if (++jobFrames >= 10) {
+      if (bikeTook || !(fieldFlags & PK_FIELD_AVATAR) || --jobTries <= 0) {
+        job = JOB_BIKE_RESTORE;
+      } else {
+        gameKeys = 1u << SELECT;
+        gameKeyFrames = 2;
+      }
+      jobFrames = 0;
+    }
+  } else if (job == JOB_BIKE_RESTORE && ++jobFrames >= 20) {
+    job = JOB_NONE;
+    bike_restore(core, game.cfg, jobItem, bikeOld);
+  } else if ((job == JOB_PC || job == JOB_REPEL || job == JOB_BIKE) && !companion && ++jobFrames > 120) {
+    job = JOB_NONE;
+    notice(item_reason(ITEM_FAILED));
+  }
+
+
   if (companion) {
     pd_ui_update(&ui, &snap);
     ui.focusId = focusId;
@@ -633,12 +881,34 @@ RETRO_API void retro_run(void) {
     pd_ui_draw(&ui, &canvas, &game, &snap, &host);
     map_cursor_sync(&ui, &game, &snap);
     focus_draw(&ui, focus_resolve(&ui));
+  } else if (quickOpen) {
+    draw_game();
+    dim(0x55);
+    struct pd_canvas qc;
+    pd_canvas_init(&qc, CW, CH, ovPixels);
+    const char *const *rows = flyList ? flyNames : repelList ? repelNames : NULL;
+    bool drawn = true;
+    if (rows)
+      quick_list_draw(&qc, flyList ? "FLY" : "REPEL", rows, flyList ? flyT.count : repelKindCount, flyList ? flySel : repelSel);
+    else
+      drawn = quick_draw(&qc, &game, quick, quickN, quickSel);
+    if (drawn) {
+      quick_finish(&qc);
+      blend_overlay(ovPixels, CW, CH, 1, 0, 0);
+    }
   } else {
     draw_game();
     bool field = (fieldFlags & PK_FIELD_KNOWN) && !(fieldFlags & (PK_FIELD_LOCKED | PK_FIELD_BATTLE)) &&
-                 (!wideSupported || pk_wide_scene() == PK_WIDE_SCENE_FIELD);
+                 (!wideSupported || pk_wide_scene() == PK_WIDE_SCENE_FIELD) && flyStage == 0;
     hudFieldFrames = field ? hudFieldFrames + 1 : 0;
     if (settings.hud && game.cfg && core->platform(core) == mPLATFORM_GBA && hudFieldFrames >= 20) {
+      int steps = repel_steps(core, game.cfg);
+      if (steps <= 0)
+        hudState.repelFull = 0;
+      else if (!hudState.repelFull || steps > hudState.repelFull)
+        hudState.repelFull = hud_repel_full(steps);
+      hudState.repel = steps > 0 ? steps : 0;
+      hudState.pc = pcOk;
       hudState.wild = hud_wild_uncaught(&game, &snap);
       draw_hud();
     } else
