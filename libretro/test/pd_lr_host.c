@@ -1,5 +1,5 @@
 /* A bare libretro frontend for testing pokedaisy_libretro on the desktop: scripted buttons, option values, frame dumps.
- *   pd_lr_host CORE ROM SAVEDIR [-o key=value]... [-p FRAME:BUTTON[:HOLD]]... [-d FRAME:FILE.ppm]... [-n FRAMES] [-R FRAME: unload and load again after it]
+ *   pd_lr_host CORE ROM SAVEDIR [-o key=value]... [-p FRAME:BUTTON[:HOLD]]... [-d FRAME:FILE.ppm]... [-n FRAMES] [-R FRAME: unload and load again after it] [-s SAVE.srm]
  * BUTTON: a b select start right left up down r l x y l2 r2 l3. -r: write the frontend's view of the last frame size. */
 #define _GNU_SOURCE
 #include "libretro.h"
@@ -69,6 +69,7 @@ int main(int argc, char **argv) {
   if (argc < 4) return 2;
   saveDir = argv[3];
   int frames = 300, reload = 0;
+  const char *savefile = NULL;
   for (int i = 4; i + 1 < argc; i += 2) {
     if (!strcmp(argv[i], "-o")) { char *e = strchr(argv[i + 1], '='); *e = 0; opts[nopts].k = argv[i + 1]; opts[nopts++].v = e + 1; }
     else if (!strcmp(argv[i], "-p")) {
@@ -81,13 +82,14 @@ int main(int argc, char **argv) {
     } else if (!strcmp(argv[i], "-d")) { char *c = strchr(argv[i + 1], ':'); *c = 0; dumps[ndump].frame = atoi(argv[i + 1]); dumps[ndump++].file = c + 1; }
     else if (!strcmp(argv[i], "-n")) frames = atoi(argv[i + 1]);
     else if (!strcmp(argv[i], "-R")) reload = atoi(argv[i + 1]);
+    else if (!strcmp(argv[i], "-s")) savefile = argv[i + 1];
   }
   void *so = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
   if (!so) { fprintf(stderr, "%s\n", dlerror()); return 1; }
 #define SYM(n) __typeof__(&n) n##_ = dlsym(so, #n)
   SYM(retro_set_environment); SYM(retro_set_video_refresh); SYM(retro_set_audio_sample); SYM(retro_set_audio_sample_batch);
   SYM(retro_set_input_poll); SYM(retro_set_input_state); SYM(retro_init); SYM(retro_load_game); SYM(retro_run);
-  SYM(retro_get_system_av_info); SYM(retro_unload_game); SYM(retro_deinit);
+  SYM(retro_get_system_av_info); SYM(retro_get_memory_data); SYM(retro_get_memory_size); SYM(retro_unload_game); SYM(retro_deinit);
   retro_set_environment_(env); retro_init_();
   retro_set_video_refresh_(video); retro_set_audio_sample_(audio_one); retro_set_audio_sample_batch_(audio);
   retro_set_input_poll_(poll); retro_set_input_state_(input);
@@ -99,6 +101,13 @@ int main(int argc, char **argv) {
   fclose(f);
   struct retro_game_info gi = {argv[2], rom, (size_t)len, NULL};
   if (!retro_load_game_(&gi)) { fprintf(stderr, "load failed\n"); return 1; }
+  if (savefile) { // the frontend's half of a battery save: the file into the core's save memory
+    void *m = retro_get_memory_data_(RETRO_MEMORY_SAVE_RAM);
+    size_t n = retro_get_memory_size_(RETRO_MEMORY_SAVE_RAM);
+    FILE *sf = fopen(savefile, "rb");
+    if (m && sf) { size_t got = fread(m, 1, n, sf); fprintf(stderr, "save: %zu of %zu bytes\n", got, n); }
+    if (sf) fclose(sf);
+  }
   struct retro_system_av_info av;
   retro_get_system_av_info_(&av);
   fprintf(stderr, "av %ux%u fps %.2f\n", av.geometry.base_width, av.geometry.base_height, av.timing.fps);
