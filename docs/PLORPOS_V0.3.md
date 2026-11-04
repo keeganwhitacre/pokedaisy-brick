@@ -46,7 +46,7 @@ preview byte-identical (80 PNGs); NC = not checked.
 |---|---|---|---|
 | Companion tabs PARTY, BAG, MAP, GUIDE, SETTINGS | `pd_ui_draw` | same on FireRed | H: each tab shown with the owner's team, bag, map and GUIDE > HERE; D: PARTY through the launcher |
 | DEX, CARD on retail FireRed | `3ds/core` | "NO POKéDEX YET" on this rev 0 cartridge, as v0.2 documents | H |
-| The same tabs on Emerald, Unbound, Crystal, Polished Crystal | `pd_ui_draw` | NC | no valid save for these on the card; code is shared, P holds |
+| The same tabs on Emerald, Emerald Legacy, Unbound, Crystal, Blue | `pd_ui_draw` | PARTY, BAG, MAP, GUIDE draw with each save's own team and bag, in ORIGINAL, EXPAND and ZOOM OUT (Crystal and Blue: "NO MAP", as the ROM has no region map art; Unbound GUIDE says its guide is not checked in-game yet). Polished Crystal NC (no save). Not compared frame by frame with v0.2 | H: the owner's saves from the Brick card, 1024x768 panel |
 | Summary, STATS, INFO, shiny marks, icons | `3ds/core` | NC in the core | P |
 | HUD parts | B2 | same as v0.2 (balls, BAG, MAP, COMPANION; PC after B3) | D: G2, core and v0.2 side by side |
 | HUD hotkey cursor | B2 | NC | needs hands (R2 on the Brick) |
@@ -56,11 +56,12 @@ preview byte-identical (80 PNGs); NC = not checked.
 | Quick menu BIKE | B3 | on and off | D |
 | Quick menu WILD ENCOUNTERS | B3 | OFF tag, notice, persisted; no battle in 96 grass steps, a battle with it on | D, with the control |
 | EXPAND, ORIGINAL on FireRed | B4 | same scene and window as v0.2 | D, Vermilion City, side by side |
-| ZOOM OUT on FireRed | B4 | 341x256 frame (3x), against EXPAND's 256x192 (4x); desktop host frames and device check pending | D, owner on the Brick |
-| AUTO ZOOM IN, Yellow and Crystal EXPAND | B4 | NC | the Yellow community save does not load as a game; follow-up bead |
-| GB look, Gen 1 DEX pages, GB GUIDE, SGB colours | `3ds/core` | NC | no valid GB save; the Yellow intro runs with the border off |
+| ZOOM OUT on FireRed | B4 | 341x256 frame (3x), against EXPAND's 256x192 (4x); the owner checked it on the Brick ("looks good") | H, D |
+| EXPAND, ZOOM OUT on Crystal | B4 | the overworld widens past the game's edges (canvas 204x153 in EXPAND, 256x192 in ZOOM OUT); the Crystal clock prompt appears because the desktop host has no RTC | H |
+| AUTO ZOOM IN, Yellow | B4 | NC | the Yellow community save does not load as a game; follow-up bead. AUTO ZOOM was off in the H runs |
+| GB look, Gen 1 DEX pages, GB GUIDE | `3ds/core` | Blue: DEX lists all 151 (SEEN 151, OWN 151); GB tabs and GUIDE notice draw on Blue and Crystal. SGB colours NC; Gen 2 DEX pages not opened | H (Blue, Crystal saves) |
 | Place names, item descriptions, hack maps, guides, cards | `3ds/core` | place name and GUIDE HERE shown on FireRed; hacks NC | H, D |
-| Save states, fast-forward, rewind | diatom | the in-game menu has Save, Load; state resume works; FF and rewind NC | D |
+| Save states, fast-forward, rewind | diatom | the in-game menu has Save, Load; state resume works; fast-forward measured at 1.8x on EXPAND (104 / 112 fps at 2x / 3x); rewind works (owner). FF audio discard untested on device | D |
 | Battery save, resume slot | diatom | the save file is the one mGBA uses (checksum unchanged after a session without saving); resume restores the state, twice in a row | D |
 | Game switcher | diatom | NC | |
 | Achievements | diatom | NC | the device had no Wi-Fi and no cached set |
