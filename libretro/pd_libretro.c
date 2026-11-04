@@ -96,6 +96,11 @@ static bool env_wrap(unsigned cmd, void *data) {
       return realEnv(cmd, cmd == RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL ? (void *)&mergedIntl : (void *)&merged);
     }
   }
+  if (cmd == RETRO_ENVIRONMENT_GET_VARIABLE && data && !strcmp(((struct retro_variable *)data)->key, "mgba_sgb_borders")) {
+    // EXPAND needs the Game Boy's own 160x144, so a Super Game Boy border never frames it (as the SDL host's pk_gb_config).
+    ((struct retro_variable *)data)->value = "OFF";
+    return true;
+  }
   bool r = realEnv(cmd, data);
   if (cmd == RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE && data && *(bool *)data)
     optionsDirty = true;
