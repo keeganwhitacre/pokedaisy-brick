@@ -128,11 +128,43 @@ static inline uint16_t to565(uint32_t p) {
   return (uint16_t)(((p >> 8) & 0xf800) | ((p >> 5) & 0x07e0) | ((p >> 3) & 0x001f));
 }
 
+/* EXPAND (the game-code layer, below): the window it rebuilt past the game's edges, when this frame has one. */
+static bool wideSupported, wideReady, fieldKnown;
+static unsigned wideW, wideH;
+static uint32_t wideSource[240 * 160], wideFrame[PK_WIDE_MAX_VIEW_W * PK_WIDE_MAX_VIEW_H];
+static uint32_t wildSwitch;
+static inline uint32_t to_xbgr(uint16_t p) {
+  uint32_t r = (p >> 11) & 31, g = (p >> 5) & 63, b = p & 31;
+  return 0xFF000000u | ((b << 3 | b >> 2) << 16) | ((g << 2 | g >> 4) << 8) | (r << 3 | r >> 2);
+}
+static inline uint32_t xbgr_to_rgb(uint32_t p) { return (p & 255) << 16 | (p >> 8 & 255) << 8 | (p >> 16 & 255); }
+
 /* The game, whole-scale and centred, over a black canvas. */
 static void draw_game(void) {
   memset(cvs, 0, (size_t)CW * CH * sizeof *cvs);
   if (!outputBuffer || !gameW || !gameH)
     return;
+  if (wideReady) {
+    int ws = CW / (int)wideW < CH / (int)wideH ? CW / (int)wideW : CH / (int)wideH;
+    if (ws < 1)
+      ws = 1;
+    int wx = (CW - (int)wideW * ws) / 2, wy = (CH - (int)wideH * ws) / 2;
+    for (unsigned y = 0; y < wideH; y++)
+      for (int k = 0; k < ws; k++) {
+        int cy = wy + (int)y * ws + k;
+        if (cy < 0 || cy >= CH)
+          continue;
+        for (unsigned x = 0; x < wideW; x++) {
+          uint32_t p = xbgr_to_rgb(wideFrame[y * wideW + x]);
+          for (int j = 0; j < ws; j++) {
+            int cx = wx + (int)x * ws + j;
+            if (cx >= 0 && cx < CW)
+              cvs[(size_t)cy * CW + cx] = p;
+          }
+        }
+      }
+    return;
+  }
   int s = CW / (int)gameW < CH / (int)gameH ? CW / (int)gameW : CH / (int)gameH;
   if (s < 1)
     s = 1;
@@ -324,6 +356,49 @@ static void draw_hud(void) {
     blend_overlay(hudPixels, w, hh, scale, ax + (aw - w * scale) / 2, ay + (ah - hh * scale) / 2);
 }
 
+
+/* ---- game-code layer: EXPAND (pk_wide), the field read, WILD ENCOUNTERS ---- */
+
+
+/* The EXPAND window for the canvas and a fw x fh game: the canvas over the game's whole scale (one less for
+ * ZOOM OUT), within pk_wide's largest view, never smaller than the game, even margins. */
+static void wide_window(int aspect, unsigned fw, unsigned fh, unsigned *w, unsigned *h) {
+  int scale = CW / (int)fw < CH / (int)fh ? CW / (int)fw : CH / (int)fh;
+  if (aspect == PD_ASPECT_ZOOM_OUT)
+    scale--;
+  if (scale < 1)
+    scale = 1;
+  unsigned x = (unsigned)CW / scale, y = (unsigned)CH / scale;
+  x = x > PK_WIDE_MAX_VIEW_W ? PK_WIDE_MAX_VIEW_W : x < fw ? fw : x;
+  y = y > PK_WIDE_MAX_VIEW_H ? PK_WIDE_MAX_VIEW_H : y < fh ? fh : y;
+  *w = x - ((x - fw) & 1);
+  *h = y - ((y - fh) & 1);
+}
+
+/* After every game frame: pk_wide's RAM history, and (wideReady) this frame's window. */
+static void wide_tick(void) {
+  wideReady = false;
+  if (!wideSupported)
+    return;
+  unsigned fw = (unsigned)pk_wide_frame_w(), fh = (unsigned)pk_wide_frame_h();
+  for (unsigned y = 0; y < fh; y++)
+    for (unsigned x = 0; x < fw; x++)
+      wideSource[y * fw + x] = to_xbgr(outputBuffer[y * 256 + x]);
+  if (settings.aspect == PD_ASPECT_ORIGINAL) {
+    // Nothing past the picture, but the scene still read (FLY's "on the field"): a one-pixel window.
+    static uint32_t px;
+    pk_wide_view(core, wideSource, &px, (struct PkWideView){0, 0, 1, 1}, NULL);
+    return;
+  }
+  int last = pk_wide_scene();
+  int aspect = settings.aspect == PD_ASPECT_ZOOM_OUT && settings.autoZoom && last != PK_WIDE_SCENE_FIELD
+                   ? PD_ASPECT_EXPAND : settings.aspect;
+  wide_window(aspect, fw, fh, &wideW, &wideH);
+  struct PkWideView v = {((int)fw - (int)wideW) / 2, ((int)fh - (int)wideH) / 2, (int)wideW, (int)wideH};
+  pk_wide_view(core, wideSource, wideFrame, v, NULL);
+  wideReady = !pk_wide_fault();
+}
+
 static void choose_canvas(void) {
   const char *v = option("pokedaisy_canvas");
   int w = 320, h = 240;
@@ -396,11 +471,21 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   } else
     snprintf(settingsPath, sizeof settingsPath, "pokedaisy-settings.ini");
   pd_settings_load(&settings, settingsPath);
+  wideSupported = pk_wide_configure(crc) != 0;
+  wideReady = false;
+  fieldKnown = core->platform(core) == mPLATFORM_GBA && pk_field_configure(crc);
+  wildSwitch = fieldKnown ? pk_wild_switch_find(rom, len) : 0;
+  if (wildSwitch)
+    pk_field_wild(wildSwitch, settings.wildOff);
+  pk_rest_reset();
+  fieldFlags = 0;
   pd_ui_init(&ui, &settings);
   memset(&host, 0, sizeof host);
   host.hideScreenMode = true;
   host.hasQuickMenu = true;
   host.hasHud = core->platform(core) == mPLATFORM_GBA;
+  host.hasExpand = true;
+  host.expandGame = wideSupported;
   host.count = 1;
   host.labels[0] = "HOST";
   snprintf(host.values[0], 40, "PokeDaisy core");
@@ -411,7 +496,19 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   return true;
 }
 
+RETRO_API bool retro_unserialize(const void *d, size_t n) {
+  bool r = mgba_retro_unserialize(d, n);
+  if (r && haveGame) {
+    pk_wide_reset(); // EXPAND's RAM history is from before the jump
+    wideReady = false;
+    snap.valid = false;
+  }
+  return r;
+}
+
 RETRO_API void retro_unload_game(void) {
+  pk_wide_configure(0);
+  wideSupported = wideReady = false;
   mgba_retro_unload_game();
   free(cvs);
   free(out565);
@@ -512,6 +609,11 @@ RETRO_API void retro_run(void) {
     mgba_retro_run();
     if (gameKeyFrames > 0)
       gameKeyFrames--;
+    if (core->platform(core) == mPLATFORM_GBA)
+      pk_rest_note(core);
+    if (fieldKnown)
+      fieldFlags = pk_field_state(core, settings.runIndoors, wildSwitch && settings.wildOff ? 0 : 100);
+    wide_tick();
   } else {
     static const int16_t silence[2 * 1024];
     audioCallback(silence, 549);
@@ -533,7 +635,8 @@ RETRO_API void retro_run(void) {
     focus_draw(&ui, focus_resolve(&ui));
   } else {
     draw_game();
-    bool field = (fieldFlags & PK_FIELD_KNOWN) && !(fieldFlags & (PK_FIELD_LOCKED | PK_FIELD_BATTLE));
+    bool field = (fieldFlags & PK_FIELD_KNOWN) && !(fieldFlags & (PK_FIELD_LOCKED | PK_FIELD_BATTLE)) &&
+                 (!wideSupported || pk_wide_scene() == PK_WIDE_SCENE_FIELD);
     hudFieldFrames = field ? hudFieldFrames + 1 : 0;
     if (settings.hud && game.cfg && core->platform(core) == mPLATFORM_GBA && hudFieldFrames >= 20) {
       hudState.wild = hud_wild_uncaught(&game, &snap);
