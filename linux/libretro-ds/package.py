@@ -9,6 +9,7 @@ p=argparse.ArgumentParser()
 p.add_argument('core',type=Path)
 p.add_argument('output',type=Path)
 p.add_argument('--strip',default='aarch64-nextui-linux-gnu-strip')
+p.add_argument('--source-ref',default='brick/ds-libretro')
 a=p.parse_args()
 root=Path(__file__).resolve().parents[2]
 with tempfile.TemporaryDirectory() as temp:
@@ -32,8 +33,9 @@ with tempfile.TemporaryDirectory() as temp:
             shutil.copyfile(source,dest)
     shutil.copyfile(root/'NOTICE',licenses/'PokeDaisy-NOTICE.txt')
     (pak/'SOURCE.txt').write_text('PokeDaisy source: https://github.com/keeganwhitacre/pokedaisy-brick branch brick/ds-libretro\n'
+        f'Exact source ref: {a.source_ref}\n'
         'Build: linux/libretro-ds/README.md. Initialize third_party/dsperate-lr recursively.\n'
-        'The matching source snapshot accompanies this test build. No ROMs, BIOS or saves are included.\n')
+        'No ROMs, BIOS or saves are included.\n')
     a.output.parent.mkdir(parents=True,exist_ok=True)
     with zipfile.ZipFile(a.output,'w',zipfile.ZIP_DEFLATED) as z:
         for f in sorted(stage.rglob('*')):
