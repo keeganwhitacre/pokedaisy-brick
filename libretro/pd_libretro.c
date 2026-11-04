@@ -68,6 +68,13 @@ static const struct retro_core_option_v2_definition pdOptions[PD_OPTION_COUNT] =
 };
 
 static retro_environment_t realEnv;
+/* diatom's "behind schedule" signal, given just before each frame (its frame skip): this frame's heavy drawing is left out. */
+static bool frameLate;
+static void audio_status(bool active, unsigned occupancy, bool underrun) {
+  (void)active;
+  (void)occupancy;
+  frameLate = underrun;
+}
 static retro_video_refresh_t realVideo;
 static retro_input_state_t realInput;
 static bool optionsDirty;
@@ -133,8 +140,46 @@ static inline uint16_t to565(uint32_t p) {
   return (uint16_t)(((p >> 8) & 0xf800) | ((p >> 5) & 0x07e0) | ((p >> 3) & 0x001f));
 }
 
+
+/* Frame cost by section, for finding what makes a mode slow: compiled in only with -DPD_PROFILE. */
+#ifdef PD_PROFILE
+#include <time.h>
+static double pf_now(void) {
+  struct timespec t;
+  clock_gettime(CLOCK_MONOTONIC, &t);
+  return (double)t.tv_sec * 1e3 + (double)t.tv_nsec / 1e6;
+}
+enum { PF_RUN, PF_WIDE, PF_DRAW, PF_PRESENT, PF_TOTAL, PF_N };
+static double pfSum[PF_N], pfMax[PF_N];
+static int pfFrames;
+#define PF_T(v) double v = pf_now()
+static int pfLate;
+#define PF_SKIPPED() do { double te_ = pf_now(); pf_add(PF_TOTAL, te_ - t0); pfLate++; } while (0)
+static void pf_add(int i, double ms) {
+  pfSum[i] += ms;
+  if (ms > pfMax[i]) pfMax[i] = ms;
+}
+static void pf_frame(void) {
+  if (++pfFrames < 600)
+    return;
+  fprintf(stderr, "pokedaisy: prof %d frames (%d skipped), ms avg/max: mgba %.2f/%.1f  wide %.2f/%.1f  draw %.2f/%.1f  present %.2f/%.1f  total %.2f/%.1f\n", pfFrames, pfLate,
+          pfSum[PF_RUN] / pfFrames, pfMax[PF_RUN], pfSum[PF_WIDE] / pfFrames, pfMax[PF_WIDE], pfSum[PF_DRAW] / pfFrames, pfMax[PF_DRAW],
+          pfSum[PF_PRESENT] / pfFrames, pfMax[PF_PRESENT], pfSum[PF_TOTAL] / pfFrames, pfMax[PF_TOTAL]);
+  memset(pfSum, 0, sizeof pfSum);
+  memset(pfMax, 0, sizeof pfMax);
+  pfFrames = 0;
+  pfLate = 0;
+}
+#else
+#define PF_T(v) (void)0
+#define PF_SKIPPED() (void)0
+#define pf_add(i, ms) ((void)0)
+#define pf_frame() ((void)0)
+enum { PF_RUN, PF_WIDE, PF_DRAW, PF_PRESENT, PF_TOTAL };
+#endif
+
 /* EXPAND (the game-code layer, below): the window it rebuilt past the game's edges, when this frame has one. */
-static bool wideSupported, wideReady, fieldKnown;
+static bool wideSupported, wideReady, wideHave, fieldKnown; // wideHave: wideFrame holds a window (from the last full frame)
 static unsigned wideW, wideH;
 static uint32_t wideSource[240 * 160], wideFrame[PK_WIDE_MAX_VIEW_W * PK_WIDE_MAX_VIEW_H];
 static uint32_t wildSwitch;
@@ -224,6 +269,7 @@ static void dim(int alpha) {
 }
 
 /* Convert and hand the finished canvas to the frontend. */
+static bool haveFrame; // a picture has gone to the frontend: a late frame may repeat it
 static void present(void) {
   if (messageFrames > 0) {
     pd_fill(&canvas, 4, CH - 50, CW - 8, 24, 0x181818);
@@ -233,6 +279,7 @@ static void present(void) {
   for (size_t i = 0; i < (size_t)CW * CH; i++)
     out565[i] = to565(cvs[i]);
   realVideo(out565, (unsigned)CW, (unsigned)CH, (size_t)CW * 2);
+  haveFrame = true;
 }
 
 /* ---- input ---- */
@@ -263,6 +310,15 @@ static void poll_keys(void) {
       if (k != MENU && realInput(0, RETRO_DEVICE_JOYPAD, 0, retroId[k]))
         held |= 1u << k;
   pressedKeys = held & ~prevHeld;
+#ifdef PD_KEYLOG
+  {
+    static int logFrame;
+    logFrame++;
+    for (int k = 0; k < NKEYS; k++)
+      if ((pressedKeys | (prevHeld & ~held)) >> k & 1)
+        fprintf(stderr, "pokedaisy: key %d %s (poll %d)\n", k, (held >> k & 1) ? "down" : "up", logFrame);
+  }
+#endif
   for (int k = 0; k < NKEYS; k++) {
     heldFrames[k] = (held >> k & 1) ? heldFrames[k] + 1 : 0;
     // The D-pad repeats while held: after a quarter second, every ~90 ms.
@@ -403,7 +459,7 @@ static void wide_window(int aspect, unsigned fw, unsigned fh, unsigned *w, unsig
 
 /* After every game frame: pk_wide's RAM history, and (wideReady) this frame's window. */
 static void wide_tick(void) {
-  wideReady = false;
+  wideReady = wideHave = false;
   if (!wideSupported)
     return;
   unsigned fw = (unsigned)pk_wide_frame_w(), fh = (unsigned)pk_wide_frame_h();
@@ -423,6 +479,7 @@ static void wide_tick(void) {
   struct PkWideView v = {((int)fw - (int)wideW) / 2, ((int)fh - (int)wideH) / 2, (int)wideW, (int)wideH};
   pk_wide_view(core, wideSource, wideFrame, v, NULL);
   wideReady = !pk_wide_fault();
+  wideHave = wideReady;
 }
 
 static void choose_canvas(void) {
@@ -471,6 +528,11 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
     return false;
   choose_canvas();
   read_options();
+  {
+    struct retro_audio_buffer_status_callback abc = {audio_status};
+    realEnv(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK, &abc);
+  }
+  frameLate = false;
   cvs = calloc((size_t)CW * CH, sizeof *cvs);
   out565 = calloc((size_t)CW * CH, sizeof *out565);
   if (!cvs || !out565)
@@ -502,6 +564,7 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   memset(&hudState, 0, sizeof hudState);
   hudState.wild = hudState.focus = -1;
   memset(&hudHits, 0, sizeof hudHits);
+  haveFrame = wideHave = false;
   hudDrawnKey = 0;
   hudW = hudH = 0;
   hudShown = hudFocus = false;
@@ -593,6 +656,7 @@ RETRO_API void retro_run(void) {
     mgba_retro_run();
     return;
   }
+  PF_T(t0);
   if (optionsDirty) {
     optionsDirty = false;
     read_options();
@@ -791,17 +855,38 @@ RETRO_API void retro_run(void) {
     }
   }
 
+  bool late = frameLate;
+  frameLate = false;
   bool paused = companion || hudFocus || (quickOpen && !flyAsk);
   maskGame = paused;
   if (!paused) {
+    PF_T(pa);
     mgba_retro_run();
+    PF_T(pb);
+    pf_add(PF_RUN, pb - pa);
     if (gameKeyFrames > 0)
       gameKeyFrames--;
     if (core->platform(core) == mPLATFORM_GBA)
       pk_rest_note(core);
     if (fieldKnown)
       fieldFlags = pk_field_state(core, settings.runIndoors, wildSwitch && settings.wildOff ? 0 : 100);
-    wide_tick();
+    if (late && wideSupported && settings.aspect != PD_ASPECT_ORIGINAL) {
+      // Behind schedule: only the RAM history EXPAND needs (as for a fast-forwarded frame), and no new window. The last
+      // one stays for the map beyond the game's edges; the game's own picture in its middle is this frame's.
+      pk_wide_skip(core, wideSource);
+      if (wideHave) {
+        unsigned fw = (unsigned)pk_wide_frame_w(), fh = (unsigned)pk_wide_frame_h();
+        unsigned ox = (wideW - fw) / 2, oy = (wideH - fh) / 2;
+        for (unsigned y = 0; y < fh; y++)
+          for (unsigned x = 0; x < fw; x++)
+            wideFrame[(y + oy) * wideW + x + ox] = to_xbgr(outputBuffer[y * 256 + x]);
+        wideReady = true;
+      } else
+        wideReady = false;
+    } else
+      wide_tick();
+    PF_T(pc);
+    pf_add(PF_WIDE, pc - pb);
   } else {
     static const int16_t silence[2 * 1024];
     audioCallback(silence, 549);
@@ -905,6 +990,13 @@ RETRO_API void retro_run(void) {
   }
 
 
+  if (late && !paused && !companion && !quickOpen && haveFrame && !wideHave) {
+    realVideo(NULL, (unsigned)CW, (unsigned)CH, (size_t)CW * 2); // the same picture again: nothing drawn
+    PF_SKIPPED();
+    pf_frame();
+    return;
+  }
+  PF_T(td0);
   if (companion) {
     pd_ui_update(&ui, &snap);
     ui.focusId = focusId;
@@ -947,5 +1039,11 @@ RETRO_API void retro_run(void) {
     } else
       hudShown = false;
   }
+  PF_T(td1);
+  pf_add(PF_DRAW, td1 - td0);
   present();
+  PF_T(td2);
+  pf_add(PF_PRESENT, td2 - td1);
+  pf_add(PF_TOTAL, td2 - t0);
+  pf_frame();
 }
