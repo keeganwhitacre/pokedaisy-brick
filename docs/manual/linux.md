@@ -70,8 +70,9 @@ the Core row of a Game Boy shelf.
 In this form the quick menu (Y) keeps PC, FLY, REPEL, BIKE, WILD ENCOUNTERS and
 COMPANION, adds a HUD tile that puts the cursor on the HUD, and the game pauses
 while it is open. X opens the companion. SETTINGS lists only what the core does
-itself: ASPECT, HUD, QUICK MENU and TAB BAR. The quick menu and companion buttons
-can be changed in the core options, and so can a button for the HUD cursor (none
-by default, because the launcher keeps L2 and R2 for turbo on the Game Boy
-Advance). The settings file sits in the `pokedaisy` folder inside the launcher's
-save folder.
+itself: ASPECT, HUD, QUICK MENU, three button rows and TAB BAR. QUICK MENU BUTTON,
+COMPANION BUTTON and HUD CURSOR BUTTON step through X, Y, L2 and R2 (and NONE for
+the cursor) when you press A on them, and a button another action already uses
+swaps over to it. The launcher keeps L2 and R2 for turbo on the Game Boy Advance,
+so there they never reach the game: use X and Y, or the HUD tile. The settings
+file sits in the `pokedaisy` folder inside the launcher's save folder.

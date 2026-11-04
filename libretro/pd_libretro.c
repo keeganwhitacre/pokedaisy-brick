@@ -55,16 +55,10 @@ static const unsigned retroId[NKEYS] = {
     RETRO_DEVICE_ID_JOYPAD_L2,    RETRO_DEVICE_ID_JOYPAD_R2,   RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_L3};
 
 /* ---- the options this layer adds to mGBA's ---- */
-#define PD_OPTION_COUNT 4
+#define PD_OPTION_COUNT 1
 static const struct retro_core_option_v2_definition pdOptions[PD_OPTION_COUNT] = {
     {"pokedaisy_canvas", "Companion canvas", NULL, "The frame size the core reports: the game sits in it at a whole scale, the companion fills it. auto = 320x240.", NULL, NULL,
      {{"auto", NULL}, {"320x240", NULL}, {"341x256", NULL}, {"400x300", NULL}, {"427x240", NULL}, {NULL, NULL}}, "auto"},
-    {"pokedaisy_quick_button", "Quick menu button", NULL, "Opens the quick menu over the game.", NULL, NULL,
-     {{"Y", NULL}, {"X", NULL}, {"R2", NULL}, {"L2", NULL}, {"L3", NULL}, {NULL, NULL}}, "Y"},
-    {"pokedaisy_companion_button", "Companion button", NULL, "Opens the companion screens.", NULL, NULL,
-     {{"X", NULL}, {"Y", NULL}, {"R2", NULL}, {"L2", NULL}, {"L3", NULL}, {NULL, NULL}}, "X"},
-    {"pokedaisy_hud_button", "HUD cursor button", NULL, "Puts the cursor on the HUD over the overworld. The quick menu's HUD tile does the same; no button is set by default (plorpOS keeps L2 and R2 for Turbo Assign on the Game Boy Advance).", NULL, NULL,
-     {{"None", NULL}, {"R2", NULL}, {"L2", NULL}, {"L3", NULL}, {"X", NULL}, {"Y", NULL}, {NULL, NULL}}, "None"},
 };
 
 static retro_environment_t realEnv;
@@ -354,23 +348,17 @@ static void present(void) {
 /* ---- input ---- */
 static unsigned held, prevHeld, pressedKeys;
 static int heldFrames[NKEYS];
-static int quickBtn = Y, companionBtn = X, hudBtn = -1; // -1: none
+static int quickBtn = Y, companionBtn = X, hudBtn = -1; // key indices, -1 none (from settings: key_of)
 static unsigned gameKeys; // keys the layer presses for the game (BIKE's SELECT)
 static int gameKeyFrames;
 static bool maskGame;     // while an overlay is up the game sees no keys
 
-static int button_named(const char *s, int def) {
-  static const struct { const char *n; int k; } names[] = {{"X", X}, {"Y", Y}, {"R2", R2}, {"L2", L2}, {"L3", L3}};
-  for (unsigned i = 0; s && i < sizeof names / sizeof *names; i++)
-    if (!strcmp(s, names[i].n))
-      return names[i].k;
-  return def;
+/* The pad buttons for the quick menu, the companion and the HUD cursor are PokeDaisy's own SETTINGS rows
+ * (a core option is out of reach in plorpOS): each frame's key index, -1 for none. */
+static int key_of(int btn) {
+  return btn == PD_BTN_X ? X : btn == PD_BTN_Y ? Y : btn == PD_BTN_L2 ? L2 : btn == PD_BTN_R2 ? R2 : -1;
 }
-static void read_options(void) {
-  quickBtn = button_named(option("pokedaisy_quick_button"), Y);
-  companionBtn = button_named(option("pokedaisy_companion_button"), X);
-  hudBtn = button_named(option("pokedaisy_hud_button"), -1);
-}
+static void read_options(void) {} // (kept for the option-update hook: the canvas is read once at load)
 
 static void poll_keys(void) {
   held = 0;
@@ -676,6 +664,7 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   memset(&host, 0, sizeof host);
   host.hideScreenMode = true;
   host.hasQuickMenu = true;
+  host.hasButtonRows = true;
   host.frontendOwnsPlayback = true;
   host.hasHud = core->platform(core) == mPLATFORM_GBA;
   host.hasExpand = true;
@@ -736,6 +725,9 @@ RETRO_API void retro_run(void) {
     optionsDirty = false;
     read_options();
   }
+  quickBtn = key_of(settings.quickBtn);
+  companionBtn = key_of(settings.companionBtn);
+  hudBtn = key_of(settings.hudBtn);
   poll_keys();
   bool wasCompanion = companion;
   if (down(companionBtn) && !hudFocus) {

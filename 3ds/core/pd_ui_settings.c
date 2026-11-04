@@ -115,6 +115,12 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
         setting(ui, c, ix, &y, iw, SETTING_FILTER, "FILTER", ui->settings->lcdFilter ? "LCD" : "OFF");
     if (host && host->hasQuickMenu)
         setting(ui, c, ix, &y, iw, SETTING_QUICK_MENU, "QUICK MENU", ui->settings->quickGrid ? "GRID" : "RING");
+    if (host && host->hasButtonRows) {
+        static const char* const NAMES[PD_BUTTONS] = {"X", "Y", "L2", "R2", "NONE"};
+        setting(ui, c, ix, &y, iw, SETTING_QUICK_BTN, "QUICK MENU BUTTON", NAMES[ui->settings->quickBtn]);
+        setting(ui, c, ix, &y, iw, SETTING_COMPANION_BTN, "COMPANION BUTTON", NAMES[ui->settings->companionBtn]);
+        if (host->hasHud) setting(ui, c, ix, &y, iw, SETTING_HUD_BTN, "HUD CURSOR BUTTON", NAMES[ui->settings->hudBtn]);
+    }
     snprintf(buf, sizeof(buf), "%d TABS", ui_bar_count(ui));
     setting(ui, c, ix, &y, iw, SETTING_TAB_BAR, "TAB BAR", buf);
     if (!host || !host->frontendOwnsPlayback) {
