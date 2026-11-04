@@ -1033,19 +1033,39 @@ static struct Foreign* connForeign[MAX_CONNS];   // this frame's: each connectio
 
 /** One map pixel: its colour (BGR555; the backdrop's when nothing's there), the priority of the BG it's
  * from (4 = backdrop) and that BG (5 = backdrop: BLDCNT's bit numbering). */
-static uint16_t mapPixel(const struct Snap* s, int mx, int my, int enabled, int* prio, int* layer, bool real) {
-    const uint8_t* vram = (const uint8_t*) G->video.vram;
+// The 64 pixels of one 8x8 map tile share its metatile, connection and BG entries: found once per tile in a draw
+// (foreignFrame counts the draws), not once per pixel.
+static struct { uint32_t epoch; int tx, ty, enabled; bool real, ok; const struct Snap* snap; struct Foreign* f; uint16_t e[3]; } tc;
+
+static void loadTile(const struct Snap* s, int mx, int my, int enabled, bool real) {
+    int tx = mx >> 3, ty = my >> 3;
+#ifndef PK_WIDE_NOCACHE
+    if (tc.ok && tc.epoch == foreignFrame && tc.snap == s && tc.tx == tx && tc.ty == ty && tc.enabled == enabled && tc.real == real) return;
+#endif
     int conn;
     int mid = blockIn(s, mx >> 4, my >> 4, &conn, real);
     // On the real screen a connected map's strip is drawn as the game draws it: with the current map's tilesets.
     struct Foreign* f = !real && conn >= 0 && conn < MAX_CONNS ? connForeign[conn] : NULL;
     int q = ((my >> 3) & 1) * 2 + ((mx >> 3) & 1);
+    for (int i = 0; i < 3; i++) {
+        int b = order3[i];
+        tc.e[i] = 0;
+        if (!(enabled & (1 << b))) continue;
+        if (f) syncSplit(s);
+        tc.e[i] = f ? metatileIn(&f->t, mid, b)[q] : metatile(s, mid, b)[q];
+    }
+    tc.epoch = foreignFrame; tc.snap = s; tc.tx = tx; tc.ty = ty; tc.enabled = enabled; tc.real = real; tc.f = f; tc.ok = true;
+}
+
+static uint16_t mapPixel(const struct Snap* s, int mx, int my, int enabled, int* prio, int* layer, bool real) {
+    const uint8_t* vram = (const uint8_t*) G->video.vram;
+    loadTile(s, mx, my, enabled, real);
+    struct Foreign* f = tc.f;
     int nt = C[PK_WIDE_PRIMARY_METATILES], np = C[PK_WIDE_PRIMARY_PALS];
     for (int i = 0; i < 3; i++) {
         int b = order3[i];
         if (!(enabled & (1 << b))) continue;
-        if (f) syncSplit(s);
-        uint16_t e = f ? metatileIn(&f->t, mid, b)[q] : metatile(s, mid, b)[q];
+        uint16_t e = tc.e[i];
         int px = mx & 7, py = my & 7;
         if (e & 0x400) px = 7 - px;
         if (e & 0x800) py = 7 - py;
@@ -1068,6 +1088,59 @@ static uint16_t mapPixel(const struct Snap* s, int mx, int my, int enabled, int*
     *prio = 4;
     *layer = 5;
     return P[0];
+}
+
+/** Up to 8 map pixels of one tile row at once ([mx, mx + n) on map row my, all in one 8x8 tile): the same answers as n
+ * calls of mapPixel, from the tile row's packed bytes. out[k] = colour (BGR555), outPrio[k], outLayer[k]. */
+static void mapTileRow(const struct Snap* s, int mx, int my, int n, int enabled, uint16_t* out, uint8_t* outPrio, uint8_t* outLayer) {
+    const uint8_t* vram = (const uint8_t*) G->video.vram;
+    loadTile(s, mx, my, enabled, false);
+    struct Foreign* f = tc.f;
+    int nt = C[PK_WIDE_PRIMARY_METATILES], np = C[PK_WIDE_PRIMARY_PALS];
+    uint8_t ci[3][8];
+    int pal[3];
+    bool ownPal[3], have[3];
+    for (int i = 0; i < 3; i++) {
+        have[i] = false;
+        int b = order3[i];
+        if (!(enabled & (1 << b))) continue;
+        uint16_t e = tc.e[i];
+        int py = my & 7;
+        if (e & 0x800) py = 7 - py;
+        int tile = e & 0x3FF;
+        const uint8_t* src;
+        pal[i] = e >> 12;
+        if (f && (f->ownPrimary || tile >= nt)) {
+            src = f->tiles + tile * 32 + py * 4;
+        } else {
+            uint32_t off = bgChar[b] + (uint32_t) tile * 32 + (uint32_t) (py * 4);
+            if (off + 4 > 0x10000 + 0) { if (off >= 0x10000) continue; }   // BG tiles can't reach OBJ VRAM
+            src = vram + off;
+        }
+        ownPal[i] = f && (f->ownPrimary || pal[i] >= np);
+        for (int k = 0; k < 8; k++) {
+            int px = e & 0x400 ? 7 - k : k;
+            uint8_t v = src[px / 2];
+            ci[i][k] = px & 1 ? v >> 4 : v & 15;
+        }
+        have[i] = true;
+    }
+    for (int k = 0; k < n; k++) {
+        int px = (mx + k) & 7;
+        int i = 0;
+        for (; i < 3; i++)
+            if (have[i] && ci[i][px]) break;
+        if (i < 3) {
+            int b = order3[i];
+            outPrio[k] = (uint8_t) bgPrio[b];
+            outLayer[k] = (uint8_t) b;
+            out[k] = ownPal[i] ? f->pal[pal[i] * 16 + ci[i][px]] : P[pal[i] * 16 + ci[i][px]];
+        } else {
+            outPrio[k] = 4;
+            outLayer[k] = 5;
+            out[k] = P[0];
+        }
+    }
 }
 
 struct Piece {
@@ -1376,11 +1449,29 @@ static void drawGhosts(const struct Snap* s, int cx, int cy, int x0, int y0, int
     }
 }
 
+#ifdef PK_WIDE_PROFILE
+#include <time.h>
+#include <stdio.h>
+/* Where a window's time goes, for the libretro core's profiling build only. */
+static double pwNow(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1e3 + t.tv_nsec / 1e6; }
+static double pwSum[8]; static int pwN; static long pwFast, pwSlow, pwWhy[4];
+#define PW_MARK(v) double v = pwNow()
+#define PW_ADD(i, a, b) (pwSum[i] += (b) - (a))
+#define PW_REPORT() do { if (++pwN >= 300) { fprintf(stderr, "pk_wide: ms avg: camera %.2f  pieces %.2f  drawRegion %.2f  compose %.2f | rows fast %ld slow %ld (windows %ld, nobg %ld, bright %ld, tint %ld) | in drawRegion: foreign %.2f  bgloop %.2f  sprites %.2f  ghosts %.2f\n", pwSum[0] / pwN, pwSum[1] / pwN, pwSum[2] / pwN, pwSum[3] / pwN, pwFast, pwSlow, pwWhy[0], pwWhy[1], pwWhy[2], pwWhy[3], pwSum[4] / pwN, pwSum[5] / pwN, pwSum[6] / pwN, pwSum[7] / pwN); for (int q = 0; q < 8; q++) pwSum[q] = 0; pwN = 0; } } while (0)
+#else
+#define PW_MARK(v) (void)0
+#define PW_ADD(i, a, b) (void)0
+#define PW_REPORT() (void)0
+#endif
+
 static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref, int x0, int y0, int x1, int y1,
                        bool skipFrame, uint32_t* dst, int stride, uint32_t alpha) {
     int w = x1 - x0, h = y1 - y0;
+    PW_MARK(dr0);
     foreignFrame++;
     for (int i = 0; i < MAX_CONNS; i++) connForeign[i] = i < s->nconn ? foreignFor(s, &s->conn[i]) : NULL;
+    PW_MARK(dr1);
+    PW_ADD(4, dr0, dr1);
     for (int j = 0; j < h; j++) {
         int y = y0 + j;
         // This line as the PPU drew it: its layers, windows and scroll (a line scrolled apart from the
@@ -1388,6 +1479,61 @@ static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref,
         useLine(y);
         int dx = signed9((io(0x14) & 0x1FF) - href), dy = signed9((io(0x16) & 0x1FF) - vref);
         int disp = io(0);
+#ifndef PK_WIDE_NOFAST
+        // The common row (no brightness fade, the frame's own pixels skipped): each map tile's row at once - where the
+        // windows give every pixel of it the same layers; a run they cut through goes pixel by pixel as below.
+        if (skipFrame && ((disp >> 8) & 0x0E) && ((io(0x50) >> 6) & 3) < 2 && !tintShown) {
+            for (int x = 0; x < w;) {
+                int sx = x0 + x;
+                if (onFrame(sx, y)) {
+                    int n = (PK_WIDE_W - sx) < (w - x) ? PK_WIDE_W - sx : w - x;
+                    for (int k = 0; k < n; k++) {
+                        holeBuf[j][x + k] = 0;
+                        takenBuf[j][x + k] = 1;
+                    }
+                    x += n;
+                    continue;
+                }
+                int wx = cx + dx + sx, wy = cy + dy + y;
+                int n = 8 - (wx & 7);                                  // to the end of this map tile
+                if (n > w - x) n = w - x;
+                if (y >= 0 && y < PK_WIDE_H && sx < 0 && n > -sx) n = -sx;   // the frame starts at sx = 0
+                int wl0 = windowLayers(sx, y), enabled = (disp >> 8) & wl0 & 0x0E;
+                bool uniform = enabled != 0;
+                for (int k = 1; uniform && k < n; k++)
+                    if (((disp >> 8) & windowLayers(sx + k, y) & 0x0E) != enabled) uniform = false;
+                if (uniform) {
+                    uint16_t col[8];
+                    uint8_t pr[8], ly[8];
+                    mapTileRow(s, wx, wy, n, enabled, col, pr, ly);
+                    for (int k = 0; k < n; k++) {
+                        uint32_t c32 = color(col[k], alpha);
+                        holeBuf[j][x + k] = 0;
+                        dst[j * stride + x + k] = c32;   // (the brightness fade is off: mode < 2)
+                        prioBuf[j][x + k] = pr[k];
+                        layerBuf[j][x + k] = ly[k];
+                        below[j][x + k] = c32;
+                        takenBuf[j][x + k] = 0;
+                    }
+                } else {
+                    for (int k = 0; k < n; k++) {
+                        int px = sx + k, wl = windowLayers(px, y), en = (disp >> 8) & wl & 0x0E;
+                        int prio = 4, layer = 5, ci = 0;
+                        holeBuf[j][x + k] = !en;
+                        uint16_t c = en ? mapPixel(s, cx + dx + px, cy + dy + y, en, &prio, &layer, false) : P[ci];
+                        uint32_t c32 = color(c, alpha);
+                        dst[j * stride + x + k] = wl & 0x20 ? brightness(c32, layer) : c32;
+                        prioBuf[j][x + k] = (uint8_t) prio;
+                        layerBuf[j][x + k] = (uint8_t) layer;
+                        below[j][x + k] = c32;
+                        takenBuf[j][x + k] = 0;
+                    }
+                }
+                x += n;
+            }
+            continue;
+        }
+#endif
         for (int x = 0; x < w; x++) {
             int sx = x0 + x;
             if (skipFrame && onFrame(sx, y)) {
@@ -1426,6 +1572,8 @@ static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref,
         }
     }
     useLive();
+    PW_MARK(dr2);
+    PW_ADD(5, dr1, dr2);
     // The PPU's OBJ layer: per pixel the first opaque piece in OAM order wins among sprites,
     // then shows if its priority is <= the front BG's.
     if (!(io(0) & 0x40)) return;   // 2D tile mapping
@@ -1472,8 +1620,12 @@ static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref,
             }
         }
     }
+    PW_MARK(dr3);
+    PW_ADD(6, dr2, dr3);
     drawGhosts(s, cx, cy, x0, y0, x1, y1, dst, stride, alpha);
     useLive();
+    PW_MARK(dr4);
+    PW_ADD(7, dr3, dr4);
 }
 
 // --- battles ---------------------------------------------------------------------------------------
@@ -2629,6 +2781,7 @@ int pk_wide_fault(void) { return lastFault; }
 
 static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView v, uint32_t* centre);
 
+
 int pk_wide_view(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView v, uint32_t* centre) {
 #ifndef PK_WIDE_NO_GUARD
     installGuard();
@@ -2705,6 +2858,7 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
     useLive();
     hookScanlines(G);
 
+    PW_MARK(pw0);
     int cur = prev == 0 ? 1 : 0;
     take(&snaps[cur]);
 
@@ -2739,6 +2893,8 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
         }
         lastScore = best;
     }
+    PW_MARK(pw1);
+    PW_ADD(0, pw0, pw1);
     bool valid = best >= MIN_SCORE;
     bool battle = !valid && inBattleScreen();
     bool menu = !valid && !battle && menuScreen();
@@ -2769,6 +2925,7 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
 
     // Sprites: the frame shows the snapshot before it; if its list isn't what the OAM has, the
     // RAM was caught mid-update (a lag frame repeats the last picture) - keep the last good list.
+    PW_MARK(pw2);
     if (valid && prev >= 0 && snaps[prev].ok) {
         int other = shown ^ 1;
         npieces[other] = buildPieces(&snaps[prev], pieces[other]);
@@ -2776,6 +2933,8 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
         else lastTorn = 1;
     }
 
+    PW_MARK(pw3);
+    PW_ADD(1, pw2, pw3);
     if (valid || battle || menu) {
         if (valid) {
             const struct Snap* s = &snaps[bestSnap];
@@ -2796,6 +2955,8 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
     } else {
         mix = mix - MIX_STEP < 0 ? 0 : mix - MIX_STEP;   // the last scene, frozen, dissolves into the glow
     }
+    PW_MARK(pw4);
+    PW_ADD(2, pw3, pw4);
     if (!rawView.w) mix = 0;   // nothing drawn yet
     if (mix < 256) ambientPrepare(frame);
     else edgeAccOk = false;    // the glow starts from the edges as they are when it's next needed
@@ -2836,6 +2997,9 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
             row[i] = overlayDim ? dimmed(o, overlayDim) : o;
         }
     }
+    PW_MARK(pw5);
+    PW_ADD(3, pw4, pw5);
+    PW_REPORT();
     if (lineIoFrames < 2) lineIoFrames++;
     prev = cur;
     return mix;

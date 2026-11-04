@@ -63,8 +63,8 @@ static const struct retro_core_option_v2_definition pdOptions[PD_OPTION_COUNT] =
      {{"Y", NULL}, {"X", NULL}, {"R2", NULL}, {"L2", NULL}, {"L3", NULL}, {NULL, NULL}}, "Y"},
     {"pokedaisy_companion_button", "Companion button", NULL, "Opens the companion screens.", NULL, NULL,
      {{"X", NULL}, {"Y", NULL}, {"R2", NULL}, {"L2", NULL}, {"L3", NULL}, {NULL, NULL}}, "X"},
-    {"pokedaisy_hud_button", "HUD cursor button", NULL, "Puts the cursor on the HUD over the overworld.", NULL, NULL,
-     {{"R2", NULL}, {"L2", NULL}, {"L3", NULL}, {"X", NULL}, {"Y", NULL}, {NULL, NULL}}, "R2"},
+    {"pokedaisy_hud_button", "HUD cursor button", NULL, "Puts the cursor on the HUD over the overworld. The quick menu's HUD tile does the same; no button is set by default (plorpOS keeps L2 and R2 for Turbo Assign on the Game Boy Advance).", NULL, NULL,
+     {{"None", NULL}, {"R2", NULL}, {"L2", NULL}, {"L3", NULL}, {"X", NULL}, {"Y", NULL}, {NULL, NULL}}, "None"},
 };
 
 static retro_environment_t realEnv;
@@ -149,7 +149,7 @@ static double pf_now(void) {
   clock_gettime(CLOCK_MONOTONIC, &t);
   return (double)t.tv_sec * 1e3 + (double)t.tv_nsec / 1e6;
 }
-enum { PF_RUN, PF_WIDE, PF_DRAW, PF_PRESENT, PF_TOTAL, PF_N };
+enum { PF_RUN, PF_WIDE, PF_DRAW, PF_PRESENT, PF_TOTAL, PF_CONV, PF_VIEW, PF_N };
 static double pfSum[PF_N], pfMax[PF_N];
 static int pfFrames;
 #define PF_T(v) double v = pf_now()
@@ -165,6 +165,7 @@ static void pf_frame(void) {
   fprintf(stderr, "pokedaisy: prof %d frames (%d skipped), ms avg/max: mgba %.2f/%.1f  wide %.2f/%.1f  draw %.2f/%.1f  present %.2f/%.1f  total %.2f/%.1f\n", pfFrames, pfLate,
           pfSum[PF_RUN] / pfFrames, pfMax[PF_RUN], pfSum[PF_WIDE] / pfFrames, pfMax[PF_WIDE], pfSum[PF_DRAW] / pfFrames, pfMax[PF_DRAW],
           pfSum[PF_PRESENT] / pfFrames, pfMax[PF_PRESENT], pfSum[PF_TOTAL] / pfFrames, pfMax[PF_TOTAL]);
+  fprintf(stderr, "pokedaisy: prof detail ms avg: wide-convert %.2f  pk_wide_view %.2f\n", pfSum[PF_CONV] / pfFrames, pfSum[PF_VIEW] / pfFrames);
   memset(pfSum, 0, sizeof pfSum);
   memset(pfMax, 0, sizeof pfMax);
   pfFrames = 0;
@@ -175,7 +176,7 @@ static void pf_frame(void) {
 #define PF_SKIPPED() (void)0
 #define pf_add(i, ms) ((void)0)
 #define pf_frame() ((void)0)
-enum { PF_RUN, PF_WIDE, PF_DRAW, PF_PRESENT, PF_TOTAL };
+enum { PF_RUN, PF_WIDE, PF_DRAW, PF_PRESENT, PF_TOTAL, PF_CONV, PF_VIEW };
 #endif
 
 /* EXPAND (the game-code layer, below): the window it rebuilt past the game's edges, when this frame has one. */
@@ -233,6 +234,60 @@ static void draw_game(void) {
   }
 }
 
+
+/* The usual frame (nothing over it but the HUD) goes straight into the frontend's 565 buffer, never through the 32-bit
+ * canvas: that detour costs two passes over every pixel of the window. */
+static bool direct565;
+static inline uint16_t xbgr_to565(uint32_t p) { return (uint16_t)(((p & 0xF8) << 8) | ((p >> 5) & 0x07E0) | ((p >> 19) & 0x1F)); }
+static void draw_game_fast(void) {
+  memset(out565, 0, (size_t)CW * CH * sizeof *out565);
+  if (!outputBuffer || !gameW || !gameH)
+    return;
+  if (wideReady) {
+    int ws = CW / (int)wideW < CH / (int)wideH ? CW / (int)wideW : CH / (int)wideH;
+    if (ws < 1)
+      ws = 1;
+    int wx = (CW - (int)wideW * ws) / 2, wy = (CH - (int)wideH * ws) / 2;
+    for (unsigned y = 0; y < wideH; y++) {
+      int cy = wy + (int)y * ws;
+      if (cy < 0 || cy + ws > CH)
+        continue;
+      uint16_t *row = out565 + (size_t)cy * CW + wx;
+      const uint32_t *src = wideFrame + (size_t)y * wideW;
+      if (ws == 1) {
+        for (unsigned x = 0; x < wideW; x++)
+          row[x] = xbgr_to565(src[x]);
+      } else {
+        for (unsigned x = 0; x < wideW; x++)
+          for (int j = 0; j < ws; j++)
+            row[x * ws + j] = xbgr_to565(src[x]);
+        for (int k = 1; k < ws; k++)
+          memcpy(row + (size_t)k * CW, row, (size_t)wideW * ws * sizeof *row);
+      }
+    }
+    return;
+  }
+  int s = CW / (int)gameW < CH / (int)gameH ? CW / (int)gameW : CH / (int)gameH;
+  if (s < 1)
+    s = 1;
+  int ox = (CW - (int)gameW * s) / 2, oy = (CH - (int)gameH * s) / 2;
+  for (unsigned y = 0; y < gameH; y++) {
+    int cy = oy + (int)y * s;
+    if (cy < 0 || cy + s > CH)
+      continue;
+    uint16_t *row = out565 + (size_t)cy * CW + ox;
+    if (s == 1) {
+      memcpy(row, outputBuffer + (size_t)y * 256, (size_t)gameW * sizeof *row);
+    } else {
+      for (unsigned x = 0; x < gameW; x++)
+        for (int j = 0; j < s; j++)
+          row[x * s + j] = outputBuffer[y * 256 + x];
+      for (int k = 1; k < s; k++)
+        memcpy(row + (size_t)k * CW, row, (size_t)gameW * s * sizeof *row);
+    }
+  }
+}
+
 /* An overlay drawn over QUICK_CLEAR and finished (quick_finish): its alpha laid over the canvas at the
  * given integer scale, its top-left at (x, y) in canvas pixels. */
 static void blend_overlay(const uint32_t *px, int w, int h, int scale, int x0, int y0) {
@@ -247,6 +302,18 @@ static void blend_overlay(const uint32_t *px, int w, int h, int scale, int x0, i
       uint32_t p = px[(y / scale) * w + x / scale], a = p >> 24;
       if (!a)
         continue;
+      if (direct565) {
+        uint16_t *d16 = &out565[(size_t)cy * CW + cx];
+        if (a == 255) {
+          *d16 = to565(p & 0xffffff);
+        } else {
+          uint32_t c = from565(*d16);
+          uint32_t r = ((c >> 16 & 255) * (255 - a) + (p >> 16 & 255) * a) / 255, g = ((c >> 8 & 255) * (255 - a) + (p >> 8 & 255) * a) / 255,
+                   b = ((c & 255) * (255 - a) + (p & 255) * a) / 255;
+          *d16 = to565(r << 16 | g << 8 | b);
+        }
+        continue;
+      }
       uint32_t *d = &cvs[(size_t)cy * CW + cx];
       if (a == 255) {
         *d = p & 0xffffff;
@@ -276,16 +343,18 @@ static void present(void) {
     pd_text_fit(&canvas, 10, CH - 46, CW - 20, message, 0xffffff, PD_NO_SHADOW);
     messageFrames--;
   }
-  for (size_t i = 0; i < (size_t)CW * CH; i++)
-    out565[i] = to565(cvs[i]);
+  if (!direct565)
+    for (size_t i = 0; i < (size_t)CW * CH; i++)
+      out565[i] = to565(cvs[i]);
   realVideo(out565, (unsigned)CW, (unsigned)CH, (size_t)CW * 2);
+  direct565 = false;
   haveFrame = true;
 }
 
 /* ---- input ---- */
 static unsigned held, prevHeld, pressedKeys;
 static int heldFrames[NKEYS];
-static int quickBtn = Y, companionBtn = X, hudBtn = R2;
+static int quickBtn = Y, companionBtn = X, hudBtn = -1; // -1: none
 static unsigned gameKeys; // keys the layer presses for the game (BIKE's SELECT)
 static int gameKeyFrames;
 static bool maskGame;     // while an overlay is up the game sees no keys
@@ -300,7 +369,7 @@ static int button_named(const char *s, int def) {
 static void read_options(void) {
   quickBtn = button_named(option("pokedaisy_quick_button"), Y);
   companionBtn = button_named(option("pokedaisy_companion_button"), X);
-  hudBtn = button_named(option("pokedaisy_hud_button"), R2);
+  hudBtn = button_named(option("pokedaisy_hud_button"), -1);
 }
 
 static void poll_keys(void) {
@@ -463,9 +532,12 @@ static void wide_tick(void) {
   if (!wideSupported)
     return;
   unsigned fw = (unsigned)pk_wide_frame_w(), fh = (unsigned)pk_wide_frame_h();
+  PF_T(cv0);
   for (unsigned y = 0; y < fh; y++)
     for (unsigned x = 0; x < fw; x++)
       wideSource[y * fw + x] = to_xbgr(outputBuffer[y * 256 + x]);
+  PF_T(cv1);
+  pf_add(PF_CONV, cv1 - cv0);
   if (settings.aspect == PD_ASPECT_ORIGINAL) {
     // Nothing past the picture, but the scene still read (FLY's "on the field"): a one-pixel window.
     static uint32_t px;
@@ -477,7 +549,10 @@ static void wide_tick(void) {
                    ? PD_ASPECT_EXPAND : settings.aspect;
   wide_window(aspect, fw, fh, &wideW, &wideH);
   struct PkWideView v = {((int)fw - (int)wideW) / 2, ((int)fh - (int)wideH) / 2, (int)wideW, (int)wideH};
+  PF_T(vw0);
   pk_wide_view(core, wideSource, wideFrame, v, NULL);
+  PF_T(vw1);
+  pf_add(PF_VIEW, vw1 - vw0);
   wideReady = !pk_wide_fault();
   wideHave = wideReady;
 }
@@ -673,7 +748,7 @@ RETRO_API void retro_run(void) {
     hudFocus = false;
     hudState.focus = -1;
   }
-  if (down(hudBtn) && !companion) {
+  if (hudBtn >= 0 && down(hudBtn) && !companion) {
     if (hudFocus || !hudShown || !hudHits.n) {
       if (!hudFocus)
         notice("No HUD on screen");
@@ -855,6 +930,9 @@ RETRO_API void retro_run(void) {
     }
   }
 
+#ifdef PD_NOSKIP
+  frameLate = false;
+#endif
   bool late = frameLate;
   frameLate = false;
   bool paused = companion || hudFocus || (quickOpen && !flyAsk);
@@ -871,18 +949,10 @@ RETRO_API void retro_run(void) {
     if (fieldKnown)
       fieldFlags = pk_field_state(core, settings.runIndoors, wildSwitch && settings.wildOff ? 0 : 100);
     if (late && wideSupported && settings.aspect != PD_ASPECT_ORIGINAL) {
-      // Behind schedule: only the RAM history EXPAND needs (as for a fast-forwarded frame), and no new window. The last
-      // one stays for the map beyond the game's edges; the game's own picture in its middle is this frame's.
+      // Behind schedule: only the RAM history EXPAND needs (as for a fast-forwarded frame), no window, and the frame below
+      // repeats the last picture whole (a stale margin around a live middle showed as a seam).
       pk_wide_skip(core, wideSource);
-      if (wideHave) {
-        unsigned fw = (unsigned)pk_wide_frame_w(), fh = (unsigned)pk_wide_frame_h();
-        unsigned ox = (wideW - fw) / 2, oy = (wideH - fh) / 2;
-        for (unsigned y = 0; y < fh; y++)
-          for (unsigned x = 0; x < fw; x++)
-            wideFrame[(y + oy) * wideW + x + ox] = to_xbgr(outputBuffer[y * 256 + x]);
-        wideReady = true;
-      } else
-        wideReady = false;
+      wideReady = wideHave = false;
     } else
       wide_tick();
     PF_T(pc);
@@ -1022,7 +1092,11 @@ RETRO_API void retro_run(void) {
       blend_overlay(ovPixels, CW, CH, 1, 0, 0);
     }
   } else {
-    draw_game();
+    direct565 = messageFrames == 0;
+    if (direct565)
+      draw_game_fast();
+    else
+      draw_game();
     bool field = (fieldFlags & PK_FIELD_KNOWN) && !(fieldFlags & (PK_FIELD_LOCKED | PK_FIELD_BATTLE)) &&
                  (!wideSupported || pk_wide_scene() == PK_WIDE_SCENE_FIELD) && flyStage == 0;
     hudFieldFrames = field ? hudFieldFrames + 1 : 0;

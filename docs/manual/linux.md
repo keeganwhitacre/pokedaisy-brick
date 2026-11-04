@@ -67,9 +67,11 @@ The save is the same file the mGBA core uses, and the launcher owns save
 states, fast-forward, rewind, shaders and leaving the game. Pick PokeDaisy in
 the Core row of a Game Boy shelf.
 
-In this form the quick menu keeps PC, FLY, REPEL, BIKE, WILD ENCOUNTERS and
-COMPANION, and the game pauses while it is open. SETTINGS lists only what the
-core does itself: ASPECT, HUD, QUICK MENU and TAB BAR. HUD, QUICK MENU and the
-companion each have a button you can change in the core options (the defaults
-are R2, Y and X). The settings file sits in the `pokedaisy` folder inside the
-launcher's save folder.
+In this form the quick menu (Y) keeps PC, FLY, REPEL, BIKE, WILD ENCOUNTERS and
+COMPANION, adds a HUD tile that puts the cursor on the HUD, and the game pauses
+while it is open. X opens the companion. SETTINGS lists only what the core does
+itself: ASPECT, HUD, QUICK MENU and TAB BAR. The quick menu and companion buttons
+can be changed in the core options, and so can a button for the HUD cursor (none
+by default, because the launcher keeps L2 and R2 for turbo on the Game Boy
+Advance). The settings file sits in the `pokedaisy` folder inside the launcher's
+save folder.
