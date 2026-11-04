@@ -35,9 +35,9 @@ static bool env(unsigned cmd, void *data) {
     return false;
   }
   case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE: *(bool *)data = false; return true;
-  case RETRO_ENVIRONMENT_GET_THROTTLE_STATE: {   // PD_FF=1: the frontend says it is fast-forwarding
+  case RETRO_ENVIRONMENT_GET_THROTTLE_STATE: {   // PD_FF=1: the frontend says it is fast-forwarding, PD_RW=1: rewinding
     struct retro_throttle_state *t = data;
-    t->mode = getenv("PD_FF") ? RETRO_THROTTLE_FAST_FORWARD : RETRO_THROTTLE_VSYNC;
+    t->mode = getenv("PD_RW") ? RETRO_THROTTLE_REWINDING : getenv("PD_FF") ? RETRO_THROTTLE_FAST_FORWARD : RETRO_THROTTLE_VSYNC;
     t->rate = 0;
     return true;
   }

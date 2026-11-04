@@ -551,17 +551,18 @@ static void wide_window(int aspect, unsigned fw, unsigned fh, unsigned *w, unsig
   *h = y - ((y - fh) & 1);
 }
 
+static bool rewinding;   // the frontend is rewinding: the camera stays where the aspect put it (no AUTO ZOOM IN on the odd frames)
 /* The window for this frame, in the game frame's pixels (and wideW x wideH set). */
 static struct PkWideView wide_rect(unsigned fw, unsigned fh) {
   int last = pk_wide_scene();
-  int aspect = settings.aspect == PD_ASPECT_ZOOM_OUT && settings.autoZoom && last != PK_WIDE_SCENE_FIELD
+  int aspect = settings.aspect == PD_ASPECT_ZOOM_OUT && settings.autoZoom && last != PK_WIDE_SCENE_FIELD && !rewinding
                    ? PD_ASPECT_EXPAND : settings.aspect;
   wide_window(aspect, fw, fh, &wideW, &wideH);
   return (struct PkWideView){((int)fw - (int)wideW) / 2, ((int)fh - (int)wideH) / 2, (int)wideW, (int)wideH};
 }
 
 /* A fast-forwarded frame: no window rebuild (that is the cost), but the picture over pk_wide's ambient glow, as rewind and
- * the menus show it, rather than over black. Not for a Game Boy game, which has no glow in the core: it keeps the plain frame. */
+ * the menus show it, rather than over black (a Game Boy game: over its menus' bars). */
 static void wide_glow_tick(void) {
   unsigned fw = (unsigned)pk_wide_frame_w(), fh = (unsigned)pk_wide_frame_h();
   for (unsigned y = 0; y < fh; y++)
@@ -640,7 +641,7 @@ static bool want_zoom_canvas(void) {
     return true;
   if (!wideSupported || settings.aspect != PD_ASPECT_ZOOM_OUT)
     return false;
-  return !(settings.autoZoom && pk_wide_scene() != PK_WIDE_SCENE_FIELD);
+  return !(settings.autoZoom && !rewinding && pk_wide_scene() != PK_WIDE_SCENE_FIELD);
 }
 
 /* Follow the aspect: when the wanted canvas differs, resize it and tell the frontend (it rescales to the new whole factor). */
@@ -1048,7 +1049,9 @@ RETRO_API void retro_run(void) {
   bool ff = false;
   if (realEnv) {
     struct retro_throttle_state th = {0, 0.0f};
-    ff = realEnv(RETRO_ENVIRONMENT_GET_THROTTLE_STATE, &th) && th.mode == RETRO_THROTTLE_FAST_FORWARD;
+    bool got = realEnv(RETRO_ENVIRONMENT_GET_THROTTLE_STATE, &th);
+    ff = got && th.mode == RETRO_THROTTLE_FAST_FORWARD;
+    rewinding = got && th.mode == RETRO_THROTTLE_REWINDING;
   }
   bool paused = companion || hudFocus || (quickOpen && !flyAsk);
   maskGame = paused;

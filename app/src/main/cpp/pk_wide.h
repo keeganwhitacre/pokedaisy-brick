@@ -161,7 +161,7 @@ void pk_wide_skip(struct mCore* core, const uint32_t* frame);
 
 /** pk_wide_skip for a fast-forwarded frame that IS shown: the RAM history kept, and `out` (view.w x view.h) gets the frame
  * with the ambient glow (the blur rewind and the menus show) around it instead of the rebuilt scene - cheap, no map read.
- * Returns 0 and draws nothing where there is no glow (a Game Boy game, an unconfigured game). */
+ * Returns 0 and draws nothing for an unconfigured game. A Game Boy game's glow is the bars its menus have. */
 int pk_wide_glow(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView view);
 // A Game Boy game configured with nothing to draw (EXPAND off): its scene only (pk_wide_scene), for the FIELD HUD -
 // pk_wide_gb.c's match run on a 1 x 1 window; `skip` (a fast-forwarded frame nobody sees) only notes its RAM.
@@ -232,6 +232,8 @@ int pk_wide_gb_configure(uint32_t crc);
 void pk_wide_gb_reset(void);
 /** pk_wide_view's twin; `out` NULL = pk_wide_skip's (only the RAM after the frame is kept). */
 int pk_wide_gb_view(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView view, uint32_t* centre);
+/** pk_wide_glow's twin for a Game Boy game: the frame over its menus' bars. */
+int pk_wide_gb_glow(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView view);
 int pk_wide_gb_scene(void);
 int pk_wide_gb_wants_close(void);
 int pk_wide_gb_last_mode(void);

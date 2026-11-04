@@ -909,6 +909,20 @@ int pk_wide_gb_last_score(void) { return gbLastScore; }
 
 static inline bool gbOnFrame(int x, int y) { return x >= 0 && x < GBW && y >= 0 && y < GBH; }
 
+/** A frame shown without its window (fast-forward): the frame over the bars the menus show past its edges, no map read.
+ * The RAM history is the caller's (pk_wide_skip). */
+int pk_wide_gb_glow(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView v) {
+    if (!core || core->platform(core) != mPLATFORM_GB || !gbCfg || !out) return 0;
+    uint32_t alpha = frame[0] & 0xFF000000u;
+    gbBackgroundRows(frame);
+    for (int j = 0; j < v.h; j++)
+        for (int i = 0; i < v.w; i++) {
+            int X = v.x + i, Y = v.y + j;
+            out[j * v.w + i] = gbOnFrame(X, Y) ? frame[Y * GBW + X] : (gbFillRow[gbClamp(Y, 0, GBH - 1)] | alpha);
+        }
+    return 1;
+}
+
 int pk_wide_gb_view(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView v, uint32_t* centre) {
     if (!core || core->platform(core) != mPLATFORM_GB || !gbCfg) {
         if (out) {

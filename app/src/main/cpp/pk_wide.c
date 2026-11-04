@@ -2853,7 +2853,12 @@ void pk_wide_skip(struct mCore* core, const uint32_t* frame) {
 
 int pk_wide_glow(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView v) {
     pk_wide_skip(core, frame);   // the RAM history, as for any frame nobody sees the window of
-    if (gbGame || !core || core->platform(core) != mPLATFORM_GBA || !configured || !out) return 0;
+    if (gbGame) {
+        if (v.w > PK_WIDE_MAX_VIEW_W) v.w = PK_WIDE_MAX_VIEW_W;
+        if (v.h > PK_WIDE_MAX_VIEW_H) v.h = PK_WIDE_MAX_VIEW_H;
+        return v.w < 1 || v.h < 1 ? 0 : pk_wide_gb_glow(core, frame, out, v);
+    }
+    if (!core || core->platform(core) != mPLATFORM_GBA || !configured || !out) return 0;
     if (v.w > PK_WIDE_MAX_VIEW_W) v.w = PK_WIDE_MAX_VIEW_W;
     if (v.h > PK_WIDE_MAX_VIEW_H) v.h = PK_WIDE_MAX_VIEW_H;
     if (v.w < 1 || v.h < 1) return 0;
