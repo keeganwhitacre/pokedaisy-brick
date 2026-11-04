@@ -577,6 +577,17 @@ RETRO_API void retro_unload_game(void) {
   haveGame = false;
 }
 
+/* The HUD's cursor goes onto it: the lead's slot where the party shows, else the first target. */
+static void hud_focus_start(void) {
+  hudFocus = true;
+  hudState.focus = hudHits.at[0].id;
+  for (int i = 0, lowest = PD_PARTY_SIZE; i < hudHits.n; i++)
+    if (hudHits.at[i].id >= HUD_SLOT && hudHits.at[i].id - HUD_SLOT < lowest) {
+      lowest = hudHits.at[i].id - HUD_SLOT;
+      hudState.focus = hudHits.at[i].id;
+    }
+}
+
 RETRO_API void retro_run(void) {
   if (!haveGame) {
     mgba_retro_run();
@@ -605,13 +616,7 @@ RETRO_API void retro_run(void) {
       hudFocus = false;
       hudState.focus = -1;
     } else {
-      hudFocus = true;
-      hudState.focus = hudHits.at[0].id;
-      for (int i = 0, lowest = PD_PARTY_SIZE; i < hudHits.n; i++)
-        if (hudHits.at[i].id >= HUD_SLOT && hudHits.at[i].id - HUD_SLOT < lowest) {
-          lowest = hudHits.at[i].id - HUD_SLOT;
-          hudState.focus = hudHits.at[i].id;
-        }
+      hud_focus_start();
     }
   } else if (hudFocus) {
     if (down(B)) {
@@ -675,6 +680,8 @@ RETRO_API void retro_run(void) {
                                           riding ? "GET OFF" : NULL};
   }
   quick[quickN++] = (struct quick_item){QUICK_WILD, settings.wildOff, false, wildSwitch ? NULL : "Not in this game", 0, 0, NULL};
+  if (host.hasHud && settings.hud)
+    quick[quickN++] = (struct quick_item){QUICK_HUD, false, false, hudShown && hudHits.n ? NULL : "No HUD on screen", 0, 0, NULL};
   quick[quickN++] = (struct quick_item){QUICK_COMPANION, false, false, NULL, 0, 0, NULL};
   if (quickSel >= quickN)
     quickSel = 0;
@@ -754,6 +761,9 @@ RETRO_API void retro_run(void) {
         break;
       case QUICK_COMPANION:
         companion = true;
+        break;
+      case QUICK_HUD:
+        hud_focus_start();
         break;
       default:
         break;
