@@ -96,7 +96,8 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
         snprintf(buf, sizeof(buf), "%dx", ui->settings->ffSpeed);
     else
         snprintf(buf, sizeof(buf), "MAX");
-    setting(ui, c, ix, &y, iw, SETTING_FF, "FAST-FORWARD", buf);
+    if (!host || !host->frontendOwnsPlayback)
+        setting(ui, c, ix, &y, iw, SETTING_FF, "FAST-FORWARD", buf);
     if (host && host->hasExpand) {
         if (host->expandGame) {
             setting(ui, c, ix, &y, iw, SETTING_ASPECT, "ASPECT", pd_aspect_name(ui->settings->aspect));
@@ -116,14 +117,16 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
         setting(ui, c, ix, &y, iw, SETTING_QUICK_MENU, "QUICK MENU", ui->settings->quickGrid ? "GRID" : "RING");
     snprintf(buf, sizeof(buf), "%d TABS", ui_bar_count(ui));
     setting(ui, c, ix, &y, iw, SETTING_TAB_BAR, "TAB BAR", buf);
-    setting(ui, c, ix, &y, iw, SETTING_SAVE_STATE, "SAVE STATE", NULL);
-    if (host && host->hasState) {
-        setting(ui, c, ix, &y, iw, SETTING_LOAD_STATE, "LOAD STATE", host->stateWhen);
-    } else {
-        // Nothing to load: shown, not tappable.
-        muted_row(c, ix, &y, iw, "LOAD STATE", "none yet");
+    if (!host || !host->frontendOwnsPlayback) {
+        setting(ui, c, ix, &y, iw, SETTING_SAVE_STATE, "SAVE STATE", NULL);
+        if (host && host->hasState) {
+            setting(ui, c, ix, &y, iw, SETTING_LOAD_STATE, "LOAD STATE", host->stateWhen);
+        } else {
+            // Nothing to load: shown, not tappable.
+            muted_row(c, ix, &y, iw, "LOAD STATE", "none yet");
+        }
+        setting(ui, c, ix, &y, iw, SETTING_LEAVE, "LEAVE GAME", NULL);
     }
-    setting(ui, c, ix, &y, iw, SETTING_LEAVE, "LEAVE GAME", NULL);
     pd_unclip(c);
     int total = y + ui->settingsScroll - listTop, view = listBottom - listTop;
     lastTotal = total;

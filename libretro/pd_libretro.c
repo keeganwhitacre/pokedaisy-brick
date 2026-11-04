@@ -521,6 +521,7 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   memset(&host, 0, sizeof host);
   host.hideScreenMode = true;
   host.hasQuickMenu = true;
+  host.frontendOwnsPlayback = true;
   host.hasHud = core->platform(core) == mPLATFORM_GBA;
   host.hasExpand = true;
   host.expandGame = wideSupported;
