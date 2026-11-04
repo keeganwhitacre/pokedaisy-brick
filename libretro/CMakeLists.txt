@@ -23,9 +23,15 @@ get_target_property(MGBA_DEFS mgba_libretro COMPILE_DEFINITIONS)
 get_directory_property(MGBA_DIR_DEFS DIRECTORY ${MGBA} COMPILE_DEFINITIONS)
 list(REMOVE_ITEM MGBA_DIR_DEFS USE_PTHREADS) # threading is off; pk_rewind.c is not built
 get_target_property(MGBA_INC mgba_libretro INCLUDE_DIRECTORIES)
-add_library(pokedaisy_libretro SHARED ${MGBA_SRC} pd_lr_mem.c)
+list(FILTER MGBA_SRC EXCLUDE REGEX "platform/libretro/libretro\\.c$") # pd_libretro.c includes it, renamed
+set(APP ${CMAKE_CURRENT_SOURCE_DIR}/../app/src/main/cpp)
+file(GLOB PD_CORE CONFIGURE_DEPENDS ../3ds/core/*.c)
+add_library(pokedaisy_libretro SHARED ${MGBA_SRC} pd_libretro.c pd_lr_mem.c ${PD_CORE}
+  ../linux/hud.c ../linux/quick_menu.c ../linux/fly.c ../linux/field_items.c ../linux/wild.c
+  ${APP}/pk_call.c ${APP}/pk_wide.c ${APP}/pk_wide_gb.c ${APP}/pk_gb_field.c)
+set_source_files_properties(${APP}/pk_wide.c ${APP}/pk_wide_gb.c PROPERTIES COMPILE_OPTIONS -Wno-unused-parameter)
 set_target_properties(pokedaisy_libretro PROPERTIES PREFIX "" COMPILE_DEFINITIONS "${MGBA_DEFS};${MGBA_DIR_DEFS};_GNU_SOURCE")
-target_include_directories(pokedaisy_libretro PRIVATE ${MGBA_INC} ${MGBA}/include ${CMAKE_CURRENT_BINARY_DIR}/mgba/include ../3ds/core)
+target_include_directories(pokedaisy_libretro PRIVATE ${MGBA_INC} ${MGBA}/include ${CMAKE_CURRENT_BINARY_DIR}/mgba/include ${MGBA}/src/platform/libretro ${MGBA}/src ../3ds/core ../linux ${APP})
 target_link_libraries(pokedaisy_libretro PRIVATE m)
 # Only retro_* leaves the object: a second mGBA is resident beside the stock core (ADR-0006).
 target_link_options(pokedaisy_libretro PRIVATE -Wl,--exclude-libs,ALL -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/retro.map)

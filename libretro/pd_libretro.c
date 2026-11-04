@@ -1,0 +1,545 @@
+/* PokeDaisy as a libretro core: mGBA's own libretro core (MPL-2.0, third_party/mgba, included below
+ * unchanged) with the companion layered over it. GPL-3.0, see ../NOTICE.
+ *
+ * mGBA's entry points are renamed with the preprocessor while its file is included, so this file can
+ * define the real retro_* functions around them and reach its static state (core, data, outputBuffer)
+ * without editing a line of upstream. */
+#define retro_set_environment mgba_retro_set_environment
+#define retro_set_video_refresh mgba_retro_set_video_refresh
+#define retro_set_input_state mgba_retro_set_input_state
+#define retro_get_system_info mgba_retro_get_system_info
+#define retro_get_system_av_info mgba_retro_get_system_av_info
+#define retro_run mgba_retro_run
+#define retro_load_game mgba_retro_load_game
+#define retro_unload_game mgba_retro_unload_game
+#define retro_unserialize mgba_retro_unserialize
+#include "libretro.c"
+#undef retro_set_environment
+#undef retro_set_video_refresh
+#undef retro_set_input_state
+#undef retro_get_system_info
+#undef retro_get_system_av_info
+#undef retro_run
+#undef retro_load_game
+#undef retro_unload_game
+#undef retro_unserialize
+
+#include "field_items.h"
+#include "fly.h"
+#include "hud.h"
+#include "pd_guide.h"
+#include "pk_call.h"
+#include "pk_wide.h"
+#include "quick_menu.h"
+#include "wild.h"
+#include "pd_dex.h"
+#include "pd_map.h"
+#include "pd_menu.h"
+#include "pd_romart.h"
+#include "pd_settings.h"
+#include "pd_ui.h"
+#include "pd_ui_internal.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+
+bool pd_lr_read_memory(void *ctx, uint32_t a, void *out, size_t n);
+
+/* ---- keys: the retropad, as the SDL host's key enum numbers them (A..L are mGBA's own key bits) ---- */
+enum { A, B, SELECT, START, RIGHT, LEFT, UP, DOWN, R, L, X, Y, L2, R2, MENU, L3, NKEYS };
+static const unsigned retroId[NKEYS] = {
+    RETRO_DEVICE_ID_JOYPAD_A,     RETRO_DEVICE_ID_JOYPAD_B,    RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_START,
+    RETRO_DEVICE_ID_JOYPAD_RIGHT, RETRO_DEVICE_ID_JOYPAD_LEFT, RETRO_DEVICE_ID_JOYPAD_UP,     RETRO_DEVICE_ID_JOYPAD_DOWN,
+    RETRO_DEVICE_ID_JOYPAD_R,     RETRO_DEVICE_ID_JOYPAD_L,    RETRO_DEVICE_ID_JOYPAD_X,      RETRO_DEVICE_ID_JOYPAD_Y,
+    RETRO_DEVICE_ID_JOYPAD_L2,    RETRO_DEVICE_ID_JOYPAD_R2,   RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_L3};
+
+/* ---- the options this layer adds to mGBA's ---- */
+#define PD_OPTION_COUNT 4
+static const struct retro_core_option_v2_definition pdOptions[PD_OPTION_COUNT] = {
+    {"pokedaisy_canvas", "Companion canvas", NULL, "The frame size the core reports: the game sits in it at a whole scale, the companion fills it. auto = 320x240.", NULL, NULL,
+     {{"auto", NULL}, {"320x240", NULL}, {"341x256", NULL}, {"400x300", NULL}, {"427x240", NULL}, {NULL, NULL}}, "auto"},
+    {"pokedaisy_quick_button", "Quick menu button", NULL, "Opens the quick menu over the game.", NULL, NULL,
+     {{"Y", NULL}, {"X", NULL}, {"R2", NULL}, {"L2", NULL}, {"L3", NULL}, {NULL, NULL}}, "Y"},
+    {"pokedaisy_companion_button", "Companion button", NULL, "Opens the companion screens.", NULL, NULL,
+     {{"X", NULL}, {"Y", NULL}, {"R2", NULL}, {"L2", NULL}, {"L3", NULL}, {NULL, NULL}}, "X"},
+    {"pokedaisy_hud_button", "HUD cursor button", NULL, "Puts the cursor on the HUD over the overworld.", NULL, NULL,
+     {{"R2", NULL}, {"L2", NULL}, {"L3", NULL}, {"X", NULL}, {"Y", NULL}, {NULL, NULL}}, "R2"},
+};
+
+static retro_environment_t realEnv;
+static retro_video_refresh_t realVideo;
+static retro_input_state_t realInput;
+static bool optionsDirty;
+
+static const char *option(const char *key) {
+  struct retro_variable v = {key, NULL};
+  return realEnv && realEnv(RETRO_ENVIRONMENT_GET_VARIABLE, &v) && v.value ? v.value : NULL;
+}
+
+/* mGBA defines its options in one call; ours go in with them (an environment may take only one). */
+static bool env_wrap(unsigned cmd, void *data) {
+  if ((cmd == RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL || cmd == RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2) && data) {
+    const struct retro_core_options_v2 *us =
+        cmd == RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL ? ((struct retro_core_options_v2_intl *)data)->us : data;
+    size_t n = 0;
+    while (us && us->definitions[n].key)
+      n++;
+    struct retro_core_option_v2_definition *defs = calloc(n + PD_OPTION_COUNT + 1, sizeof *defs);
+    if (defs && us) {
+      memcpy(defs, us->definitions, n * sizeof *defs);
+      memcpy(defs + n, pdOptions, sizeof pdOptions);
+      static struct retro_core_options_v2 merged;
+      static struct retro_core_options_v2_intl mergedIntl;
+      merged = (struct retro_core_options_v2){us->categories, defs};
+      mergedIntl = (struct retro_core_options_v2_intl){&merged, NULL};
+      return realEnv(cmd, cmd == RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2_INTL ? (void *)&mergedIntl : (void *)&merged);
+    }
+  }
+  bool r = realEnv(cmd, data);
+  if (cmd == RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE && data && *(bool *)data)
+    optionsDirty = true;
+  return r;
+}
+
+/* ---- the frame: the canvas the frontend sees, and where the game and the overlays are drawn ---- */
+#define CANVAS_MAX_W 640
+#define CANVAS_MAX_H 480
+static int CW = 320, CH = 240;
+static uint32_t *cvs;     // the companion's canvas, 0xRRGGBB
+static uint16_t *out565;  // what the frontend gets
+static struct pd_canvas canvas;
+static unsigned gameW, gameH;
+static bool gameShown;
+
+static char message[128];
+static int messageFrames;
+static void notice(const char *s) {
+  snprintf(message, sizeof message, "%s", s);
+  messageFrames = 90;
+  fprintf(stderr, "pokedaisy: %s\n", s);
+}
+
+static inline uint32_t from565(uint16_t p) {
+  uint32_t r = (p >> 11) & 31, g = (p >> 5) & 63, b = p & 31;
+  return ((r << 3 | r >> 2) << 16) | ((g << 2 | g >> 4) << 8) | (b << 3 | b >> 2);
+}
+static inline uint16_t to565(uint32_t p) {
+  return (uint16_t)(((p >> 8) & 0xf800) | ((p >> 5) & 0x07e0) | ((p >> 3) & 0x001f));
+}
+
+/* The game, whole-scale and centred, over a black canvas. */
+static void draw_game(void) {
+  memset(cvs, 0, (size_t)CW * CH * sizeof *cvs);
+  if (!outputBuffer || !gameW || !gameH)
+    return;
+  int s = CW / (int)gameW < CH / (int)gameH ? CW / (int)gameW : CH / (int)gameH;
+  if (s < 1)
+    s = 1;
+  int ox = (CW - (int)gameW * s) / 2, oy = (CH - (int)gameH * s) / 2;
+  for (unsigned y = 0; y < gameH; y++) {
+    uint32_t *row = cvs + (size_t)(oy + (int)y * s) * CW + ox;
+    if (oy + (int)y * s < 0 || oy + ((int)y + 1) * s > CH)
+      continue;
+    for (unsigned x = 0; x < gameW; x++) {
+      uint32_t p = from565(outputBuffer[y * 256 + x]);
+      for (int k = 0; k < s; k++)
+        row[x * s + k] = p;
+    }
+    for (int k = 1; k < s; k++)
+      memcpy(row + (size_t)k * CW, row, (size_t)gameW * s * sizeof *row);
+  }
+}
+
+/* An overlay drawn over QUICK_CLEAR and finished (quick_finish): its alpha laid over the canvas at the
+ * given integer scale, its top-left at (x, y) in canvas pixels. */
+static void blend_overlay(const uint32_t *px, int w, int h, int scale, int x0, int y0) {
+  for (int y = 0; y < h * scale; y++) {
+    int cy = y0 + y;
+    if (cy < 0 || cy >= CH)
+      continue;
+    for (int x = 0; x < w * scale; x++) {
+      int cx = x0 + x;
+      if (cx < 0 || cx >= CW)
+        continue;
+      uint32_t p = px[(y / scale) * w + x / scale], a = p >> 24;
+      if (!a)
+        continue;
+      uint32_t *d = &cvs[(size_t)cy * CW + cx];
+      if (a == 255) {
+        *d = p & 0xffffff;
+      } else {
+        uint32_t dr = *d >> 16 & 255, dg = *d >> 8 & 255, db = *d & 255;
+        uint32_t r = (dr * (255 - a) + (p >> 16 & 255) * a) / 255, g = (dg * (255 - a) + (p >> 8 & 255) * a) / 255,
+                 b = (db * (255 - a) + (p & 255) * a) / 255;
+        *d = r << 16 | g << 8 | b;
+      }
+    }
+  }
+}
+
+static void dim(int alpha) {
+  for (size_t i = 0; i < (size_t)CW * CH; i++) {
+    uint32_t p = cvs[i];
+    cvs[i] = (((p >> 16 & 255) * (255 - alpha) / 255) << 16) | (((p >> 8 & 255) * (255 - alpha) / 255) << 8) |
+             ((p & 255) * (255 - alpha) / 255);
+  }
+}
+
+/* Convert and hand the finished canvas to the frontend. */
+static void present(void) {
+  if (messageFrames > 0) {
+    pd_fill(&canvas, 4, CH - 50, CW - 8, 24, 0x181818);
+    pd_text_fit(&canvas, 10, CH - 46, CW - 20, message, 0xffffff, PD_NO_SHADOW);
+    messageFrames--;
+  }
+  for (size_t i = 0; i < (size_t)CW * CH; i++)
+    out565[i] = to565(cvs[i]);
+  realVideo(out565, (unsigned)CW, (unsigned)CH, (size_t)CW * 2);
+}
+
+/* ---- input ---- */
+static unsigned held, prevHeld, pressedKeys;
+static int heldFrames[NKEYS];
+static int quickBtn = Y, companionBtn = X, hudBtn = R2;
+static unsigned gameKeys; // keys the layer presses for the game (BIKE's SELECT)
+static int gameKeyFrames;
+static bool maskGame;     // while an overlay is up the game sees no keys
+
+static int button_named(const char *s, int def) {
+  static const struct { const char *n; int k; } names[] = {{"X", X}, {"Y", Y}, {"R2", R2}, {"L2", L2}, {"L3", L3}};
+  for (unsigned i = 0; s && i < sizeof names / sizeof *names; i++)
+    if (!strcmp(s, names[i].n))
+      return names[i].k;
+  return def;
+}
+static void read_options(void) {
+  quickBtn = button_named(option("pokedaisy_quick_button"), Y);
+  companionBtn = button_named(option("pokedaisy_companion_button"), X);
+  hudBtn = button_named(option("pokedaisy_hud_button"), R2);
+}
+
+static void poll_keys(void) {
+  held = 0;
+  if (realInput)
+    for (int k = 0; k < NKEYS; k++)
+      if (k != MENU && realInput(0, RETRO_DEVICE_JOYPAD, 0, retroId[k]))
+        held |= 1u << k;
+  pressedKeys = held & ~prevHeld;
+  for (int k = 0; k < NKEYS; k++) {
+    heldFrames[k] = (held >> k & 1) ? heldFrames[k] + 1 : 0;
+    // The D-pad repeats while held: after a quarter second, every ~90 ms.
+    if (k >= RIGHT && k <= DOWN && heldFrames[k] > 15 && (heldFrames[k] - 15) % 5 == 0)
+      pressedKeys |= 1u << k;
+  }
+  prevHeld = held;
+}
+static bool down(int k) { return (pressedKeys >> k & 1) != 0; }
+
+/* What mGBA reads while its frame runs. */
+static int16_t masked_input(unsigned port, unsigned device, unsigned index, unsigned id) {
+  if (port != 0 || device != RETRO_DEVICE_JOYPAD)
+    return 0;
+  if (id == RETRO_DEVICE_ID_JOYPAD_MASK) {
+    int16_t m = 0;
+    for (int k = A; k <= L; k++)
+      if (maskGame ? (gameKeys >> k & 1) : ((held >> k & 1) || (gameKeyFrames > 0 && (gameKeys >> k & 1))))
+        m |= 1 << retroId[k];
+    return m;
+  }
+  for (int k = A; k <= L; k++)
+    if (retroId[k] == id)
+      return maskGame ? (gameKeyFrames > 0 && (gameKeys >> k & 1)) : ((held >> k & 1) || (gameKeyFrames > 0 && (gameKeys >> k & 1)));
+  return maskGame ? 0 : realInput(port, device, index, id);
+}
+
+/* ---- the companion ---- */
+#include "pd_focus.inc"
+
+static struct pd_game game;
+static struct pd_settings settings;
+static struct pd_ui ui;
+static struct pd_snapshot snap;
+static struct pd_host_info host;
+static char settingsPath[1100];
+static bool companion, companionWas, haveGame;
+static int frames;
+
+/* the HUD over the overworld (B2) */
+static struct hud_state hudState = {0, 0, false, -1, -1};
+static struct hud_hits hudHits;
+static bool hudFocus, hudShown;
+static uint32_t *hudPixels;
+static uint32_t hudDrawnKey;
+static int hudW, hudH;
+static int fieldFlags, hudFieldFrames;
+
+static void snapshot(void) { pd_snapshot_read(&snap, &game, pd_lr_read_memory, core); }
+
+static int hud_wild_uncaught(const struct pd_game *g, const struct pd_snapshot *s) {
+  struct pd_wild_set w;
+  if (!g->cfg || !g->cfg->wildHeaders)
+    return -1;
+  if (!pd_wild_here(g, s, &w))
+    return 0;
+  int seen[PD_WILD_METHODS * PD_WILD_MAX], n = 0, left = 0;
+  for (int m = 0; m < PD_WILD_METHODS; m++)
+    for (int i = 0; i < w.count[m]; i++) {
+      int sp = w.mons[m][i].species, k = 0;
+      while (k < n && seen[k] != sp)
+        k++;
+      if (k < n)
+        continue;
+      seen[n++] = sp;
+      left += !pd_dex_caught(s, pd_dex_national(g, sp));
+    }
+  return left;
+}
+
+/* The HUD over the game's own picture, at the companion's pixel scale (SIZE steps it). */
+static void draw_hud(void) {
+  int gs = CW / (int)gameW < CH / (int)gameH ? CW / (int)gameW : CH / (int)gameH;
+  if (gs < 1)
+    gs = 1;
+  int ax = (CW - (int)gameW * gs) / 2, ay = (CH - (int)gameH * gs) / 2, aw = (int)gameW * gs, ah = (int)gameH * gs;
+  int scale = 1 + settings.hudSize - PD_HUD_NORMAL;
+  if (scale < 1)
+    scale = 1;
+  int w = aw / scale, hh = ah / scale;
+  if (!hudPixels)
+    hudPixels = malloc((size_t)CANVAS_MAX_W * CANVAS_MAX_H * sizeof *hudPixels);
+  if (!hudPixels)
+    return;
+  uint32_t key = hud_key(&snap, &hudState, &settings) ^ (uint32_t)(w * 65599 + hh);
+  if (key != hudDrawnKey || w != hudW || hh != hudH) {
+    struct pd_canvas hc;
+    pd_canvas_init(&hc, w, hh, hudPixels);
+    hudShown = hud_draw(&hc, &game, &snap, &hudState, &settings, &hudHits);
+    quick_finish(&hc);
+    hudDrawnKey = key;
+    hudW = w;
+    hudH = hh;
+  }
+  if (hudShown)
+    blend_overlay(hudPixels, w, hh, scale, ax + (aw - w * scale) / 2, ay + (ah - hh * scale) / 2);
+}
+
+static void choose_canvas(void) {
+  const char *v = option("pokedaisy_canvas");
+  int w = 320, h = 240;
+  if (v && sscanf(v, "%dx%d", &w, &h) != 2)
+    w = 320, h = 240;
+  CW = w < 320 ? 320 : w > CANVAS_MAX_W ? CANVAS_MAX_W : w;
+  CH = h < 240 ? 240 : h > CANVAS_MAX_H ? CANVAS_MAX_H : h;
+}
+
+/* ---- entry points ---- */
+RETRO_API void retro_set_environment(retro_environment_t e) {
+  realEnv = e;
+  mgba_retro_set_environment(env_wrap);
+}
+/* What the capture of mGBA's own video call records: the size; the pixels stay in outputBuffer. */
+static void capture_video(const void *d, unsigned w, unsigned h, size_t pitch) {
+  (void)d;
+  (void)pitch;
+  gameW = w;
+  gameH = h;
+}
+RETRO_API void retro_set_video_refresh(retro_video_refresh_t v) {
+  realVideo = v;
+  mgba_retro_set_video_refresh(capture_video);
+}
+RETRO_API void retro_set_input_state(retro_input_state_t i) {
+  realInput = i;
+  mgba_retro_set_input_state(masked_input);
+}
+RETRO_API void retro_get_system_info(struct retro_system_info *info) {
+  mgba_retro_get_system_info(info);
+  info->library_name = "PokeDaisy";
+  info->library_version = "0.3";
+}
+RETRO_API void retro_get_system_av_info(struct retro_system_av_info *info) {
+  mgba_retro_get_system_av_info(info);
+  info->geometry.base_width = info->geometry.max_width = (unsigned)CW;
+  info->geometry.base_height = info->geometry.max_height = (unsigned)CH;
+  info->geometry.aspect_ratio = (float)CW / (float)CH;
+}
+
+RETRO_API bool retro_load_game(const struct retro_game_info *g) {
+  if (!mgba_retro_load_game(g))
+    return false;
+  choose_canvas();
+  read_options();
+  cvs = calloc((size_t)CW * CH, sizeof *cvs);
+  out565 = calloc((size_t)CW * CH, sizeof *out565);
+  if (!cvs || !out565)
+    return false;
+  pd_canvas_init(&canvas, CW, CH, cvs);
+  uint32_t crc = 0;
+  core->checksum(core, &crc, mCHECKSUM_CRC32);
+  const unsigned char *rom = data;
+  size_t len = dataSize;
+  pd_game_detect(&game, rom, len);
+  game.rom = rom;
+  game.romSize = len;
+  pd_game_identify(&game);
+  fprintf(stderr, "pokedaisy: %s, sha1 %s%s%s\n", game.title ? game.title : "?", game.sha1[0] ? game.sha1 : "-",
+          game.unsupported ? " - " : "", game.unsupported ? game.unsupported : "");
+  if (core->platform(core) == mPLATFORM_GBA)
+    pd_romart_scan(&game);
+  const char *dir = NULL;
+  if (realEnv(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &dir) && dir) {
+    char sub[1050];
+    snprintf(sub, sizeof sub, "%s/pokedaisy", dir);
+    mkdir(sub, 0755);
+    snprintf(settingsPath, sizeof settingsPath, "%s/settings.ini", sub);
+  } else
+    snprintf(settingsPath, sizeof settingsPath, "pokedaisy-settings.ini");
+  pd_settings_load(&settings, settingsPath);
+  pd_ui_init(&ui, &settings);
+  memset(&host, 0, sizeof host);
+  host.hideScreenMode = true;
+  host.hasQuickMenu = true;
+  host.hasHud = core->platform(core) == mPLATFORM_GBA;
+  host.count = 1;
+  host.labels[0] = "HOST";
+  snprintf(host.values[0], 40, "PokeDaisy core");
+  focusId = -1;
+  focus_new_screen();
+  companion = hudFocus = false;
+  haveGame = true;
+  return true;
+}
+
+RETRO_API void retro_unload_game(void) {
+  mgba_retro_unload_game();
+  free(cvs);
+  free(out565);
+  free(hudPixels);
+  cvs = NULL;
+  out565 = NULL;
+  hudPixels = NULL;
+  haveGame = false;
+}
+
+RETRO_API void retro_run(void) {
+  if (!haveGame) {
+    mgba_retro_run();
+    return;
+  }
+  if (optionsDirty) {
+    optionsDirty = false;
+    read_options();
+  }
+  poll_keys();
+  bool wasCompanion = companion;
+  if (down(companionBtn) && !hudFocus) {
+    companion = !companion;
+  }
+  // The HUD button: the cursor goes onto the HUD, the D-pad moves it, A presses what it is on, B / the button leave.
+  if (hudFocus && (companion || !hudShown)) {
+    hudFocus = false;
+    hudState.focus = -1;
+  }
+  if (down(hudBtn) && !companion) {
+    if (hudFocus || !hudShown || !hudHits.n) {
+      if (!hudFocus)
+        notice("No HUD on screen");
+      hudFocus = false;
+      hudState.focus = -1;
+    } else {
+      hudFocus = true;
+      hudState.focus = hudHits.at[0].id;
+      for (int i = 0, lowest = PD_PARTY_SIZE; i < hudHits.n; i++)
+        if (hudHits.at[i].id >= HUD_SLOT && hudHits.at[i].id - HUD_SLOT < lowest) {
+          lowest = hudHits.at[i].id - HUD_SLOT;
+          hudState.focus = hudHits.at[i].id;
+        }
+    }
+  } else if (hudFocus) {
+    if (down(B)) {
+      hudFocus = false;
+      hudState.focus = -1;
+    } else if (down(A)) {
+      int id = hudState.focus;
+      hudFocus = false;
+      hudState.focus = -1;
+      if (id >= HUD_SLOT && id < HUD_SLOT + PD_PARTY_SIZE) {
+        ui.tab = PD_TAB_PARTY;
+        ui.summarySlot = id - HUD_SLOT;
+      } else if (id == HUD_MAP || id == HUD_MAP_BUTTON) {
+        ui.tab = PD_TAB_MAP;
+        ui.mapPage = -1;
+      } else if (id == HUD_BALLS || id == HUD_REPEL || id == HUD_BAG) {
+        ui.tab = PD_TAB_BAG;
+      } else if (id == HUD_WILD) {
+        ui.tab = PD_TAB_GUIDE;
+        ui.guidePage = 0;
+        ui.guideOpen = -1;
+      }
+      if (id != HUD_PC)
+        companion = true;
+    } else {
+      int dir = down(UP) ? UP : down(DOWN) ? DOWN : down(LEFT) ? LEFT : down(RIGHT) ? RIGHT : -1;
+      if (dir >= 0)
+        hudState.focus = hud_step(&hudHits, hudState.focus, dir);
+    }
+  }
+
+  if (companion) {
+    if (down(B) && !map_cursor_back(&ui) && !pd_ui_back(&ui))
+      companion = false;
+    if (down(L) || down(R))
+      pd_ui_next_tab(&ui, down(R) ? 1 : -1);
+    for (int k = RIGHT; k <= DOWN; k++)
+      if (down(k))
+        focus_move(&ui, k);
+    if (down(A))
+      focus_activate(&ui);
+    switch (pd_ui_take_action(&ui)) {
+    case PD_ACTION_SETTINGS_CHANGED:
+      pd_settings_save(&settings, settingsPath);
+      hudDrawnKey = 0;
+      break;
+    default:
+      break;
+    }
+  }
+
+  bool paused = companion || hudFocus;
+  maskGame = paused;
+  if (!paused) {
+    mgba_retro_run();
+    if (gameKeyFrames > 0)
+      gameKeyFrames--;
+  } else {
+    static const int16_t silence[2 * 1024];
+    audioCallback(silence, 549);
+  }
+
+  if (!snap.valid || (companion && !wasCompanion) || (!companion && frames % 30 == 0))
+    snapshot();
+  companionWas = companion;
+  frames++;
+
+  if (companion) {
+    pd_ui_update(&ui, &snap);
+    ui.focusId = focusId;
+    host.ffOn = false;
+    host.hasState = false;
+    memset(cvs, 0, (size_t)CW * CH * sizeof *cvs);
+    pd_ui_draw(&ui, &canvas, &game, &snap, &host);
+    map_cursor_sync(&ui, &game, &snap);
+    focus_draw(&ui, focus_resolve(&ui));
+  } else {
+    draw_game();
+    bool field = (fieldFlags & PK_FIELD_KNOWN) && !(fieldFlags & (PK_FIELD_LOCKED | PK_FIELD_BATTLE));
+    hudFieldFrames = field ? hudFieldFrames + 1 : 0;
+    if (settings.hud && game.cfg && core->platform(core) == mPLATFORM_GBA && hudFieldFrames >= 20) {
+      hudState.wild = hud_wild_uncaught(&game, &snap);
+      draw_hud();
+    } else
+      hudShown = false;
+  }
+  present();
+}
