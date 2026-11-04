@@ -12,8 +12,13 @@ v0.2 SDL host (`docs/PLORPOS_V0.2.md`) and the list of intentional differences.
 - mGBA's `src/platform/libretro/libretro.c` is compiled unchanged: `pd_libretro.c` includes it with its entry points
   renamed by the preprocessor, then defines the real `retro_*` functions around them.
 - Only `retro_*` is exported (`test/check_exports.sh`); a second mGBA is resident beside the stock core.
-- Output is RGB565. The frame size is the `pokedaisy_canvas` option (`auto` = 320x240; plorpOS sets a third of the
-  panel, 341x256 on the Brick). The game sits in it at a whole scale; the companion, HUD and quick menu are drawn on it.
+- Output is RGB565. The core picks its own frame size from the panel (`pokedaisy_panel`, sent by plorpOS; `auto` = the older `pokedaisy_canvas` option alone, 320x240 by default)
+  and the aspect: the game's whole scale `s` is the largest that fits the panel, and the frame is the panel divided by
+  `s`. EXPAND (and any game without EXPAND support) uses the full scale, 4x on the Brick = 256x192; ZOOM OUT uses one
+  scale less, 3x = 341x256. ORIGINAL, the companion, the quick menu and the HUD focus use the ZOOM OUT frame, so the
+  companion and menus look the same in every aspect. A change of frame is a `SET_GEOMETRY`; diatom re-fits the picture.
+  The less the frame, the less the core draws: EXPAND at 4x costs about 8.5 ms a frame on the Brick, ZOOM OUT about 11.
+  AUTO ZOOM switches between the two as the scene changes (field = ZOOM OUT frame, elsewhere the EXPAND frame).
 - Core options: `pokedaisy_quick_button` (Y), `pokedaisy_companion_button` (X), `pokedaisy_hud_button` (R2).
 - Settings: `<save directory>/pokedaisy/settings.ini`.
 
@@ -24,8 +29,8 @@ v0.2 SDL host (`docs/PLORPOS_V0.2.md`) and the list of intentional differences.
 | No SAVE STATE, LOAD STATE, FAST-FORWARD or LEAVE GAME in the quick menu or SETTINGS | diatom owns them (`frontendOwnsPlayback`) |
 | No game menu (resume, states, quit) | the launcher's in-game menu is that |
 | The quick menu pauses the game | brief; FLY's ask runs frames while it waits for a safe moment |
-| The game is drawn at 1x of the canvas (3x on the glass), not 4x | the canvas decision |
-| ZOOM OUT looks like EXPAND at the Brick's canvas | the game is already 1x, there is no smaller whole scale; it differs only with a canvas of 2x the game or more |
+| The game is drawn at 1x of its frame, which is 4x (EXPAND) or 3x (ZOOM OUT) on the glass | the core picks the frame from the aspect |
+| ZOOM OUT is one whole scale below EXPAND (3x against 4x on the Brick), not a different map size on one canvas | what v0.2's ZOOM OUT does; the frame is what changes |
 | SCREEN, FILTER (LCD), scaling, rewind and fast-forward settings are not offered | diatom's shaders, display modes and hotkeys |
 | The HUD hotkey is a core option button (R2), not a hotkey-file entry | the launcher drops the `hud` action: diatom refuses a hotkey list that names it |
 | mGBA's Super Game Boy border is forced off | EXPAND needs the 160x144 frame (the SDL host does the same) |
@@ -51,7 +56,7 @@ preview byte-identical (80 PNGs); NC = not checked.
 | Quick menu BIKE | B3 | on and off | D |
 | Quick menu WILD ENCOUNTERS | B3 | OFF tag, notice, persisted; no battle in 96 grass steps, a battle with it on | D, with the control |
 | EXPAND, ORIGINAL on FireRed | B4 | same scene and window as v0.2 | D, Vermilion City, side by side |
-| ZOOM OUT on FireRed | B4 | equals EXPAND at this canvas (see above); the v0.2 shot was not captured | D |
+| ZOOM OUT on FireRed | B4 | 341x256 frame (3x), against EXPAND's 256x192 (4x); desktop host frames and device check pending | D, owner on the Brick |
 | AUTO ZOOM IN, Yellow and Crystal EXPAND | B4 | NC | the Yellow community save does not load as a game; follow-up bead |
 | GB look, Gen 1 DEX pages, GB GUIDE, SGB colours | `3ds/core` | NC | no valid GB save; the Yellow intro runs with the border off |
 | Place names, item descriptions, hack maps, guides, cards | `3ds/core` | place name and GUIDE HERE shown on FireRed; hacks NC | H, D |

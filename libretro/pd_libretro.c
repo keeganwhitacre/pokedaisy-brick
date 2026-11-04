@@ -13,6 +13,9 @@
 #define retro_load_game mgba_retro_load_game
 #define retro_unload_game mgba_retro_unload_game
 #define retro_unserialize mgba_retro_unserialize
+#ifdef __ARM_NEON
+#include <arm_neon.h>
+#endif
 #include "libretro.c"
 #undef retro_set_environment
 #undef retro_set_video_refresh
@@ -55,10 +58,12 @@ static const unsigned retroId[NKEYS] = {
     RETRO_DEVICE_ID_JOYPAD_L2,    RETRO_DEVICE_ID_JOYPAD_R2,   RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_L3};
 
 /* ---- the options this layer adds to mGBA's ---- */
-#define PD_OPTION_COUNT 1
+#define PD_OPTION_COUNT 2
 static const struct retro_core_option_v2_definition pdOptions[PD_OPTION_COUNT] = {
     {"pokedaisy_canvas", "Companion canvas", NULL, "The frame size the core reports: the game sits in it at a whole scale, the companion fills it. auto = 320x240.", NULL, NULL,
      {{"auto", NULL}, {"320x240", NULL}, {"341x256", NULL}, {"400x300", NULL}, {"427x240", NULL}, {NULL, NULL}}, "auto"},
+    {"pokedaisy_panel", "Panel size", NULL, "The frontend's screen. With it the core picks its own canvas: EXPAND at the game's whole scale, ZOOM OUT one scale less. auto = the canvas option alone.", NULL, NULL,
+     {{"auto", NULL}, {"640x480", NULL}, {"720x480", NULL}, {"720x720", NULL}, {"960x544", NULL}, {"1024x768", NULL}, {"1280x720", NULL}, {"1920x1080", NULL}, {NULL, NULL}}, "auto"},
 };
 
 static retro_environment_t realEnv;
@@ -111,7 +116,10 @@ static bool env_wrap(unsigned cmd, void *data) {
 /* ---- the frame: the canvas the frontend sees, and where the game and the overlays are drawn ---- */
 #define CANVAS_MAX_W 640
 #define CANVAS_MAX_H 480
-static int CW = 320, CH = 240;
+static int CW = 320, CH = 240;       // the canvas now (follows the aspect, see canvas_update)
+static int CWMAX = 320, CHMAX = 240; // the largest canvas: what the buffers hold and what the frontend is told is the maximum
+static int panelW, panelH;           // the frontend's screen, 0 = unknown (the canvas option alone then)
+static int baseGW = 240, baseGH = 160; // the game's frame before the first picture
 static uint32_t *cvs;     // the companion's canvas, 0xRRGGBB
 static uint16_t *out565;  // what the frontend gets
 static struct pd_canvas canvas;
@@ -148,6 +156,14 @@ static double pfSum[PF_N], pfMax[PF_N];
 static int pfFrames;
 #define PF_T(v) double v = pf_now()
 static int pfLate;
+/* Distributions, not averages: core time of each full frame (ms) and the wall gap between retro_run calls. */
+static int pfHist[6], pfGap[5];
+static double pfPrev;
+static void pf_hist(double ms) { pfHist[ms < 10 ? 0 : ms < 13 ? 1 : ms < 15 ? 2 : ms < 16.7 ? 3 : ms < 20 ? 4 : 5]++; }
+static void pf_gap(double now) {
+  if (pfPrev > 0) { double g = now - pfPrev; pfGap[g < 15 ? 0 : g < 18.5 ? 1 : g < 25 ? 2 : g < 40 ? 3 : 4]++; }
+  pfPrev = now;
+}
 #define PF_SKIPPED() do { double te_ = pf_now(); pf_add(PF_TOTAL, te_ - t0); pfLate++; } while (0)
 static void pf_add(int i, double ms) {
   pfSum[i] += ms;
@@ -159,6 +175,10 @@ static void pf_frame(void) {
   fprintf(stderr, "pokedaisy: prof %d frames (%d skipped), ms avg/max: mgba %.2f/%.1f  wide %.2f/%.1f  draw %.2f/%.1f  present %.2f/%.1f  total %.2f/%.1f\n", pfFrames, pfLate,
           pfSum[PF_RUN] / pfFrames, pfMax[PF_RUN], pfSum[PF_WIDE] / pfFrames, pfMax[PF_WIDE], pfSum[PF_DRAW] / pfFrames, pfMax[PF_DRAW],
           pfSum[PF_PRESENT] / pfFrames, pfMax[PF_PRESENT], pfSum[PF_TOTAL] / pfFrames, pfMax[PF_TOTAL]);
+  fprintf(stderr, "pokedaisy: prof core-ms hist <10:%d 10-13:%d 13-15:%d 15-16.7:%d 16.7-20:%d >20:%d | call-gap <15:%d 15-18.5:%d 18.5-25:%d 25-40:%d >40:%d\n", pfHist[0], pfHist[1], pfHist[2], pfHist[3], pfHist[4], pfHist[5],
+          pfGap[0], pfGap[1], pfGap[2], pfGap[3], pfGap[4]);
+  memset(pfHist, 0, sizeof pfHist);
+  memset(pfGap, 0, sizeof pfGap);
   fprintf(stderr, "pokedaisy: prof detail ms avg: wide-convert %.2f  pk_wide_view %.2f\n", pfSum[PF_CONV] / pfFrames, pfSum[PF_VIEW] / pfFrames);
   memset(pfSum, 0, sizeof pfSum);
   memset(pfMax, 0, sizeof pfMax);
@@ -167,6 +187,8 @@ static void pf_frame(void) {
 }
 #else
 #define PF_T(v) (void)0
+#define pf_hist(ms) ((void)0)
+#define pf_gap(now) ((void)0)
 #define PF_SKIPPED() (void)0
 #define pf_add(i, ms) ((void)0)
 #define pf_frame() ((void)0)
@@ -180,6 +202,7 @@ static uint32_t wideSource[240 * 160], wideFrame[PK_WIDE_MAX_VIEW_W * PK_WIDE_MA
 static uint32_t wildSwitch;
 static inline uint32_t to_xbgr(uint16_t p) {
   uint32_t r = (p >> 11) & 31, g = (p >> 5) & 63, b = p & 31;
+  g |= g >> 5;   // mGBA's 565 leaves green's low bit 0; the margins (pk_wide color(), mColorFrom555) have g5>>4 there: match them or the middle's edge shows a seam
   return 0xFF000000u | ((b << 3 | b >> 2) << 16) | ((g << 2 | g >> 4) << 8) | (r << 3 | r >> 2);
 }
 static inline uint32_t xbgr_to_rgb(uint32_t p) { return (p & 255) << 16 | (p >> 8 & 255) << 8 | (p >> 16 & 255); }
@@ -233,6 +256,21 @@ static void draw_game(void) {
  * canvas: that detour costs two passes over every pixel of the window. */
 static bool direct565;
 static inline uint16_t xbgr_to565(uint32_t p) { return (uint16_t)(((p & 0xF8) << 8) | ((p >> 5) & 0x07E0) | ((p >> 19) & 0x1F)); }
+/* n pixels of XBGR into 565, 16 at a time on NEON (R,G,B are bytes 0,1,2 of each pixel). */
+static void row_to565(uint16_t *dst, const uint32_t *src, unsigned n) {
+  unsigned x = 0;
+#ifdef __ARM_NEON
+  for (; x + 16 <= n; x += 16) {
+    uint8x16x4_t p = vld4q_u8((const uint8_t *)(src + x));
+    uint8x16x2_t o;
+    o.val[1] = vorrq_u8(vandq_u8(p.val[0], vdupq_n_u8(0xF8)), vshrq_n_u8(p.val[1], 5));
+    o.val[0] = vorrq_u8(vandq_u8(vshlq_n_u8(p.val[1], 3), vdupq_n_u8(0xE0)), vshrq_n_u8(p.val[2], 3));
+    vst2q_u8((uint8_t *)(dst + x), o);
+  }
+#endif
+  for (; x < n; x++)
+    dst[x] = xbgr_to565(src[x]);
+}
 static void draw_game_fast(void) {
   memset(out565, 0, (size_t)CW * CH * sizeof *out565);
   if (!outputBuffer || !gameW || !gameH)
@@ -249,8 +287,7 @@ static void draw_game_fast(void) {
       uint16_t *row = out565 + (size_t)cy * CW + wx;
       const uint32_t *src = wideFrame + (size_t)y * wideW;
       if (ws == 1) {
-        for (unsigned x = 0; x < wideW; x++)
-          row[x] = xbgr_to565(src[x]);
+        row_to565(row, src, wideW);
       } else {
         for (unsigned x = 0; x < wideW; x++)
           for (int j = 0; j < ws; j++)
@@ -545,13 +582,68 @@ static void wide_tick(void) {
   wideHave = wideReady;
 }
 
+/* The canvas for a fw x fh game on the panel: the panel over the game's whole scale (one less for ZOOM OUT), so the
+ * frontend shows it at exactly that integer scale. EXPAND's window is the whole canvas. */
+static void canvas_for(int fw, int fh, bool zoom, int *w, int *h) {
+  int s = panelW / fw < panelH / fh ? panelW / fw : panelH / fh;
+  if (s < 1)
+    s = 1;
+  if (zoom && s > 1)
+    s--;
+  int x = panelW / s, y = panelH / s;
+  *w = x < fw ? fw : x > CANVAS_MAX_W ? CANVAS_MAX_W : x;
+  *h = y < fh ? fh : y > CANVAS_MAX_H ? CANVAS_MAX_H : y;
+}
+
 static void choose_canvas(void) {
   const char *v = option("pokedaisy_canvas");
   int w = 320, h = 240;
   if (v && sscanf(v, "%dx%d", &w, &h) != 2)
     w = 320, h = 240;
-  CW = w < 320 ? 320 : w > CANVAS_MAX_W ? CANVAS_MAX_W : w;
-  CH = h < 240 ? 240 : h > CANVAS_MAX_H ? CANVAS_MAX_H : h;
+  CWMAX = w < 320 ? 320 : w > CANVAS_MAX_W ? CANVAS_MAX_W : w;
+  CHMAX = h < 240 ? 240 : h > CANVAS_MAX_H ? CANVAS_MAX_H : h;
+  panelW = panelH = 0;
+  v = option("pokedaisy_panel");
+  if (v && sscanf(v, "%dx%d", &panelW, &panelH) == 2 && panelW > 0 && panelH > 0) {
+    struct retro_system_av_info av;
+    mgba_retro_get_system_av_info(&av);
+    baseGW = (int)av.geometry.base_width;
+    baseGH = (int)av.geometry.base_height;
+    canvas_for(baseGW, baseGH, true, &CWMAX, &CHMAX); // ZOOM OUT's is the largest
+  } else
+    panelW = panelH = 0;
+  CW = CWMAX;
+  CH = CHMAX;
+}
+
+/* Which canvas this moment wants. With a known panel: ZOOM OUT (one scale less) while it is the chosen view, and while a
+ * menu is up (they are laid out for it); EXPAND's scale otherwise, which for a game with no EXPAND is the default. */
+static bool want_zoom_canvas(void) {
+  if (companion || quickOpen || hudFocus || settings.aspect == PD_ASPECT_ORIGINAL)
+    return true;
+  if (!wideSupported || settings.aspect != PD_ASPECT_ZOOM_OUT)
+    return false;
+  return !(settings.autoZoom && pk_wide_scene() != PK_WIDE_SCENE_FIELD);
+}
+
+/* Follow the aspect: when the wanted canvas differs, resize it and tell the frontend (it rescales to the new whole factor). */
+static void canvas_update(bool notify) {
+  if (!panelW)
+    return;
+  int w, h;
+  unsigned fw = gameW ? gameW : (unsigned)baseGW, fh = gameH ? gameH : (unsigned)baseGH;
+  canvas_for((int)fw, (int)fh, want_zoom_canvas(), &w, &h);
+  if (w == CW && h == CH)
+    return;
+  CW = w;
+  CH = h;
+  if (cvs)
+    pd_canvas_init(&canvas, CW, CH, cvs);
+  hudDrawnKey = 0;
+  if (notify && realEnv) {
+    struct retro_game_geometry g = {(unsigned)CW, (unsigned)CH, (unsigned)CWMAX, (unsigned)CHMAX, (float)CW / (float)CH};
+    realEnv(RETRO_ENVIRONMENT_SET_GEOMETRY, &g);
+  }
 }
 
 /* ---- entry points ---- */
@@ -581,8 +673,10 @@ RETRO_API void retro_get_system_info(struct retro_system_info *info) {
 }
 RETRO_API void retro_get_system_av_info(struct retro_system_av_info *info) {
   mgba_retro_get_system_av_info(info);
-  info->geometry.base_width = info->geometry.max_width = (unsigned)CW;
-  info->geometry.base_height = info->geometry.max_height = (unsigned)CH;
+  info->geometry.base_width = (unsigned)CW;
+  info->geometry.base_height = (unsigned)CH;
+  info->geometry.max_width = (unsigned)CWMAX;
+  info->geometry.max_height = (unsigned)CHMAX;
   info->geometry.aspect_ratio = (float)CW / (float)CH;
 }
 
@@ -596,8 +690,8 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
     realEnv(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK, &abc);
   }
   frameLate = false;
-  cvs = calloc((size_t)CW * CH, sizeof *cvs);
-  out565 = calloc((size_t)CW * CH, sizeof *out565);
+  cvs = calloc((size_t)CWMAX * CHMAX, sizeof *cvs);
+  out565 = calloc((size_t)CWMAX * CHMAX, sizeof *out565);
   if (!cvs || !out565)
     return false;
   pd_canvas_init(&canvas, CW, CH, cvs);
@@ -642,6 +736,7 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   quickSel = 0;
   wideSupported = pk_wide_configure(crc) != 0;
   wideReady = false;
+  canvas_update(false);
   fieldKnown = core->platform(core) == mPLATFORM_GBA && pk_field_configure(crc);
   wildSwitch = fieldKnown ? pk_wild_switch_find(rom, len) : 0;
   if (wildSwitch)
@@ -659,7 +754,7 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   flyAsk = flyStage = 0;
   job = JOB_NONE;
   quick_set_grid(settings.quickGrid);
-  ovPixels = calloc((size_t)CW * CH, sizeof *ovPixels);
+  ovPixels = calloc((size_t)CWMAX * CHMAX, sizeof *ovPixels);
   pd_ui_init(&ui, &settings);
   memset(&host, 0, sizeof host);
   host.hideScreenMode = true;
@@ -721,6 +816,9 @@ RETRO_API void retro_run(void) {
     return;
   }
   PF_T(t0);
+#ifdef PD_PROFILE
+  pf_gap(t0);
+#endif
   if (optionsDirty) {
     optionsDirty = false;
     read_options();
@@ -922,11 +1020,19 @@ RETRO_API void retro_run(void) {
     }
   }
 
+  canvas_update(true);
 #ifdef PD_NOSKIP
   frameLate = false;
 #endif
   bool late = frameLate;
   frameLate = false;
+  // Fast-forward leaves a fraction of the normal frame budget (2x: half), which EXPAND's window cannot fit: while the
+  // frontend says it is fast-forwarding, the game is drawn as in ORIGINAL (the RAM history EXPAND needs still advances).
+  bool ff = false;
+  if (realEnv) {
+    struct retro_throttle_state th = {0, 0.0f};
+    ff = realEnv(RETRO_ENVIRONMENT_GET_THROTTLE_STATE, &th) && th.mode == RETRO_THROTTLE_FAST_FORWARD;
+  }
   bool paused = companion || hudFocus || (quickOpen && !flyAsk);
   maskGame = paused;
   if (!paused) {
@@ -940,7 +1046,7 @@ RETRO_API void retro_run(void) {
       pk_rest_note(core);
     if (fieldKnown)
       fieldFlags = pk_field_state(core, settings.runIndoors, wildSwitch && settings.wildOff ? 0 : 100);
-    if (late && wideSupported && settings.aspect != PD_ASPECT_ORIGINAL) {
+    if ((late || ff) && wideSupported && settings.aspect != PD_ASPECT_ORIGINAL) {
       // Behind schedule: only the RAM history EXPAND needs (as for a fast-forwarded frame), no window, and the frame below
       // repeats the last picture whole (a stale margin around a live middle showed as a seam).
       pk_wide_skip(core, wideSource);
@@ -1052,7 +1158,7 @@ RETRO_API void retro_run(void) {
   }
 
 
-  if (late && !paused && !companion && !quickOpen && haveFrame && !wideHave) {
+  if (late && !ff && !paused && !companion && !quickOpen && haveFrame && !wideHave) {
     realVideo(NULL, (unsigned)CW, (unsigned)CH, (size_t)CW * 2); // the same picture again: nothing drawn
     PF_SKIPPED();
     pf_frame();
@@ -1111,5 +1217,8 @@ RETRO_API void retro_run(void) {
   PF_T(td2);
   pf_add(PF_PRESENT, td2 - td1);
   pf_add(PF_TOTAL, td2 - t0);
+#ifdef PD_PROFILE
+  pf_hist(td2 - t0);
+#endif
   pf_frame();
 }

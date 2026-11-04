@@ -956,6 +956,22 @@ static int windowLayers(int x, int y) {
     return io(0x4A) & 0x3F;   // outside them (an OBJ window would need the sprites: not the field's)
 }
 
+/** True when windowLayers(x, y) is the same for every x in sx .. sx+n-1: it only changes where a window starts or ends
+ * (its left / right edge), and answers the edge column's for x outside the frame. */
+static bool windowsUniform(int sx, int n) {
+    uint16_t disp = io(0);
+    if (!(disp & 0xE000)) return true;
+    int xa = sx < 0 ? 0 : sx >= PK_WIDE_W ? PK_WIDE_W - 1 : sx;
+    int e = sx + n - 1;
+    int xb = e < 0 ? 0 : e >= PK_WIDE_W ? PK_WIDE_W - 1 : e;
+    for (int w = 0; w < 2; w++) {
+        if (!(disp & (0x2000 << w))) continue;
+        int l = io(0x40 + 2 * w) >> 8, r = io(0x40 + 2 * w) & 0xFF;
+        if ((xa < l && l <= xb) || (xa < r && r <= xb)) return false;
+    }
+    return true;
+}
+
 /** The field's BG setup: mode 0, BG1-3 on and 256x256. Windows (Flash's dark circle, battle
  * transitions' wedges) and per-line scroll are drawn as the game sets them, line by line. */
 static bool fieldDisplay(void) {
@@ -1457,10 +1473,12 @@ static double pwNow(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t
 static double pwSum[8]; static int pwN; static long pwFast, pwSlow, pwWhy[4];
 #define PW_MARK(v) double v = pwNow()
 #define PW_ADD(i, a, b) (pwSum[i] += (b) - (a))
+#define PW_COUNT(x) ((x)++)
 #define PW_REPORT() do { if (++pwN >= 300) { fprintf(stderr, "pk_wide: ms avg: camera %.2f  pieces %.2f  drawRegion %.2f  compose %.2f | rows fast %ld slow %ld (windows %ld, nobg %ld, bright %ld, tint %ld) | in drawRegion: foreign %.2f  bgloop %.2f  sprites %.2f  ghosts %.2f\n", pwSum[0] / pwN, pwSum[1] / pwN, pwSum[2] / pwN, pwSum[3] / pwN, pwFast, pwSlow, pwWhy[0], pwWhy[1], pwWhy[2], pwWhy[3], pwSum[4] / pwN, pwSum[5] / pwN, pwSum[6] / pwN, pwSum[7] / pwN); for (int q = 0; q < 8; q++) pwSum[q] = 0; pwN = 0; } } while (0)
 #else
 #define PW_MARK(v) (void)0
 #define PW_ADD(i, a, b) (void)0
+#define PW_COUNT(x) (void)0
 #define PW_REPORT() (void)0
 #endif
 
@@ -1483,6 +1501,7 @@ static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref,
         // The common row (no brightness fade, the frame's own pixels skipped): each map tile's row at once - where the
         // windows give every pixel of it the same layers; a run they cut through goes pixel by pixel as below.
         if (skipFrame && ((disp >> 8) & 0x0E) && ((io(0x50) >> 6) & 3) < 2 && !tintShown) {
+            PW_COUNT(pwFast);
             for (int x = 0; x < w;) {
                 int sx = x0 + x;
                 if (onFrame(sx, y)) {
@@ -1500,8 +1519,19 @@ static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref,
                 if (y >= 0 && y < PK_WIDE_H && sx < 0 && n > -sx) n = -sx;   // the frame starts at sx = 0
                 int wl0 = windowLayers(sx, y), enabled = (disp >> 8) & wl0 & 0x0E;
                 bool uniform = enabled != 0;
-                for (int k = 1; uniform && k < n; k++)
-                    if (((disp >> 8) & windowLayers(sx + k, y) & 0x0E) != enabled) uniform = false;
+#ifdef PK_WIDE_CHECK
+                bool slowU = enabled != 0;
+                for (int k = 1; slowU && k < n; k++)
+                    if (((disp >> 8) & windowLayers(sx + k, y) & 0x0E) != enabled) slowU = false;
+#endif
+                // The layers differ along the run only where a window's edge falls in it.
+                if (uniform && !windowsUniform(sx, n)) {
+                    for (int k = 1; uniform && k < n; k++)
+                        if (((disp >> 8) & windowLayers(sx + k, y) & 0x0E) != enabled) uniform = false;
+                }
+#ifdef PK_WIDE_CHECK
+                if (uniform != slowU) { fprintf(stderr, "windowsUniform MISMATCH sx=%d n=%d y=%d\n", sx, n, y); abort(); }
+#endif
                 if (uniform) {
                     uint16_t col[8];
                     uint8_t pr[8], ly[8];
@@ -1534,6 +1564,8 @@ static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref,
             continue;
         }
 #endif
+        PW_COUNT(pwSlow);
+        PW_COUNT(pwWhy[!skipFrame ? 0 : !((disp >> 8) & 0x0E) ? 1 : ((io(0x50) >> 6) & 3) >= 2 ? 2 : 3]);
         for (int x = 0; x < w; x++) {
             int sx = x0 + x;
             if (skipFrame && onFrame(sx, y)) {
@@ -2984,17 +3016,45 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
                 i += n - 1;
                 continue;
             }
-            int rx = X - rawView.x, m = mix;
-            uint32_t scene = 0;
-            if (rawRow && rx >= 0 && rx < rawView.w) {
-                // A hole goes on with the frame's nearest edge pixel as the game shows it now (so it follows fades).
-                scene = rawHole[ry][rx] ? frame[clampi(Y, 0, PK_WIDE_H - 1) * PK_WIDE_W + clampi(X, 0, PK_WIDE_W - 1)]
-                                        : raw[ry][rx];
-            } else {
-                m = 0;   // the window moved off what was last drawn: the glow
+            // A run of pixels outside the frame (a whole row above/below it, or the left run before it, or the right run).
+            int n = (Y < 0 || Y >= PK_WIDE_H || X >= PK_WIDE_W) ? v.w - i : (-X < v.w - i ? -X : v.w - i);
+            // Where the last drawn window is settled (no glow mixed in) and nothing dims it, a run inside `raw` is its row
+            // copied, the holes patched after: the same pixels the per-pixel path below gives, without its branches.
+            int fa = -1, fb = -1;
+            if (mix >= 256 && !overlayDim && rawRow) {
+                fa = rawView.x - X < 0 ? 0 : rawView.x - X;
+                fb = rawView.x + rawView.w - X > n ? n : rawView.x + rawView.w - X;
+                if (fa >= fb) fa = fb = -1;
             }
-            uint32_t o = m >= 256 ? scene : lerp(glowAt(frame, X, Y, reach, alpha), scene, m);
-            row[i] = overlayDim ? dimmed(o, overlayDim) : o;
+            for (int k = 0; k < n;) {
+                if (k == fa) {
+                    int rx0 = X + k - rawView.x, cnt = fb - fa;
+                    memcpy(row + i + k, &raw[ry][rx0], (size_t) cnt * sizeof(uint32_t));
+                    const uint8_t* hole = &rawHole[ry][rx0];
+                    for (int q = 0; q < cnt; q++) {
+                        if (hole[q]) {
+                            int XX = X + k + q;
+                            row[i + k + q] = frame[clampi(Y, 0, PK_WIDE_H - 1) * PK_WIDE_W + clampi(XX, 0, PK_WIDE_W - 1)];
+                        }
+                    }
+                    k = fb;
+                    continue;
+                }
+                int XX = X + k;
+                int rx = XX - rawView.x, m = mix;
+                uint32_t scene = 0;
+                if (rawRow && rx >= 0 && rx < rawView.w) {
+                    // A hole goes on with the frame's nearest edge pixel as the game shows it now (so it follows fades).
+                    scene = rawHole[ry][rx] ? frame[clampi(Y, 0, PK_WIDE_H - 1) * PK_WIDE_W + clampi(XX, 0, PK_WIDE_W - 1)]
+                                            : raw[ry][rx];
+                } else {
+                    m = 0;   // the window moved off what was last drawn: the glow
+                }
+                uint32_t o = m >= 256 ? scene : lerp(glowAt(frame, XX, Y, reach, alpha), scene, m);
+                row[i + k] = overlayDim ? dimmed(o, overlayDim) : o;
+                k++;
+            }
+            i += n - 1;
         }
     }
     PW_MARK(pw5);
