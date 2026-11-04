@@ -497,6 +497,23 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   } else
     snprintf(settingsPath, sizeof settingsPath, "pokedaisy-settings.ini");
   pd_settings_load(&settings, settingsPath);
+  // A resident frontend loads the core again in the same process: nothing of the last game may survive.
+  memset(&snap, 0, sizeof snap);
+  memset(&hudState, 0, sizeof hudState);
+  hudState.wild = hudState.focus = -1;
+  memset(&hudHits, 0, sizeof hudHits);
+  hudDrawnKey = 0;
+  hudW = hudH = 0;
+  hudShown = hudFocus = false;
+  hudFieldFrames = 0;
+  messageFrames = 0;
+  frames = 0;
+  gameKeys = 0;
+  gameKeyFrames = 0;
+  prevHeld = held = pressedKeys = 0;
+  memset(heldFrames, 0, sizeof heldFrames);
+  gameW = gameH = 0;
+  quickSel = 0;
   wideSupported = pk_wide_configure(crc) != 0;
   wideReady = false;
   fieldKnown = core->platform(core) == mPLATFORM_GBA && pk_field_configure(crc);

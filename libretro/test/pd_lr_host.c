@@ -1,5 +1,5 @@
 /* A bare libretro frontend for testing pokedaisy_libretro on the desktop: scripted buttons, option values, frame dumps.
- *   pd_lr_host CORE ROM SAVEDIR [-o key=value]... [-p FRAME:BUTTON[:HOLD]]... [-d FRAME:FILE.ppm]... [-n FRAMES] [-r FILE.ram]
+ *   pd_lr_host CORE ROM SAVEDIR [-o key=value]... [-p FRAME:BUTTON[:HOLD]]... [-d FRAME:FILE.ppm]... [-n FRAMES] [-R FRAME: unload and load again after it]
  * BUTTON: a b select start right left up down r l x y l2 r2 l3. -r: write the frontend's view of the last frame size. */
 #define _GNU_SOURCE
 #include "libretro.h"
@@ -68,7 +68,7 @@ static void write_ppm(const char *f) {
 int main(int argc, char **argv) {
   if (argc < 4) return 2;
   saveDir = argv[3];
-  int frames = 300;
+  int frames = 300, reload = 0;
   for (int i = 4; i + 1 < argc; i += 2) {
     if (!strcmp(argv[i], "-o")) { char *e = strchr(argv[i + 1], '='); *e = 0; opts[nopts].k = argv[i + 1]; opts[nopts++].v = e + 1; }
     else if (!strcmp(argv[i], "-p")) {
@@ -80,6 +80,7 @@ int main(int argc, char **argv) {
       presses[npress].frame = f; presses[npress].button = k; presses[npress++].hold = h;
     } else if (!strcmp(argv[i], "-d")) { char *c = strchr(argv[i + 1], ':'); *c = 0; dumps[ndump].frame = atoi(argv[i + 1]); dumps[ndump++].file = c + 1; }
     else if (!strcmp(argv[i], "-n")) frames = atoi(argv[i + 1]);
+    else if (!strcmp(argv[i], "-R")) reload = atoi(argv[i + 1]);
   }
   void *so = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
   if (!so) { fprintf(stderr, "%s\n", dlerror()); return 1; }
@@ -104,6 +105,10 @@ int main(int argc, char **argv) {
   for (frame = 0; frame < frames; frame++) {
     retro_run_();
     for (int i = 0; i < ndump; i++) if (dumps[i].frame == frame) write_ppm(dumps[i].file);
+    if (reload && frame == reload) { // unload and load the same game again in this process, as the resident frontend does
+      retro_unload_game_();
+      if (!retro_load_game_(&gi)) { fprintf(stderr, "reload failed\n"); return 1; }
+    }
   }
   retro_unload_game_(); retro_deinit_();
   return 0;
