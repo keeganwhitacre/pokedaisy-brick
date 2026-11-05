@@ -28,6 +28,7 @@ v0.2 SDL host (`docs/PLORPOS_V0.2.md`) and the list of intentional differences.
 - The companion's D-pad cursor in a list (BAG, DEX, GUIDE, SETTINGS, PLACES) moves one row a press. A row cut by the
   list's edge scrolls wholly into view when the cursor lands on it, and past the last row shown the list scrolls one row
   and the cursor goes onto the new row. The cursor leaves the list (for the tab bar) only once the list is at its end.
+- Game Boy games' BAG: the closed pocket tabs are ink chips with white text (the open one is black on white).
 - Settings: `<save directory>/pokedaisy/settings.ini`.
 
 ## Intentional differences from v0.2
@@ -55,14 +56,14 @@ preview byte-identical (80 PNGs); NC = not checked.
 | Companion tabs PARTY, BAG, MAP, GUIDE, SETTINGS | `pd_ui_draw` | same on FireRed | H: each tab shown with the owner's team, bag, map and GUIDE > HERE; D: PARTY through the launcher |
 | DEX, CARD on retail FireRed | `3ds/core` | "NO POKéDEX YET" on this rev 0 cartridge, as v0.2 documents | H |
 | The same tabs on Emerald, Emerald Legacy, Unbound, Crystal, Blue | `pd_ui_draw` | PARTY, BAG, MAP, GUIDE draw with each save's own team and bag, in ORIGINAL, EXPAND and ZOOM OUT (Crystal and Blue: "NO MAP", as the ROM has no region map art; Unbound GUIDE says its guide is not checked in-game yet). Polished Crystal NC (no save). Not compared frame by frame with v0.2 | H: the owner's saves from the Brick card, 1024x768 panel |
-| Summary, STATS, INFO, shiny marks, icons | `3ds/core` | NC in the core | P |
+| Summary, STATS, INFO, shiny marks, icons | `3ds/core` | NC in the core; INFO and STATS also on 240-row frames (720x480 panels, the 3DS), with the name and HP lines packed closer there; STATS has one line per stat and HIDDEN POWER on one line | P; desktop host 720x480, 1024x768, 1600x1440 (Emerald Legacy) |
 | HUD parts | B2 | same as v0.2 (balls, BAG, MAP, COMPANION; PC after B3) | D: G2, core and v0.2 side by side |
 | HUD hotkey cursor | B2 | opens on R2 and on L2 (the setting row); it did nothing on GBA until the launcher stopped clearing L2/R2 for this core | D, owner on the Brick |
 | Quick menu PC | B3 | works | D |
 | Quick menu FLY | B3 | list of visited towns, flight to Pallet Town; indoors "You can't FLY from here." | D |
 | Quick menu REPEL | B3 | dimmed "No REPEL in your bag"; use NC (the save has none) | D |
 | Quick menu BIKE | B3 | on and off | D |
-| Quick menu WILD ENCOUNTERS | B3 | OFF tag, notice, persisted; no battle in 96 grass steps, a battle with it on | D, with the control |
+| Quick menu WILD ENCOUNTERS | B3 | OFF tag, notice, persisted; no battle in 96 grass steps, a battle with it on. Not shown for a game without the switch (Crystal) | D, with the control |
 | EXPAND, ORIGINAL on FireRed | B4 | same scene and window as v0.2 | D, Vermilion City, side by side |
 | ZOOM OUT on FireRed | B4 | 341x256 frame (3x), against EXPAND's 256x192 (4x); the owner checked it on the Brick ("looks good") | H, D |
 | EXPAND, ZOOM OUT on Crystal | B4 | the overworld widens past the game's edges (canvas 204x153 in EXPAND, 256x192 in ZOOM OUT, its menus 341x256); the border drew in the wrong colours until the 16-bit palette was converted (rebuilt window 360 of 360 cells differed from the frame before, 0 after); the Crystal clock prompt appears because the desktop host has no RTC | H, D (border colours, owner) |

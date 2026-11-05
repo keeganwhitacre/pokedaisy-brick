@@ -941,7 +941,8 @@ RETRO_API void retro_run(void) {
     quick[quickN++] = (struct quick_item){QUICK_BIKE, false, false, bike ? NULL : "No bike in your bag", 0, bike ? bike : 360,
                                           riding ? "GET OFF" : NULL};
   }
-  quick[quickN++] = (struct quick_item){QUICK_WILD, settings.wildOff, false, wildSwitch ? NULL : "Not in this game", 0, 0, NULL};
+  if (wildSwitch) // a game with no wild-encounter switch has no WILD entry
+    quick[quickN++] = (struct quick_item){QUICK_WILD, settings.wildOff, false, NULL, 0, 0, NULL};
   if (host.hasHud && settings.hud)
     quick[quickN++] = (struct quick_item){QUICK_HUD, false, false, hudShown && hudHits.n ? NULL : "No HUD on screen", 0, 0, NULL};
   quick[quickN++] = (struct quick_item){QUICK_COMPANION, false, false, NULL, 0, 0, NULL};
