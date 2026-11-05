@@ -48,7 +48,9 @@ const PkNdsFieldGame* game;
 DsCompanion snapshot;
 DsMapArt map;
 std::vector<std::vector<uint32_t>> icons;
-bool supported=false, companion=false;
+bool supported=false, companion=false, quickOpen=false;
+int quickSelected=0;
+uint32_t quick_pixels[341*256];
 DsCompanionUi shell;
 unsigned held_frames[16]={};
 bool select_used=false, select_pulse=false;
@@ -63,7 +65,7 @@ uint32_t read32(uint32_t a) {
   return nds->bus.dma_read32(ds::Cpu::ARM9,a);
 }
 void clear() {
-  supported=companion=select_used=select_pulse=false; game=nullptr; snapshot={};map={};icons.clear();
+  supported=companion=quickOpen=select_used=select_pulse=false;quickSelected=0; game=nullptr; snapshot={};map={};icons.clear();
   old_buttons=buttons=tick=0;std::fill(held_frames,held_frames+16,0);
   screen_override=0;cursor_x=128;cursor_y=96;layout=0;
 }
@@ -126,6 +128,34 @@ void draw_companion() {
   for(unsigned i=0;i<341*256;++i)pixels[i]=rgb565(ui_pixels[i]);
   video(pixels,width,height,width*2);
 }
+void draw_quick() {
+  pd_canvas c;pd_canvas_init(&c,341,256,quick_pixels);
+  pd_game presentation{};
+  const quick_item items[]={
+    {QUICK_COMPANION,false,false,nullptr,0,0,"PARTY"},
+    {QUICK_COMPANION,false,false,nullptr,0,0,"BAG"},
+    {QUICK_COMPANION,false,false,nullptr,0,0,"MAP"},
+    {QUICK_COMPANION,false,false,nullptr,0,0,"DEX"},
+    {QUICK_COMPANION,false,false,nullptr,0,0,"SETTINGS"},
+    {QUICK_PC,false,shell.settings.hud,nullptr,0,0,"HUD"}};
+  quick_draw(&c,&presentation,items,6,quickSelected,-1,shell.settings.quickGrid);
+  quick_finish(&c);
+  const uint32_t* src=nds->gpu.framebuffer(layout==1?1:0);
+  geometry(341,256);
+  for(unsigned y=0;y<256;++y)for(unsigned x=0;x<341;++x){
+    uint32_t base=x>=42 && x<298 && y>=32 && y<224?src[(y-32)*256+x-42]&0xffffff:0;
+    base=(base&0xfefefe)>>1;
+    uint32_t p=quick_pixels[y*341+x];
+    if(p!=QUICK_CLEAR){unsigned a=p>>24;
+      unsigned r=(((p>>16)&255)*a+((base>>16)&255)*(255-a))/255;
+      unsigned g=(((p>>8)&255)*a+((base>>8)&255)*(255-a))/255;
+      unsigned b=((p&255)*a+(base&255)*(255-a))/255;
+      base=(r<<16)|(g<<8)|b;
+    }
+    pixels[y*341+x]=rgb565(base);
+  }
+  video(pixels,341,256,341*2);
+}
 void present(const void* data,unsigned,unsigned,size_t) {
   if(companion){draw_companion();return;}
   // Refresh composition even when DSperate skipped rasterization: switching
@@ -181,7 +211,7 @@ void present(const void* data,unsigned,unsigned,size_t) {
 int16_t filtered_input(unsigned p,unsigned d,unsigned i,unsigned id) {
   if(d==RETRO_DEVICE_JOYPAD) {
     if(id==RETRO_DEVICE_ID_JOYPAD_SELECT && select_pulse)return 1;
-    if(companion || (buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)))return 0;
+    if(companion || quickOpen || (buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)))return 0;
     if(id==shell.companion_id() || int(id)==shell.screen_id())return 0;
   }
   // DSperate expects a pointer over stacked screens. Reproject the current
@@ -212,9 +242,27 @@ void controls() {
   unsigned edge=buttons&~old_buttons;old_buttons=buttons;
   for(unsigned id=RETRO_DEVICE_ID_JOYPAD_UP;id<=RETRO_DEVICE_ID_JOYPAD_RIGHT;++id){
     held_frames[id]=(buttons&(1u<<id))?held_frames[id]+1:0;
-    if(companion && held_frames[id]>15 && (held_frames[id]-15)%5==0)edge|=1u<<id;
+    if((companion || quickOpen) && held_frames[id]>15 && (held_frames[id]-15)%5==0)edge|=1u<<id;
   }
   auto hit=[&](unsigned id){return !!(edge&(1u<<id));};
+  if(hit(shell.companion_id()) && (buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)) && !companion){
+    quickOpen=!quickOpen;select_used=true;quickSelected=0;return;
+  }
+  if(quickOpen){
+    if(hit(RETRO_DEVICE_ID_JOYPAD_B) || hit(shell.companion_id())){quickOpen=false;return;}
+    int dx=hit(RETRO_DEVICE_ID_JOYPAD_RIGHT)-hit(RETRO_DEVICE_ID_JOYPAD_LEFT);
+    int dy=hit(RETRO_DEVICE_ID_JOYPAD_DOWN)-hit(RETRO_DEVICE_ID_JOYPAD_UP);
+    if(dx || dy)quickSelected=quick_step_layout(6,quickSelected,dx,dy,341,256,shell.settings.quickGrid);
+    if(hit(RETRO_DEVICE_ID_JOYPAD_A)){
+      if(quickSelected==5){shell.settings.hud=!shell.settings.hud;shell.save();}
+      else{
+        static const pd_tab tabs[]={PD_TAB_PARTY,PD_TAB_BAG,PD_TAB_MAP,PD_TAB_DEX,PD_TAB_SETTINGS};
+        refresh();shell.frame.tab=tabs[quickSelected];shell.picker=-1;companion=true;
+      }
+      quickOpen=false;
+    }
+    return;
+  }
   if(hit(shell.companion_id())) {
     companion=!companion;
     if(companion){refresh();shell.mapX=snapshot.mapX;shell.mapY=snapshot.mapY;}
@@ -261,7 +309,7 @@ RETRO_API void retro_set_environment(retro_environment_t cb){pd_ds::environment=
   cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,const_cast<retro_input_descriptor*>(d));}
 RETRO_API void retro_set_video_refresh(retro_video_refresh_t cb){pd_ds::video=cb;ds_set_video_refresh(pd_ds::present);}
 RETRO_API void retro_set_input_state(retro_input_state_t cb){pd_ds::input=cb;ds_set_input_state(pd_ds::filtered_input);}
-RETRO_API void retro_get_system_info(retro_system_info* info){ds_get_system_info(info);info->library_name="PokeDaisy DS";info->library_version="0.2-companion-settings";}
+RETRO_API void retro_get_system_info(retro_system_info* info){ds_get_system_info(info);info->library_name="PokeDaisy DS";info->library_version="0.3-unified-quick-menu";}
 RETRO_API void retro_get_system_av_info(retro_system_av_info* info){
   ds_get_system_av_info(info);info->geometry={256,192,512,384,4.f/3.f};
 }
@@ -287,19 +335,19 @@ RETRO_API bool retro_load_game(const retro_game_info* info){
   return true;
 }
 RETRO_API void retro_reset(){
-  ds_reset();pd_ds::companion=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;
+  ds_reset();pd_ds::companion=pd_ds::quickOpen=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;
 }
 RETRO_API bool retro_unserialize(const void* data,size_t n){
   bool ok=ds_unserialize(data,n);
-  if(ok){pd_ds::companion=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;}
+  if(ok){pd_ds::companion=pd_ds::quickOpen=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;}
   return ok;
 }
 RETRO_API void retro_unload_game(){ds_unload_game();pd_ds::clear();}
 RETRO_API void retro_run(){
   if(!nds)return;
   input_poll_cb();pd_ds::controls();
-  if(pd_ds::companion){
-    pd_ds::draw_companion();
+  if(pd_ds::companion || pd_ds::quickOpen){
+    if(pd_ds::quickOpen)pd_ds::draw_quick();else pd_ds::draw_companion();
     static const int16_t silence[548*2]={};audio_batch_cb(silence,547);
   }else {ds_run();++pd_ds::tick;}
 }

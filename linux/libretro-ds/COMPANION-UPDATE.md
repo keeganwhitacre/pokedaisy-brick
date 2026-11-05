@@ -65,3 +65,8 @@ the accompanying validation files. Emulator serialization and battery-save
 formats are unchanged; no separate save writer was added. New actual-Brick
 checks: open the gear, change/reopen a preference, test a picker cancel, confirm
 L2/R2 defaults still work, then test a native state/quick resume.
+
+
+The unified integration branch adds Select + companion-button quick menu,
+Ring/Grid selection, and an independent pokedaisy-ds settings namespace. See
+../libretro-unified/README.md for migration and current feature boundaries.

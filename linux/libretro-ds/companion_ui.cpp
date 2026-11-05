@@ -22,7 +22,7 @@ const char* const buttonNames[]={"L2","R2","X","Y","NONE"};
 const unsigned buttonIds[]={RETRO_DEVICE_ID_JOYPAD_L2,RETRO_DEVICE_ID_JOYPAD_R2,RETRO_DEVICE_ID_JOYPAD_X,RETRO_DEVICE_ID_JOYPAD_Y};
 const char* const speedNames[]={"SLOW","NORMAL","FAST"};
 const char* const resetNames[]={"CANCEL","RESET"};
-const char* const labels[]={"DS LAYOUT","AUTO BATTLES","PARTY HUD","COMPANION BUTTON","SCREEN BUTTON","STYLUS SPEED","RESET SETTINGS"};
+const char* const labels[]={"DS LAYOUT","AUTO BATTLES","PARTY HUD","COMPANION BUTTON","SCREEN BUTTON","STYLUS SPEED","QUICK MENU","RESET SETTINGS"};
 const char* const* choices(int row){
   return row==DsCompanionUi::Layout?layoutNames:row==DsCompanionUi::PenSpeed?speedNames:
     row==DsCompanionUi::Reset?resetNames:buttonNames;
@@ -38,14 +38,21 @@ void DsCompanionUi::defaults(){
 void DsCompanionUi::init(const std::string& directory,int legacyLayout,bool legacyHud){
   *this=DsCompanionUi{};defaults();layout=std::clamp(legacyLayout,0,4);settings.hud=legacyHud;
   if(!directory.empty()){
-    const std::string sub=directory+"/pokedaisy";
+    const std::string sub=directory+"/pokedaisy-ds";
     if(mkdir(sub.c_str(),0755)==0 || errno==EEXIST)path=sub+"/settings.ini";
   }
   bool loaded=false;
   if(!path.empty()){
-    loaded=pd_settings_load(&settings,path.c_str());
+    std::string loadPath=path;
+    // Only migrate a DS-authored legacy file; never import the GB/GBA settings.
+    if(access(path.c_str(),F_OK)!=0){
+      const std::string legacy=directory+"/pokedaisy/settings.ini";
+      std::ifstream old(legacy);std::string line;
+      while(std::getline(old,line))if(line.rfind("ds_layout=",0)==0){loadPath=legacy;break;}
+    }
+    loaded=pd_settings_load(&settings,loadPath.c_str());
     if(!loaded){defaults();layout=std::clamp(legacyLayout,0,4);settings.hud=legacyHud;}
-    std::ifstream file(path);std::string line;
+    std::ifstream file(loadPath);std::string line;
     while(std::getline(file,line)){
       auto at=line.find('=');if(at==std::string::npos)continue;
       auto key=line.substr(0,at),text=line.substr(at+1);char* end=nullptr;
@@ -83,7 +90,7 @@ int DsCompanionUi::screen_id()const{return screenButton<4?int(buttonIds[screenBu
 int DsCompanionUi::pen_step()const{return penSpeed==0?1:penSpeed==1?3:6;}
 int DsCompanionUi::value(int row)const{
   return row==Layout?layout:row==Battles?autoBattles:row==Hud?settings.hud:
-    row==CompanionButton?companionButton:row==ScreenButton?screenButton:row==PenSpeed?penSpeed:0;
+    row==CompanionButton?companionButton:row==ScreenButton?screenButton:row==PenSpeed?penSpeed:row==QuickStyle?settings.quickGrid:0;
 }
 void DsCompanionUi::apply(int row,int v){
   if(row==Layout){layout=v;++displayRevision;}
@@ -92,6 +99,7 @@ void DsCompanionUi::apply(int row,int v){
   else if(row==CompanionButton){if(screenButton==v)screenButton=companionButton;companionButton=v;}
   else if(row==ScreenButton){if(companionButton==v){error="Button already opens companion";return;}screenButton=v;}
   else if(row==PenSpeed)penSpeed=v;
+  else if(row==QuickStyle)settings.quickGrid=v;
   else if(row==Reset && v){defaults();++displayRevision;frame.settings=&settings;options.settings=&settings;}
   save();
 }
@@ -99,12 +107,12 @@ void DsCompanionUi::draw_settings(pd_canvas* c){
   const auto& s=*snapshot;
   const std::string money=s.valid?std::to_string(s.money):"-";
   const char* values[]={layoutNames[layout],autoBattles?"ON":"OFF",settings.hud?"ON":"OFF",
-    buttonNames[companionButton],buttonNames[screenButton],speedNames[penSpeed],"..."};
-  pd_option_row rows[12]={{"TRAINER",s.valid?s.trainer.c_str():"-"},{"PLACE",s.valid?ds_place(s.map):"-"},{"MONEY",money.c_str()}};
+    buttonNames[companionButton],buttonNames[screenButton],speedNames[penSpeed],settings.quickGrid?"GRID":"RING","..."};
+  pd_option_row rows[13]={{"TRAINER",s.valid?s.trainer.c_str():"-"},{"PLACE",s.valid?ds_place(s.map):"-"},{"MONEY",money.c_str()}};
   for(int i=0;i<Rows;i++)rows[3+i]={labels[i],values[i]};
-  rows[10]={"STATES / SPEED","NXRedux MENU"};
-  rows[11]={"RESUME / SHADERS","NXRedux MENU"};
-  pd_option_source source{"SETTINGS",rows,12};
+  rows[11]={"STATES / SPEED","NXRedux MENU"};
+  rows[12]={"RESUME / SHADERS","NXRedux MENU"};
+  pd_option_source source{"SETTINGS",rows,13};
   options.optionSource=&source;options.optionSelected=3+setting;
   pd_game game{};pd_snapshot state{};
   pd_ui_options_view(&options,c,&game,&state);options.optionSource=nullptr;
@@ -147,7 +155,7 @@ bool DsCompanionUi::control(unsigned pressed){
     setting=std::clamp(setting+dy,0,int(Rows)-1);
     if(hit(RETRO_DEVICE_ID_JOYPAD_B)){frame.tab=PD_TAB_PARTY;return false;}
     if(hit(RETRO_DEVICE_ID_JOYPAD_A)){
-      error.clear();if(setting==Battles || setting==Hud)apply(setting,!value(setting));
+      error.clear();if(setting==Battles || setting==Hud || setting==QuickStyle)apply(setting,!value(setting));
       else{picker=setting;choice=value(setting);}
     }return false;
   }

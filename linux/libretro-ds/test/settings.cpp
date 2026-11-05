@@ -49,11 +49,22 @@ int main(int argc,char** argv){
   DsCompanionUi reloaded;reloaded.init(path);
   assert(reloaded.layout==3 && !reloaded.autoBattles && reloaded.settings.hud && reloaded.companion_id()==RETRO_DEVICE_ID_JOYPAD_X && reloaded.screen_id()==-1 && reloaded.pen_step()==6);
   // A cancelled reset leaves the file and current values alone.
+  press(ui,RETRO_DEVICE_ID_JOYPAD_DOWN);press(ui,RETRO_DEVICE_ID_JOYPAD_A);assert(ui.settings.quickGrid);
   press(ui,RETRO_DEVICE_ID_JOYPAD_DOWN);press(ui,RETRO_DEVICE_ID_JOYPAD_A);assert(ui.choice==0);press(ui,RETRO_DEVICE_ID_JOYPAD_A);assert(ui.layout==3);
   press(ui,RETRO_DEVICE_ID_JOYPAD_A);press(ui,RETRO_DEVICE_ID_JOYPAD_DOWN);press(ui,RETRO_DEVICE_ID_JOYPAD_A);
   assert(ui.layout==0 && ui.autoBattles && !ui.settings.hud && ui.companion_id()==RETRO_DEVICE_ID_JOYPAD_L2);
   reloaded.init(path);assert(reloaded.layout==0 && !reloaded.settings.hud);
+  // Keep the two engines' preferences independent in a common frontend save directory.
+  std::filesystem::create_directory(std::string(path)+"/pokedaisy");
+  {std::ofstream gb(std::string(path)+"/pokedaisy/settings.ini");gb<<"hud=1\naspect=2\n";}
+  DsCompanionUi separate;separate.init(path);assert(!separate.settings.hud);
+  std::filesystem::remove(ui.path);
+  separate.init(path);assert(!separate.settings.hud); // GBA file is not a DS migration source
+  {std::ofstream legacy(std::string(path)+"/pokedaisy/settings.ini");legacy<<"hud=1\nds_layout=4\n";}
+  separate.init(path);assert(separate.settings.hud && separate.layout==4);
+  assert(separate.save()); // DS-authored legacy settings migrate without modifying the source
   // Hostile/old preference values never index a label/button array out of bounds.
+  ui.save();
   {std::ofstream file(ui.path,std::ios::app);file<<"ds_layout=999\nds_companionbtn=-1\nds_penspeed=oops\n";}
   reloaded.init(path);assert(reloaded.layout==0 && reloaded.companion_id()==RETRO_DEVICE_ID_JOYPAD_L2);
   reloaded.init("/missing/pdds-parent");assert(!reloaded.save() && !reloaded.error.empty());

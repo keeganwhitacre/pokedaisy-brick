@@ -20,6 +20,7 @@ set(APP ${ROOT}/app/src/main/cpp/nds)
 file(GLOB PD_CORE CONFIGURE_DEPENDS ${ROOT}/3ds/core/*.c)
 add_library(pokedaisy_ds_libretro SHARED pd_ds_libretro.cpp companion_ui.cpp ${PD_CORE}
   ${ROOT}/linux/hud.c
+  ${ROOT}/linux/quick_menu.c
   ${ROOT}/linux/dsperate/companion.cpp
   ${ROOT}/linux/dsperate/party_view.cpp
   ${ROOT}/linux/dsperate/bag_view.cpp
@@ -27,6 +28,7 @@ add_library(pokedaisy_ds_libretro SHARED pd_ds_libretro.cpp companion_ui.cpp ${P
   ${ROOT}/linux/dsperate/map_art.cpp
   ${ROOT}/linux/dsperate/map_view.cpp
   ${APP}/pk_nds_field.cpp)
+set_source_files_properties(${ROOT}/linux/quick_menu.c PROPERTIES COMPILE_DEFINITIONS PD_QUICK_NO_POLISHED)
 set_target_properties(pokedaisy_ds_libretro PROPERTIES PREFIX "")
 target_include_directories(pokedaisy_ds_libretro PRIVATE ${LR}/include ${LR} ${DS}/src
   ${ROOT}/3ds/core ${ROOT}/linux/dsperate ${APP})

@@ -36,7 +36,7 @@ or a state is loaded/reset. All four DS face buttons remain available.
 Open the companion and press L1 from PARTY to reach the Settings gear. The
 companion now uses the shared GB/GBA-style bottom tabs and choice windows.
 Change DS layout, automatic battle menus, party HUD, shortcut buttons or stylus
-speed there. Settings persist in `Saves/PDDS/pokedaisy/settings.ini`; legacy core
+speed there. Settings persist in `Saves/PDDS/pokedaisy-ds/settings.ini`; legacy core
 options are only initial defaults when that file does not exist. Native states,
 resume, fast-forward, shaders and scaling remain in NXRedux's own menu.
 The separate GBA/GB core's quick-menu field actions are not yet ported.
