@@ -658,8 +658,10 @@ static void choose_canvas(void) {
  * menu is up (they are laid out for it); EXPAND's scale otherwise, which for a game with no EXPAND is the default. The
  * HUD cursor is not a menu: it sits on the game's own view, so the canvas stays as it is. */
 static int want_canvas(void) {
-  if (companion || quickOpen || settings.aspect == PD_ASPECT_ORIGINAL)
+  if (companion || quickOpen)
     return CANVAS_MENU;
+  if (settings.aspect == PD_ASPECT_ORIGINAL) // one scale under the panel's largest, as ZOOM OUT: a Game Boy game 4x on the Brick
+    return CANVAS_ZOOM;
   if (!wideSupported || settings.aspect != PD_ASPECT_ZOOM_OUT)
     return CANVAS_EXPAND;
   return settings.autoZoom && !rewinding && pk_wide_scene() != PK_WIDE_SCENE_FIELD ? CANVAS_EXPAND : CANVAS_ZOOM;
