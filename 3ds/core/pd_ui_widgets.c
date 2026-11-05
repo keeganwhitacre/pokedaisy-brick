@@ -94,7 +94,9 @@ void ui_row(struct pd_canvas* c, int x, int y, int w, const char* label, const c
     int ty = pd_text_y(y, ROW_H);
     pd_text(c, x, ty, label, PD_LABEL, PD_LABEL_SHADOW);
     if (value) {
-        int vx = x + w * 42 / 100;
+        // The value column, or past a label too long for it (a Game Boy font's QUICK MENU BUTTON ran under its value).
+        int vx = x + w * 42 / 100, past = x + pd_text_width(label) + 8;
+        if (vx < past) vx = past;
         pd_text_fit(c, vx, ty, x + w - vx, value, PD_VALUE, PD_VALUE_SHADOW);
     }
 }

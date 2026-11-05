@@ -35,7 +35,8 @@ static void setting(struct pd_ui* ui, struct pd_canvas* c, int x, int* y, int w,
 // A row shown, not tappable (LOAD STATE with none yet, ASPECT N/A).
 static void muted_row(struct pd_canvas* c, int x, int* y, int w, const char* label, const char* value) {
     pd_text(c, x, pd_text_y(*y, ROW_H), label, PD_MUTED, PD_MUTED_SHADOW);
-    pd_text(c, x + w * 42 / 100, pd_text_y(*y, ROW_H), value, PD_MUTED, PD_MUTED_SHADOW);
+    int vx = x + w * 42 / 100, past = x + pd_text_width(label) + 8;
+    pd_text(c, vx < past ? past : vx, pd_text_y(*y, ROW_H), value, PD_MUTED, PD_MUTED_SHADOW);
     *y += ROW_H;
 }
 
