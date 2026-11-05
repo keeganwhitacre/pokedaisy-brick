@@ -29,6 +29,7 @@
 
 #include "field_items.h"
 #include "fly.h"
+#include "gb_field.h"
 #include "hud.h"
 #include "pd_guide.h"
 #include "pk_call.h"
@@ -479,6 +480,11 @@ static char repelRows[REPEL_KINDS][48];
 static const char *repelNames[REPEL_KINDS];
 static uint32_t *ovPixels; // the quick menu's canvas, see-through where nothing is drawn
 static const unsigned char *romData;
+/* The Game Boy games' PC / FLY / WILD (gb_field.c, the app's GbField): the cart's config, the running frames left before
+ * asking whether the game took a queued action, and whether the map's encounters may still be held (put back once). */
+static const struct gb_field *gbf;
+static int gbTake;
+static bool gbWildHeld;
 static size_t romLen;
 
 
@@ -783,6 +789,9 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   itemsOk = game.cfg && gba && field_items_supported(game.cfg, rom, len);
   pcOk = itemsOk && pc_supported(game.cfg, rom, len);
   bikeOk = itemsOk && bike_supported(game.cfg);
+  gbf = !gba && game.cfg ? gb_field_find(rom, len) : NULL;
+  gbTake = 0;
+  gbWildHeld = gbf != NULL; // a resume state taken while OFF carries the held rates: put back once when ON
   quickOpen = flyList = repelList = false;
   flyAsk = flyStage = 0;
   job = JOB_NONE;
@@ -900,6 +909,9 @@ RETRO_API void retro_run(void) {
         ui.tab = PD_TAB_GUIDE;
         ui.guidePage = 0;
         ui.guideOpen = -1;
+      } else if (id == HUD_PC) {
+        job = JOB_PC; // the game's own PC, as the quick menu's
+        jobFrames = 0;
       }
       if (id != HUD_PC)
         companion = true;
@@ -916,9 +928,9 @@ RETRO_API void retro_run(void) {
   struct quick_item quick[QUICK_COUNT];
   int quickN = 0;
   char repelWhy[32] = "";
-  if (pcOk)
+  if (pcOk || gbf)
     quick[quickN++] = (struct quick_item){QUICK_PC, false, false, NULL, 0, 0, NULL};
-  if (flyCfg) {
+  if (flyCfg || gbf) {
     int flyer = fly_flyer(&snap);
     quick[quickN++] = (struct quick_item){QUICK_FLY, false, false, flyer < 0 ? "No one in your party knows FLY" : NULL,
                                           flyer < 0 ? 0 : snap.party[flyer].species, 0, NULL};
@@ -941,7 +953,7 @@ RETRO_API void retro_run(void) {
     quick[quickN++] = (struct quick_item){QUICK_BIKE, false, false, bike ? NULL : "No bike in your bag", 0, bike ? bike : 360,
                                           riding ? "GET OFF" : NULL};
   }
-  if (wildSwitch) // a game with no wild-encounter switch has no WILD entry
+  if (wildSwitch || gbf) // a game with no wild-encounter switch has no WILD entry
     quick[quickN++] = (struct quick_item){QUICK_WILD, settings.wildOff, false, NULL, 0, 0, NULL};
   if (host.hasHud && settings.hud)
     quick[quickN++] = (struct quick_item){QUICK_HUD, false, false, hudShown && hudHits.n ? NULL : "No HUD on screen", 0, 0, NULL};
@@ -1082,6 +1094,17 @@ RETRO_API void retro_run(void) {
       pk_rest_note(core);
     if (fieldKnown)
       fieldFlags = pk_field_state(core, settings.runIndoors, wildSwitch && settings.wildOff ? 0 : 100);
+    if (gbf) {
+      // A queued PC / FLY the game hasn't taken by now is withdrawn (counted on frames that ran: the quick menu pauses).
+      if (gbTake > 0 && --gbTake == 0 && !gb_field_taken(core, gbf))
+        notice(item_reason(ITEM_NOT_NOW));
+      if (settings.wildOff) {
+        gb_field_hold_wild(core, gbf);
+        gbWildHeld = true;
+      } else if (gbWildHeld && (!wideSupported || pk_wide_scene() == PK_WIDE_SCENE_FIELD) &&
+                 gb_field_release_wild(core, gbf, romData, romLen))
+        gbWildHeld = false;
+    }
     if (ff && wideSupported && settings.aspect != PD_ASPECT_ORIGINAL) {
       wide_glow_tick();
     } else if (late && wideSupported && settings.aspect != PD_ASPECT_ORIGINAL) {
@@ -1106,10 +1129,17 @@ RETRO_API void retro_run(void) {
   // FLY's steps and the field-item jobs, each between two frames the game's own code can be called in.
   bool flyBattle = snap.inBattle || (fieldFlags & PK_FIELD_BATTLE);
   bool flyBusy = companion || (fieldFlags & PK_FIELD_LOCKED) || (wideSupported && pk_wide_scene() != PK_WIDE_SCENE_FIELD);
-  if (flyCfg && flyAsk && quickOpen && !companion) {
-    if (pk_call_safe(core)) {
+  if ((flyCfg || gbf) && flyAsk && quickOpen && !companion) {
+    bool answered = false;
+    if (gbf) {
+      gb_field_fly_targets(core, gbf, romData, romLen, flyBusy, &flyT);
+      answered = true;
+    } else if (pk_call_safe(core)) {
       snapshot();
       fly_targets(core, flyCfg, romData, romLen, &snap, flyBusy, flyBattle, &flyT);
+      answered = true;
+    }
+    if (answered) {
       flyAsk = 0;
       if (flyT.result == FLY_OK && flyT.count) {
         for (int i = 0; i < flyT.count; i++) {
@@ -1128,7 +1158,15 @@ RETRO_API void retro_run(void) {
       notice(fly_reason(FLY_FAILED));
     }
   }
-  if (flyCfg && flyStage == 1 && !companion && pk_call_safe(core)) {
+  if (gbf && flyStage == 1 && !companion) {
+    // The Game Boy's FLY is RAM the game's own loop acts on (Gen 1) or a queued script (Crystal): one step, then a check.
+    enum fly_result r = gb_field_fly(core, gbf, romData, romLen, flyMapsec, flyBusy);
+    flyStage = 0;
+    if (r == FLY_OK)
+      gbTake = GB_FIELD_TAKE_FRAMES;
+    else
+      notice(fly_reason(r));
+  } else if (flyCfg && flyStage == 1 && !companion && pk_call_safe(core)) {
     snapshot();
     enum fly_result r = fly_start(core, flyCfg, romData, romLen, &snap, flyMapsec, &flyT, flyBusy, flyBattle);
     if (r == FLY_OK) {
@@ -1144,10 +1182,13 @@ RETRO_API void retro_run(void) {
     if (!fly_finish(core, flyCfg, romData, romLen, flyMapsec, &flyT, fly_main_callback(core, flyCfg) != flyCallback))
       notice(fly_reason(FLY_FAILED));
   }
-  bool safe = job != JOB_NONE && !companion && pk_call_safe(core);
+  // pk_call_safe reads the ARM CPU: never on a Game Boy core, whose jobs need no call guard.
+  bool safe = job != JOB_NONE && !companion && (gbf ? true : pk_call_safe(core));
   if (job == JOB_PC && safe) {
     job = JOB_NONE;
-    enum item_result r = pc_open(core, game.cfg, romData, romLen, flyBusy, flyBattle);
+    enum item_result r = gbf ? gb_field_pc(core, gbf, flyBusy) : pc_open(core, game.cfg, romData, romLen, flyBusy, flyBattle);
+    if (gbf && r == ITEM_USED)
+      gbTake = GB_FIELD_TAKE_FRAMES;
     if (r != ITEM_USED)
       notice(item_reason(r));
   } else if (job == JOB_REPEL && safe) {
