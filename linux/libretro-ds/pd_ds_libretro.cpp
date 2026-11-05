@@ -23,6 +23,7 @@
 #undef retro_reset
 #undef retro_unserialize
 #include "companion.h"
+#include "companion_ui.h"
 #include "party_view.h"
 #include "bag_view.h"
 #include "dex_view.h"
@@ -47,13 +48,13 @@ const PkNdsFieldGame* game;
 DsCompanion snapshot;
 DsMapArt map;
 std::vector<std::vector<uint32_t>> icons;
-bool supported=false, companion=false, summary=false, details=false;
+bool supported=false, companion=false;
+DsCompanionUi shell;
+unsigned held_frames[16]={};
 bool select_used=false, select_pulse=false;
 unsigned old_buttons=0, buttons=0, tick=0, width=256, height=192;
-int tab=0, selected=0, page=0, scroll=0, pocket=0, filter=0;
 int screen_override=0, cursor_x=128, cursor_y=96;
 int layout=0; // 0 top, 1 bottom, 2 side by side, 3 stacked
-int map_x=0,map_y=0;
 uint16_t pixels[512*384];
 uint32_t ui_pixels[341*256];
 
@@ -62,17 +63,17 @@ uint32_t read32(uint32_t a) {
   return nds->bus.dma_read32(ds::Cpu::ARM9,a);
 }
 void clear() {
-  supported=companion=summary=details=select_used=select_pulse=false; game=nullptr; snapshot={};map={};icons.clear();
-  old_buttons=buttons=tick=0;tab=selected=page=scroll=pocket=filter=0;
-  screen_override=0;cursor_x=128;cursor_y=96;layout=0;map_x=map_y=0;
+  supported=companion=select_used=select_pulse=false; game=nullptr; snapshot={};map={};icons.clear();
+  old_buttons=buttons=tick=0;std::fill(held_frames,held_frames+16,0);
+  screen_override=0;cursor_x=128;cursor_y=96;layout=0;
 }
 bool env(unsigned cmd,void* data) {
   if(cmd==RETRO_ENVIRONMENT_SET_VARIABLES) {
     auto vars=static_cast<const retro_variable*>(data);
     std::vector<retro_variable> all;
     for(;vars && vars->key;++vars)all.push_back(*vars);
-    all.push_back({"pokedaisy_ds_layout","DS layout; auto|top|bottom|stacked"});
-    all.push_back({"pokedaisy_ds_hud","Party HUD; disabled|enabled"});
+    all.push_back({"pokedaisy_ds_layout","Initial DS layout (saved companion settings take priority); auto|top|bottom|stacked"});
+    all.push_back({"pokedaisy_ds_hud","Initial party HUD (saved companion settings take priority); disabled|enabled"});
     all.push_back({nullptr,nullptr});
     return environment(cmd,all.data());
   }
@@ -93,11 +94,12 @@ void refresh() {
   snapshot=supported?ds_read_companion(nds->bus.main_ram.get(),nds->bus.main_ram_size()):DsCompanion{};
 }
 void choose_layout() {
-  const auto option=opt("pokedaisy_ds_layout");
+  int option=shell.layout;
   if(screen_override)layout=screen_override==1?1:0;
-  else if(option=="top")layout=0;
-  else if(option=="bottom")layout=1;
-  else if(option=="stacked")layout=3;
+  else if(option==1)layout=0;
+  else if(option==2)layout=1;
+  else if(option==3)layout=2;
+  else if(option==4)layout=3;
   else {
     int bits=game?pk_nds_field_state(game,read32,nullptr,0):0;
     // Upstream pk_nds.cpp's blank-screen fallback covers CONTINUE and intro
@@ -113,27 +115,13 @@ void choose_layout() {
     if(top_blank && bottom_blank)return; // retain layout through a scene fade
     if(top_blank && !bottom_blank){layout=1;return;}
     layout=(bits&PK_NDS_FIELD_TOP_ONLY)?0:
-      (bits&(PK_NDS_FIELD_TOUCH_ONLY|PK_NDS_FIELD_TOUCH_BATTLE_MENU))?1:
+      ((bits&PK_NDS_FIELD_TOUCH_ONLY) || (shell.autoBattles && (bits&PK_NDS_FIELD_TOUCH_BATTLE_MENU)))?1:
       (bits&PK_NDS_FIELD_TOUCH)?2:0;
   }
 }
 void draw_companion() {
-  pd_canvas c;pd_canvas_init(&c,341,256,ui_pixels);pd_backdrop(&c);
-  pd_title_box(&c,5,5,331,25,0xffffff);
-  pd_text(&c,12,10,"PokeDaisy DS",PD_TITLE_TEXT,PD_TITLE_SHADOW);
-  const char* names[]={"PARTY","BAG","DEX","MAP"};
-  pd_canvas nav;pd_canvas_init(&nav,341,26,ui_pixels+32*341);
-  pd_ui u{};u.pressedId=-1;pd_ui_navigation(&u,&nav,names,4,tab);
-  pd_list_box(&c,5,61,331,171);
-  pd_canvas body;pd_canvas_init(&body,341,171,ui_pixels+61*341);
-  if(!supported)pd_text(&body,13,12,"Companion: Platinum USA rev 1 only",0x303030,PD_NO_SHADOW);
-  else if(!snapshot.valid)pd_text(&body,13,12,"Return to game to load save data",0x303030,PD_NO_SHADOW);
-  else if(tab==0)ds_party_view(&body,snapshot,icons,selected,summary,page);
-  else if(tab==1)ds_bag_view(&body,snapshot,pocket,scroll,details);
-  else if(tab==2)ds_dex_view(&body,snapshot,filter,scroll);
-  else ds_map_view(&body,snapshot,map,map_x,map_y);
-  const char* hints[]={"L/R tabs  L2 game  A summary  B back","L/R tabs  L2 game  Left/Right pocket","L/R tabs  L2 game  SELECT filter","L/R tabs  L2 game  D-pad move"};
-  pd_text_fit(&c,9,236,323,hints[tab],0xffffff,PD_NO_SHADOW);
+  pd_canvas c;pd_canvas_init(&c,341,256,ui_pixels);
+  shell.draw(&c,snapshot,supported,map,icons);
   geometry(341,256);
   for(unsigned i=0;i<341*256;++i)pixels[i]=rgb565(ui_pixels[i]);
   video(pixels,width,height,width*2);
@@ -161,7 +149,7 @@ void present(const void* data,unsigned,unsigned,size_t) {
       if(y>=oy && y<oy+192)pixels[y*w+x]=0xffff;
     }
   }
-  if(supported && opt("pokedaisy_ds_hud")=="enabled" && layout==0) {
+  if(supported && shell.settings.hud && layout==0) {
     if(tick%12==0 || !snapshot.valid)refresh();
     pd_canvas c;pd_canvas_init(&c,256,192,ui_pixels);
     std::fill(ui_pixels,ui_pixels+256*192,QUICK_CLEAR);
@@ -194,7 +182,7 @@ int16_t filtered_input(unsigned p,unsigned d,unsigned i,unsigned id) {
   if(d==RETRO_DEVICE_JOYPAD) {
     if(id==RETRO_DEVICE_ID_JOYPAD_SELECT && select_pulse)return 1;
     if(companion || (buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)))return 0;
-    if(id==RETRO_DEVICE_ID_JOYPAD_L2 || id==RETRO_DEVICE_ID_JOYPAD_R2)return 0;
+    if(id==shell.companion_id() || int(id)==shell.screen_id())return 0;
   }
   // DSperate expects a pointer over stacked screens. Reproject the current
   // layout into that convention before its input::apply receives it.
@@ -222,18 +210,22 @@ void controls() {
     (old_buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)) && !select_used;
   if(!(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)))select_used=false;
   unsigned edge=buttons&~old_buttons;old_buttons=buttons;
+  for(unsigned id=RETRO_DEVICE_ID_JOYPAD_UP;id<=RETRO_DEVICE_ID_JOYPAD_RIGHT;++id){
+    held_frames[id]=(buttons&(1u<<id))?held_frames[id]+1:0;
+    if(companion && held_frames[id]>15 && (held_frames[id]-15)%5==0)edge|=1u<<id;
+  }
   auto hit=[&](unsigned id){return !!(edge&(1u<<id));};
-  if(hit(RETRO_DEVICE_ID_JOYPAD_L2)) {
+  if(hit(shell.companion_id())) {
     companion=!companion;
-    if(companion){refresh();map_x=snapshot.mapX;map_y=snapshot.mapY;}
+    if(companion){refresh();shell.mapX=snapshot.mapX;shell.mapY=snapshot.mapY;}
   }
   if(!companion) {
-    if(hit(RETRO_DEVICE_ID_JOYPAD_R2))screen_override=(screen_override+1)%3;
+    if(shell.screen_id()>=0 && hit(shell.screen_id()))screen_override=(screen_override+1)%3;
     if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)) {
-      if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_UP))cursor_y-=3;
-      if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_DOWN))cursor_y+=3;
-      if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_LEFT))cursor_x-=3;
-      if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_RIGHT))cursor_x+=3;
+      if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_UP))cursor_y-=shell.pen_step();
+      if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_DOWN))cursor_y+=shell.pen_step();
+      if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_LEFT))cursor_x-=shell.pen_step();
+      if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_RIGHT))cursor_x+=shell.pen_step();
       cursor_x=std::clamp(cursor_x,0,255);cursor_y=std::clamp(cursor_y,0,191);
       // A SELECT tap is forwarded on release; SELECT plus pen controls is consumed.
       unsigned pen_keys=(1u<<RETRO_DEVICE_ID_JOYPAD_UP)|(1u<<RETRO_DEVICE_ID_JOYPAD_DOWN)|
@@ -242,28 +234,10 @@ void controls() {
     }
     return;
   }
-  if(hit(RETRO_DEVICE_ID_JOYPAD_L) || hit(RETRO_DEVICE_ID_JOYPAD_R)) {
-    tab=(tab+(hit(RETRO_DEVICE_ID_JOYPAD_R)?1:3))%4;scroll=0;summary=details=false;
-  }
-  int dy=hit(RETRO_DEVICE_ID_JOYPAD_DOWN)-hit(RETRO_DEVICE_ID_JOYPAD_UP);
-  int dx=hit(RETRO_DEVICE_ID_JOYPAD_RIGHT)-hit(RETRO_DEVICE_ID_JOYPAD_LEFT);
-  if(tab==0) {
-    selected=std::clamp(selected+dy+(summary?0:dx),0,std::max(0,int(snapshot.party.size())-1));
-    if(summary && dx)page=1-page;
-    if(hit(RETRO_DEVICE_ID_JOYPAD_A))summary=!summary;
-    if(hit(RETRO_DEVICE_ID_JOYPAD_B)){if(summary)summary=false;else companion=false;}
-  } else if(tab==1) {
-    if(dx){pocket=(pocket+dx+9)%9;scroll=0;}
-    scroll=std::clamp(scroll+dy,0,std::max(0,ds_bag_count(snapshot,pocket)-1));
-    if(hit(RETRO_DEVICE_ID_JOYPAD_A))details=!details;
-  } else if(tab==2) {
-    if(hit(RETRO_DEVICE_ID_JOYPAD_SELECT)){filter=(filter+1)%3;scroll=0;}
-    scroll=std::clamp(scroll+dy+dx*8,0,std::max(0,ds_dex_count(snapshot,filter)-1));
-  } else {
-    map_x=std::clamp(map_x+dx,0,29);map_y=std::clamp(map_y+dy,0,29);
-    if(hit(RETRO_DEVICE_ID_JOYPAD_A)){map_x=snapshot.mapX;map_y=snapshot.mapY;}
-  }
-  if(tab && hit(RETRO_DEVICE_ID_JOYPAD_B))companion=false;
+  unsigned previous_layout=shell.displayRevision;
+  if(shell.control(edge))companion=false;
+  if(shell.displayRevision!=previous_layout)screen_override=0;
+
 }
 }
 extern "C" {
@@ -287,7 +261,7 @@ RETRO_API void retro_set_environment(retro_environment_t cb){pd_ds::environment=
   cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,const_cast<retro_input_descriptor*>(d));}
 RETRO_API void retro_set_video_refresh(retro_video_refresh_t cb){pd_ds::video=cb;ds_set_video_refresh(pd_ds::present);}
 RETRO_API void retro_set_input_state(retro_input_state_t cb){pd_ds::input=cb;ds_set_input_state(pd_ds::filtered_input);}
-RETRO_API void retro_get_system_info(retro_system_info* info){ds_get_system_info(info);info->library_name="PokeDaisy DS";info->library_version="0.1-experimental";}
+RETRO_API void retro_get_system_info(retro_system_info* info){ds_get_system_info(info);info->library_name="PokeDaisy DS";info->library_version="0.2-companion-settings";}
 RETRO_API void retro_get_system_av_info(retro_system_av_info* info){
   ds_get_system_av_info(info);info->geometry={256,192,512,384,4.f/3.f};
 }
@@ -306,15 +280,18 @@ RETRO_API bool retro_load_game(const retro_game_info* info){
       pd_ds::map=ds_map_art(rom);pd_ds::icons=ds_party_icons(rom);
     }
   }
+  const auto old_layout=opt("pokedaisy_ds_layout");
+  pd_ds::shell.init(dir(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY),
+    old_layout=="top"?1:old_layout=="bottom"?2:old_layout=="stacked"?4:0,opt("pokedaisy_ds_hud")=="enabled");
   log(RETRO_LOG_INFO,"PokeDaisy DS: Platinum companion %s\n",pd_ds::supported?"enabled":"unavailable for this ROM");
   return true;
 }
 RETRO_API void retro_reset(){
-  ds_reset();pd_ds::companion=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;
+  ds_reset();pd_ds::companion=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;
 }
 RETRO_API bool retro_unserialize(const void* data,size_t n){
   bool ok=ds_unserialize(data,n);
-  if(ok){pd_ds::companion=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;}
+  if(ok){pd_ds::companion=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;}
   return ok;
 }
 RETRO_API void retro_unload_game(){ds_unload_game();pd_ds::clear();}
