@@ -1,6 +1,13 @@
 # Linux parity audit: current source, remaining work and DS one-screen port
 
 Audited application sources, not an assumption of feature equivalence from similar screenshots.
+Implementation follow-up: the one-screen update ports the layout controller,
+2/6-frame touch settling, fade wait/timeout, static floating/modal rendering,
+LARGE + SMALL/PIP arrangements, layout-aware pen projection and free-field HUD
+gating. The GB build adds a legacy fast-forward callback fallback. See README's
+“One-screen update” for current behavior and validation. The tables below retain
+the original audit findings at the following historical runtime revision.
+
 Runtime package reviewed: `brick/libretro-unified` at fb40f3f.
 
 | Reference | Current inspected revision |

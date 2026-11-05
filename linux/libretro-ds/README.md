@@ -9,7 +9,7 @@ The previous candidate launched, fast-forwarded and opened/swapped screens on th
 1. Extract the package at the SD card root. It adds only `Emus/tg5040/PDDS.pak`.
 2. Put a COPY of your Platinum ROM in `Roms/PokeDaisy DS (PDDS)/`.
 3. Launch from NXRedux. Use Aspect scaling, with no crop/overscan. The normal
-   256x192 gameplay frame fits the 1024x768 Brick at exactly 4x. No panel option
+   512x384 stage scales 2x to the Brick; full-screen native DS pixels scale 4x. No panel option
    is required. The companion uses 341x256 (3x, one spare horizontal pixel).
 4. For the first test, keep saves isolated in the new PDDS system. A supported
    retail Platinum USA revision 1 is required for the companion and game-specific
@@ -30,7 +30,7 @@ The previous candidate launched, fast-forwarded and opened/swapped screens on th
 For drawing, keep Select+A held while moving the D-pad. Pen coordinates and
 pointer reprojection are implemented; actual Brick interaction still needs a
 hand test. Set shoulder shortcuts so L2/R2 reach the core; this pak's default
-bindings expose both. R2's manual override persists until cycled back to AUTO
+bindings expose both. Select + R2 toggles a floating touch panel. R2's manual override persists until cycled back to the selected layout
 or a state is loaded/reset. All four DS face buttons remain available.
 
 Open the companion and press L1 from PARTY to reach the Settings gear. The
@@ -70,16 +70,16 @@ snapshot. An invalid machine state follows DSperate's reset-on-failure policy.
   `linux/dsperate`, using the same `3ds/core` canvas, UI and generated app data.
 - The current upstream RAM-only `pk_nds_field` reader, including Platinum's
   party/options top-screen rules and battle touch-panel detection.
-- Top-only gameplay, bottom-only for battle selection/touch-only screens,
-  side-by-side for other touch menus, optional stacked layout, manual fallback.
+- Full-screen gameplay with scene-driven floating touch and menu windows, plus
+  TOP/BOTTOM/SIDE BY SIDE/STACKED/LARGE + SMALL/PICTURE IN PICTURE layouts.
 - Upstream's one-colour fallback for bottom-only boot questions, and retaining
   the current layout through fully blank scene transitions.
 - RGB565 software output and dynamic libretro geometry; native frontend
   postprocessing remains available. Actual shader behavior needs Brick testing.
 
-This is not Android 1.4 parity. Android's floating/animated DS layout, complete
-fade hysteresis, custom battle-button overlays and all field actions are not
-ported. Native game battle input is forwarded, with the stylus fallback; no
+The upstream one-screen scene timing and static floating/modal composition are
+ported. Animated transitions, custom battle-button overlays and all field actions
+remain outstanding; this is not full Android 1.4 parity. Native game battle input is forwarded, with the stylus fallback; no
 live battle was validated in this session. Automatic rules are tested against
 synthetic menu states using app-owned metadata and a captured RAM fixture;
 full battle/menu transition playtesting remains outstanding.

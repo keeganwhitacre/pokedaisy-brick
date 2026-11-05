@@ -1,3 +1,38 @@
+# One-screen update validation — 2026-11-05
+
+- Desktop: 7/7 CTest checks pass, including DS scene/fade policy, geometry/pen
+  bounds and composition, preferences, shared UI and libretro lifecycle.
+- Real Platinum USA rev1: loaded the earlier DSperate state, rendered gameplay,
+  companion tabs and all seven layout choices; native X menu remains full-screen;
+  native Bag opens the two-screen modal. Manual floating touch also captured.
+- ARM/QEMU: scene and playback unit tests, settings selection/reload, Platinum
+  SRAM/state restore and companion pause pass. Save pointer stays stable and
+  4 MiB machine RAM restores byte-for-byte. The original battery save is unchanged.
+- Adapted GB/GBC/GBA ARM cores: all three diagnostic carts complete state round
+  trips; legacy-only GET_FASTFORWARDING is queried 127 times per run. A separate
+  mock verifies modern callback precedence, rewind and unsupported callbacks.
+- Both emulator submodules remain unmodified. No projection probe is packaged.
+- This does not establish physical Brick speed/audio, live battle transitions,
+  firmware resume, shaders or touchscreen behavior. Those require a device test.
+
+## Brick test
+
+Update only the PDAI pak from this zip, keeping backups of the previous pak and
+saves. Use Aspect scaling without crop. Launch Platinum, open Settings > DS LAYOUT,
+try ONE SCREEN / LARGE + SMALL / PICTURE IN PICTURE, then return to ONE SCREEN.
+Open the native Bag and a battle; verify appearance/dismissal of the bottom panel.
+Use Select+R2 to toggle the manual touch panel, Select+D-pad/A to point/tap, and
+R2 alone to cycle the manual full-screen fallback. Check HUD only appears after
+free-field settling, companion/quick menu pause, fast-forward, native save/load,
+quit/resume, and a GB/GBC/GBA game through the same collection.
+
+The new scene policy leaves emulator serialization unchanged. Earlier compatible
+DSperate core states load in the tests; cross-emulator states remain unsupported.
+
+---
+
+The following describes the previous unified-package baseline:
+
 # Unified native integration validation
 
 Source base: own DS branch 89adcfe; pinned Thwonp feat/libretro-core 4ab40fa;

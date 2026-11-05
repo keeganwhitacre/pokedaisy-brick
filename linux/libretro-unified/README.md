@@ -24,8 +24,8 @@ Extract archives first; ZIP dispatch is deliberately not guessed.
 
 GB/GBC/GBA games use Thwonp's existing companion, HUD, quick menu, settings,
 EXPAND and ZOOM OUT on the games he supports. The Brick panel is preset to
-1024x768. DS retains full-size 256x192 gameplay (4x on the Brick), auto/manual
-screen layouts and the Platinum companion. There is no SDL launcher.
+1024x768. DS composes the native 256x192 gameplay onto a 512x384 stage (2x frontend
+scaling on the Brick, 4x native pixels), with automatic/manual screen layouts and the Platinum companion. There is no SDL launcher.
 
 The old DS pak and your existing GB/GBA installation are preserved. This is a
 new frontend tag, so importing previous progress requires COPIES of saves to the
@@ -75,13 +75,13 @@ git submodule update --init --recursive third_party/dsperate-lr
 git submodule update --init third_party/pokedaisy-libretro
 git -C third_party/pokedaisy-libretro submodule update --init third_party/mgba
 # Set NEXTUI_TOOLCHAIN as documented by linux/libretro-ds/README.md.
-cmake -S third_party/pokedaisy-libretro/libretro -B build/gb -G Ninja \
+cmake -S linux/libretro-unified/gb -B build/gb -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$PWD/linux/trimui-toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
 cmake --build build/gb --target pokedaisy_libretro -j4
 cmake -S linux/libretro-ds -B build/ds -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$PWD/linux/trimui-toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
 cmake --build build/ds -j4
-python3 linux/libretro-unified/package.py build/gb/pokedaisy_libretro.so \
+python3 linux/libretro-unified/package.py build/gb/thwonp/pokedaisy_libretro.so \
   build/ds/pokedaisy_ds_libretro.so PokeDaisy-Unified-NXRedux-Test.zip \
   --strip "$NEXTUI_TOOLCHAIN/bin/aarch64-nextui-linux-gnu-strip" --source-ref YOUR_COMMIT
 ```
@@ -105,3 +105,35 @@ handle game-side culling, scene gating, stale geometry on setting changes or
 presentation independence across save states. It is not packaged as the normal
 DS core and no supported EXPAND/ZOOM OUT option is claimed. Those issues must be
 resolved before exposing it as a persistent setting or asserting Android parity.
+
+## One-screen update
+
+DS LAYOUT now offers ONE SCREEN (the former AUTO setting), TOP, BOTTOM,
+SIDE BY SIDE, STACKED, LARGE + SMALL and PICTURE IN PICTURE. ONE SCREEN uses
+upstream's RAM scene flags and touch/fade settling to show a framed bottom
+panel when needed, and a two-screen modal for general menus. Unknown games
+fall back to PIP. Platinum USA revision 1 remains the supported companion target.
+Hold Select and press the screen shortcut (R2 by default) to toggle the floating
+touch panel manually; Select + D-pad/A positions/presses the pen. Unmodified R2
+still cycles selected layout / bottom / top. Layout changes and state loads
+clear manual overrides. Normal gameplay fills the Brick in Aspect mode.
+
+Windows are static: Android's animated transitions and custom battle strip are
+not included. AUTO BATTLES exposes the native bottom battle panel. It does not
+replace it with companion battle buttons. The existing party HUD now waits for
+20 free-field frames and hides in locked/menu/battle scenes.
+
+The GB/GBA build wrapper preserves the pinned Thwonp source and adds a checked
+build-time playback callback adaptation: prefer GET_THROTTLE_STATE; when absent,
+query GET_FASTFORWARDING, which NXRedux supports. This lets his existing expansion
+fast-forward safeguards run on minarch. Rewind detection still needs the modern
+callback; no unsupported rewind state is inferred. Build through the compatibility
+CMake entry above to include this fix.
+
+Both cores build for ARM. Desktop tests and QEMU cover layout/fade timing,
+controller selection and persistence of all seven layouts, touch bounds,
+Platinum SRAM/state restore, companion pause, and GB/GBC/GBA state round trips
+with a legacy-only fast-forward callback. QEMU is not a physical performance or
+firmware-resume test. Verify speed/audio, automatic battle/menu transitions,
+shaders, touch, quick resume and frontend geometry on the Brick before replacing
+a preferred build. Previous native states remain emulator-version dependent.
