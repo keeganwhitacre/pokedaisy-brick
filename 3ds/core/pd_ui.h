@@ -93,6 +93,7 @@ struct pd_host_info {
     char values[PD_UI_HOST_LINES][40];
     int count;
     bool ffOn;
+    bool frontendOwnsPlayback; // No duplicate playback controls for libretro hosts.
     bool hideScreenMode; // Optional: host owns display scaling. Zero keeps the 3DS row.
     bool hasExpand;      // Optional: the host can EXPAND (ASPECT / AUTO ZOOM IN rows) ...
     bool expandGame;     // ... and does for this game (else ASPECT reads N/A)
@@ -169,6 +170,10 @@ struct pd_map_source {
 struct pd_option_row { const char* label; const char* value; };
 struct pd_option_source { const char* title; const struct pd_option_row* rows; int count; };
 struct pd_ui {
+    // Optional backend content inside the shared companion frame and tab bar.
+    unsigned availableTabs; // 0 preserves the original complete tab set.
+    void* contentCtx;
+    void (*content)(void*, struct pd_ui*, struct pd_canvas*);
     const struct pd_option_source* optionSource;
     int optionSelected;
     const struct pd_dex_source* dexSource;
@@ -224,6 +229,9 @@ struct pd_ui {
     struct pd_hit hits[PD_UI_MAX_HITS];
     int hitCount;
 };
+
+// Shared modal choice window for backend-owned preferences (selection is host-owned).
+void pd_ui_choices_view(struct pd_canvas*, const char*, const char* const*, int, int);
 
 // Shared party body, including its original frames, HP bars, status and summary.
 void pd_ui_map_view(struct pd_canvas*, const struct pd_map_source*);

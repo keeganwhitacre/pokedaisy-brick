@@ -115,8 +115,10 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
 
     if (!host || !host->hideScreenMode)
         setting(ui, c, ix, &y, iw, SETTING_SCREEN, "SCREEN", pd_screen_mode_name(ui->settings->screenMode));
-    snprintf(buf, sizeof(buf), "%dx", ui->settings->ffSpeed);
-    setting(ui, c, ix, &y, iw, SETTING_FF, "FAST-FORWARD", buf);
+    if (!host || !host->frontendOwnsPlayback) {
+        snprintf(buf, sizeof(buf), "%dx", ui->settings->ffSpeed);
+        setting(ui, c, ix, &y, iw, SETTING_FF, "FAST-FORWARD", buf);
+    }
     if (host && host->hasExpand) {
         if (host->expandGame) {
             setting(ui, c, ix, &y, iw, SETTING_ASPECT, "ASPECT", pd_aspect_name(ui->settings->aspect));
@@ -140,6 +142,7 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
         setting(ui, c, ix, &y, iw, SETTING_QUICK_MENU, "QUICK MENU", ui->settings->quickGrid ? "GRID" : "RING");
     snprintf(buf, sizeof(buf), "%d TABS", ui_bar_count(ui));
     setting(ui, c, ix, &y, iw, SETTING_TAB_BAR, "TAB BAR", buf);
+    if (!host || !host->frontendOwnsPlayback) {
     setting(ui, c, ix, &y, iw, SETTING_SAVE_STATE, "SAVE STATE", NULL);
     if (host && host->hasState) {
         setting(ui, c, ix, &y, iw, SETTING_LOAD_STATE, "LOAD STATE", host->stateWhen);
@@ -148,6 +151,7 @@ void ui_settings_tab(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game
         muted_row(c, ix, &y, iw, "LOAD STATE", "none yet");
     }
     setting(ui, c, ix, &y, iw, SETTING_LEAVE, "LEAVE GAME", NULL);
+    }
     pd_unclip(c);
     int total = y + ui->settingsScroll - listTop, view = listBottom - listTop;
     lastTotal = total;
@@ -305,4 +309,11 @@ void ui_overlay(struct pd_ui* ui, struct pd_canvas* c) {
 
 void pd_ui_options_view(struct pd_ui* ui,struct pd_canvas* c,const struct pd_game* g,const struct pd_snapshot* s){
     ui->hitCount=0;pd_backdrop(c);ui_settings_tab(ui,c,g,s,NULL);
+}
+
+void pd_ui_choices_view(struct pd_canvas* c,const char* title,const char* const* choices,int count,int selected){
+    if(count<1 || count>8)return;
+    struct pd_ui ui={0};ui.pressedId=-1;
+    pd_dim(c,230);
+    pick_list(&ui,c,title,choices,count,selected);
 }
