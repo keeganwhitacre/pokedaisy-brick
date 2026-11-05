@@ -15,8 +15,8 @@ v0.2 SDL host (`docs/PLORPOS_V0.2.md`) and the list of intentional differences.
 - Output is RGB565. The core picks its own frame size from the panel (`pokedaisy_panel`, sent by plorpOS; `auto` = the older `pokedaisy_canvas` option alone, 320x240 by default)
   and the aspect: the game's whole scale `s` is the largest that fits the panel, and the frame is the panel divided by
   `s`. EXPAND (and any game without EXPAND support) uses the full scale, 4x on the Brick = 256x192; ZOOM OUT uses one
-  scale less, 3x = 341x256. ORIGINAL, the companion and the quick menu use the menu frame: the ZOOM OUT
-  frame, or a scale less again until it holds 320x240 (what the companion is laid out for: a Game Boy game's ZOOM OUT
+  scale less, 3x = 341x256. ORIGINAL uses the ZOOM OUT frame (a Game Boy game 4x on the Brick, 256x192). The companion
+  and the quick menu use the menu frame while they're open: the ZOOM OUT frame, or a scale less again until it holds 320x240 (what the companion is laid out for: a Game Boy game's ZOOM OUT
   on the Brick is 256x192, so its menus get 341x256), the same in every aspect. The HUD sits on the picture that is on
   screen: in EXPAND and ZOOM OUT its corners are the whole frame's, not the game's middle. The HUD cursor keeps the
   frame that is on screen (it is not a menu: it sits on the game's own view). A change of frame is a
@@ -64,7 +64,10 @@ preview byte-identical (80 PNGs); NC = not checked.
 | Quick menu FLY | B3 | list of visited towns, flight to Pallet Town; indoors "You can't FLY from here." | D |
 | Quick menu REPEL | B3 | dimmed "No REPEL in your bag"; use NC (the save has none) | D |
 | Quick menu BIKE | B3 | on and off | D |
-| Quick menu WILD ENCOUNTERS | B3 | OFF tag, notice, persisted; no battle in 96 grass steps, a battle with it on. Not shown for a game without the switch (Crystal) | D, with the control |
+| Quick menu WILD ENCOUNTERS | B3 | OFF tag, notice, persisted; no battle in 96 grass steps, a battle with it on. Not shown for a game without the switch | D, with the control |
+| Game Boy quick menu: PC, FLY, WILD ENCOUNTERS (Red, Blue, Yellow, Crystal rev 0 / rev 1 / AU; PureRed / PureBlue 2.7.6) | `linux/gb_field.c` (the app's GbField) | each the game's own way in: Gen 1's PC routine called from its overworld loop, its FLY the town map's warp flags, its encounters the map's rates held at 0; Crystal's PC and FLY queued as map scripts, its encounters' cooldown held. A queued action the game hasn't taken within 24 running frames is withdrawn. Each cart's code is checked first (`gb_field_test`) | desktop host: Crystal PC opens, FLY (badge / Fly / spawns poked in) lists 12 Johto towns and lands in New Bark Town, WILD OFF holds the cooldown; Blue's PC from the field and back |
+| Game Boy HUD (English Yellow, Crystal) | `linux/hud.c`, `pd_libretro.c` | where the field scene is known, as in the app: balls, BAG, PC, WILD (from the GUIDE), MAP, the party in ZOOM OUT; WINDOW is the game's black-on-white window; the compact HUD drops its last buttons / ball kinds where a narrow picture can't hold them | desktop host, Crystal in ORIGINAL, EXPAND, ZOOM OUT |
+| Touch (RG Rotate) | diatom's Rotate port, `pd_libretro.c` | while PokeDaisy runs, the panel's first finger is the libretro pointer over the picture (no hold-for-Menu; the launcher's edge swipes held back as in the DS screens): taps and drags on the companion, a tap on a HUD part presses it, a tap on a quick menu tile or FLY / REPEL row picks it, outside closes. The game picture itself takes no touch | desktop host (`-t`): HUD BAG, a tab chip, the quick menu's PC, a tap outside |
 | EXPAND, ORIGINAL on FireRed | B4 | same scene and window as v0.2 | D, Vermilion City, side by side |
 | ZOOM OUT on FireRed | B4 | 341x256 frame (3x), against EXPAND's 256x192 (4x); the owner checked it on the Brick ("looks good") | H, D |
 | EXPAND, ZOOM OUT on Crystal | B4 | the overworld widens past the game's edges (canvas 204x153 in EXPAND, 256x192 in ZOOM OUT, its menus 341x256); the border drew in the wrong colours until the 16-bit palette was converted (rebuilt window 360 of 360 cells differed from the frame before, 0 after); the Crystal clock prompt appears because the desktop host has no RTC | H, D (border colours, owner) |

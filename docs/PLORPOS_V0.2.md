@@ -29,7 +29,7 @@ own tests assert where they assert something; a feature without a reference was 
 | Game Boy look | the game's own font and icons | the game's font on every Game Boy game, Red / Blue's Super Game Boy colours, own party icons on Red, Blue, Yellow, Crystal, Gold, Silver. Not yet: Crystal Clear, Prism, Polished Crystal, PureRGB icons (Poké Ball) |
 | Game Boy DEX | list with entry pages | Red, Blue, Yellow: list and pages (sprite, category, size, text, stats). Gold, Silver, Crystal, Crystal Clear, Polished, PureRGB: the list only. Prism: none |
 | Game Boy GUIDE | HERE, NEXT BOSS, WHERE IS (+ TIPS on Crystal / Polished) | Red, Blue, Yellow: HERE, NEXT BOSS, WHERE IS. Crystal: all four (no headbutt trees in HERE). Not: Polished Crystal, Gold, Silver (the app has none for Gold / Silver either), Crystal Clear, Prism, PureRGB |
-| Game Boy MAP / CARD | Pokégear / town map, card | not available |
+| Game Boy MAP | Pokégear / town map | not available (in the v0.3 libretro core since 2026-11-05). The app has no Game Boy trainer card |
 | GB battle input / party switch; GB quick-menu items | yes | no |
 | European Yellow builds | yes | no (no ROMs here) |
 | DS | yes | out of scope on Linux |
