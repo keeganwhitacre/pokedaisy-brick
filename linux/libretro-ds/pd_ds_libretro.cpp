@@ -24,6 +24,7 @@
 #undef retro_unserialize
 #include "companion.h"
 #include "companion_ui.h"
+#include "layout.h"
 #include "party_view.h"
 #include "bag_view.h"
 #include "dex_view.h"
@@ -52,6 +53,10 @@ bool supported=false, companion=false, quickOpen=false;
 int quickSelected=0;
 uint32_t quick_pixels[341*256];
 DsCompanionUi shell;
+DsScenePolicy scene;
+DsArrangement arrangement;
+bool manualTouch=false,fieldValid=false;
+uint32_t stage[512*384],fieldFrame[256*192];
 unsigned held_frames[16]={};
 bool select_used=false, select_pulse=false;
 unsigned old_buttons=0, buttons=0, tick=0, width=256, height=192;
@@ -68,6 +73,7 @@ void clear() {
   supported=companion=quickOpen=select_used=select_pulse=false;quickSelected=0; game=nullptr; snapshot={};map={};icons.clear();
   old_buttons=buttons=tick=0;std::fill(held_frames,held_frames+16,0);
   screen_override=0;cursor_x=128;cursor_y=96;layout=0;
+  scene.reset();arrangement={};manualTouch=fieldValid=false;
 }
 bool env(unsigned cmd,void* data) {
   if(cmd==RETRO_ENVIRONMENT_SET_VARIABLES) {
@@ -96,30 +102,21 @@ void refresh() {
   snapshot=supported?ds_read_companion(nds->bus.main_ram.get(),nds->bus.main_ram_size()):DsCompanion{};
 }
 void choose_layout() {
-  int option=shell.layout;
-  if(screen_override)layout=screen_override==1?1:0;
-  else if(option==1)layout=0;
-  else if(option==2)layout=1;
-  else if(option==3)layout=2;
-  else if(option==4)layout=3;
-  else {
-    int bits=game?pk_nds_field_state(game,read32,nullptr,0):0;
-    // Upstream pk_nds.cpp's blank-screen fallback covers CONTINUE and intro
-    // questions before the field process exists. No game addresses are added.
-    auto one_colour=[](const uint32_t* px){
-      uint32_t first=px[0]&0xffffff;
-      for(int gy=0;gy<12;++gy)for(int gx=0;gx<16;++gx)
-        if((px[(gy*16+8)*256+gx*16+8]&0xffffff)!=first)return false;
-      return true;
-    };
-    bool top_blank=one_colour(nds->gpu.framebuffer(0));
-    bool bottom_blank=one_colour(nds->gpu.framebuffer(1));
-    if(top_blank && bottom_blank)return; // retain layout through a scene fade
-    if(top_blank && !bottom_blank){layout=1;return;}
-    layout=(bits&PK_NDS_FIELD_TOP_ONLY)?0:
-      ((bits&PK_NDS_FIELD_TOUCH_ONLY) || (shell.autoBattles && (bits&PK_NDS_FIELD_TOUCH_BATTLE_MENU)))?1:
-      (bits&PK_NDS_FIELD_TOUCH)?2:0;
-  }
+  int bits=game?pk_nds_field_state(game,read32,nullptr,0):0;
+  auto one_colour=[](const uint32_t* px){
+    uint32_t first=px[0]&0xffffff;
+    for(int gy=0;gy<12;++gy)for(int gx=0;gx<16;++gx)
+      if((px[(gy*16+8)*256+gx*16+8]&0xffffff)!=first)return false;
+    return true;
+  };
+  bool topBlank=one_colour(nds->gpu.framebuffer(0)),bottomBlank=one_colour(nds->gpu.framebuffer(1));
+  if(topBlank&&!bottomBlank)bits|=PK_NDS_FIELD_TOUCH;
+  // PIP already exposes the native battle panel; it must not float twice.
+  scene.tick(bits,topBlank,bottomBlank,shell.autoBattles&&shell.layout!=DS_PIP);
+  int mode=screen_override==1?DS_BOTTOM:screen_override==2?DS_TOP:shell.layout;
+  arrangement=ds_arrange(mode,scene,game!=nullptr,manualTouch&&screen_override==0);
+  layout=mode==DS_BOTTOM?1:mode==DS_SIDE?2:mode==DS_STACKED?3:0;
+  if(scene.hud&&!scene.dark){std::memcpy(fieldFrame,nds->gpu.framebuffer(0),sizeof fieldFrame);fieldValid=true;}
 }
 void draw_companion() {
   pd_canvas c;pd_canvas_init(&c,341,256,ui_pixels);
@@ -162,24 +159,19 @@ void present(const void* data,unsigned,unsigned,size_t) {
   // screens must still display the latest retained framebuffer.
   (void)data;
   choose_layout();
-  unsigned w=layout==2?512:256,h=layout==3?384:192;
+  const unsigned w=512,h=384;
   geometry(w,h);
-  const uint32_t* top=nds->gpu.framebuffer(0);
-  const uint32_t* bottom=nds->gpu.framebuffer(1);
-  for(unsigned y=0;y<h;++y)for(unsigned x=0;x<w;++x) {
-    const uint32_t* src=layout==1?bottom:(layout==2 && x>=256)||(layout==3 && y>=192)?bottom:top;
-    pixels[y*w+x]=rgb565(src[(y%192)*256+(x%256)]);
-  }
-  if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)) {
-    int ox=layout==2?256:0,oy=layout==3?192:0;
-    if(layout!=0)for(int d=-4;d<=4;++d){
-      int x=ox+cursor_x+d,y=oy+cursor_y;
-      if(x>=ox && x<ox+256)pixels[y*w+x]=0xffff;
-      x=ox+cursor_x;y=oy+cursor_y+d;
-      if(y>=oy && y<oy+192)pixels[y*w+x]=0xffff;
+  ds_compose(stage,arrangement,nds->gpu.framebuffer(0),nds->gpu.framebuffer(1),fieldValid?fieldFrame:nullptr);
+  for(unsigned i=0;i<w*h;++i)pixels[i]=rgb565(stage[i]);
+  if((buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT))&&arrangement.touch.w>0){
+    int cx=arrangement.touch.x+cursor_x*arrangement.touch.w/256;
+    int cy=arrangement.touch.y+cursor_y*arrangement.touch.h/192;
+    for(int d=-4;d<=4;++d){
+      if(arrangement.touch.contains(cx+d,cy))pixels[cy*w+cx+d]=0xffff;
+      if(arrangement.touch.contains(cx,cy+d))pixels[(cy+d)*w+cx]=0xffff;
     }
   }
-  if(supported && shell.settings.hud && layout==0) {
+  if(supported && shell.settings.hud && scene.hud && !scene.dark && arrangement.top.w==512 && arrangement.touch.w==0) {
     if(tick%12==0 || !snapshot.valid)refresh();
     pd_canvas c;pd_canvas_init(&c,256,192,ui_pixels);
     std::fill(ui_pixels,ui_pixels+256*192,QUICK_CLEAR);
@@ -200,10 +192,13 @@ void present(const void* data,unsigned,unsigned,size_t) {
     for(unsigned i=0;i<256*192;++i){
       uint32_t p=ui_pixels[i];if(p==QUICK_CLEAR)continue;
       unsigned a=p>>24;if(!a)a=255;
-      uint16_t old=pixels[i];unsigned r=(old>>11&31)*255/31,g=(old>>5&63)*255/63,b=(old&31)*255/31;
-      r=(((p>>16)&255)*a+r*(255-a))/255;
-      g=(((p>>8)&255)*a+g*(255-a))/255;b=((p&255)*a+b*(255-a))/255;
-      pixels[i]=rgb565((r<<16)|(g<<8)|b);
+      for(unsigned dy=0;dy<2;++dy)for(unsigned dx=0;dx<2;++dx){
+        unsigned at=((i/256)*2+dy)*512+(i%256)*2+dx;
+        uint16_t old=pixels[at];unsigned r=(old>>11&31)*255/31,g=(old>>5&63)*255/63,b=(old&31)*255/31;
+        r=(((p>>16)&255)*a+r*(255-a))/255;
+        g=(((p>>8)&255)*a+g*(255-a))/255;b=((p&255)*a+b*(255-a))/255;
+        pixels[at]=rgb565((r<<16)|(g<<8)|b);
+      }
     }
   }
   video(pixels,w,h,w*2);
@@ -224,13 +219,10 @@ int16_t filtered_input(unsigned p,unsigned d,unsigned i,unsigned id) {
       if(id==RETRO_DEVICE_ID_POINTER_Y)return cursor_y*32768/192;
     }
     int x=input(p,d,i,RETRO_DEVICE_ID_POINTER_X),y=input(p,d,i,RETRO_DEVICE_ID_POINTER_Y);
-    if(layout==0)return 0;
-    if(layout==1 && id==RETRO_DEVICE_ID_POINTER_Y)return (y+32767)/2;
-    if(layout==2) {
-      if(id==RETRO_DEVICE_ID_POINTER_PRESSED)return x>=0?input(p,d,i,id):0;
-      if(id==RETRO_DEVICE_ID_POINTER_X)return std::clamp(x*2-32767,-32767,32767);
-      if(id==RETRO_DEVICE_ID_POINTER_Y)return (y+32767)/2;
-    }
+    auto pen=ds_pen(arrangement,(x+32767)*512/65535,(y+32767)*384/65535);
+    if(id==RETRO_DEVICE_ID_POINTER_PRESSED)return pen.valid?input(p,d,i,id):0;
+    if(id==RETRO_DEVICE_ID_POINTER_X)return pen.valid?pen.x*65535/256-32767:0;
+    if(id==RETRO_DEVICE_ID_POINTER_Y)return pen.valid?pen.y*32768/192:0;
   }
   return input(p,d,i,id);
 }
@@ -268,7 +260,11 @@ void controls() {
     if(companion){refresh();shell.mapX=snapshot.mapX;shell.mapY=snapshot.mapY;}
   }
   if(!companion) {
-    if(shell.screen_id()>=0 && hit(shell.screen_id()))screen_override=(screen_override+1)%3;
+    if(shell.screen_id()>=0 && hit(shell.screen_id())){
+      if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)){
+        manualTouch=!manualTouch;screen_override=0;select_used=true;
+      }else{screen_override=(screen_override+1)%3;manualTouch=false;}
+    }
     if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)) {
       if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_UP))cursor_y-=shell.pen_step();
       if(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_DOWN))cursor_y+=shell.pen_step();
@@ -278,13 +274,19 @@ void controls() {
       // A SELECT tap is forwarded on release; SELECT plus pen controls is consumed.
       unsigned pen_keys=(1u<<RETRO_DEVICE_ID_JOYPAD_UP)|(1u<<RETRO_DEVICE_ID_JOYPAD_DOWN)|
         (1u<<RETRO_DEVICE_ID_JOYPAD_LEFT)|(1u<<RETRO_DEVICE_ID_JOYPAD_RIGHT)|(1u<<RETRO_DEVICE_ID_JOYPAD_A);
-      if(buttons&pen_keys){select_used=true;if(layout==0)screen_override=1;}
+      if(buttons&pen_keys){
+        select_used=true;
+        if(arrangement.touch.w==0){
+          if(shell.layout==DS_ONE||shell.layout==DS_PIP){manualTouch=true;screen_override=0;}
+          else screen_override=1;
+        }
+      }
     }
     return;
   }
   unsigned previous_layout=shell.displayRevision;
   if(shell.control(edge))companion=false;
-  if(shell.displayRevision!=previous_layout)screen_override=0;
+  if(shell.displayRevision!=previous_layout){screen_override=0;manualTouch=false;}
 
 }
 }
@@ -309,12 +311,12 @@ RETRO_API void retro_set_environment(retro_environment_t cb){pd_ds::environment=
   cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,const_cast<retro_input_descriptor*>(d));}
 RETRO_API void retro_set_video_refresh(retro_video_refresh_t cb){pd_ds::video=cb;ds_set_video_refresh(pd_ds::present);}
 RETRO_API void retro_set_input_state(retro_input_state_t cb){pd_ds::input=cb;ds_set_input_state(pd_ds::filtered_input);}
-RETRO_API void retro_get_system_info(retro_system_info* info){ds_get_system_info(info);info->library_name="PokeDaisy DS";info->library_version="0.3-unified-quick-menu";}
+RETRO_API void retro_get_system_info(retro_system_info* info){ds_get_system_info(info);info->library_name="PokeDaisy DS";info->library_version="0.4-one-screen";}
 RETRO_API void retro_get_system_av_info(retro_system_av_info* info){
-  ds_get_system_av_info(info);info->geometry={256,192,512,384,4.f/3.f};
+  ds_get_system_av_info(info);info->geometry={512,384,512,384,4.f/3.f};
 }
 RETRO_API bool retro_load_game(const retro_game_info* info){
-  pd_ds::clear();pd_ds::width=256;pd_ds::height=192;
+  pd_ds::clear();pd_ds::width=512;pd_ds::height=384;
   if(!ds_load_game(info))return false;
   std::ifstream f(info->path,std::ios::binary);
   std::vector<uint8_t> rom{std::istreambuf_iterator<char>(f),{}};
@@ -335,11 +337,11 @@ RETRO_API bool retro_load_game(const retro_game_info* info){
   return true;
 }
 RETRO_API void retro_reset(){
-  ds_reset();pd_ds::companion=pd_ds::quickOpen=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;
+  ds_reset();pd_ds::companion=pd_ds::quickOpen=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;pd_ds::scene.reset();pd_ds::arrangement={};pd_ds::manualTouch=pd_ds::fieldValid=false;
 }
 RETRO_API bool retro_unserialize(const void* data,size_t n){
   bool ok=ds_unserialize(data,n);
-  if(ok){pd_ds::companion=pd_ds::quickOpen=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;}
+  if(ok){pd_ds::companion=pd_ds::quickOpen=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;pd_ds::scene.reset();pd_ds::arrangement={};pd_ds::manualTouch=pd_ds::fieldValid=false;}
   return ok;
 }
 RETRO_API void retro_unload_game(){ds_unload_game();pd_ds::clear();}

@@ -18,7 +18,7 @@ add_subdirectory(${DS} dsperate EXCLUDE_FROM_ALL)
 set_property(TARGET dsperate_core PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
 set(APP ${ROOT}/app/src/main/cpp/nds)
 file(GLOB PD_CORE CONFIGURE_DEPENDS ${ROOT}/3ds/core/*.c)
-add_library(pokedaisy_ds_libretro SHARED pd_ds_libretro.cpp companion_ui.cpp ${PD_CORE}
+add_library(pokedaisy_ds_libretro SHARED pd_ds_libretro.cpp companion_ui.cpp layout.cpp ${PD_CORE}
   ${ROOT}/linux/hud.c
   ${ROOT}/linux/quick_menu.c
   ${ROOT}/linux/dsperate/companion.cpp
@@ -45,6 +45,15 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+  add_executable(ds-layout-test test/layout.cpp layout.cpp ${ROOT}/3ds/core/pd_canvas.c ${ROOT}/3ds/core/pd_font_gen.c ${ROOT}/3ds/core/pd_style.c)
+  target_include_directories(ds-layout-test PRIVATE . ${APP} ${ROOT}/3ds/core)
+  target_compile_options(ds-layout-test PRIVATE -UNDEBUG)
+  target_link_libraries(ds-layout-test PRIVATE m)
+  add_test(NAME ds-layout-policy COMMAND ds-layout-test)
+  add_executable(gb-playback-test ../libretro-unified/gb/test_playback.c)
+  target_include_directories(gb-playback-test PRIVATE ../libretro-unified/gb ${LR}/include)
+  target_compile_options(gb-playback-test PRIVATE -UNDEBUG)
+  add_test(NAME gb-playback-compat COMMAND gb-playback-test)
   add_executable(ds-libretro-host test/host.c)
   target_include_directories(ds-libretro-host PRIVATE ${LR}/include)
   target_link_libraries(ds-libretro-host PRIVATE dl)

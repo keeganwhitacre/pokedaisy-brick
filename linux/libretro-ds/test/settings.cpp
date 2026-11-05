@@ -63,6 +63,18 @@ int main(int argc,char** argv){
   {std::ofstream legacy(std::string(path)+"/pokedaisy/settings.ini");legacy<<"hud=1\nds_layout=4\n";}
   separate.init(path);assert(separate.settings.hud && separate.layout==4);
   assert(separate.save()); // DS-authored legacy settings migrate without modifying the source
+  // Every appended layout is selectable and survives a real settings reload.
+  ui.init(path);ui.layout=0;ui.frame.tab=PD_TAB_SETTINGS;ui.setting=0;
+  for(int mode=0;mode<7;++mode){
+    press(ui,RETRO_DEVICE_ID_JOYPAD_A);
+    for(int i=0;i<mode;++i)press(ui,RETRO_DEVICE_ID_JOYPAD_DOWN);
+    press(ui,RETRO_DEVICE_ID_JOYPAD_A);assert(ui.layout==mode);
+    reloaded.init(path);assert(reloaded.layout==mode);
+    // Return to zero so the next selection starts at the same row.
+    press(ui,RETRO_DEVICE_ID_JOYPAD_A);
+    for(int i=0;i<mode;++i)press(ui,RETRO_DEVICE_ID_JOYPAD_UP);
+    press(ui,RETRO_DEVICE_ID_JOYPAD_A);assert(ui.layout==0);
+  }
   // Hostile/old preference values never index a label/button array out of bounds.
   ui.save();
   {std::ofstream file(ui.path,std::ios::app);file<<"ds_layout=999\nds_companionbtn=-1\nds_penspeed=oops\n";}

@@ -76,19 +76,35 @@ int main(int argc,char** argv){
   for(int i=0;i<3;++i){mask=1u<<RETRO_DEVICE_ID_JOYPAD_R;retro_run_fn();mask=0;retro_run_fn();ppm(directory,i==0?"bag":i==1?"map":"dex");}
   mask=1u<<RETRO_DEVICE_ID_JOYPAD_R;retro_run_fn();mask=0;retro_run_fn();ppm(directory,"settings");
   mask=1u<<RETRO_DEVICE_ID_JOYPAD_A;retro_run_fn();mask=0;retro_run_fn();ppm(directory,"settings-picker");
-  mask=1u<<RETRO_DEVICE_ID_JOYPAD_B;retro_run_fn();mask=0;retro_run_fn();
+  if(getenv("PD_TEST_LAYOUT")){
+    int mode=atoi(getenv("PD_TEST_LAYOUT"));assert(mode>=0&&mode<7);
+    for(int i=0;i<mode;i++){mask=1u<<RETRO_DEVICE_ID_JOYPAD_DOWN;retro_run_fn();mask=0;retro_run_fn();}
+    mask=1u<<RETRO_DEVICE_ID_JOYPAD_A;retro_run_fn();mask=0;retro_run_fn();
+  }else{mask=1u<<RETRO_DEVICE_ID_JOYPAD_B;retro_run_fn();mask=0;retro_run_fn();}
   if(getenv("PD_TEST_GRID")){
     for(int i=0;i<6;i++){mask=1u<<RETRO_DEVICE_ID_JOYPAD_DOWN;retro_run_fn();mask=0;retro_run_fn();}
     mask=1u<<RETRO_DEVICE_ID_JOYPAD_A;retro_run_fn();mask=0;retro_run_fn();ppm(directory,"quick-settings");
   }
-  mask=1u<<RETRO_DEVICE_ID_JOYPAD_L2;retro_run_fn();mask=0;retro_run_fn();assert(w==256&&h==192);
+  mask=1u<<RETRO_DEVICE_ID_JOYPAD_L2;retro_run_fn();mask=0;retro_run_fn();assert(w==512&&h==384);
   if(getenv("PD_TEST_GRID")){
     memcpy(before,ram,ramsize);
     mask=(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)|(1u<<RETRO_DEVICE_ID_JOYPAD_L2);retro_run_fn();mask=0;retro_run_fn();assert(w==341&&h==256);assert(!memcmp(before,ram,ramsize));ppm(directory,"quick-grid");
     mask=1u<<RETRO_DEVICE_ID_JOYPAD_B;retro_run_fn();mask=0;retro_run_fn();
   }
 
-  mask=1u<<RETRO_DEVICE_ID_JOYPAD_R2;retro_run_fn();mask=0;retro_run_fn();assert(w==256&&h==192);ppm(directory,"bottom");
+  ppm(directory,"chosen-layout");
+  if(getenv("PD_TEST_MENU")){
+    for(int i=0;i<120;++i)retro_run_fn();
+    mask=1u<<RETRO_DEVICE_ID_JOYPAD_X;for(int i=0;i<4;++i)retro_run_fn();mask=0;
+    for(int i=0;i<90;++i)retro_run_fn();ppm(directory,"native-menu");
+    for(int n=0;n<2;++n){mask=1u<<RETRO_DEVICE_ID_JOYPAD_DOWN;for(int i=0;i<4;++i)retro_run_fn();mask=0;for(int i=0;i<4;++i)retro_run_fn();}
+    mask=1u<<RETRO_DEVICE_ID_JOYPAD_A;for(int i=0;i<4;++i)retro_run_fn();mask=0;
+    for(int i=0;i<120;++i)retro_run_fn();ppm(directory,"native-bag");
+    mask=1u<<RETRO_DEVICE_ID_JOYPAD_B;retro_run_fn();mask=0;
+    for(int i=0;i<60;++i)retro_run_fn();
+  }
+  mask=(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)|(1u<<RETRO_DEVICE_ID_JOYPAD_R2);retro_run_fn();mask=0;retro_run_fn();assert(w==512&&h==384);ppm(directory,"manual-touch");
+  mask=1u<<RETRO_DEVICE_ID_JOYPAD_R2;retro_run_fn();mask=0;retro_run_fn();assert(w==512&&h==384);ppm(directory,"bottom");
  }
  assert(!retro_unserialize_fn(state,3));
  free(before);free(state);retro_unload_game_fn();retro_deinit_fn();dlclose(so);

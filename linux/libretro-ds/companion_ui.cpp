@@ -1,5 +1,6 @@
 // GPL-3.0. Reuses the shared frame, row widgets, pick-list and Platinum views.
 #include "companion_ui.h"
+#include "layout.h"
 #include "party_view.h"
 #include "bag_view.h"
 #include "dex_view.h"
@@ -17,7 +18,7 @@ extern "C" {
 #include "pd_style.h"
 }
 namespace {
-const char* const layoutNames[]={"AUTO","TOP","BOTTOM","SIDE BY SIDE","STACKED"};
+const char* const layoutNames[]={"ONE SCREEN","TOP","BOTTOM","SIDE BY SIDE","STACKED","LARGE + SMALL","PICTURE IN PICTURE"};
 const char* const buttonNames[]={"L2","R2","X","Y","NONE"};
 const unsigned buttonIds[]={RETRO_DEVICE_ID_JOYPAD_L2,RETRO_DEVICE_ID_JOYPAD_R2,RETRO_DEVICE_ID_JOYPAD_X,RETRO_DEVICE_ID_JOYPAD_Y};
 const char* const speedNames[]={"SLOW","NORMAL","FAST"};
@@ -27,7 +28,7 @@ const char* const* choices(int row){
   return row==DsCompanionUi::Layout?layoutNames:row==DsCompanionUi::PenSpeed?speedNames:
     row==DsCompanionUi::Reset?resetNames:buttonNames;
 }
-int count(int row){return row==DsCompanionUi::Layout?5:row==DsCompanionUi::CompanionButton?4:
+int count(int row){return row==DsCompanionUi::Layout?DS_LAYOUTS:row==DsCompanionUi::CompanionButton?4:
  row==DsCompanionUi::ScreenButton?5:row==DsCompanionUi::PenSpeed?3:2;}
 }
 void DsCompanionUi::defaults(){
@@ -58,7 +59,7 @@ void DsCompanionUi::init(const std::string& directory,int legacyLayout,bool lega
       auto key=line.substr(0,at),text=line.substr(at+1);char* end=nullptr;
       long v=std::strtol(text.c_str(),&end,10);
       if(end==text.c_str() || (*end && *end!='\r') || v<0 || v>8)continue;
-      if(key=="ds_layout" && v<5)layout=v;
+      if(key=="ds_layout" && v<DS_LAYOUTS)layout=v;
       if(key=="ds_battles" && v<2)autoBattles=v;
       if(key=="ds_companionbtn" && v<4)companionButton=v;
       if(key=="ds_screenbtn" && v<5)screenButton=v;
