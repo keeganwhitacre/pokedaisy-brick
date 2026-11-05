@@ -15,8 +15,11 @@ v0.2 SDL host (`docs/PLORPOS_V0.2.md`) and the list of intentional differences.
 - Output is RGB565. The core picks its own frame size from the panel (`pokedaisy_panel`, sent by plorpOS; `auto` = the older `pokedaisy_canvas` option alone, 320x240 by default)
   and the aspect: the game's whole scale `s` is the largest that fits the panel, and the frame is the panel divided by
   `s`. EXPAND (and any game without EXPAND support) uses the full scale, 4x on the Brick = 256x192; ZOOM OUT uses one
-  scale less, 3x = 341x256. ORIGINAL, the companion, the quick menu and the HUD focus use the ZOOM OUT frame, so the
-  companion and menus look the same in every aspect. A change of frame is a `SET_GEOMETRY`; diatom re-fits the picture.
+  scale less, 3x = 341x256. ORIGINAL, the companion, the quick menu and the HUD focus use the menu frame: the ZOOM OUT
+  frame, or a scale less again until it holds 320x240 (what the companion is laid out for: a Game Boy game's ZOOM OUT
+  on the Brick is 256x192, so its menus get 341x256), the same in every aspect. The HUD sits on the picture that is on
+  screen: in EXPAND and ZOOM OUT its corners are the whole frame's, not the game's middle. A change of frame is a
+  `SET_GEOMETRY`; diatom re-fits the picture.
   The less the frame, the less the core draws: EXPAND at 4x costs about 8.5 ms a frame on the Brick, ZOOM OUT about 11.
   AUTO ZOOM switches between the two as the scene changes (field = ZOOM OUT frame, elsewhere the EXPAND frame).
 - Buttons: the quick menu (Y), companion (X) and HUD cursor (R2) buttons are rows of PokeDaisy's own SETTINGS, saved in `settings.ini` (a core option is out of reach in plorpOS). The launcher keeps L2 and R2 for this core on GBA (it clears them for the other GBA cores).
@@ -58,7 +61,7 @@ preview byte-identical (80 PNGs); NC = not checked.
 | Quick menu WILD ENCOUNTERS | B3 | OFF tag, notice, persisted; no battle in 96 grass steps, a battle with it on | D, with the control |
 | EXPAND, ORIGINAL on FireRed | B4 | same scene and window as v0.2 | D, Vermilion City, side by side |
 | ZOOM OUT on FireRed | B4 | 341x256 frame (3x), against EXPAND's 256x192 (4x); the owner checked it on the Brick ("looks good") | H, D |
-| EXPAND, ZOOM OUT on Crystal | B4 | the overworld widens past the game's edges (canvas 204x153 in EXPAND, 256x192 in ZOOM OUT); the border drew in the wrong colours until the 16-bit palette was converted (rebuilt window 360 of 360 cells differed from the frame before, 0 after); the Crystal clock prompt appears because the desktop host has no RTC | H, D (border colours, owner) |
+| EXPAND, ZOOM OUT on Crystal | B4 | the overworld widens past the game's edges (canvas 204x153 in EXPAND, 256x192 in ZOOM OUT, its menus 341x256); the border drew in the wrong colours until the 16-bit palette was converted (rebuilt window 360 of 360 cells differed from the frame before, 0 after); the Crystal clock prompt appears because the desktop host has no RTC | H, D (border colours, owner) |
 | Fast-forward and rewind edges (GBA and Game Boy) | pk_wide | the picture over the blurred glow, not black or flat bars; rewind keeps ZOOM OUT; fast-forward is silent | H, D (owner) |
 | AUTO ZOOM IN | B4 | steps ZOOM OUT in to the EXPAND frame on menus, the START menu, battles and text (Crystal start/select, owner); building interiors are the overworld, so nothing steps in there (by design, as v0.2); Yellow NC (the community save does not load as a game; follow-up bead) | D |
 | GB look, Gen 1 DEX pages, GB GUIDE | `3ds/core` | Blue: DEX lists all 151 (SEEN 151, OWN 151); GB tabs and GUIDE notice draw on Blue and Crystal. SGB colours NC; Gen 2 DEX pages not opened | H (Blue, Crystal saves) |

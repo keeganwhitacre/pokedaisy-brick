@@ -127,7 +127,11 @@ static void tabs(struct pd_ui* ui, struct pd_canvas* c, const struct bag_palette
         int tx = x + f + 5, ty = pd_text_y(y, TAB_H);
         int tw = pd_text_fit(c, tx, ty, w - 2 * f - 8, name, open ? p->text : p->tabText,
                              open ? p->textShadow : p->tabTextShadow);
-        if (open) pd_fill(c, tx, y + TAB_H - f - 4, tw, 2, p->cursor); // the open tab's underline
+        if (open) { // the open tab's underline: under the text's shadow (caps rows 4-12, shadow 13), inside the border
+            int uy = ty + 14, uh = y + TAB_H - f - uy;
+            if (uh > 2) uh = 2;
+            if (uh > 0) pd_fill(c, tx, uy, tw, uh, p->cursor);
+        }
         if (ui->pressedId == HIT_BAG_TAB + i) pd_fill(c, x + f, y + f, w - 2 * f, 1, p->cursor);
         ui_add_hit(ui, x, y, w, TAB_H, HIT_BAG_TAB + i);
     }

@@ -510,6 +510,15 @@ static void draw_hud(void) {
   if (gs < 1)
     gs = 1;
   int ax = (CW - (int)gameW * gs) / 2, ay = (CH - (int)gameH * gs) / 2, aw = (int)gameW * gs, ah = (int)gameH * gs;
+  if (wideReady) { // the wide view (EXPAND, ZOOM OUT) is what is on screen: anchor to it, not to the centred game picture
+    int ws = CW / (int)wideW < CH / (int)wideH ? CW / (int)wideW : CH / (int)wideH;
+    if (ws < 1)
+      ws = 1;
+    aw = (int)wideW * ws;
+    ah = (int)wideH * ws;
+    ax = (CW - aw) / 2;
+    ay = (CH - ah) / 2;
+  }
   int scale = 1 + settings.hudSize - PD_HUD_NORMAL;
   if (scale < 1)
     scale = 1;
@@ -602,11 +611,16 @@ static void wide_tick(void) {
 
 /* The canvas for a fw x fh game on the panel: the panel over the game's whole scale (one less for ZOOM OUT), so the
  * frontend shows it at exactly that integer scale. EXPAND's window is the whole canvas. */
-static void canvas_for(int fw, int fh, bool zoom, int *w, int *h) {
+enum { CANVAS_EXPAND, CANVAS_ZOOM, CANVAS_MENU };
+static void canvas_for(int fw, int fh, int kind, int *w, int *h) {
   int s = panelW / fw < panelH / fh ? panelW / fw : panelH / fh;
   if (s < 1)
     s = 1;
-  if (zoom && s > 1)
+  if (kind != CANVAS_EXPAND && s > 1)
+    s--;
+  // The companion and its menus are laid out for 320x240 at least: a Game Boy game's ZOOM OUT on a 1024x768 panel is
+  // 256x192, where text overran its boxes (plorpOS plorpos-oe0.26). Menus step down until the canvas holds them.
+  while (kind == CANVAS_MENU && s > 1 && (panelW / s < 320 || panelH / s < 240))
     s--;
   int x = panelW / s, y = panelH / s;
   *w = x < fw ? fw : x > CANVAS_MAX_W ? CANVAS_MAX_W : x;
@@ -627,7 +641,7 @@ static void choose_canvas(void) {
     mgba_retro_get_system_av_info(&av);
     baseGW = (int)av.geometry.base_width;
     baseGH = (int)av.geometry.base_height;
-    canvas_for(baseGW, baseGH, true, &CWMAX, &CHMAX); // ZOOM OUT's is the largest
+    canvas_for(baseGW, baseGH, CANVAS_MENU, &CWMAX, &CHMAX); // the menus' is the largest
   } else
     panelW = panelH = 0;
   CW = CWMAX;
@@ -636,12 +650,12 @@ static void choose_canvas(void) {
 
 /* Which canvas this moment wants. With a known panel: ZOOM OUT (one scale less) while it is the chosen view, and while a
  * menu is up (they are laid out for it); EXPAND's scale otherwise, which for a game with no EXPAND is the default. */
-static bool want_zoom_canvas(void) {
+static int want_canvas(void) {
   if (companion || quickOpen || hudFocus || settings.aspect == PD_ASPECT_ORIGINAL)
-    return true;
+    return CANVAS_MENU;
   if (!wideSupported || settings.aspect != PD_ASPECT_ZOOM_OUT)
-    return false;
-  return !(settings.autoZoom && !rewinding && pk_wide_scene() != PK_WIDE_SCENE_FIELD);
+    return CANVAS_EXPAND;
+  return settings.autoZoom && !rewinding && pk_wide_scene() != PK_WIDE_SCENE_FIELD ? CANVAS_EXPAND : CANVAS_ZOOM;
 }
 
 /* Follow the aspect: when the wanted canvas differs, resize it and tell the frontend (it rescales to the new whole factor). */
@@ -650,7 +664,7 @@ static void canvas_update(bool notify) {
     return;
   int w, h;
   unsigned fw = gameW ? gameW : (unsigned)baseGW, fh = gameH ? gameH : (unsigned)baseGH;
-  canvas_for((int)fw, (int)fh, want_zoom_canvas(), &w, &h);
+  canvas_for((int)fw, (int)fh, want_canvas(), &w, &h);
   if (w == CW && h == CH)
     return;
   CW = w;
