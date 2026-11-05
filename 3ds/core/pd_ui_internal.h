@@ -123,6 +123,8 @@ void ui_ball(struct pd_canvas* c, int x, int y, bool caught);
 
 // A scrolled list's offset clamped to its content: max(0, total - view).
 int ui_clamp_scroll(int scroll, int total, int view);
+// The scroll that keeps a row (top..top+h in list pixels) wholly in a view of [view] pixels, moved as little as can be.
+int ui_scroll_to(int scroll, int top, int h, int view);
 // A thin scroll bar along a list's right edge.
 void ui_scroll_bar(struct pd_canvas* c, int x, int y, int h, int scroll, int total, uint32_t color);
 

@@ -161,19 +161,62 @@ static int focus_resolve(struct pd_ui *u) {
     focusAt = u->hits[i];
   return i;
 }
+/* The list window (a scrolled list's own hit) the hit [h] is in, -1 = none. */
+static int list_of(const struct pd_ui *u, const struct pd_hit *h) {
+  int cx = h->x + h->w / 2, cy = h->y + h->h / 2;
+  for (int j = modal_floor(u); j < u->hitCount; j++) {
+    const struct pd_hit *l = &u->hits[j];
+    bool window = l->id == HIT_BAG_LIST || l->id == HIT_DEX_LIST || l->id == HIT_GUIDE_LIST ||
+                  l->id == HIT_SETTINGS_LIST || (l->id == HIT_SCRIM && l->scroll);
+    if (window && l != h && cx >= l->x && cx < l->x + l->w && cy >= l->y && cy < l->y + l->h)
+      return j;
+  }
+  return -1;
+}
+static bool centre_in(const struct pd_hit *l, const struct pd_hit *t) {
+  int cx = t->x + t->w / 2, cy = t->y + t->h / 2;
+  return cx >= l->x && cx < l->x + l->w && cy >= l->y && cy < l->y + l->h;
+}
+/* The scroll of the list on screen (the draw clamps it to the list's length), NULL = none. */
+static int *list_scroll(struct pd_ui *u) {
+  if (u->overlay == PD_OVERLAY_PLACES)
+    return &u->placesScroll;
+  if (u->overlay != PD_OVERLAY_NONE)
+    return NULL;
+  return u->tab == PD_TAB_BAG ? &u->bagScroll : u->tab == PD_TAB_DEX ? &u->dexScroll : u->tab == PD_TAB_GUIDE ? &u->guideScroll
+         : u->tab == PD_TAB_SETTINGS ? &u->settingsScroll : NULL;
+}
+/* A move that found nothing and scrolled the list instead: after the next draw, the row it brought into view. */
+static int focusRetry = -1;
+static bool focus_step(struct pd_ui *u, int direction, bool scroll);
 static void focus_move(struct pd_ui *u, int direction) {
+  focusRetry = -1;
+  if (!focus_step(u, direction, true))
+    focusRetry = direction;
+}
+/* After a draw: a scrolled move's second half, onto the row now shown (no further scroll). */
+static int focus_after_draw(struct pd_ui *u, int at) {
+  if (focusRetry < 0)
+    return at;
+  int d = focusRetry;
+  focusRetry = -1;
+  focus_step(u, d, false);
+  return focus_index(u, focusId);
+}
+/* The cursor's step; false when there was nothing that way and the list scrolled one row instead. */
+static bool focus_step(struct pd_ui *u, int direction, bool scroll) {
   if (map_cursor_active(u)) {
     if (direction == LEFT && mapCursor.tx > mapCursor.minX) mapCursor.tx--;
     if (direction == RIGHT && mapCursor.tx < mapCursor.maxX) mapCursor.tx++;
     if (direction == UP && mapCursor.ty > mapCursor.minY) mapCursor.ty--;
     if (direction == DOWN && mapCursor.ty < mapCursor.maxY) mapCursor.ty++;
     focus_activate(u); // Name the location immediately, like the game's map.
-    return;
+    return true;
   }
   int cur = focus_index(u, focusId);
   if (cur < 0) {
     focus_resolve(u);
-    return;
+    return true;
   }
   const struct pd_hit *h = &u->hits[cur];
   int best = -1, score = 1000000;
@@ -203,22 +246,25 @@ static void focus_move(struct pd_ui *u, int direction) {
       score = cost;
     }
   }
+  // In a list, a target past the list's window (the tab bar under it) waits until the list has scrolled to its end:
+  // the list scrolls one row instead, and after the next draw the cursor goes onto the row that came into view (or,
+  // with the list at its end and nothing new, on past it).
+  int list = list_of(u, h);
+  bool vertical = direction == UP || direction == DOWN;
+  bool leaves = list >= 0 && (best < 0 || !centre_in(&u->hits[list], &u->hits[best]));
+  if (scroll && vertical && (best < 0 || leaves)) {
+    int *at = list_scroll(u);
+    if (at) {
+      int d = h->h > 0 && h->h <= 48 ? h->h : 18; // one row: the cursor's own
+      *at += direction == DOWN ? d : -d;
+      return false;
+    }
+  }
   if (best >= 0) {
     focusId = u->hits[best].id;
     focusAt = u->hits[best];
-  } else if (direction == UP || direction == DOWN) {
-    int d = direction == DOWN ? 36 : -36;
-    if (u->overlay == PD_OVERLAY_PLACES)
-      u->placesScroll += d;
-    else if (u->tab == PD_TAB_BAG)
-      u->bagScroll += d;
-    else if (u->tab == PD_TAB_DEX)
-      u->dexScroll += d;
-    else if (u->tab == PD_TAB_GUIDE)
-      u->guideScroll += d;
-    else if (u->tab == PD_TAB_SETTINGS && u->overlay == PD_OVERLAY_NONE)
-      u->settingsScroll += d;
   }
+  return true;
 }
 static void focus_draw(struct pd_ui *u, int focus) {
   if (focus < 0 || focus >= u->hitCount)

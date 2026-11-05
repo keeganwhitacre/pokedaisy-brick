@@ -118,6 +118,12 @@ void ui_ball(struct pd_canvas* c, int x, int y, bool caught) {
     }
 }
 
+int ui_scroll_to(int scroll, int top, int h, int view) {
+    if (top + h > scroll + view) scroll = top + h - view;
+    if (top < scroll) scroll = top;
+    return scroll;
+}
+
 int ui_clamp_scroll(int scroll, int total, int view) {
     int max = total - view;
     if (max < 0) max = 0;

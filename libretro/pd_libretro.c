@@ -649,9 +649,10 @@ static void choose_canvas(void) {
 }
 
 /* Which canvas this moment wants. With a known panel: ZOOM OUT (one scale less) while it is the chosen view, and while a
- * menu is up (they are laid out for it); EXPAND's scale otherwise, which for a game with no EXPAND is the default. */
+ * menu is up (they are laid out for it); EXPAND's scale otherwise, which for a game with no EXPAND is the default. The
+ * HUD cursor is not a menu: it sits on the game's own view, so the canvas stays as it is. */
 static int want_canvas(void) {
-  if (companion || quickOpen || hudFocus || settings.aspect == PD_ASPECT_ORIGINAL)
+  if (companion || quickOpen || settings.aspect == PD_ASPECT_ORIGINAL)
     return CANVAS_MENU;
   if (!wideSupported || settings.aspect != PD_ASPECT_ZOOM_OUT)
     return CANVAS_EXPAND;
@@ -1209,7 +1210,7 @@ RETRO_API void retro_run(void) {
     memset(cvs, 0, (size_t)CW * CH * sizeof *cvs);
     pd_ui_draw(&ui, &canvas, &game, &snap, &host);
     map_cursor_sync(&ui, &game, &snap);
-    focus_draw(&ui, focus_resolve(&ui));
+    focus_draw(&ui, focus_after_draw(&ui, focus_resolve(&ui)));
   } else if (quickOpen) {
     draw_game();
     dim(0x55);

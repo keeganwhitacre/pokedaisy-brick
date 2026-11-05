@@ -15,15 +15,19 @@ v0.2 SDL host (`docs/PLORPOS_V0.2.md`) and the list of intentional differences.
 - Output is RGB565. The core picks its own frame size from the panel (`pokedaisy_panel`, sent by plorpOS; `auto` = the older `pokedaisy_canvas` option alone, 320x240 by default)
   and the aspect: the game's whole scale `s` is the largest that fits the panel, and the frame is the panel divided by
   `s`. EXPAND (and any game without EXPAND support) uses the full scale, 4x on the Brick = 256x192; ZOOM OUT uses one
-  scale less, 3x = 341x256. ORIGINAL, the companion, the quick menu and the HUD focus use the menu frame: the ZOOM OUT
+  scale less, 3x = 341x256. ORIGINAL, the companion and the quick menu use the menu frame: the ZOOM OUT
   frame, or a scale less again until it holds 320x240 (what the companion is laid out for: a Game Boy game's ZOOM OUT
   on the Brick is 256x192, so its menus get 341x256), the same in every aspect. The HUD sits on the picture that is on
-  screen: in EXPAND and ZOOM OUT its corners are the whole frame's, not the game's middle. A change of frame is a
+  screen: in EXPAND and ZOOM OUT its corners are the whole frame's, not the game's middle. The HUD cursor keeps the
+  frame that is on screen (it is not a menu: it sits on the game's own view). A change of frame is a
   `SET_GEOMETRY`; diatom re-fits the picture.
   The less the frame, the less the core draws: EXPAND at 4x costs about 8.5 ms a frame on the Brick, ZOOM OUT about 11.
   AUTO ZOOM switches between the two as the scene changes (field = ZOOM OUT frame, elsewhere the EXPAND frame).
 - Buttons: the quick menu (Y), companion (X) and HUD cursor (R2) buttons are rows of PokeDaisy's own SETTINGS, saved in `settings.ini` (a core option is out of reach in plorpOS). The launcher keeps L2 and R2 for this core on GBA (it clears them for the other GBA cores).
 - Off the map (menus, fast-forward, rewind) the window past the frame is the ambient glow, blurred from the frame's own edges, for GBA and for Game Boy games. Fast-forward skips the map rebuild and draws only the glow (`pk_wide_glow`) and plays no audio. Rewind (`RETRO_THROTTLE_REWINDING`) holds the chosen aspect: AUTO ZOOM IN does not step in on rewound frames.
+- The companion's D-pad cursor in a list (BAG, DEX, GUIDE, SETTINGS, PLACES) moves one row a press. A row cut by the
+  list's edge scrolls wholly into view when the cursor lands on it, and past the last row shown the list scrolls one row
+  and the cursor goes onto the new row. The cursor leaves the list (for the tab bar) only once the list is at its end.
 - Settings: `<save directory>/pokedaisy/settings.ini`.
 
 ## Intentional differences from v0.2

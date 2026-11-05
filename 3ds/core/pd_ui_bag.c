@@ -148,12 +148,15 @@ static void list(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g,
     }
     int maxScroll = v->count * BAG_ROW - ih;
     if (maxScroll < 0) maxScroll = 0;
-    // Keep the selected row in view (the D-pad walks down past the window).
-    if (ui->bagSelected >= 0) {
-        int top = ui->bagSelected * BAG_ROW;
-        if (top < ui->bagScroll) ui->bagScroll = top;
-        if (top + BAG_ROW > ui->bagScroll + ih) ui->bagScroll = top + BAG_ROW - ih;
-    }
+    // The selected row, and the row a host's D-pad cursor is on, come wholly into view when they change (a row cut at
+    // the window's edge); after that the list scrolls freely (the D-pad walks on past the window).
+    static int seenSel = -1, seenFocus = -1;
+    if (ui->bagSelected >= 0 && ui->bagSelected != seenSel)
+        ui->bagScroll = ui_scroll_to(ui->bagScroll, ui->bagSelected * BAG_ROW, BAG_ROW, ih);
+    if (ui->focusId != seenFocus && ui->focusId >= HIT_BAG_ROW && ui->focusId < HIT_BAG_ROW + v->count)
+        ui->bagScroll = ui_scroll_to(ui->bagScroll, (ui->focusId - HIT_BAG_ROW) * BAG_ROW, BAG_ROW, ih);
+    seenSel = ui->bagSelected;
+    seenFocus = ui->focusId;
     if (ui->bagScroll > maxScroll) ui->bagScroll = maxScroll;
     if (ui->bagScroll < 0) ui->bagScroll = 0;
 
