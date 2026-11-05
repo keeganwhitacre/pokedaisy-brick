@@ -60,7 +60,7 @@ int main(int argc,char** argv){
  for(frame=0;frame<frames;++frame){
   // Platinum: dismiss title, then CONTINUE. Harmless on diagnostic cart.
   mask=(frame%60>=30 && frame%60<34 && frame+240<frames)?1u<<RETRO_DEVICE_ID_JOYPAD_A:0;
-  if(frame+200>=frames && frame+196<frames)mask=1u<<RETRO_DEVICE_ID_JOYPAD_B;
+  if(frame+200>=frames && frame+196<frames)mask=1u<<RETRO_DEVICE_ID_JOYPAD_START;
   if(getenv("PD_TEST_BUTTON"))mask=(frame%60>=30 && frame%60<34)?1u<<atoi(getenv("PD_TEST_BUTTON")):0;retro_run_fn();
  }
  mask=0;retro_run_fn();ppm(directory,"game");
@@ -72,7 +72,10 @@ int main(int argc,char** argv){
  for(int i=0;i<5;++i)retro_run_fn();assert(retro_unserialize_fn(state,n));assert(!memcmp(before,ram,ramsize));assert(save==retro_get_memory_data_fn(RETRO_MEMORY_SAVE_RAM));
  if(fmt==2){
   mask=1u<<RETRO_DEVICE_ID_JOYPAD_L2;retro_run_fn();mask=0;retro_run_fn();assert(w==341&&h==256);assert(!memcmp(before,ram,ramsize));ppm(directory,"party");
-  for(int i=0;i<3;++i){mask=1u<<RETRO_DEVICE_ID_JOYPAD_R;retro_run_fn();mask=0;retro_run_fn();ppm(directory,i==0?"bag":i==1?"dex":"map");}
+  for(int i=0;i<3;++i){mask=1u<<RETRO_DEVICE_ID_JOYPAD_R;retro_run_fn();mask=0;retro_run_fn();ppm(directory,i==0?"bag":i==1?"map":"dex");}
+  mask=1u<<RETRO_DEVICE_ID_JOYPAD_R;retro_run_fn();mask=0;retro_run_fn();ppm(directory,"settings");
+  mask=1u<<RETRO_DEVICE_ID_JOYPAD_A;retro_run_fn();mask=0;retro_run_fn();ppm(directory,"settings-picker");
+  mask=1u<<RETRO_DEVICE_ID_JOYPAD_B;retro_run_fn();mask=0;retro_run_fn();
   mask=1u<<RETRO_DEVICE_ID_JOYPAD_L2;retro_run_fn();mask=0;retro_run_fn();assert(w==256&&h==192);
   mask=1u<<RETRO_DEVICE_ID_JOYPAD_R2;retro_run_fn();mask=0;retro_run_fn();assert(w==256&&h==192);ppm(directory,"bottom");
  }

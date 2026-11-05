@@ -21,6 +21,7 @@ with tempfile.TemporaryDirectory() as temp:
         shutil.copyfile(Path(__file__).parent/name,pak/name)
     (pak/'launch.sh').chmod(0o755)
     shutil.copyfile(Path(__file__).parent/'README.md',stage/'README.md')
+    shutil.copyfile(Path(__file__).parent/'COMPANION-UPDATE.md',stage/'COMPANION-UPDATE.md')
     licenses=pak/'licenses';licenses.mkdir()
     shutil.copyfile(root/'LICENSE',licenses/'PokeDaisy-GPL-3.0.txt')
     ds=root/'third_party/dsperate-lr/DSperate'

@@ -1,8 +1,8 @@
-# PokeDaisy DS libretro — first Brick test build
+# PokeDaisy DS libretro — companion/settings test build
 
-Experimental Platinum milestone, 2026-11-04. This is a separate core and pak.
+Experimental Platinum companion/settings update. See COMPANION-UPDATE.md. This is a separate core and pak.
 It does not replace the working mGBA PokeDaisy core, the NDS pak or brick/dev.
-Physical Brick validation has NOT been performed by this development session.
+The previous candidate launched, fast-forwarded and opened/swapped screens on the owner’s Brick. This UI update still needs a hardware check.
 
 ## Install on NXRedux
 
@@ -23,7 +23,7 @@ Physical Brick validation has NOT been performed by this development session.
 | Select + D-pad | Move stylus (automatically exposes bottom screen) |
 | Select + A | Hold stylus down; release A to lift |
 | Select tap | Forward DS Select on release |
-| Companion L1/R1 | Party / Bag / Dex / Map |
+| Companion L1/R1 | Party / Bag / Map / Dex / Settings gear |
 | Companion A/B | Details / back |
 | Native MENU / shortcuts | Frontend menus, states, fast-forward, resume |
 
@@ -33,10 +33,13 @@ hand test. Set shoulder shortcuts so L2/R2 reach the core; this pak's default
 bindings expose both. R2's manual override persists until cycled back to AUTO
 or a state is loaded/reset. All four DS face buttons remain available.
 
-The party HUD is an optional core option (`pokedaisy_ds_hud=enabled`), off by
- default. It uses the existing shared party HUD and DS ROM icons. It appears
-only on the top-only layout and can cover game content. The separate GBA/GB
-core's quick-menu field actions are not yet ported to this core.
+Open the companion and press L1 from PARTY to reach the Settings gear. The
+companion now uses the shared GB/GBA-style bottom tabs and choice windows.
+Change DS layout, automatic battle menus, party HUD, shortcut buttons or stylus
+speed there. Settings persist in `Saves/PDDS/pokedaisy/settings.ini`; legacy core
+options are only initial defaults when that file does not exist. Native states,
+resume, fast-forward, shaders and scaling remain in NXRedux's own menu.
+The separate GBA/GB core's quick-menu field actions are not yet ported.
 
 ## Saves, states and resume
 
