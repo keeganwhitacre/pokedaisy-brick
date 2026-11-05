@@ -492,7 +492,7 @@ static void snapshot(void) { pd_snapshot_read(&snap, &game, pd_lr_read_memory, c
 
 static int hud_wild_uncaught(const struct pd_game *g, const struct pd_snapshot *s) {
   struct pd_wild_set w;
-  if (!g->cfg || !g->cfg->wildHeaders)
+  if (!g->cfg || (!g->cfg->gb && !g->cfg->wildHeaders)) // the Game Boy games' come from their GUIDE data
     return -1;
   if (!pd_wild_here(g, s, &w))
     return 0;
@@ -803,7 +803,8 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   host.hasQuickMenu = true;
   host.hasButtonRows = true;
   host.frontendOwnsPlayback = true;
-  host.hasHud = core->platform(core) == mPLATFORM_GBA;
+  // The Game Boy games get the HUD where the field scene is known (English Yellow, Crystal: pk_wide_gb), as in the app.
+  host.hasHud = core->platform(core) == mPLATFORM_GBA || wideSupported;
   host.hasExpand = true;
   host.expandGame = wideSupported;
   host.count = 1;
@@ -1274,17 +1275,19 @@ RETRO_API void retro_run(void) {
       draw_game_fast();
     else
       draw_game();
-    bool field = (fieldFlags & PK_FIELD_KNOWN) && !(fieldFlags & (PK_FIELD_LOCKED | PK_FIELD_BATTLE)) &&
-                 (!wideSupported || pk_wide_scene() == PK_WIDE_SCENE_FIELD) && flyStage == 0;
+    bool gb = core->platform(core) == mPLATFORM_GB;
+    bool field = gb ? wideSupported && pk_wide_scene() == PK_WIDE_SCENE_FIELD && !snap.inBattle && flyStage == 0
+                    : (fieldFlags & PK_FIELD_KNOWN) && !(fieldFlags & (PK_FIELD_LOCKED | PK_FIELD_BATTLE)) &&
+                          (!wideSupported || pk_wide_scene() == PK_WIDE_SCENE_FIELD) && flyStage == 0;
     hudFieldFrames = field ? hudFieldFrames + 1 : 0;
-    if (settings.hud && game.cfg && core->platform(core) == mPLATFORM_GBA && hudFieldFrames >= 20) {
-      int steps = repel_steps(core, game.cfg);
+    if (settings.hud && game.cfg && host.hasHud && hudFieldFrames >= 20) {
+      int steps = gb ? 0 : repel_steps(core, game.cfg); // the Game Boy games' Repel steps aren't read (nor in the app)
       if (steps <= 0)
         hudState.repelFull = 0;
       else if (!hudState.repelFull || steps > hudState.repelFull)
         hudState.repelFull = hud_repel_full(steps);
       hudState.repel = steps > 0 ? steps : 0;
-      hudState.pc = pcOk;
+      hudState.pc = pcOk || gbf;
       hudState.wild = hud_wild_uncaught(&game, &snap);
       draw_hud();
     } else
