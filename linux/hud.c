@@ -200,18 +200,18 @@ static void minimap(struct hud *u, int x, int y, int mw, int mh, int lines) {
   if (has) {
     int cx = tx * 8 + 4, cy = ty * 8 + 4;
     int left = cx - mw / 2, top = cy - mh / 2;
-    if (left > PD_MAP_W - mw)
-      left = PD_MAP_W - mw;
-    if (top > PD_MAP_H - mh)
-      top = PD_MAP_H - mh;
+    if (left > a->w - mw)
+      left = a->w - mw;
+    if (top > a->h - mh)
+      top = a->h - mh;
     if (left < 0)
       left = 0;
     if (top < 0)
       top = 0;
     const uint32_t *px = a->page[page];
-    for (int yy = 0; yy < mh && top + yy < PD_MAP_H; yy++)
-      for (int xx = 0; xx < mw && left + xx < PD_MAP_W; xx++) {
-        uint32_t p = px[(top + yy) * PD_MAP_W + left + xx];
+    for (int yy = 0; yy < mh && top + yy < a->h; yy++)
+      for (int xx = 0; xx < mw && left + xx < a->w; xx++) {
+        uint32_t p = px[(top + yy) * a->w + left + xx];
         if (p != PD_MAP_CLEAR)
           pd_fill(u->c, mx + xx, my + yy, 1, 1, p & 0xFFFFFF);
       }
