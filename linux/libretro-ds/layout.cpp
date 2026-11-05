@@ -54,7 +54,8 @@ DsPen ds_pen(const DsArrangement& a,int x,int y){
   if(!a.touch.contains(x,y))return {};
   return {true,std::clamp((x-a.touch.x)*256/a.touch.w,0,255),std::clamp((y-a.touch.y)*192/a.touch.h,0,191)};
 }
-void ds_compose(uint32_t* out,const DsArrangement& a,const uint32_t* top,const uint32_t* bottom,const uint32_t* field){
+void ds_compose(uint32_t* out,const DsArrangement& a,const uint32_t* top,const uint32_t* bottom,const uint32_t* field,
+                void (*overlay)(uint32_t*)){
   auto blit=[&](const uint32_t* src,const DsRect& r){
     if(r.w<=0||r.h<=0)return;
     for(int y=0;y<r.h;++y)for(int x=0;x<r.w;++x)
@@ -82,7 +83,9 @@ void ds_compose(uint32_t* out,const DsArrangement& a,const uint32_t* top,const u
   if(!a.floating)blit(top,a.top);
   if(a.floating){
     if(a.useField&&field)blit(field,{0,0,512,384});
+    if(overlay)overlay(out);
     pd_dim(&c,130);frame(a.touch);
   }else if(a.touch.w>0&&a.top.w==512)frame(a.touch);
+  if(!a.floating && overlay)overlay(out);
   blit(bottom,a.touch);
 }

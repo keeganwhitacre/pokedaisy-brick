@@ -7,11 +7,12 @@ extern "C" {
 #include "pd_settings.h"
 }
 struct DsCompanionUi {
-  enum Row { Layout, Battles, Hud, CompanionButton, ScreenButton, PenSpeed, QuickStyle, Reset, Rows };
+  enum Row { Layout, Battles, Hud, CompanionButton, ScreenButton, PenSpeed, QuickStyle, Reset, BattleStrip, Rows };
   pd_settings settings{};
   pd_ui frame{}, options{};
   unsigned displayRevision=0;
   int layout=0, autoBattles=1, companionButton=0, screenButton=1, penSpeed=1;
+  bool battleStrip=false;
   int selected=0,page=0,scroll=0,pocket=0,filter=0,mapX=0,mapY=0;
   bool summary=false,details=false;
   int setting=0,picker=-1,choice=0;

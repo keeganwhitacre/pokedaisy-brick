@@ -42,6 +42,19 @@ toggles the HUD. The DS core has native viewport layouts and read-only companion
 views. EXPAND, ZOOM OUT and field actions are features of the supported GB/GBA
 games.
 
+### Platinum One Screen battle strip
+
+On Platinum USA revision 1, enable **Battle Strip** in the DS companion
+Settings with **One Screen** selected. Use the D-pad and A to choose Fight,
+Bag, Pokémon or Run. Fight opens the move grid with move types and current PP.
+B returns from the move grid. Native Bag and party windows float over the
+strip. Doubles and native prompts use the game's own controls.
+
+Platinum's compact battle buttons use the native lettering and tiles without
+the Fight sprite. The move cards retain the original type badges and
+current/max PP. HGSS, BW and B2W2
+need their own battle readers and visual profiles before enabling the strip.
+
 ## Build the Brick package
 
 Run from the repository root with CMake, Ninja and Python 3.12 or later.

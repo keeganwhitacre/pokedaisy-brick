@@ -24,6 +24,7 @@
 #undef retro_unserialize
 #include "companion.h"
 #include "companion_ui.h"
+#include "battle_strip.h"
 #include "layout.h"
 #include "party_view.h"
 #include "bag_view.h"
@@ -54,6 +55,18 @@ int quickSelected=0;
 uint32_t quick_pixels[341*256];
 DsCompanionUi shell;
 DsScenePolicy scene;
+DsBattleStrip battleStrip;
+DsBattleTap battleTap;
+DsBattleView drawnBattle;
+std::string battleName;
+std::array<uint32_t,256*192> battlePanelArt;
+bool battlePanelArtValid=false;
+unsigned battleHeld=0;
+int holdStrip=0,restoreGrace=0;
+bool battleActive=false,injectBattleTap=false;
+constexpr unsigned battleKeys=(1u<<RETRO_DEVICE_ID_JOYPAD_A)|(1u<<RETRO_DEVICE_ID_JOYPAD_B)|
+  (1u<<RETRO_DEVICE_ID_JOYPAD_UP)|(1u<<RETRO_DEVICE_ID_JOYPAD_DOWN)|
+  (1u<<RETRO_DEVICE_ID_JOYPAD_LEFT)|(1u<<RETRO_DEVICE_ID_JOYPAD_RIGHT);
 DsArrangement arrangement;
 bool manualTouch=false,fieldValid=false;
 uint32_t stage[512*384],fieldFrame[256*192];
@@ -69,7 +82,36 @@ uint32_t read32(uint32_t a) {
   if (!nds || a<0x02000000 || a>0x023ffffc) return 0;
   return nds->bus.dma_read32(ds::Cpu::ARM9,a);
 }
+void clear_battle() {
+  battleStrip={};battleTap={};drawnBattle={};battleName.clear();battlePanelArtValid=false;
+  battleHeld=0;holdStrip=restoreGrace=0;battleActive=injectBattleTap=false;
+}
+bool wants_strip() {
+  return supported && shell.battleStrip && shell.layout==DS_ONE && !screen_override &&
+    !manualTouch && !companion && !quickOpen;
+}
+DsBattleView battle_view(int bits) {
+  if(!wants_strip() || (buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)))return {};
+  return ds_read_platinum_battle(game,read32,bits);
+}
+void update_battle(unsigned pressed) {
+  battleHeld&=buttons;
+  if(!wants_strip() || (buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT))) {
+    battleStrip={};battleTap={};injectBattleTap=false;return;
+  }
+  const auto view=battle_view(pk_nds_field_state(game,read32,nullptr,0));
+  if(view.panel!=DsBattlePanel::Native)battleHeld|=buttons&battleKeys;
+  if(restoreGrace>0){--restoreGrace;pressed=0;}
+  auto hit=[&](unsigned id){return bool(pressed&(1u<<id));};
+  battleStrip.select(view,
+    hit(RETRO_DEVICE_ID_JOYPAD_RIGHT)-hit(RETRO_DEVICE_ID_JOYPAD_LEFT),
+    hit(RETRO_DEVICE_ID_JOYPAD_DOWN)-hit(RETRO_DEVICE_ID_JOYPAD_UP),
+    hit(RETRO_DEVICE_ID_JOYPAD_A),hit(RETRO_DEVICE_ID_JOYPAD_B));
+  injectBattleTap=battleStrip.tapFrames>0;
+  battleTap=battleStrip.tick();
+}
 void clear() {
+  clear_battle();
   supported=companion=quickOpen=select_used=select_pulse=false;quickSelected=0; game=nullptr; snapshot={};map={};icons.clear();
   old_buttons=buttons=tick=0;std::fill(held_frames,held_frames+16,0);
   screen_override=0;cursor_x=128;cursor_y=96;layout=0;
@@ -111,10 +153,41 @@ void choose_layout() {
   };
   bool topBlank=one_colour(nds->gpu.framebuffer(0)),bottomBlank=one_colour(nds->gpu.framebuffer(1));
   if(topBlank&&!bottomBlank)bits|=PK_NDS_FIELD_TOUCH;
+  const auto view=battle_view(bits);
+  battleActive=view.panel!=DsBattlePanel::Native;
+  if(battleActive){
+    if(drawnBattle.panel!=view.panel || drawnBattle.personality!=view.personality ||
+       drawnBattle.species!=view.species ||
+       (view.panel==DsBattlePanel::Moves &&
+        (drawnBattle.moves!=view.moves || drawnBattle.pp!=view.pp)))battlePanelArtValid=false;
+    if(!battlePanelArtValid){
+      const auto* lower=nds->gpu.framebuffer(1);
+      const bool ready=view.panel==DsBattlePanel::Actions?ds_platinum_has_command_art(lower):
+        ds_platinum_has_move_art(lower,view);
+      if(ready){
+        std::copy_n(lower,battlePanelArt.size(),battlePanelArt.begin());
+        battlePanelArtValid=true;
+      }
+    }
+    if(drawnBattle.personality!=view.personality || drawnBattle.species!=view.species || battleName.empty()){
+      const auto party=ds_read_companion(nds->bus.main_ram.get(),nds->bus.main_ram_size()).party;
+      auto mon=std::find_if(party.begin(),party.end(),[&](const DsMon& candidate){
+        return candidate.personality==view.personality && candidate.species==view.species;
+      });
+      battleName=mon!=party.end() && !mon->nickname.empty()?mon->nickname:ds_species(view.species);
+    }
+    drawnBattle=view;
+    holdStrip=18;
+  }else if(!wants_strip() || !(bits&PK_NDS_FIELD_BATTLE) || (bits&PK_NDS_FIELD_TOUCH_BATTLE_MENU)){
+    holdStrip=0;drawnBattle={};battlePanelArtValid=false;
+  }else if(holdStrip>0 && !(bits&PK_NDS_FIELD_TOUCH_FADES)){
+    --holdStrip;
+  }
   // PIP already exposes the native battle panel; it must not float twice.
-  scene.tick(bits,topBlank,bottomBlank,shell.autoBattles&&shell.layout!=DS_PIP);
+  scene.tick(bits,topBlank,bottomBlank,!battleActive&&(shell.autoBattles||wants_strip())&&shell.layout!=DS_PIP);
   int mode=screen_override==1?DS_BOTTOM:screen_override==2?DS_TOP:shell.layout;
   arrangement=ds_arrange(mode,scene,game!=nullptr,manualTouch&&screen_override==0);
+  if(battleActive && !scene.dark)arrangement={{0,0,512,384},{}};
   layout=mode==DS_BOTTOM?1:mode==DS_SIDE?2:mode==DS_STACKED?3:0;
   if(scene.hud&&!scene.dark){std::memcpy(fieldFrame,nds->gpu.framebuffer(0),sizeof fieldFrame);fieldValid=true;}
 }
@@ -162,7 +235,14 @@ void present(const void* data,unsigned,unsigned,size_t) {
   choose_layout();
   const unsigned w=512,h=384;
   geometry(w,h);
-  ds_compose(stage,arrangement,nds->gpu.framebuffer(0),nds->gpu.framebuffer(1),fieldValid?fieldFrame:nullptr);
+  const auto overlay=holdStrip>0 && !scene.dark && arrangement.top.w==512 && wants_strip()
+    ? +[](uint32_t* out){
+        const int focus=drawnBattle.panel==DsBattlePanel::Moves?battleStrip.moveFocus:battleStrip.actionFocus;
+        ds_draw_battle_strip(out,ds_platinum_battle_style,drawnBattle,battleName,focus,
+                             battleActive&&!battleStrip.tapFrames,tick,
+                             battlePanelArtValid?battlePanelArt.data():nullptr);
+      } : nullptr;
+  ds_compose(stage,arrangement,nds->gpu.framebuffer(0),nds->gpu.framebuffer(1),fieldValid?fieldFrame:nullptr,overlay);
   for(unsigned i=0;i<w*h;++i)pixels[i]=rgb565(stage[i]);
   if((buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT))&&arrangement.touch.w>0){
     int cx=arrangement.touch.x+cursor_x*arrangement.touch.w/256;
@@ -208,6 +288,7 @@ int16_t filtered_input(unsigned p,unsigned d,unsigned i,unsigned id) {
   if(d==RETRO_DEVICE_JOYPAD) {
     if(id==RETRO_DEVICE_ID_JOYPAD_SELECT && select_pulse)return 1;
     if(companion || quickOpen || (buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT)))return 0;
+    if(id<16 && (battleHeld&(1u<<id)))return 0;
     if(id==shell.companion_id() || int(id)==shell.screen_id())return 0;
   }
   // DSperate expects a pointer over stacked screens. Reproject the current
@@ -218,6 +299,11 @@ int16_t filtered_input(unsigned p,unsigned d,unsigned i,unsigned id) {
       if(id==RETRO_DEVICE_ID_POINTER_PRESSED)return !!(buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_A));
       if(id==RETRO_DEVICE_ID_POINTER_X)return cursor_x*65535/256-32767;
       if(id==RETRO_DEVICE_ID_POINTER_Y)return cursor_y*32768/192;
+    }
+    if(injectBattleTap) {
+      if(id==RETRO_DEVICE_ID_POINTER_PRESSED)return battleTap.down;
+      if(id==RETRO_DEVICE_ID_POINTER_X)return (battleTap.x*65535+255)/256-32767;
+      if(id==RETRO_DEVICE_ID_POINTER_Y)return (battleTap.y*32768+191)/192;
     }
     int x=input(p,d,i,RETRO_DEVICE_ID_POINTER_X),y=input(p,d,i,RETRO_DEVICE_ID_POINTER_Y);
     auto pen=ds_pen(arrangement,(x+32767)*512/65535,(y+32767)*384/65535);
@@ -341,17 +427,24 @@ RETRO_API bool retro_load_game(const retro_game_info* info){
   return true;
 }
 RETRO_API void retro_reset(){
+  pd_ds::clear_battle();
   ds_reset();pd_ds::companion=pd_ds::quickOpen=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;pd_ds::scene.reset();pd_ds::arrangement={};pd_ds::manualTouch=pd_ds::fieldValid=false;
 }
 RETRO_API bool retro_unserialize(const void* data,size_t n){
+  pd_ds::clear_battle();
   bool ok=ds_unserialize(data,n);
+  if(ok)pd_ds::restoreGrace=4;
   if(ok){pd_ds::companion=pd_ds::quickOpen=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::tick=0;pd_ds::scene.reset();pd_ds::arrangement={};pd_ds::manualTouch=pd_ds::fieldValid=false;}
   return ok;
 }
 RETRO_API void retro_unload_game(){ds_unload_game();pd_ds::clear();}
 RETRO_API void retro_run(){
   if(!nds)return;
-  input_poll_cb();pd_ds::controls();
+  input_poll_cb();
+  const unsigned previous=pd_ds::old_buttons;
+  const bool menuWasOpen=pd_ds::companion || pd_ds::quickOpen;
+  pd_ds::controls();
+  pd_ds::update_battle(menuWasOpen?0:pd_ds::buttons&~previous);
   if(pd_ds::companion || pd_ds::quickOpen){
     if(pd_ds::quickOpen)pd_ds::draw_quick();else pd_ds::draw_companion();
     static const int16_t silence[548*2]={};audio_batch_cb(silence,547);

@@ -32,7 +32,7 @@ add_custom_command(OUTPUT ${DS_DATA}
   VERBATIM)
 add_custom_target(ds-app-data DEPENDS ${DS_DATA})
 file(GLOB PD_CORE CONFIGURE_DEPENDS ${ROOT}/3ds/core/*.c)
-add_library(pd_ds_presentation STATIC companion_ui.cpp layout.cpp ${PD_CORE}
+add_library(pd_ds_presentation STATIC companion_ui.cpp layout.cpp battle_strip.cpp battle_style.cpp ${PD_CORE}
   ${ROOT}/linux/hud.c
   ${ROOT}/linux/quick_menu.c
   ${ROOT}/linux/dsperate/companion.cpp
@@ -81,6 +81,12 @@ if(BUILD_TESTING)
   set_tests_properties(ds-libretro-contract PROPERTIES FIXTURES_REQUIRED diagnostic TIMEOUT 90)
   add_executable(ds-companion-fixture test/fixture.cpp)
   add_executable(ds-shared-default-ui ${ROOT}/3ds/test/host_display_test.c)
+  add_executable(ds-battle-strip-test test/battle_strip.cpp)
+  target_include_directories(ds-battle-strip-test PRIVATE .)
+  target_compile_options(ds-battle-strip-test PRIVATE -UNDEBUG)
+  target_link_libraries(ds-battle-strip-test PRIVATE pd_ds_presentation)
+  add_test(NAME ds-platinum-battle-strip COMMAND ds-battle-strip-test
+    ${ROOT}/app/src/test/resources/fixtures/platinum_battle/mainram.bin)
   add_executable(ds-settings-test test/settings.cpp)
   foreach(test ds-companion-fixture ds-shared-default-ui ds-settings-test)
     target_compile_options(${test} PRIVATE -UNDEBUG)

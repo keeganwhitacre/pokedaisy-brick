@@ -15,6 +15,12 @@ def number(text, name):
     return int(re.search(r'\b' + name + r'(?:\s*:\s*\w+)?\s*=\s*(0x[0-9a-fA-F]+|\d+)', text)[1], 0)
 fields = {name: number(config, name) for name in
           ['saveDataPtr', 'trainerOff', 'partyOff', 'bagOff', 'locationOff', 'pokedexOff', 'nationalDexOff']}
+battle_defaults = reader.split('data class Gen4Battle(', 1)[1].split('\n)', 1)[0]
+battle_config = config.split('battle = Gen4Battle(', 1)[1].split(')', 1)[0]
+for name in ('fieldSystemPtr', 'battleTemplate'):
+    fields['battle_' + name] = number(battle_config, name)
+for name in ('offChild', 'offAppData', 'offBattleType', 'offBattleCtx', 'offBattleMons'):
+    fields['battle_' + name] = number(battle_defaults, name)
 dex = (data / 'Gen4Dex.kt').read_text()
 fields['dexSize'] = int(re.search(r'val d = r.readCoreMemory\(body \+ off, (0x[0-9A-Fa-f]+)\)', dex)[1], 0)
 fields['dexMagic'] = int(re.search(r'if \(magic != (0x[0-9A-Fa-f]+)L\)', dex)[1], 0)

@@ -23,4 +23,5 @@ struct DsPen {bool valid=false;int x=0,y=0;};
 DsArrangement ds_arrange(int mode,const DsScenePolicy&,bool followed,bool manual=false);
 DsPen ds_pen(const DsArrangement&,int x,int y);
 // 512x384 stage; sources are unmodified native 256x192 framebuffers.
-void ds_compose(uint32_t* out,const DsArrangement&,const uint32_t* top,const uint32_t* bottom,const uint32_t* field=nullptr);
+void ds_compose(uint32_t* out,const DsArrangement&,const uint32_t* top,const uint32_t* bottom,const uint32_t* field=nullptr,
+                void (*overlay)(uint32_t*)=nullptr);
