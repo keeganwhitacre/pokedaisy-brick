@@ -498,6 +498,7 @@ static int fieldFlags, hudFieldFrames;
 
 /* the quick menu and the game-code jobs: PC, FLY, REPEL, BIKE (fly.c, field_items.c) */
 static bool quickOpen;
+static struct hud_bag bagPeek;
 static int quickSel;
 static const struct pd_config *flyCfg;
 static struct fly_targets flyT;
@@ -851,6 +852,7 @@ RETRO_API bool retro_load_game(const struct retro_game_info *g) {
   gbTake = 0;
   gbWildHeld = gbf != NULL; // a resume state taken while OFF carries the held rates: put back once when ON
   quickOpen = flyList = repelList = false;
+  bagPeek.open = false;
   flyAsk = flyStage = 0;
   job = JOB_NONE;
   quick_set_grid(settings.quickGrid);
@@ -889,6 +891,8 @@ static void layer_jump(void) {
   haveGameFrame = repeatedFrame = false;
   wideReady = false;
   snap.valid = false;
+  if (bagPeek.open)
+    bagPeek.open = quickOpen = false;
   job = JOB_NONE;
   flyAsk = flyStage = 0;
   gbTake = 0;
@@ -946,6 +950,12 @@ static void hud_press(int id) {
   } else if (id == HUD_MAP || id == HUD_MAP_BUTTON) {
     ui.tab = PD_TAB_MAP;
     ui.mapPage = -1;
+  } else if (id == HUD_BAG && snap.bagOk) {
+    bagPeek = (struct hud_bag){.open = true};
+    quickOpen = true;
+    flyList = repelList = false;
+    flyAsk = 0;
+    return;
   } else if (id == HUD_BALLS || id == HUD_REPEL || id == HUD_BAG) {
     ui.tab = PD_TAB_BAG;
   } else if (id == HUD_WILD) {
@@ -1036,7 +1046,9 @@ RETRO_API void retro_run(void) {
     snapshot();
   // A tap on the quick menu: a tile (or a FLY / REPEL list row) is picked as A picks it; outside, the list or the menu
   // closes as B. On the field, a tap that starts and ends on one HUD part presses it; the game picture itself does nothing.
-  if (touch_tapped() && quickOpen && !companion) {
+  if (touch_tapped() && bagPeek.open) {
+    pressedKeys |= 1u << B;
+  } else if (touch_tapped() && quickOpen && !companion) {
     int i = (flyList || repelList) ? quick_list_hit(touchX, touchY) : quick_hit(touchX, touchY);
     if (i >= 0) {
       if (flyList)
@@ -1057,7 +1069,7 @@ RETRO_API void retro_run(void) {
     }
   }
   bool wasCompanion = companion;
-  if (down(companionBtn) && !hudFocus) {
+  if (down(companionBtn) && !hudFocus && !bagPeek.open) {
     companion = !companion;
     quickOpen = flyList = repelList = false;
     flyAsk = 0;
@@ -1067,7 +1079,7 @@ RETRO_API void retro_run(void) {
     hudFocus = false;
     hudState.focus = -1;
   }
-  if (hudBtn >= 0 && down(hudBtn) && !companion) {
+  if (hudBtn >= 0 && down(hudBtn) && !companion && !bagPeek.open) {
     if (hudFocus || !hudShown || !hudHits.n) {
       if (!hudFocus)
         notice("No HUD on screen");
@@ -1139,11 +1151,20 @@ RETRO_API void retro_run(void) {
         settings.wildOff ? NULL : pcFieldWhy, 0, 0, NULL};
   if (host.hasHud && settings.hud)
     quick[quickN++] = (struct quick_item){QUICK_HUD, false, false, hudShown && hudHits.n ? NULL : "No HUD on screen", 0, 0, NULL};
+  if (!hudShown && snap.valid && snap.bagOk && !snap.inBattle)
+    quick[quickN++] = (struct quick_item){.action = QUICK_BAG};
   quick[quickN++] = (struct quick_item){QUICK_COMPANION, false, false, NULL, 0, 0, NULL};
   if (quickSel >= quickN)
     quickSel = 0;
   quick_set_grid(settings.quickGrid);
-  if (down(quickBtn) && !companion && !hudFocus) {
+  if (bagPeek.open) {
+    if (down(B) || down(quickBtn) || down(companionBtn)) {
+      bagPeek.open = quickOpen = false;
+      shortcutBlocked |= held;
+    } else {
+      hud_bag_step(&bagPeek, down(R) - down(L), down(DOWN) - down(UP));
+    }
+  } else if (down(quickBtn) && !companion && !hudFocus) {
     quickOpen = !quickOpen;
     flyList = repelList = false;
     flyAsk = 0;
@@ -1210,6 +1231,10 @@ RETRO_API void retro_run(void) {
       if (polishedActions)
         shortcutBlocked |= held;
       switch (quick[quickSel].action) {
+      case QUICK_BAG:
+        bagPeek = (struct hud_bag){.open = true};
+        quickOpen = true;
+        break;
       case QUICK_PC:
         if (polishedActions)
           polished_open_pc();
@@ -1653,7 +1678,9 @@ RETRO_API void retro_run(void) {
     pd_canvas_init(&qc, CW, CH, ovPixels);
     const char *const *rows = flyList ? flyNames : repelList ? repelNames : NULL;
     bool drawn = true;
-    if (rows)
+    if (bagPeek.open)
+      drawn = hud_bag_draw(&qc, &bagPeek, &game, &snap, NULL, settings.hudLook, NULL);
+    else if (rows)
       quick_list_draw(&qc, flyList ? "FLY" : "REPEL", rows, flyList ? flyT.count : repelKindCount, flyList ? flySel : repelSel, settings.hudLook);
     else
       drawn = quick_draw(&qc, &game, quick, quickN, quickSel, settings.hudLook);

@@ -64,6 +64,7 @@ int hudCursor=-1;
 unsigned hudConsumed=0;
 void clear_hud_focus(){hudHits.n=0;hudCursor=-1;hudConsumed=0;}
 bool supported=false, companion=false, quickOpen=false, swallowMenuInput=false;
+hud_bag bagPeek;
 int quickSelected=0,companionHold=0;
 struct FlyDestination { int x,y; const char* name; int header=0; };
 enum class FlyStage { Idle, Menu, Party, Member, Move, Town, Release };
@@ -81,7 +82,7 @@ bool flyPicker=false,heldQuickConfirm=false;
 int pcJob=0,flyCallJob=0;
 bool flyChecking=false,autoRunThisFrame=false;
 const char* flyWhy=nullptr;
-constexpr size_t shortcutCapacity=6;
+constexpr size_t shortcutCapacity=7;
 bool stageReady=false;
 uint32_t quick_pixels[341*256];
 DsCompanionUi shell;
@@ -169,6 +170,7 @@ void clear() {
   shell.dexArt={};shell.dexPage={};shell.dexCachedSpecies=0;
   clear_battle();
   flyJob={};flyPicker=heldQuickConfirm=false;flyDestinations.clear();
+  bagPeek={};
   supported=companion=quickOpen=select_used=select_pulse=false;quickSelected=0; game=nullptr; snapshot={};map={};icons.clear();hudItemIcons.clear();repelFull=0;
   companionHold=0;
   battleStyle=nullptr;
@@ -576,8 +578,19 @@ int ds_shortcuts(quick_item (&items)[shortcutCapacity]){
     if(game)items[count++]={QUICK_WILD,shell.settings.wildOff,false,fieldWhy};
     items[count++]={QUICK_HUD,false,shell.settings.hud,nullptr};
   }
+  if(snapshot.valid && field)
+    items[count++]={QUICK_BAG,false,false,nullptr};
   items[count++]={QUICK_COMPANION,false,false,nullptr};
   return count;
+}
+bool draw_hud_item(pd_canvas* c,int id,int x,int y){
+  if(id<0||size_t(id)>=hudItemIcons.size()||hudItemIcons[id].empty())return false;
+  const auto& art=hudItemIcons[id];
+  for(int row=0;row<PD_ITEM_ICON;++row)for(int col=0;col<PD_ITEM_ICON;++col){
+    const auto p=art[(row*32/PD_ITEM_ICON)*32+col*32/PD_ITEM_ICON];
+    if(p>>24)pd_fill(c,x+col,y+row,1,1,p&0xffffff);
+  }
+  return true;
 }
 void draw_quick() {
   pd_canvas c;pd_canvas_init(&c,341,256,quick_pixels);
@@ -585,7 +598,10 @@ void draw_quick() {
   quick_item items[shortcutCapacity]{};
   const int count=ds_shortcuts(items);
   quick_set_grid(shell.settings.quickGrid);
-  if(repelPicker){
+  if(bagPeek.open){
+    const auto bag=ds_bag_source(snapshot);
+    hud_bag_draw(&c,&bagPeek,nullptr,nullptr,&bag,shell.settings.hudLook,draw_hud_item);
+  }else if(repelPicker){
     const char* labels[3]={repelLabels[0].c_str(),repelLabels[1].c_str(),repelLabels[2].c_str()};
     quick_list_draw(&c,"REPEL",labels,repelCount,repelSelected,shell.settings.hudLook);
   }else if(flyPicker){
@@ -664,7 +680,8 @@ void present(const void* data,unsigned,unsigned,size_t) {
     const int steps=snapshot.repelSteps;
     if(!steps)repelFull=0;
     else if(steps>repelFull)repelFull=hud_repel_full(steps);
-    const hud_state state{steps,repelFull,false,-1,-1};
+    hud_state state{steps,repelFull,false,-1,-1};
+    state.bagButton=snapshot.valid;
     const bool pip=arrangement.touch.w>0 && arrangement.touch.x>top.x && arrangement.touch.x<top.x+top.w;
     const int hudRight=pip?(arrangement.touch.x-top.x)*256/top.w:256;
     struct HudIcons {const pd_snapshot& party;bool small;};
@@ -688,15 +705,7 @@ void present(const void* data,unsigned,unsigned,size_t) {
         const auto p=art[(j*32/size)*32+i*32/size];
         if(p>>24)pd_fill(c,x+i,y+j,1,1,p&0xffffff);
       }
-    }, [](pd_canvas* c,int id,int x,int y){
-      if(id<0||size_t(id)>=hudItemIcons.size()||hudItemIcons[id].empty())return false;
-      const auto& art=hudItemIcons[id];
-      for(int row=0;row<PD_ITEM_ICON;++row)for(int col=0;col<PD_ITEM_ICON;++col){
-        const auto p=art[(row*32/PD_ITEM_ICON)*32+col*32/PD_ITEM_ICON];
-        if(p>>24)pd_fill(c,x+col,y+row,1,1,p&0xffffff);
-      }
-      return true;
-    },79,shell.hudMinimal,hudRight,&hudHits);
+    },draw_hud_item,79,shell.hudMinimal,hudRight,&hudHits);
     const auto player=ds_map_position(snapshot);
     if(!shell.hudMinimal&&!(shell.settings.hudHidden&(1<<PD_HUD_MAP))&&!map.background.empty()&&player.x>=0&&player.y>=0)
       hud_ds_minimap(&c,&shell.settings,ds_place(snapshot.map,companionGame),[](pd_canvas* c,int x,int y,int w,int h){
@@ -782,6 +791,10 @@ void hud_open_target(int id) {
     shell.frame.tab=PD_TAB_MAP;
     shell.mapX=snapshot.mapX;
     shell.mapY=snapshot.mapY;
+  }else if(id==HUD_BAG){
+    bagPeek={true};
+    quickOpen=true;
+    return;
   }else if(id==HUD_BALLS || id==HUD_REPEL){
     shell.frame.tab=PD_TAB_BAG;
     shell.pocket=shell.scroll=0;
@@ -835,6 +848,17 @@ void controls() {
   if(!companionDown)companionHold=0;
   else if(companionHold>=0)++companionHold;
   const bool selectDown=buttons&(1u<<RETRO_DEVICE_ID_JOYPAD_SELECT);
+  if(bagPeek.open){
+    if(hit(RETRO_DEVICE_ID_JOYPAD_B) || hit(shell.companion_id())){
+      bagPeek.open=quickOpen=false;
+      hudConsumed|=buttons;
+      if(companionDown)companionHold=-1;
+    }else{
+      hud_bag_step(&bagPeek,hit(RETRO_DEVICE_ID_JOYPAD_R)-hit(RETRO_DEVICE_ID_JOYPAD_L),
+                   hit(RETRO_DEVICE_ID_JOYPAD_DOWN)-hit(RETRO_DEVICE_ID_JOYPAD_UP));
+    }
+    return;
+  }
   if(!companion && companionHold>0 && (selectDown || (!quickOpen&&companionHold>=24))){
     quickOpen=!quickOpen;repelPicker=flyPicker=false;select_used=selectDown;quickSelected=0;companionHold=-1;
     if(quickOpen){flyWhy=nullptr;refresh();}
@@ -868,6 +892,7 @@ void controls() {
     if(hit(RETRO_DEVICE_ID_JOYPAD_A)){
       const auto& shortcut=shortcuts[quickSelected];
       if(shortcut.why)return;
+      if(shortcut.action==QUICK_BAG){bagPeek={true};return;}
       if(shortcut.action==QUICK_PC){open_pc();return;}
       if(shortcut.action==QUICK_FLY){open_fly();return;}
       if(shortcut.action==QUICK_REPEL){open_repel();return;}
@@ -990,7 +1015,7 @@ RETRO_API bool retro_load_game(const retro_game_info* info){
 }
 RETRO_API void retro_reset(){
   pd_ds::clear_battle();
-  ds_reset();pd_ds::clear_hud_focus();pd_ds::stageReady=false;pd_ds::clear_field_actions();pd_ds::flyJob={};pd_ds::flyPicker=pd_ds::heldQuickConfirm=false;pd_ds::companion=pd_ds::quickOpen=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::shell.dexEntry=0;pd_ds::shell.guideLoadedPage=-1;pd_ui_guide_reset(&pd_ds::shell.frame);pd_ds::shell.placeRow=pd_ds::shell.mapAction=-1;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::repelFull=0;pd_ds::tick=0;pd_ds::scene.reset();pd_ds::arrangement={};pd_ds::manualTouch=pd_ds::fieldValid=pd_ds::fieldMenuFlow=false;pd_ds::companionHold=0;
+  ds_reset();pd_ds::clear_hud_focus();pd_ds::stageReady=false;pd_ds::clear_field_actions();pd_ds::flyJob={};pd_ds::flyPicker=pd_ds::heldQuickConfirm=false;pd_ds::bagPeek={};pd_ds::companion=pd_ds::quickOpen=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::shell.dexEntry=0;pd_ds::shell.guideLoadedPage=-1;pd_ui_guide_reset(&pd_ds::shell.frame);pd_ds::shell.placeRow=pd_ds::shell.mapAction=-1;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::repelFull=0;pd_ds::tick=0;pd_ds::scene.reset();pd_ds::arrangement={};pd_ds::manualTouch=pd_ds::fieldValid=pd_ds::fieldMenuFlow=false;pd_ds::companionHold=0;
 }
 RETRO_API bool retro_unserialize(const void* data,size_t n){
   pd_ds::clear_battle();
@@ -1008,7 +1033,7 @@ RETRO_API bool retro_unserialize(const void* data,size_t n){
     if(sram.data()!=frontendSave)log(RETRO_LOG_WARN,"PokeDaisy DS: the save buffer moved on a state load\n");
   }
   if(ok){pd_ds::shell.battle={};pd_ds::shell.update_battle();pd_ds::stageReady=false;pd_ds::restoreGrace=4;pd_ds::set_wild_rates();}
-  if(ok){pd_ds::clear_hud_focus();pd_ds::clear_field_actions();pd_ds::flyJob={};pd_ds::flyPicker=pd_ds::heldQuickConfirm=false;pd_ds::companion=pd_ds::quickOpen=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::shell.dexEntry=0;pd_ds::shell.guideLoadedPage=-1;pd_ui_guide_reset(&pd_ds::shell.frame);pd_ds::shell.placeRow=pd_ds::shell.mapAction=-1;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::repelFull=0;pd_ds::tick=0;pd_ds::scene.reset();pd_ds::arrangement={};pd_ds::manualTouch=pd_ds::fieldValid=pd_ds::fieldMenuFlow=false;pd_ds::companionHold=0;}
+  if(ok){pd_ds::clear_hud_focus();pd_ds::clear_field_actions();pd_ds::flyJob={};pd_ds::flyPicker=pd_ds::heldQuickConfirm=false;pd_ds::bagPeek={};pd_ds::companion=pd_ds::quickOpen=false;pd_ds::shell.picker=-1;pd_ds::shell.summary=false;pd_ds::shell.details=false;pd_ds::shell.dexEntry=0;pd_ds::shell.guideLoadedPage=-1;pd_ui_guide_reset(&pd_ds::shell.frame);pd_ds::shell.placeRow=pd_ds::shell.mapAction=-1;pd_ds::screen_override=0;pd_ds::snapshot={};pd_ds::repelFull=0;pd_ds::tick=0;pd_ds::scene.reset();pd_ds::arrangement={};pd_ds::manualTouch=pd_ds::fieldValid=pd_ds::fieldMenuFlow=false;pd_ds::companionHold=0;}
   return ok;
 }
 RETRO_API void retro_unload_game(){ds_unload_game();pd_ds::clear();}

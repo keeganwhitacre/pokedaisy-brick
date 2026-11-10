@@ -6,7 +6,7 @@
 #include "pd_game.h"
 #include <stdbool.h>
 
-enum quick_action { QUICK_PC, QUICK_FLY, QUICK_REPEL, QUICK_BIKE, QUICK_WILD, QUICK_SAVE_STATE, QUICK_LOAD_STATE, QUICK_FF, QUICK_COMPANION, QUICK_HUD, QUICK_COUNT };
+enum quick_action { QUICK_PC, QUICK_FLY, QUICK_REPEL, QUICK_BIKE, QUICK_WILD, QUICK_SAVE_STATE, QUICK_LOAD_STATE, QUICK_FF, QUICK_COMPANION, QUICK_HUD, QUICK_BAG, QUICK_COUNT };
 /* QUICK_HUD: the HUD cursor (the libretro core, which has no hotkey of its own to reach it). */
 
 struct quick_item {
@@ -38,7 +38,7 @@ int quick_list_hit(int x, int y);
 const char *quick_label(enum quick_action a);
 /* Pixel art shared with the HUD's buttons, a character a pixel ('.' clear), NULL-terminated. */
 extern const char *const quick_icon_pc[], *const quick_icon_grass[], *const quick_icon_companion[];
-extern const char *const quick_icon_repel[];
+extern const char *const quick_icon_repel[], *const quick_icon_bag[];
 /* After drawing: every pixel opaque but the clear ones and the glass's own alpha. */
 void quick_finish(struct pd_canvas *c);
 #endif

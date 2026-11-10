@@ -1,5 +1,6 @@
 // Settings changes go through real controller navigation and shared rendering.
 #include "companion_ui.h"
+#include "bag_view.h"
 #include "libretro.h"
 extern "C" {
 #include "../../hud.h"
@@ -138,6 +139,10 @@ int main(int argc,char** argv){
   press(ui,RETRO_DEVICE_ID_JOYPAD_A);
   assert(ui.frame.overlay==PD_OVERLAY_MORE && pd_ui_tab_menu_count(&ui.frame)==1);
   draw();ppm((std::string(argv[2])+"/shared-more.ppm").c_str(),px);
+  press(ui,RETRO_DEVICE_ID_JOYPAD_DOWN);
+  assert(ui.choice==1); // Tab Bar is below the last row.
+  press(ui,RETRO_DEVICE_ID_JOYPAD_UP);
+  assert(ui.choice==0);
   press(ui,RETRO_DEVICE_ID_JOYPAD_A);
   assert(ui.frame.tab==PD_TAB_MAP);
   // Hidden cards occupy the More position when using the shoulder buttons.
@@ -167,6 +172,32 @@ int main(int argc,char** argv){
   const hud_state noRepel{0,0,false,-1,-1};
   hud_ds_draw(&c,&field,&noRepel,&hudOptions,nullptr,nullptr,nullptr,79,true,c.w,&hits);
   assert(hud_step(&hits,HUD_REPEL,0,-1)==-1);
+  hud_state withBag=noRepel;
+  withBag.bagButton=true;
+  hud_ds_draw(&c,&field,&withBag,&hudOptions,nullptr,nullptr,nullptr,79,true,c.w,&hits);
+  assert(hud_first(&hits)==HUD_BAG);
+  const auto inventory=ds_bag_source(s);
+  pd_bag_preview view{};
+  assert(pd_ui_bag_preview(nullptr,nullptr,&inventory,0,0,&view) && view.pockets>1 && view.shown>0);
+  hud_bag compactBag{true,0,0};
+  assert(hud_bag_draw(&c,&compactBag,nullptr,nullptr,&inventory,PD_HUD_GLASS,nullptr));
+  ppm((std::string(argv[2])+"/compact-bag-ds.ppm").c_str(),px);
+  hud_bag_step(&compactBag,-1,0);
+  assert(hud_bag_draw(&c,&compactBag,nullptr,nullptr,&inventory,PD_HUD_WHITE_GLASS,nullptr));
+  assert(compactBag.pocket==view.pockets-1 && compactBag.row==0);
+  const int originalBar=ui.settings.tabBar;
+  ui.settings.tabBar=(1<<PD_TAB_PARTY)|(1<<PD_TAB_BAG);
+  ui.frame.overlay=PD_OVERLAY_MORE;
+  ui.choice=0;
+  draw();ppm((std::string(argv[2])+"/more-grid.ppm").c_str(),px);
+  assert(pd_ui_tab_menu_count(&ui.frame)==3);
+  press(ui,RETRO_DEVICE_ID_JOYPAD_RIGHT);
+  assert(ui.choice==1);
+  press(ui,RETRO_DEVICE_ID_JOYPAD_DOWN);
+  press(ui,RETRO_DEVICE_ID_JOYPAD_A);
+  assert(ui.frame.overlay==PD_OVERLAY_TAB_BAR);
+  ui.settings.tabBar=originalBar;
+  ui.frame.overlay=PD_OVERLAY_NONE;
   ui.frame.tab=PD_TAB_BAG;
   s.bag.clear();
   draw();

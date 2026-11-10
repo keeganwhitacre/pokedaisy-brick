@@ -340,11 +340,13 @@ bool DsCompanionUi::control(unsigned pressed){
     scroll=dexEntry=0;placeRow=mapAction=dexFilterFocus=-1;bagTabKey=-1;summary=details=false;error.clear();return false;
   }
   if(frame.overlay==PD_OVERLAY_TAB_BAR || frame.overlay==PD_OVERLAY_MORE){
-    const int step=frame.overlay==PD_OVERLAY_MORE && dx ? dx : dy;
-    choice=std::clamp(choice+step,0,std::max(0,pd_ui_tab_menu_count(&frame)-1));
+    const bool more=frame.overlay==PD_OVERLAY_MORE;
+    choice=more?pd_ui_more_step(&frame,choice,dx,dy):
+      std::clamp(choice+dy,0,std::max(0,pd_ui_tab_menu_count(&frame)-1));
     if(hit(RETRO_DEVICE_ID_JOYPAD_B))pd_ui_back(&frame);
     else if(hit(RETRO_DEVICE_ID_JOYPAD_A)){
       pd_ui_tab_menu_choose(&frame,choice);
+      if(more && frame.overlay==PD_OVERLAY_TAB_BAR)choice=0;
       if(pd_ui_take_action(&frame)==PD_ACTION_SETTINGS_CHANGED)save();
       if(frame.overlay==PD_OVERLAY_NONE){
         summary=details=false;dexEntry=0;placeRow=mapAction=-1;

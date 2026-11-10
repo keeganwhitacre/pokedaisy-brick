@@ -123,6 +123,39 @@ static int by_count(const void* a, const void* b) {
 }
 
 // The pocket tabs down the left, the open one joined to the list.
+bool pd_ui_bag_preview(const struct pd_game* g, const struct pd_snapshot* s, const struct pd_bag_source* source,
+                       int pocket, int row, struct pd_bag_preview* out) {
+    if (!source && (!g || !g->cfg || !s || !s->bagOk)) return false;
+    struct pd_ui ui = {0};
+    struct bag_view view;
+    ui.bagSource = source;
+    gather(&ui, g, s, &view);
+    // ALL stays in the full Bag. The field panel opens on the first occupied pocket.
+    pocket = view.tabs > 1 ? 1 + (pocket % (view.tabs - 1) + view.tabs - 1) % (view.tabs - 1) : 0;
+    int key = view.pockets[pocket];
+    if (pocket) {
+        int n = 0;
+        for (int i = 0; i < view.count; i++)
+            if (view.rows[i].pocket == key) view.rows[n++] = view.rows[i];
+        view.count = n;
+    }
+    if (row < 0 || !view.count) row = 0;
+    else if (row >= view.count) row = view.count - 1;
+    int first = row < PD_BAG_PREVIEW_ROWS ? 0 : row - PD_BAG_PREVIEW_ROWS + 1;
+    *out = (struct pd_bag_preview){
+        .pocketName = !pocket ? "ITEMS" : source ? source->pocketName(source->ctx, key) : pd_pocket_name(key),
+        .pocket = pocket ? pocket - 1 : 0, .pockets = view.tabs - 1,
+        .row = row, .first = first, .count = view.count
+    };
+    for (int i = first; i < view.count && out->shown < PD_BAG_PREVIEW_ROWS; i++) {
+        int at = out->shown++;
+        out->items[at].item = view.rows[i].item;
+        out->items[at].name = view.rows[i].name;
+        out->items[at].quantity = view.rows[i].quantity;
+    }
+    return true;
+}
+
 static void tabs(struct pd_ui* ui, struct pd_canvas* c, const struct pd_bag_palette* p, const struct bag_view* v,
                  int x, int w, int bottom, int joinX) {
     int visible = ui->shoulderTabs ? (bottom - CONTENT_Y + 3) / (TAB_H + 3) : v->tabs;

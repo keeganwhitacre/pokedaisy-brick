@@ -22,7 +22,8 @@ struct hud_state {
   int left, right; // keeps to these columns (the game's picture); right 0 = the whole canvas
   bool compact;    // smaller HUD for a 3DS (its game is drawn at 1.5x)
   bool noButtons;  // no PC / BAG / WILD / COMPANION buttons (a 3DS: no touch on the top screen, X opens the companion)
-  int repelItem;   // the item the REPEL STEPS icon shows, 0 = the plain Repel (last, so positional initializers leave it 0)
+  int repelItem;   // the item the REPEL STEPS icon shows, 0 = the plain Repel
+  bool bagButton;  // the DS host has inventory available for the compact Bag
 };
 
 /* How wide the compact HUD's minimap is, its frame included. */
@@ -59,6 +60,10 @@ bool hud_draw(struct pd_canvas *c, const struct pd_game *g, const struct pd_snap
 /* DS uses the same HUD widgets with cartridge art and the companion's controller shortcuts. */
 typedef void (*hud_mon_draw_fn)(struct pd_canvas *, void *, const struct pd_mon *, int x, int y, bool faded);
 typedef bool (*hud_item_draw_fn)(struct pd_canvas *, int item, int x, int y);
+struct hud_bag { bool open; int pocket, row; };
+void hud_bag_step(struct hud_bag*, int pocketStep, int rowStep);
+bool hud_bag_draw(struct pd_canvas*, struct hud_bag*, const struct pd_game*, const struct pd_snapshot*,
+                  const struct pd_bag_source*, int look, hud_item_draw_fn);
 /* The party row alone in the default look, the canvas not cleared (the Linux host's DSperate backend). */
 void hud_party_draw(struct pd_canvas *c, const struct pd_snapshot *s, void *ctx, hud_mon_draw_fn draw);
 void hud_ds_draw(struct pd_canvas *, const struct pd_snapshot *, const struct hud_state *,

@@ -75,6 +75,7 @@ const char *quick_label(enum quick_action a) {
   case QUICK_FF: return "FF";
   case QUICK_COMPANION: return "COMPANION";
   case QUICK_HUD: return "HUD";
+  case QUICK_BAG: return "BAG";
   default: return "";
   }
 }
@@ -85,6 +86,8 @@ static uint32_t icon_color(enum quick_action a, char ch, uint32_t text) {
   if (a == QUICK_PC)
     return ch == 'K' ? 0x202838 : ch == 'L' ? 0xD8D8E0 : ch == 'D' ? 0x9098A8 : ch == 'S' ? 0x3070C8
          : ch == 'H' ? 0x90C8F8 : 0x40D040;
+  if (a == QUICK_BAG)
+    return ch == 'K' ? 0x3A2414 : ch == 'B' ? 0xC0783A : ch == 'L' ? 0xE8A868 : 0xF8D030;
   if (a == QUICK_REPEL)
     return ch == 'K' ? 0x202838 : ch == 'L' ? 0xE8ECF4 : 0x48A848;
   if (a == QUICK_SAVE_STATE || a == QUICK_LOAD_STATE)
@@ -97,7 +100,7 @@ static void icon(struct pd_canvas *c, enum quick_action a, int cx, int cy, int s
   const char *const *rows = a == QUICK_PC ? quick_icon_pc : a == QUICK_WILD ? quick_icon_grass : a == QUICK_SAVE_STATE ? SAVE_STATE
                           : a == QUICK_LOAD_STATE ? LOAD_STATE : a == QUICK_FF ? FF : a == QUICK_REPEL ? quick_icon_repel
                           : a == QUICK_BIKE ? BIKE : a == QUICK_FLY ? WING
-                          : a == QUICK_HUD ? quick_icon_hud : quick_icon_companion;
+                          : a == QUICK_HUD ? quick_icon_hud : a == QUICK_BAG ? quick_icon_bag : quick_icon_companion;
   int h = 0, w = (int)strlen(rows[0]);
   while (rows[h])
     h++;

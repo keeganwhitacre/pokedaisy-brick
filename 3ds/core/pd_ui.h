@@ -500,6 +500,15 @@ void pd_ui_guide_control(struct pd_ui*, int dx, int dy, bool confirm);
 void pd_ui_guide_boss_note(char*, size_t, const char* place, int count, int ace, int best);
 void pd_ui_dex_view(struct pd_ui*,struct pd_canvas*,const struct pd_game*,const struct pd_snapshot*,int selected);
 void pd_ui_bag_cycle_sort(struct pd_ui*);
+enum { PD_BAG_PREVIEW_ROWS = 5 };
+struct pd_bag_preview {
+    const char* pocketName;
+    int pocket, pockets, row, first, count, shown;
+    struct { struct pd_item item; const char* name; bool quantity; } items[PD_BAG_PREVIEW_ROWS];
+};
+/* The read-only field panel uses the same pocket order and rows as the Companion Bag. */
+bool pd_ui_bag_preview(const struct pd_game*, const struct pd_snapshot*, const struct pd_bag_source*,
+                       int pocket, int row, struct pd_bag_preview*);
 // The tab bar's D-pad step: the key after / before `key` in `keys` (the tabs in the order they are drawn), the ends
 // stopping the cursor; a key not among them starts from the first.
 int pd_ui_bag_tab_step(const int* keys, int count, int key, int dy);
@@ -515,6 +524,8 @@ void pd_ui_draw(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g,
 bool pd_ui_touch(struct pd_ui* ui, int x, int y, bool down);
 // Buttons the GBA doesn't have (the 3DS's X / Y): next / previous tab, BACK.
 // Controller access to the same TAB BAR / MORE overlays used by touch hosts.
+enum { PD_MORE_COLUMNS = 3 };
+int pd_ui_more_step(const struct pd_ui*, int choice, int dx, int dy);
 int pd_ui_tab_menu_count(const struct pd_ui*);
 void pd_ui_tab_menu_focus(struct pd_ui*, int row);
 void pd_ui_tab_menu_choose(struct pd_ui*, int row);

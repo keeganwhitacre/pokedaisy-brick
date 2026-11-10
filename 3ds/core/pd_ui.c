@@ -712,12 +712,28 @@ int pd_ui_tab_menu_count(const struct pd_ui* ui) {
     return 0;
 }
 
+int pd_ui_more_step(const struct pd_ui* ui, int choice, int dx, int dy) {
+    int count = pd_ui_tab_menu_count(ui);
+    if (!count) return 0;
+    if (choice < 0 || choice > count) choice = 0;
+    if (choice == count) return dy < 0 ? count - 1 : count;
+    int cols = count < PD_MORE_COLUMNS ? count : PD_MORE_COLUMNS;
+    if (dy > 0) return choice + cols < count ? choice + cols : count;
+    if (dy < 0) return choice >= cols ? choice - cols : choice;
+    int next = choice + dx;
+    return next >= 0 && next < count && next / cols == choice / cols ? next : choice;
+}
+
 void pd_ui_tab_menu_focus(struct pd_ui* ui, int row) {
-    ui->pressedId = row >= 0 && row < pd_ui_tab_menu_count(ui) ? HIT_OPTION + row : -1;
+    int count = pd_ui_tab_menu_count(ui);
+    ui->pressedId = ui->overlay == PD_OVERLAY_MORE && row == count ? HIT_MORE_TAB_BAR :
+        row >= 0 && row < count ? HIT_OPTION + row : -1;
 }
 
 void pd_ui_tab_menu_choose(struct pd_ui* ui, int row) {
-    if (row >= 0 && row < pd_ui_tab_menu_count(ui)) ui_toggle_act(ui, row);
+    int count = pd_ui_tab_menu_count(ui);
+    if (ui->overlay == PD_OVERLAY_MORE && row == count) act(ui, HIT_MORE_TAB_BAR);
+    else if (row >= 0 && row < count) ui_toggle_act(ui, row);
 }
 
 void pd_ui_next_tab(struct pd_ui* ui, int dir) {

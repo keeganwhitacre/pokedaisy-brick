@@ -36,7 +36,13 @@ The panels have a battle-style shadow, and each party sprite has an HP bar
 with room for a status tag when needed. Turn
 it or any of its parts off in the companion's `SETTINGS` > `HUD`. In
 `SETTINGS` > `TAB BAR` you pick which tabs sit on the bar; the rest open from
-`MORE`.
+`MORE`, where hidden tabs appear in a grid with `TAB BAR` below.
+
+On the Linux libretro cores, select `BAG` on the field HUD to peek into your
+inventory over the game. When the HUD is unavailable, look for `BAG` in the
+quick menu on supported games. Use Up and Down to browse items, L and R to
+change pockets, and B to close. The game pauses while you browse. Open the
+full Companion Bag for item details or the game’s Bag to use an item.
 
 Press the companion button to pause the game and open its companion. Use the
 D-pad to focus an option, A to choose it and B to go back. The shoulder buttons

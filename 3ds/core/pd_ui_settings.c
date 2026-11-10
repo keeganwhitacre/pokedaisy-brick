@@ -384,19 +384,25 @@ void ui_more_page(struct pd_ui* ui, struct pd_canvas* c, const struct pd_game* g
     int y = CONTENT_Y + TITLE_H + 3, h = c->h - y - 2;
     int f = pd_list_box(c, x, y, w, h);
     int ix = x + f + 4, iy = y + f + 4, iw = w - 2 * (f + 4);
-    int tile = 52, gap = 6;
-    for (int i = 0; i < n; i++) {
-        int tx = ix + (i % 5) * (tile + gap), ty = iy + (i / 5) * (tile + gap);
-        pd_title_box(c, tx, ty, tile, tile, ui->pressedId == HIT_OPTION + i ? PD_LIST_FILL : 0xF0F0F0);
-        const struct pd_art* art = ui_tab_art(more[i]);
-        if (art) ui_art(c, art, tx + (tile - 32) / 2, ty + 4, 2);
-        const char* label = ui_tab_label(more[i]);
-        pd_text(c, tx + (tile - pd_text_width(label)) / 2, ty + tile - 16, label, PD_TITLE_TEXT, PD_TITLE_SHADOW);
-        ui_add_hit(ui, tx, ty, tile, tile, HIT_OPTION + i);
-    }
     int by = y + h - f - 23;
-    pd_text_wrap(c, ix, by - 33, iw, 15, 2, "Tabs that aren't on the tab bar are here. Pick the bar's tabs in TAB BAR.",
-                 PD_LABEL, PD_LABEL_SHADOW);
+    int cols = n < PD_MORE_COLUMNS ? (n > 0 ? n : 1) : PD_MORE_COLUMNS;
+    int rows = (n + cols - 1) / cols, gap = 6;
+    int tileH = rows ? (by - iy - 19 - gap * (rows - 1)) / rows : 0;
+    if (tileH > 60) tileH = 60;
+    for (int i = 0; i < n; i++) {
+        int col = i % cols, ty = iy + i / cols * (tileH + gap);
+        int pitch = iw + gap;
+        int tx = ix + col * pitch / cols, tw = ix + (col + 1) * pitch / cols - tx - gap;
+        pd_title_box(c, tx, ty, tw, tileH, ui->pressedId == HIT_OPTION + i ? PD_ROW_SELECTED : PD_TITLE_FILL);
+        const struct pd_art* art = ui_tab_art(more[i]);
+        int scale = tileH >= 50 ? 2 : 1;
+        if (art) ui_art(c, art, tx + (tw - 16 * scale) / 2, ty + 4, scale);
+        const char* label = ui_tab_label(more[i]);
+        pd_text(c, tx + (tw - pd_text_width(label)) / 2, ty + tileH - 16, label, PD_TITLE_TEXT, PD_TITLE_SHADOW);
+        ui_add_hit(ui, tx, ty, tw, tileH, HIT_OPTION + i);
+    }
+    pd_fill(c, ix, by - 7, iw, 1, PD_DIVIDER);
+    pd_text_fit(c, ix, by + 2, iw - 87, "Hidden tabs appear here.", PD_LABEL, PD_LABEL_SHADOW);
     ui_button(ui, c, x + w - f - 86, by, 80, 20, "TAB BAR", HIT_MORE_TAB_BAR);
 }
 

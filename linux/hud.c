@@ -672,7 +672,7 @@ static void repel_panel(struct hud *u, int x, int y, bool narrow) {
 // ---- Buttons ------------------------------------------------------------------------------------
 
 /* A satchel / a region map (FieldHud.kt's BAG_ICON / MAP_ICON). */
-static const char *const BAG_ICON[] = {
+const char *const quick_icon_bag[] = {
     ".....KKKKKK.....", "....KK....KK....", "....K......K....", "..KKKKKKKKKKKK..", ".KBLLLLLLLLLLBK.",
     ".KBBBBBBBBBBBBK.", ".KBBBBBBBBBBBBK.", ".KKKKKKYYKKKKKK.", ".KBBBBKYYKBBBBK.", ".KBBBBBKKBBBBBK.",
     ".KBBBBBBBBBBBBK.", ".KBBBBBBBBBBBBK.", ".KLBBBBBBBBBBLK.", ".KLLBBBBBBBBLLK.", "..KKKKKKKKKKKK..",
@@ -721,7 +721,7 @@ static void button(struct hud *u, int id, int x, int y, int w, bool framed) {
   if (id == HUD_PC)
     art(u->c, quick_icon_pc, ax, ay, "KLDSHG", (const uint32_t[]){0x202838, 0xD8D8E0, 0x9098A8, 0x3070C8, 0x90C8F8, 0x40D040}, 0);
   else if (id == HUD_BAG)
-    art(u->c, BAG_ICON, ax, ay, "KBLY", (const uint32_t[]){0x3A2414, 0xC0783A, 0xE8A868, 0xF8D030}, 0);
+    art(u->c, quick_icon_bag, ax, ay, "KBLY", (const uint32_t[]){0x3A2414, 0xC0783A, 0xE8A868, 0xF8D030}, 0);
   else if (id == HUD_WILD)
     art(u->c, quick_icon_grass, ax, ay, "KGL", (const uint32_t[]){0x183818, 0x389838, 0x78D058}, 0);
   else if (id == HUD_MAP_BUTTON)
@@ -982,6 +982,66 @@ void hud_party_draw(struct pd_canvas *c, const struct pd_snapshot *s, void *ctx,
     party_row(&u, EDGE, c->h - EDGE - party_height(&u));
 }
 
+void hud_bag_step(struct hud_bag *bag, int pocketStep, int rowStep) {
+  if (pocketStep) {
+    bag->pocket += pocketStep;
+    bag->row = 0;
+  } else {
+    bag->row += rowStep;
+  }
+}
+
+bool hud_bag_draw(struct pd_canvas *c, struct hud_bag *bag, const struct pd_game *game, const struct pd_snapshot *s,
+                  const struct pd_bag_source *source, int look, hud_item_draw_fn itemDraw) {
+  struct pd_bag_preview view;
+  if (!pd_ui_bag_preview(game, s, source, bag->pocket, bag->row, &view))
+    return false;
+  bag->pocket = view.pocket;
+  bag->row = view.row;
+  pd_fill(c, 0, 0, c->w, c->h, QUICK_CLEAR);
+  const struct hud_ink *ink = hud_ink(look);
+  const uint32_t text = ink->window ? PD_TITLE_TEXT : ink->text;
+  const uint32_t shadow = ink->window ? PD_TITLE_SHADOW : ink->shadow;
+  const bool showArt = itemDraw || (game && game->cfg && !game->cfg->gb);
+  const int w = c->w < 320 ? c->w - 16 : 206, h = 208;
+  const int x = c->w - w - 8, y = (c->h - h) / 2;
+  hud_panel(c, ink, x, y, w, h, 3);
+  pd_text(c, x + 10, y + 7, "BAG", text, shadow);
+  const char *pocket = view.pocketName;
+  int pw = pd_text_width(pocket) + 14;
+  hud_tile(c, ink, x + 10, y + 24, pw, 18, true);
+  pd_text(c, x + 17, y + 26, pocket, text, shadow);
+  if (view.pockets > 1) {
+    char number[20];
+    snprintf(number, sizeof number, "%d / %d", view.pocket + 1, view.pockets);
+    pd_text(c, x + w - 10 - pd_text_width(number), y + 26, number, ink->accent, shadow);
+  }
+  for (int i = 0; i < view.shown; ++i) {
+    const int ry = y + 48 + i * 25;
+    const bool selected = view.row == view.first + i;
+    pd_round_rect(c, x + 9, ry, w - 18, 24, 3, selected ? HUD_SELECTED : ink->edge);
+    pd_round_rect(c, x + 10, ry + 1, w - 20, 22, 2, ink->window ? PD_TITLE_FILL : ink->tileTop);
+    const struct pd_item item = view.items[i].item;
+    const bool icon = showArt && (itemDraw ? itemDraw(c, item.id, x + 11, ry)
+                                         : pd_draw_item_icon(c, game, item.id, x + 11, ry, false));
+    const int nameX = x + (icon ? 34 : 15);
+    char qty[12] = "";
+    if (view.items[i].quantity)
+      snprintf(qty, sizeof qty, "x%u", item.quantity);
+    const int qtyX = x + w - 15 - pd_text_width(qty);
+    const char *name = view.items[i].name;
+    pd_text_fit(c, nameX, ry + 5, qtyX - nameX - 5, name && *name ? name : "ITEM", text, shadow);
+    pd_text(c, qtyX, ry + 5, qty, ink->accent, shadow);
+  }
+  if (!view.shown)
+    pd_text(c, x + 12, y + 51, "Your bag is empty.", text, shadow);
+  const char *close = "B  CLOSE";
+  if (view.pockets > 1)
+    pd_text(c, x + 10, y + h - 21, "L/R  POCKET", ink->muted, shadow);
+  pd_text(c, x + w - 10 - pd_text_width(close), y + h - 21, close, ink->muted, shadow);
+  return true;
+}
+
 void hud_ds_draw(struct pd_canvas *c, const struct pd_snapshot *s, const struct hud_state *h,
                  const struct pd_settings *st, void *ctx, hud_mon_draw_fn monDraw,
                  hud_item_draw_fn itemDraw, int repelItem, bool minimal, int right, struct hud_hits *out) {
@@ -998,8 +1058,10 @@ void hud_ds_draw(struct pd_canvas *c, const struct pd_snapshot *s, const struct 
   u.partyN = !minimal && shows(&u, PD_HUD_PARTY) ? s->partyCount : 0;
   u.balls = shows(&u, PD_HUD_BALLS) ? balls(s, u.ball) : 0;
   u.repel = shows(&u, PD_HUD_REPEL) && h->repel > 0;
+  if (h->bagButton && shows(&u, PD_HUD_BAG))
+    u.button[u.buttons++] = HUD_BAG;
   if (minimal) {
-    if (!u.balls && !u.repel && shows(&u, PD_HUD_PARTY) && s->partyCount) {
+    if (!u.buttons && !u.balls && !u.repel && shows(&u, PD_HUD_PARTY) && s->partyCount) {
       u.partyN = 1;
       party_row(&u, EDGE, c->h - EDGE - party_height(&u));
     } else compact(&u);
