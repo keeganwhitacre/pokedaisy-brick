@@ -1,4 +1,4 @@
-// GPL-3.0. Optional Polished Crystal profile for the shared GB renderer.
+// GPL-3.0. The Game Boy renderer's per-game addresses (pk_wide_gb.c), Polished Crystal's profile included.
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
@@ -37,14 +37,10 @@ enum {
     GB_HSCX,              // Crystal: hSCX (HRAM; hSCY follows): the scroll the next frame is drawn with
     GB_TIME_OF_DAY,       // Crystal: wTimeOfDay (0 morning, 1 day, 2 night)
     GB_HOURS,             // Crystal: hHours (HRAM)
+    GB_CLEAR,             // Crystal Clear: per-tile attributes and compressed connected maps
     PC_METATILES, PC_ATTRIBUTES, PC_SCRATCH, PC_MAP_ATTR_BANK, PC_LOADED_PALS,
     GB_CONFIG
 };
 
 typedef int (*pk_wide_gb_decode_fn)(const unsigned char*, size_t, size_t,
                                     unsigned char*, size_t);
-// Identify a compatible ROM first. Caller owns addresses until next configure.
-// This does not register ROM identities or enable Android expansion support.
-// A null profile or decoder disables expansion and returns zero.
-int pk_wide_gb_configure_polished(const uint32_t addresses[GB_CONFIG],
-                                 pk_wide_gb_decode_fn decode);

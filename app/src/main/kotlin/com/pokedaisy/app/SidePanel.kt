@@ -48,6 +48,10 @@ import kotlin.math.roundToInt
  * pad is up.
  * While the FIELD HUD is on screen it carries the open button itself, beside BAG and WILD ([tabInHud]): the edge
  * tab steps aside then.
+ *
+ * **Book mode** ([book], SETTINGS > FOLD LAYOUT): a foldable half open like a book. The side panel is the right page,
+ * locked from the hinge to the screen's edge whatever COMPANION VIEW, the lock or the width say, the game on the left
+ * page; no tabs, and BACK is only ever the companion's own.
  */
 class SidePanel(
     private val root: FrameLayout,
@@ -93,28 +97,38 @@ class SidePanel(
     private val fullScreen = mutableStateOf(false)
 
     /**
-     * A DS game on one screen (GitHub #244): the panel holds its touch screen ([DsTouchPane]), so it stays open and locked
-     * at half the screen beside the game - the DS's two screens side by side - with no tabs to close, unlock or resize it.
+     * Book mode: where a foldable's hinge runs down the screen (px, left to right of it, in the root's coordinates), or
+     * null. See the class comment.
      */
-    private val dsScreen = mutableStateOf(false)
+    var book: IntRange?
+        // Compose state: the panel's content reads [isWindow].
+        get() = bookState.value
+        set(v) {
+            if (bookState.value == v) return
+            bookState.value = v
+            if (enabled) {
+                open = v != null || (!isWindow && isDocked)
+                apply()
+            }
+        }
 
-    fun setDsScreen(on: Boolean) {
-        if (dsScreen.value == on) return
-        dsScreen.value = on
-        if (enabled) { open = on || (!isWindow && docked.value); apply() }
-    }
+    private val bookState = mutableStateOf<IntRange?>(null)
 
-    /** Opens as a window: COMPANION VIEW's WINDOW, or [fullScreen] - never with a DS game's touch screen in it. */
-    private val isWindow: Boolean get() = (window.value || fullScreen.value) && !dsScreen.value
+    /** Opens as a window: COMPANION VIEW's WINDOW, or [fullScreen]; never in book mode. */
+    private val isWindow: Boolean get() = (window.value || fullScreen.value) && book == null
 
-    /** Locked beside the game: the lock tab's, or a DS game's touch screen. */
-    private val isDocked: Boolean get() = docked.value || dsScreen.value
+    /** Locked beside the game (the lock tab's, or book mode's). */
+    private val isDocked: Boolean get() = docked.value || book != null
 
     fun setFullScreen(on: Boolean) {
         if (fullScreen.value == on) return
         fullScreen.value = on
-        if (enabled) { open = !isWindow && isDocked; apply() }
+        if (enabled) { open = book != null || (!isWindow && isDocked); apply() }
     }
+
+    /** Over the game where a touch could land on it: the window, or a panel slid in unlocked (a locked one sits beside
+     * the game, the touch controls moved clear of it). TouchInputWindows step aside meanwhile. */
+    val overGame: Boolean get() = enabled && open && (isWindow || !isDocked)
 
     /** The window is up: the game's buttons are the companion's ([menuKey]). */
     var windowOpen = false
@@ -136,6 +150,15 @@ class SidePanel(
             apply()
         }
 
+    /** A DS battle's menu sits in the edge tab's corner: the tab goes to the top right corner meanwhile, so the
+     *  companion can still be opened with a tap (GitHub #595: hidden, it left no way to tap it open). */
+    var tabRaised = false
+        set(v) {
+            if (field == v) return
+            field = v
+            apply()
+        }
+
     private var panel: View? = null
     /** Over the game and the HUD while the panel is open and unlocked: a tap there closes it ([catchOutside]). */
     private var outside: View? = null
@@ -146,7 +169,7 @@ class SidePanel(
 
     private val rootWidth get() = root.width.takeIf { it > 0 } ?: context.resources.displayMetrics.widthPixels
     private val rootHeight get() = root.height.takeIf { it > 0 } ?: context.resources.displayMetrics.heightPixels
-    private val panelWidth get() = (rootWidth * (if (dsScreen.value) 0.5f else fraction)).roundToInt()
+    private val panelWidth get() = book?.let { (rootWidth - it.last).coerceAtLeast(0) } ?: (rootWidth * fraction).roundToInt()
 
     private val relayout = View.OnLayoutChangeListener { _, l, _, r, _, _, _, _, _ ->
         if (r - l != lastRootWidth) {
@@ -162,7 +185,7 @@ class SidePanel(
         if (on) {
             docked.value = prefs.sidePanelDocked
             window.value = prefs.companionWindow
-            open = !isWindow && isDocked
+            open = book != null || (!isWindow && isDocked)
             outside = View(context).apply { setOnTouchListener { _, e -> catchOutside(e) } }
                 .also { root.addView(it, root.indexOfChild(under) + 1, FrameLayout.LayoutParams(-1, -1)) }
             val at = root.indexOfChild(under) + 2
@@ -220,6 +243,11 @@ class SidePanel(
     /** A BACK tap; false = not ours (no side panel - the second screen's companion takes it). */
     fun onBack(): Boolean {
         if (!enabled) return false
+        if (book != null) {
+            // The right page is always there: BACK is the companion's alone.
+            back.back()
+            return true
+        }
         when {
             !open -> show()
             back.back() -> Unit
@@ -300,7 +328,7 @@ class SidePanel(
     }
 
     private fun hide() {
-        if (!open || dsScreen.value) return
+        if (!open || book != null) return
         open = false
         if (isWindow) {
             // The buttons are the game's again now; the window fades out over it. Its focus goes: the next opening
@@ -362,8 +390,7 @@ class SidePanel(
         val win = isWindow
         // The window: the panel's view is the whole screen (its dim), the companion drawn in the middle, no tabs.
         val side = shown && !win
-        // A DS game's touch screen: no lock / close / resize tabs (it stays as it is).
-        val tabs = side && !dsScreen.value
+        val tabs = side && book == null
         outside?.visibility = if (side && !isDocked) View.VISIBLE else View.GONE
         panel?.apply {
             visibility = if (shown) View.VISIBLE else View.GONE
@@ -384,16 +411,22 @@ class SidePanel(
         }
         closed.value = enabled && !open
         openTab?.apply {
-            visibility = if (enabled && !open && !tabInHud && openTabShown) View.VISIBLE else View.GONE
+            visibility = if (enabled && !open && !tabInHud && openTabShown && book == null) View.VISIBLE else View.GONE
             alpha = if (docked.value && !win) LOCKED_TAB_ALPHA else 1f
+            val lp = layoutParams as FrameLayout.LayoutParams
+            val gravity = Gravity.END or if (tabRaised) Gravity.TOP else Gravity.BOTTOM
+            if (lp.gravity != gravity) {
+                val margin = ((if (tabRaised) HANDLE_TOP_DP else TAB_MARGIN_DP) * context.resources.displayMetrics.density).roundToInt()
+                lp.gravity = gravity
+                lp.topMargin = if (tabRaised) margin else 0
+                lp.bottomMargin = if (tabRaised) 0 else margin
+                layoutParams = lp
+            }
         }
-        setRightMargin(game, if (side && isDocked) w else 0)
-        // A DS game's touch screen: the controls span both screens (the D-pad's side on the left, A / B / X / Y's on the
-        // right), above the panel; a touch on no button goes through to the screen (TouchControlsView.passMisses).
-        val overDs = side && dsScreen.value
-        setRightMargin(touchControls, if (side && !overDs) w else 0)
-        touchControls.translationZ = if (overDs) DS_CONTROLS_Z else 0f
-        (touchControls as? TouchControlsView)?.passMisses = overDs
+        // Book mode: the game's page ends at the hinge, not at the companion's edge.
+        val gameEdge = book?.let { (rootWidth - it.first).coerceAtLeast(0) } ?: w
+        setRightMargin(game, if (side && isDocked) gameEdge else 0)
+        setRightMargin(touchControls, if (side) gameEdge else 0)
     }
 
     private fun setRightMargin(v: View, margin: Int) {
@@ -412,11 +445,13 @@ class SidePanel(
     }
 
     private fun onDrag(dx: Float) {
+        if (book != null) return
         fraction = ((dragStartWidth - dx) / rootWidth).coerceIn(MIN_FRACTION, MAX_FRACTION)
         apply()
     }
 
     private fun onDragEnd() {
+        if (book != null) return
         // A game area within a few pixels of a whole-number scale snaps to it (half a 1080p
         // screen is exactly 4x already).
         val area = rootWidth - panelWidth
@@ -429,9 +464,6 @@ class SidePanel(
     }
 
     private companion object {
-        /** The touch controls' lift over a DS game's touch screen in the panel (it's drawn and touched in Z order). */
-        private const val DS_CONTROLS_Z = 8f
-
         const val MIN_FRACTION = 0.3f
         const val MAX_FRACTION = 0.75f
         const val HANDLE_TOP_DP = 12

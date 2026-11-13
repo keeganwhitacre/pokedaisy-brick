@@ -11,6 +11,9 @@ struct pd_glyph {
     uint16_t codepoint;
     uint8_t advance;
     uint16_t rows[PD_FONT_HEIGHT]; // bit 0 = leftmost pixel
+    // Optional: how much of each pixel the letter covers (16 x 16, row by row, 0-255), for a font drawn at a size it wasn't
+    // made at (a Game Boy game's 8 rows drawn as 10): its edges blended rather than rows repeated. NULL = [rows] alone.
+    const uint8_t* alpha;
 };
 
 extern const struct pd_glyph pd_font_glyphs[];
@@ -20,6 +23,7 @@ extern const int pd_font_glyph_count;
 // Keep the array alive until reset. NULL or count <= 0 restores the default.
 // Process-wide: set/reset on the render thread, including before ROM unload.
 void pd_font_set(const struct pd_glyph* glyphs, int count);
+void pd_font_get(const struct pd_glyph** glyphs, int* count);
 
 // The glyph for a codepoint ('?' when the font lacks it).
 const struct pd_glyph* pd_font_glyph(uint32_t codepoint);

@@ -1,12 +1,12 @@
 ---
 title: Screen, aspect and shaders
-summary: Change how the game sits on the top screen and how it looks, from widescreen EXPAND to LCD and CRT filters, frames and dark mode.
+summary: Change how the game sits on the top screen and how it looks, from widescreen EXPAND to LCD and CRT filters, frames, themes and dark mode.
 section: player
 order: 3
-keywords: [lag, slow device, input delay, light companion, widescreen, fullscreen, 16:9, 3:2, ratio, bezel, border, frame, crt, lcd, scanlines, xbrz, scalefx, upscale, unlit, backlight, pixel transparency, night, appearance, framerate, fps, performance, graphics, look]
+keywords: [ds resolution, internal resolution, upscaling, hd, sharper 3d, jagged, lag, slow device, input delay, light companion, widescreen, fullscreen, 16:9, 3:2, ratio, bezel, border, frame, crt, lcd, scanlines, xbrz, scalefx, upscale, unlit, backlight, pixel transparency, night, appearance, framerate, fps, performance, graphics, look, theme, themes, colour scheme, color scheme, skin, holiday, seasonal, christmas, halloween, easter, lunar new year, valentine, cherry, rainbow]
 ---
 
-The top screen is wider than a GBA, so there's a choice to make about the space around the game. You can keep the GBA's own shape, stretch it, or let PokeDaisy draw more of the world into the gaps. On top of that you can run the picture through a filter, put a frame around it and switch the app's windows to a dark look.
+The top screen is wider than a GBA, so there's a choice to make about the space around the game. You can keep the GBA's own shape, stretch it, or let PokeDaisy draw more of the world into the gaps. On top of that you can run the picture through a filter, put a frame around it and give the app's windows a theme or a dark look.
 
 Everything on this page is in the `SCREEN` group of Settings, on both screens: the top screen's Settings (from the library) and the companion's `SETTINGS` tab. `STATUS BAR`, `SHADERS`, `OVERLAY` and `LIGHT COMPANION` are on its `DISPLAY OPTIONS` page. A change made on the companion shows on the game straight away.
 
@@ -33,21 +33,73 @@ A few things worth knowing:
 - **Battles are wide too.** The battle scenery carries on past the edges, and Pokémon, trainers and health boxes slide in from off screen. Some hacks only draw their battle scenes as wide as the screen; there the scene is mirrored out from its edges so it still flows on. The dark band behind the text and the battle menu runs right across.
 - **Weather and caves work.** Fog, ash and rain reach the screen's edges, and a dark cave stays dark around your light.
 - **Menus and the title screen** can't be extended, so there the strips glow softly with the colours at the game's edges, and fade back into the map when you return to it.
-- **Supported games:** FireRed, LeafGreen, Emerald, Ruby and Sapphire (every language and revision), plus Unbound, Radical Red, Lazarus, SoulGold, Heart and Soul, Gaia, Odyssey, Amethyst 1.3.0, Glazed, Seaglass, Emerald Imperium, Emerald Legacy, Emerald Rogue, Too Many Types 2, Recharged Yellow, Super Mariomon, Ultra Violet, FireRed Rocket Edition, Ash Gray, Ghost Grey, Elite Redux, Sword and Shield Ultimate Plus, GS Chronicles and Celia's hack.
-- **On the Game Boy:** Yellow (the English cart) and Crystal have it too. The town or route goes on past the small screen, with the people standing in it, and zoom and looking around work the same way. People in the next town or route show up in the strips before you cross over. Text boxes, the start menu, the save prompt and the options screen keep the map around them. Battles and the other menu screens aren't widened: the strips there are plain, in the colours along the screen's sides (white in most of them, Yellow's trainer card too; black beside a screen whose top part is black).
+- **Supported games:** FireRed, LeafGreen, Emerald, Ruby and Sapphire (every language and revision), plus Unbound, Radical Red, Lazarus, SoulGold, Heart and Soul, Gaia, Odyssey, Amethyst 1.3.0, Glazed, Seaglass, Emerald Imperium, Emerald Legacy, Emerald Rogue, Too Many Types 2, Recharged Yellow, Super Mariomon, Ultra Violet, FireRed Rocket Edition, Ash Gray, Let's Go, Elite Redux, Monomyth, Sword and Shield Ultimate Plus, GS Chronicles and Celia's hack.
+- **DS games:** Platinum, HeartGold, SoulSilver, Black, White, Black 2, White 2 and Origin HeartGold. Their 3D world goes on past the screen, and so do their battles: the whole battle scene of Black, White and their sequels, sky, ground and all, and the others' battle backgrounds with the health boxes carried to the edges.
+- **On the Game Boy:** Yellow (the English cart), Yellow Legacy, Crystal, Crystal Legacy, Crystal Clear and Polished Crystal (version 3.2.3, the normal build) have it too. The town or route goes on past the small screen, with the people standing in it, and zoom and looking around work the same way. People in the next town or route show up in the strips before you cross over. Text boxes, the start menu, the save prompt and the options screen keep the map around them. Battles and the other menu screens aren't widened: the strips there are plain, in the colours along the screen's sides (white in most of them, Yellow's trainer card too; black beside a screen whose top part is black).
 
 `EXPAND` is tagged `BETA` in Settings: it works in every game listed above, but it isn't perfect yet, and now and then you may spot something at the edges that the game itself doesn't show. If you do, [tell us](https://pokedaisy.com/feedback/) where it happened.
 
 In a game that doesn't support it yet, `EXPAND` shows as `ORIGINAL` and the companion's pick-list tags it `NOT YET`. You can leave it on: it kicks in for every game that has it.
+
+> [!NOTE]
+> On plorpOS, where PokeDaisy runs as a core, the picture is sized to the screen instead: see [Linux handhelds](linux.md#the-picture-in-the-launcher).
 
 > [!TIP]
 > The first time you start a game that supports it, PokeDaisy may ask whether to turn `EXPAND` on (`TURN ON` or `NOT NOW`). Either answer is fine, and you can change it any time under `ASPECT`.
 
 ### Zoom and looking around
 
-With `EXPAND` on, the `ZOOM` hotkey steps the view out so you see further around you. It's R3 (clicking the right stick) by default, or `C` on a keyboard; you can move it to any button under `HOTKEYS` (see [Controls](controls.md)). Battles, conversations and menus ease back in by themselves, so text is never tiny. Each game keeps the zoom you picked: open it again and, once you're back on the field, the view eases out to it. If you'd rather keep your zoom through conversations, signs and menus, turn `AUTO ZOOM IN` off in Settings; battles still ease in, and so do the party and bag screens you open from one.
+With `EXPAND` on, the `ZOOM` hotkey steps the view out so you see further around you. It's R3 (clicking the right stick) by default, or `C` on a keyboard; you can move it to any button under `HOTKEYS` (see [Controls](controls.md)). No right stick? Pick the zoom from a list in the companion's Settings: `ZOOM`, in the `SCREEN` group, while a game is running. Battles, conversations and menus ease back in by themselves, so text is never tiny. Each game keeps the zoom you picked: open it again and, once you're back on the field, the view eases out to it. If you'd rather keep your zoom through conversations and signs, turn `AUTO ZOOM IN` off in Settings; battles and the game's menu screens, like the party, the bag or the Pokédex, still ease in.
 
-The **right stick** looks around. Push it and the view moves; let go and it stays put until you walk, then glides back to you. Hold it while you walk and the camera looks ahead in that direction, keeping your character on screen.
+The **right stick** looks around (turn off `LOOK AROUND` in the `SCREEN` group if you'd rather it didn't). Push it and the view moves; let go and it stays put until you walk, then glides back to you. Hold it while you walk and the camera looks ahead in that direction, keeping your character on screen.
+
+## DS core: DS games on weaker devices
+
+PokeDaisy has two DS emulators. melonDS has every DS feature. DSperate needs far less from your device, so it keeps DS games at full speed on budget handhelds, older phones and tablets, and devices running 32-bit Android, where melonDS can be slow. `DS CORE` picks which one runs your DS games.
+
+| Choice | What you get |
+| --- | --- |
+| `AUTO` | DSperate on a device that looks weak or runs 32-bit Android, melonDS everywhere else. The row shows which one it picked. This is the default. |
+| `MELONDS` | Always melonDS. |
+| `DSPERATE` | Always DSperate. |
+
+A few things worth knowing:
+
+- **Some features are melonDS only for now.** On DSperate, `EXPAND`, `DS RESOLUTION` and `DS CPU BOOST` are greyed out, the companion's `PC` and `FLY` don't show for DS games, and fast-forward plays the music sped up (`FF MUSIC`'s `STEADY` needs melonDS). The companion's tabs, the touch screen, `DS LAYOUT`, `BATTLE BUTTONS`, cheats, achievements and your saves all work the same.
+- **It applies when a DS game starts.** Change it in the companion while a game is running and it takes effect at `RESTART GAME` or the next time you open the game.
+- **Save in the game before you switch.** Each emulator only reads its own save states. When you switch, the game starts from your save file, and the place you left it on the other emulator is kept: switch back and the game picks up there again, as long as you haven't saved in the game since. Save states you made in `STATES` load only on the emulator that made them.
+
+## DS resolution: sharper 3D
+
+The DS games (Platinum, HeartGold and SoulSilver) draw their world in 3D, and the DS drew it small: 256 by 192 pixels, so on a big screen the edges look jagged. `DS RESOLUTION` draws that 3D at more pixels instead.
+
+| Choice | What you get |
+| --- | --- |
+| `ORIGINAL` | The DS's own picture, pixel for pixel. This is the default. |
+| `2x` to `8x` | The 3D drawn that many times sharper by your device's graphics chip. `4x` is about as sharp as a 1080p screen can show; `6x` and `8x` go past it, which smooths the edges even more. |
+
+Text, menus and anything the game draws flat keep their own pixels, so they look the same at every choice.
+
+With `2x` or more and `ASPECT` on `EXPAND`, the world past the screen's edges is drawn together with the screen in one go, just as sharp, and the strips stay smooth as you walk. Zoomed far out, the 3D is drawn a little less sharp to keep things quick; it's small on screen then anyway.
+
+A few things worth knowing:
+
+- **It works the graphics chip harder.** If a game slows down or your device runs warm, pick a lower choice.
+- **Not every device can do it.** It needs a fairly recent graphics chip (OpenGL ES 3.2, which most handhelds of the last few years have). On a device without one the row shows `N/A` and the game uses `ORIGINAL`.
+- **Some shaders step aside.** `SMOOTHING` and `UNLIT SCREEN` work on the DS's own pixels, so they're off at `2x` and up. `FILTER` and `GBA COLORS` still apply.
+- On the companion, the row only shows while a DS game is running, and a change shows on the game straight away.
+
+## DS CPU boost: fewer slowdowns
+
+The DS games sometimes can't finish a frame in time and hold the last picture a little longer: walking in HeartGold and SoulSilver stutters every few steps, more so with a Pokémon following you. That happens on a real DS too. `DS CPU BOOST` runs the DS's processor twice as fast, so the game finishes its frames and walking stays smooth. The game itself doesn't speed up: it still waits for each frame as it always does.
+
+The overworld in these games runs at 30 frames a second on a DS as well, so that's as smooth as walking gets; the boost removes the hiccups on top of it.
+
+It costs your device more work, so it starts on only where the device has the speed for it. On a handheld with a slower processor (no core faster than 2.3 GHz, or less than 3 GB of memory) it starts off, because there the boost takes more time than it saves. Whatever it started as, you can switch it: if a DS game runs slower with it on, or your device runs warm, turn it off. On the companion, the row only shows while a DS game is running.
+
+### When your device can't keep up
+
+On a device that can't run a DS game at full speed, PokeDaisy keeps the game at the DS's own speed by drawing fewer pictures: it draws one frame and skips drawing the next one (or up to three) while the game itself keeps running. The music, walking and battles stay at their real pace, and the picture is a little less smooth. It happens by itself, only when it's needed, and stops when the game is light enough again. On a device so slow that skipping wouldn't bring the speed back, every frame is drawn and the game simply runs slower. Fast-forward does its own skipping, so none of this applies while it's on.
 
 ## Status bar
 
@@ -104,7 +156,7 @@ The first GBA had no light behind its screen. Light from the room went in throug
 
 ### On the companion too
 
-`ON COMPANION` (on by default) puts the same `FILTER` and `GBA COLORS` (not `UNLIT SCREEN`) over the companion screen and the status bar, so both screens match. The grid is sized to the game's pixels, so the lines line up with the top screen's. This needs Android 13 or newer; on older devices the companion keeps its plain look.
+`ON COMPANION` (on by default) puts the same `FILTER` and `GBA COLORS` (not `UNLIT SCREEN`) over the companion screen and the status bar, so both screens match. The grid is sized to the game's pixels, so the lines line up with the top screen's. This needs Android 13 or newer; on older devices the companion keeps its plain look. A DS game's touch screen is part of the game, so it gets `FILTER` and `GBA COLORS` either way (Android 13 and newer).
 
 ## Overlay: a frame around the game
 
@@ -148,11 +200,26 @@ The game's own art stays as it is: party slots, the map, the trainer card and ba
 
 ## Theme
 
-`THEME` picks the backdrop behind the top screen's library, Settings and setup. `POKéDAISY` (the default) is the website's light page with soft blobs and floating logos. The others are colour themes from the games: `FIRERED`, `LEAFGREEN`, `EMERALD`, `RUBY`, `SAPPHIRE`, `PLATINUM`, `HEARTGOLD` and `SOULSILVER`.
+`THEME` gives the whole app a colour scheme: the library, Settings, setup and the companion while you play, on both screens at once. It works like `DARK MODE`: the windows take the theme's colour, the values in the lists take its accent, and the backdrop behind them gets its own colours. You can pick it in the top screen's Settings or in the companion's SETTINGS, under SCREEN, and use it with `DARK MODE` on or off.
 
-The theme only changes the top screen outside a game. While you play, the companion always uses the running game's own look.
+- `POKéDAISY` (the default): the classic white and grey windows over the website's light page with soft blobs and floating logos.
+- `CHERRY`, `RAINBOW`, `OCEAN`, `MINT`, `LAVENDER`, `SUNSET`, `FOREST` and `LEMON`: always there. `CHERRY` floats blossoms over the library, and `RAINBOW` keeps the usual windows but fills the tabs and buttons with the colours of the rainbow.
 
-![The THEME pick-list in Settings with POKéDAISY selected and the game themes below it](shots/settings-theme.png)
+The game's own art stays as it is: party slots, the map, the trainer card and type colours keep the game's look. Behind them, the game's backdrop takes a soft wash of the theme's colour.
+
+![The library in the CHERRY theme: pink windows over a light pink backdrop with blossoms](shots/library-theme-cherry.png)
+
+![The THEME pick-list in Settings with POKéDAISY selected and the other themes below it](shots/settings-theme.png)
+
+### Holiday themes
+
+A few themes show up only around a holiday, from a few days before it to a few days after: `LUNAR NEW YEAR`, `VALENTINE'S DAY`, `ST. PATRICK'S DAY`, `EASTER`, `HALLOWEEN`, `CHRISTMAS` and `NEW YEAR`. Each has its own picture floating over the library (a pumpkin, snowflakes, lanterns and so on) and carries a `LIMITED` tag in the `THEME` list.
+
+When one of them arrives, the library tells you once with a small window. `TRY IT` puts it on right away; `NO THANKS` leaves your theme alone, and the holiday theme stays in the `THEME` list until its dates are over. When they end, the app goes back to the theme you had before.
+
+The dates follow your device's calendar. If two holidays overlap (`LUNAR NEW YEAR` and `VALENTINE'S DAY` sometimes do), you get one window for each.
+
+![The window for a holiday theme: its picture, its name, the last day it's available, NO THANKS and TRY IT](shots/library-seasonal-popup.png)
 
 ## FPS / CPU
 

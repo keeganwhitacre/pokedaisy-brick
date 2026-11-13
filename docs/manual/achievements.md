@@ -2,8 +2,8 @@
 title: RetroAchievements
 summary: Earn RetroAchievements while you play, see the game's set and leaderboards on the companion, and why it's softcore only.
 section: companion
-order: 9
-keywords: [cheevos, ra, achievements, trophies, login, account, sign in, points, hardcore, softcore, leaderboard]
+order: 10
+keywords: [cheevos, ra, achievements, trophies, login, account, sign in, points, hardcore, softcore, leaderboard, shiny odds]
 ---
 
 [RetroAchievements](https://retroachievements.org) is a free community site that adds achievements to old games: "beat the first gym without a healing item", "catch every Pokémon on this route" and so on. PokeDaisy has it built in. Sign in once, and achievements unlock as you play, pop up on the companion and count towards your account on the site, like they would in RetroArch.
@@ -70,11 +70,13 @@ Achievement news pops up at the top of the companion, over whatever tab you're o
 
 Tap an unlock or progress popup to open the ACHIEVEMENTS tab right on that achievement, highlighted. Press `BACK` and you're returned to the tab you were on.
 
+When the companion isn't on screen (a DS game's touch screen in its place, or the companion closed on a one-screen handheld), popups show at the top of the game instead, and a tap there just closes them.
+
 ## Leaderboards and challenges
 
 Some sets have leaderboards (fastest time, highest score). When the game has any, a `LEADERBOARDS` button appears on the ACHIEVEMENTS tab. Tap a board to see the top 10 and the players around your own entry, with your row highlighted.
 
-While a leaderboard attempt is running, its current value (a timer, a count) shows in the bottom-right corner of the companion. Some achievements are challenges you have to finish without breaking a rule; while one is active, its badge sits in that corner too, so you know it's still on.
+While a leaderboard attempt is running, its current value (a timer, a count) shows in the bottom-right corner of the companion. Some achievements are challenges you have to finish without breaking a rule; while one is active, its badge sits in that corner too, so you know it's still on. With the companion off screen, they sit in the game's bottom right corner. Rather not see them? Turn off `CHALLENGE ICONS` in SETTINGS (COMPANION group).
 
 ## Save states and achievement progress
 
@@ -83,6 +85,8 @@ Every save state keeps your achievement progress with it. Load a state and the p
 ## Cheats pause achievements
 
 While any cheat is loaded, achievements are paused: nothing can unlock, and the ACHIEVEMENTS tab shows `PAUSED: CHEATS ON`. A popup tells you when cheats go on or off. Turn every cheat off and achievements pick up again. See [Cheats](cheats.md).
+
+Raising `SHINY ODDS` pauses them the same way, and the tab shows `PAUSED: SHINY ODDS` until you set it back to `NORMAL`. See [SHINY ODDS](controls.md#shiny-odds).
 
 ## When the site can't be reached
 

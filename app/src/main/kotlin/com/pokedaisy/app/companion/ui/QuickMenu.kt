@@ -31,7 +31,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawBehind
+import kotlin.math.hypot
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.SubcomposeLayout
@@ -45,12 +49,11 @@ import com.pokedaisy.app.companion.QuickAction
 import com.pokedaisy.app.companion.QuickMenuStyle
 import com.pokedaisy.app.companion.REPEL_KINDS
 import com.pokedaisy.app.companion.data.FlyTargets
-import com.pokedaisy.app.companion.data.gen4ConfigFor
+import com.pokedaisy.app.companion.data.dsFlySpotName
 import com.pokedaisy.app.companion.data.KeyItems
 import com.pokedaisy.app.companion.data.SnapshotView
 import com.pokedaisy.app.companion.data.activeGame
 import com.pokedaisy.app.companion.data.activeMapSecData
-import com.pokedaisy.app.companion.data.flySpotName
 import com.pokedaisy.app.companion.data.isDsGame
 import com.pokedaisy.app.companion.data.gameCase
 import com.pokedaisy.app.companion.data.itemName
@@ -84,11 +87,17 @@ interface QuickActions {
     /** The player is on a bike now (the field read's gPlayerAvatar): BIKE is GET OFF. */
     fun riding(): Boolean = false
 
+    /** FREE FLIGHT is up (EmulatorEngine.flightState): TAKE OFF is LAND. */
+    fun flying(): Boolean = false
+
     /** WILD ENCOUNTERS now, as SETTINGS has it (100 = NORMAL, 0 = OFF). */
     fun wildEncounters(): Int = 100
 
     /** Steps left on the REPEL in effect (0 = none). */
     fun repelSteps(): Int = 0
+
+    /** FLASH would light this place up (a dark cave, the light not on yet); false = it's light here, null = can't tell. */
+    fun flashDark(): Boolean? = null
 }
 
 /**
@@ -279,13 +288,26 @@ fun repelKindsIn(s: SnapshotView): List<Int> =
     REPEL_KINDS.map { it.first }.filter { id -> s.items.any { it.itemId == id && it.quantity > 0 } }
 
 /** Why [action] can't run now in [s]; null = it can. The game-side checks (a menu up, fields locked) answer when it runs. */
-fun quickBlocked(action: QuickAction, s: SnapshotView, repelSteps: Int = 0): String? {
+fun quickBlocked(action: QuickAction, s: SnapshotView, repelSteps: Int = 0, dark: Boolean? = null, flying: Boolean = false): String? {
     val field = !s.inBattle
     return when (action) {
+        // Up there, LAND always can (the bird finds the nearest ground).
+        QuickAction.FLIGHT -> when {
+            flying -> null
+            !field -> tr("Not during a battle")
+            s.party.none { !it.isEgg && it.moves.any { mv -> mv.id == FLY_MOVE } } -> tr("No one in your party knows FLY")
+            else -> null
+        }
         QuickAction.PC -> if (!field) tr("Not during a battle") else null
         QuickAction.FLY -> when {
             !field -> tr("Not during a battle")
             s.party.none { !it.isEgg && it.moves.any { mv -> mv.id == FLY_MOVE } } -> tr("No one in your party knows FLY")
+            else -> null
+        }
+        QuickAction.FLASH -> when {
+            !field -> tr("Not during a battle")
+            s.party.none { !it.isEgg && it.moves.any { mv -> mv.id == FLASH_MOVE } } -> tr("No one in your party knows FLASH")
+            dark == false -> tr("It isn't dark here")
             else -> null
         }
         QuickAction.REPEL -> when {
@@ -308,9 +330,21 @@ fun quickBlocked(action: QuickAction, s: SnapshotView, repelSteps: Int = 0): Str
     }
 }
 
+/** Why FLASH didn't start, in the companion's words (the HUD's notice). */
+internal fun flashMessage(r: com.pokedaisy.app.companion.data.FlashResult): String = when (r) {
+    com.pokedaisy.app.companion.data.FlashResult.NOT_NOW -> tr("Not now: close the game's menus and battles first.")
+    com.pokedaisy.app.companion.data.FlashResult.IN_BATTLE -> tr("You can't do that during a battle.")
+    com.pokedaisy.app.companion.data.FlashResult.NO_BADGE -> tr("FLASH needs a new BADGE first.")
+    com.pokedaisy.app.companion.data.FlashResult.NO_FLASHER -> tr("No one in your party knows FLASH")
+    com.pokedaisy.app.companion.data.FlashResult.CANT_USE_HERE -> tr("It isn't dark here")
+    com.pokedaisy.app.companion.data.FlashResult.ALREADY_LIT -> tr("This place is lit already.")
+    else -> tr("It can't be used here.")
+}
+
 /** A tile's text under its icon. */
 private fun quickLabel(action: QuickAction, actions: QuickActions): String = when (action) {
     QuickAction.BIKE -> if (actions.riding()) tr("GET OFF") else tr(action.label)
+    QuickAction.FLIGHT -> if (actions.flying()) tr("LAND") else tr(action.label)
     QuickAction.WILD -> tr("WILD")
     else -> tr(action.label)
 }
@@ -328,35 +362,46 @@ private fun quickHint(action: QuickAction, actions: QuickActions): String = when
  */
 @Composable
 fun QuickMenu(state: QuickMenuState, snapshot: SnapshotView, actions: QuickActions, shown: Set<QuickAction>, look: FieldHudLook) {
-    if (!state.open) return
+    // 0 closed, 1 open: the tiles come out of the middle one by one ([tileOut]) and go back the same way, the last one first.
+    // It stays drawn while they go, the keys already the game's.
+    val fan by androidx.compose.animation.core.animateFloatAsState(
+        if (state.open) 1f else 0f,
+        // Not LIGHT COMPANION's business: it moves a dozen tiles at placement, nothing composes.
+        androidx.compose.animation.core.tween(if (state.open) RING_OPEN_MS else RING_CLOSE_MS, easing = androidx.compose.animation.core.LinearEasing),
+        label = "quick-menu-fan",
+    )
+    if (!state.open && fan == 0f) return
     val items = QuickAction.entries.filter { it in shown && actions.offered(it) }
     val repelSteps = actions.repelSteps()
+    val dark = if (QuickAction.FLASH in shown) actions.flashDark() else null
     state.items = items
-    state.blocked = { quickBlocked(it, snapshot, repelSteps) }
+    val flying = actions.flying()
+    state.blocked = { quickBlocked(it, snapshot, repelSteps, dark, flying) }
     state.repelKinds = repelKindsIn(snapshot)
     LaunchedEffect(items.size) { state.clamp() }
     val m = rememberGbaTextMetrics(1f)
     val u = m.u
-    CompanionBackHandler { if (state.fly != null || state.repels != null) state.back() else state.close() }
+    CompanionBackHandler(enabled = state.open) { if (state.fly != null || state.repels != null) state.back() else state.close() }
     CompositionLocalProvider(LocalHudLook provides look) {
         BoxWithConstraints(
-            Modifier.fillMaxSize().background(Color(0x55000000)).pointerInput(Unit) { detectTapGestures { state.close() } },
+            Modifier.fillMaxSize().drawBehind { drawRect(Color(0x55000000).copy(alpha = 0x55 / 255f * fan)) }
+                .pointerInput(Unit) { detectTapGestures { state.close() } },
             contentAlignment = Alignment.Center,
         ) {
             val fly = state.fly
             val repels = state.repels
             val current = items.getOrNull(state.index)
-            val why = current?.let { quickBlocked(it, snapshot, repelSteps) }
+            val why = current?.let { quickBlocked(it, snapshot, repelSteps, dark, flying) }
             val hint = current?.let { why ?: quickHint(it, actions) }
             val ring = state.ring
             val tile: @Composable (Int) -> Unit = { i ->
                 val a = items[i]
-                QuickTile(a, snapshot, actions, selected = i == state.index, blocked = quickBlocked(a, snapshot, repelSteps) != null, m, label = state.labels) { state.tap(i) }
+                QuickTile(a, snapshot, actions, selected = i == state.index, blocked = quickBlocked(a, snapshot, repelSteps, dark, flying) != null, m, label = state.labels) { state.tap(i) }
             }
             if (fly != null || repels != null || items.isEmpty() || !ring) {
                 Column(
                     // Taps on the panel stay in it (the dim around it closes the menu).
-                    Modifier.widthIn(max = maxWidth * 0.92f).hudPanel(u).pointerInput(Unit) { detectTapGestures { } }.padding(u * 6),
+                    Modifier.graphicsLayer { alpha = fan }.widthIn(max = maxWidth * 0.92f).hudPanel(u).pointerInput(Unit) { detectTapGestures { } }.padding(u * 6),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(u * 4),
                 ) {
@@ -365,14 +410,14 @@ fun QuickMenu(state: QuickMenuState, snapshot: SnapshotView, actions: QuickActio
                         repels != null -> RepelKinds(state, repels, snapshot, m)
                         items.isEmpty() -> GbaText(tr("Nothing to show: pick actions in SETTINGS > QUICK MENU"), ink.text, ink.shadow, m, maxLines = 2)
                         else -> {
-                            TileGrid(items.size, gap = u * 3, tile)
+                            TileGrid(items.size, gap = u * 5, tile)
                             if (hint != null) GbaText(hint, ink.text, ink.shadow, rememberGbaTextMetrics(0.75f), maxLines = 2)
                         }
                     }
                 }
             } else {
                 // The highlighted one's name (and why it's dimmed) in the middle, like a game's weapon wheel.
-                TileRing(state, items.size, gap = u * 6, maxW = maxWidth * 0.96f, maxH = maxHeight * 0.96f, tile) {
+                TileRing(state, items.size, gap = u * 10, maxW = maxWidth * 0.96f, maxH = maxHeight * 0.96f, { fan }, tile) {
                     // With names on the tiles, the middle only says why the highlighted one is dimmed (or WILD's state).
                     val name = if (state.labels) null else quickLabel(current ?: QuickAction.PC, actions)
                     val note = why ?: if (current == QuickAction.WILD) quickHint(current, actions) else null
@@ -446,7 +491,7 @@ private fun TileGrid(n: Int, gap: Dp, tile: @Composable (Int) -> Unit) {
  * same gap from the last instead. Too tall for the screen, the circle becomes an oval, wider than it is tall.
  */
 @Composable
-private fun TileRing(state: QuickMenuState, n: Int, gap: Dp, maxW: Dp, maxH: Dp, tile: @Composable (Int) -> Unit, center: @Composable () -> Unit) {
+private fun TileRing(state: QuickMenuState, n: Int, gap: Dp, maxW: Dp, maxH: Dp, fan: () -> Float, tile: @Composable (Int) -> Unit, center: @Composable () -> Unit) {
     val density = LocalDensity.current
     val (gapPx, limW, limH) = with(density) { Triple(gap.toPx(), maxW.toPx(), maxH.toPx()) }
     var places = RingPlaces(0f, 0f, FloatArray(0), FloatArray(0))
@@ -460,14 +505,38 @@ private fun TileRing(state: QuickMenuState, n: Int, gap: Dp, maxW: Dp, maxH: Dp,
         place = { tiles, w, h, extra ->
             val cx = places.rx + w / 2f
             val cy = places.ry + h / 2f
+            // Read here, in placement: the tiles move without being composed again.
+            val open = fan()
             tiles.forEachIndexed { i, p ->
-                p.place((cx + places.x[i] - w / 2f).roundToInt(), (cy + places.y[i] - h / 2f).roundToInt())
+                val out = tileOut(open, i, n)
+                p.placeWithLayer((cx + places.x[i] * out - w / 2f).roundToInt(), (cy + places.y[i] * out - h / 2f).roundToInt()) {
+                    alpha = (out * 3f).coerceAtMost(1f)
+                    scaleX = TILE_START_SCALE + (1f - TILE_START_SCALE) * out
+                    scaleY = scaleX
+                }
             }
-            extra.forEach { e -> e.place((cx - e.width / 2f).roundToInt(), (cy - e.height / 2f).roundToInt()) }
+            extra.forEach { e -> e.placeWithLayer((cx - e.width / 2f).roundToInt(), (cy - e.height / 2f).roundToInt()) { alpha = open } }
         },
         // The hint inside the ring, clear of the tiles at its sides.
         extraWidth = { w, _ -> (2 * places.rx - w - 2 * gapPx).roundToInt() },
     )
+}
+
+/** How long the ring takes to open and to close, how small a tile starts, and how much of that time one tile's trip takes. */
+private const val RING_OPEN_MS = 300
+private const val RING_CLOSE_MS = 220
+private const val TILE_START_SCALE = 0.3f
+private const val TILE_TRIP = 0.4f
+
+/**
+ * How far tile [i] of [n] is on its way from the ring's middle to its place when the ring is [open] (0..1), 0 to 1: each
+ * leaves a little after the one before it and slows as it arrives, so closing, the same run backwards, takes the last one in
+ * first.
+ */
+internal fun tileOut(open: Float, i: Int, n: Int): Float {
+    val start = if (n > 1) i * (1f - TILE_TRIP) / (n - 1) else 0f
+    val t = ((open - start) / TILE_TRIP).coerceIn(0f, 1f)
+    return 1f - (1f - t) * (1f - t) * (1f - t)
 }
 
 /** Tile centres round the ring (from its middle, px), its radii, and each tile's turn from the top (0..1). */
@@ -545,8 +614,8 @@ internal fun ringPlaces(n: Int, w: Float, h: Float, gap: Float, limW: Float, lim
 private fun FlyDestinations(state: QuickMenuState, targets: FlyTargets, m: GbaTextMetrics) {
     val ids = targets.destinations
     LaunchedEffect(targets) { state.startFly(targets, ids) }
-    // A DS game's destinations are its fly spots (spawn ids), not map sections.
-    val name: (Int) -> String? = if (activeGame.isDsGame) ({ gen4ConfigFor(activeGame)?.flySpotName(it) }) else ({ activeMapSecData[it]?.name })
+    // A DS game's destinations are its fly spots (Gen 4: spawn ids; Gen 5: the towns' places), not map sections.
+    val name: (Int) -> String? = if (activeGame.isDsGame) ({ dsFlySpotName(activeGame, it) }) else ({ activeMapSecData[it]?.name })
     PickList(tr("FLY"), ids.map { id -> gameCase(name(id) ?: tr("AREA {0}", id)) }, state, m)
 }
 
@@ -602,13 +671,14 @@ private fun QuickTile(
     val noRipple = remember { MutableInteractionSource() }
     val off = action == QuickAction.WILD && actions.wildEncounters() == 0
     Box(
-        Modifier.fillMaxSize().gbaFocusRing(selected, PixelRoundedShape(u * 3)).hudPanel(u)
+        Modifier.fillMaxSize().hudButtonFace(u, selected, solid = false, shadow = true)
             .soundClickable(interactionSource = noRipple, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             // Icons alone: a bigger icon and more room round it, so the tiles stay easy to see and tap without names.
-            Modifier.widthIn(min = if (label) u * 38 else 0.dp).padding(u * if (label) 3 else 7).alpha(if (blocked) 0.45f else 1f),
+            // With names, taller than they were (5u a side): about square, the user's call with the HP box look.
+            Modifier.widthIn(min = if (label) u * 38 else 0.dp).padding(horizontal = u * if (label) 5 else 8, vertical = u * 8).alpha(if (blocked) 0.45f else 1f),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             val icon = u * if (label) 20 else 24
@@ -657,11 +727,14 @@ private fun QuickIcon(action: QuickAction, s: SnapshotView, actions: QuickAction
             val flyer = s.party.firstOrNull { !it.isEgg && it.moves.any { mv -> mv.id == FLY_MOVE } } ?: s.party.firstOrNull()
             SpeciesIcon(flyer?.iconAsset, size * 1.2f)
         }
+        // The wings: up (TAKE OFF) or down (LAND).
+        QuickAction.FLIGHT -> PixelArt(if (actions.flying()) LAND_ICON else TAKE_OFF_ICON, WING_COLORS, Modifier.size(size * 0.8f))
         // The strongest one held.
         QuickAction.REPEL -> item(REPEL_KINDS.map { it.first }.reversed())
         QuickAction.BIKE -> item(KeyItems.BIKES)
         QuickAction.ROD -> item(KeyItems.RODS)
         QuickAction.WILD -> PixelArt(GRASS_ICON, GRASS_COLORS, Modifier.size(size * 0.8f))
+        QuickAction.FLASH -> PixelArt(FLASH_ICON, FLASH_COLORS, Modifier.size(size * 0.8f))
         QuickAction.SAVE_STATE -> PixelArt(SAVE_STATE_ICON, STATE_COLORS, Modifier.size(size * 0.8f))
         QuickAction.LOAD_STATE -> PixelArt(LOAD_STATE_ICON, STATE_COLORS, Modifier.size(size * 0.8f))
         QuickAction.FF -> PixelIcon(FF_ICON, ink.text, Modifier.size(size * 0.8f))
@@ -687,12 +760,74 @@ fun quickMenuRows(
         SettingRow(tk("LABELS"), onOff(labels), subtitle = "Each action's name under its icon") { setLabels(!labels) },
         groupTitle(tk("SHOW")),
     ) + QuickAction.entries.map { a ->
-        SettingRow(a.label, onOff(a in shown)) { setShown(if (a in shown) shown - a else shown + a) }
+        val badge = when (a) {
+            QuickAction.FLASH -> NewFeatures.badge(NewFeatures.QUICK_FLASH)
+            QuickAction.FLIGHT -> NewFeatures.badge(NewFeatures.FREE_FLIGHT)
+            else -> null
+        }
+        SettingRow(a.label, onOff(a in shown), labelBadge = badge) {
+            setShown(if (a in shown) shown - a else shown + a)
+        }
     }
 }
 
 /** SETTINGS' row for the page. */
-fun quickMenuBadge(): String? = NewFeatures.badge(NewFeatures.QUICK_MENU)
+fun quickMenuBadge(): String? = NewFeatures.badge(NewFeatures.QUICK_MENU) ?: NewFeatures.badge(NewFeatures.QUICK_FLASH)
+    ?: NewFeatures.badge(NewFeatures.FREE_FLIGHT)
+
+/** MOVE_FLASH (the quick menu's FLASH tile, the party check). */
+internal const val FLASH_MOVE = 148
+
+/** FLASH: a burst of light, K outline, Y its glow, W the white middle. */
+private val FLASH_ICON = listOf(
+    ".....KK.....",
+    ".K...KK...K.",
+    "..K.KYYK.K..",
+    "...KYWWYK...",
+    "..KYWWWWYK..",
+    "KKYWWWWWWYKK",
+    "KKYWWWWWWYKK",
+    "..KYWWWWYK..",
+    "...KYWWYK...",
+    "..K.KYYK.K..",
+    ".K...KK...K.",
+    ".....KK.....",
+)
+
+/** FREE FLIGHT: a pair of wings, the arrow over them going up (TAKE OFF) or under them going down (LAND). */
+private val TAKE_OFF_ICON = listOf(
+    ".....GG.....",
+    "....GGGG....",
+    "...G.GG.G...",
+    ".....GG.....",
+    "K....KK....K",
+    "KB..KBBK..BK",
+    "KBBKBBBBKBBK",
+    "KBWBBBBBBWBK",
+    ".KBWBBBBWBK.",
+    "..KBBKKBBK..",
+    "...KK..KK...",
+    "............",
+)
+
+private val LAND_ICON = listOf(
+    "K....KK....K",
+    "KB..KBBK..BK",
+    "KBBKBBBBKBBK",
+    "KBWBBBBBBWBK",
+    ".KBWBBBBWBK.",
+    "..KBBKKBBK..",
+    "...KK..KK...",
+    "............",
+    ".....GG.....",
+    "...G.GG.G...",
+    "....GGGG....",
+    ".....GG.....",
+)
+
+private val WING_COLORS = mapOf('K' to Color(0xFF202850), 'B' to Color(0xFF5068C8), 'W' to Color(0xFFB8C8F8), 'G' to Color(0xFF58C858))
+
+private val FLASH_COLORS = mapOf('K' to Color(0xFF584818), 'Y' to Color(0xFFF8D030), 'W' to Color(0xFFFFFFF0))
 
 /** A disk with an arrow into it: K outline, D the disk, L its label, A the arrow. */
 private val SAVE_STATE_ICON = listOf(

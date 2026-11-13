@@ -74,6 +74,12 @@ data class Gen2Config(
     val berriesMax: Int = 0,
     /** A faithful build: its own species types, moves and item names over the normal ones (ActiveTables). */
     val polishedFaithful: Boolean = false,
+    /** A European cart's language letter and game code ("BYTD"), for its names ([gameText]); null = English. */
+    val language: Char? = null,
+    val gameCode: String? = null,
+    /** The left column of BattleMenu and of BattleMonMenu (SWITCH / STATS / CANCEL). */
+    val battleMenuLeft: Int = 0x09,
+    val switchMenuLeft: Int = 0x0C,
 )
 
 /** Crystal's Mail (FLOWER_MAIL 0x9E, SURF_MAIL 0xB5 .. MIRAGE_MAIL 0xBD): the party menu marks a mon holding one with Mail's icon. */
@@ -112,6 +118,48 @@ val GEN2_CRYSTAL = Gen2Config(
     genderRatios = gen2GenderRatiosCrystal,
     tmItems = gen2TmItemsCrystal,
     pokedex = POKEDEX_CRYSTAL,
+)
+
+/** German Crystal (Kristall): English Crystal's RAM; its own names ([CRYSTAL_DE_TEXT]), dex pages and battle menu columns. */
+val GEN2_CRYSTAL_DE = GEN2_CRYSTAL.copy(
+    pokedex = POKEDEX_CRYSTAL_DE,
+    language = 'D',
+    gameCode = "BYTD",
+    battleMenuLeft = 0x05,
+    switchMenuLeft = 0x0A,
+)
+
+/**
+ * Crystal Legacy v1.3.1 (cRz-Shadows/Pokemon_Crystal_Legacy, a pret/pokecrystal fork: `make pokecrystal.gbc` with rgbds 0.5.2 at
+ * tag V1.3.1 is the patched cart byte for byte, from either retail revision's patch, so its pokecrystal.sym gives every
+ * address). Crystal's structs and engine: most of WRAM bank 1 sits 11 bytes later, ITEMS holds 84, and BALLS and the PC's
+ * items moved into padding. Its TM ids start at 0xC1 (ITEM_C3 / ITEM_DC moved ahead of them). Checked headless on the retail
+ * save rewritten by scripts/convert_save_legacy.py (the `crystal_legacy*` fixtures).
+ */
+val GEN2_CRYSTAL_LEGACY = GEN2_CRYSTAL.copy(
+    partyCount = wramx(1, 0xDCE2),
+    partyMons = wramx(1, 0xDCEA),
+    numItems = wramx(1, 0xD89D),
+    numKeyItems = wramx(1, 0xD947),
+    numBalls = wramx(1, 0xD9CC),
+    tmsHms = wramx(1, 0xD864),
+    money = wramx(1, 0xD859),
+    mapGroup = wramx(1, 0xDCC0),
+    backupMapGroup = wramx(1, 0xDCB8),
+    battleMode = wramx(1, 0xD238),
+    enemyMon = wramx(1, 0xD211),
+    otPartyCount = wramx(1, 0xD28B),
+    otPartyMons = wramx(1, 0xD293),
+    playerGender = wramx(1, 0xD47D),
+    gameTime = wramx(1, 0xD4CF),
+    dexCaught = wramx(1, 0xDEA4),
+    dexSeen = wramx(1, 0xDEC4),
+    moveMenuType = wramx(1, 0xD240),
+    partyMenuAction = wramx(1, 0xD14C),
+    curBattleMon = wramx(1, 0xD0DF),
+    tmItems = gen2TmItemsCrystalLegacy,
+    pokedex = POKEDEX_CRYSTAL_LEGACY,
+    itemsMax = 84,
 )
 
 /**
@@ -154,6 +202,16 @@ val GEN2_GOLD = Gen2Config(
     pokedex = POKEDEX_GOLD,
 )
 val GEN2_SILVER = GEN2_GOLD.copy(pokedex = POKEDEX_SILVER)
+
+/** German Gold / Silver: English Gold's RAM; their own names ([GOLD_SILVER_DE_TEXT]), dex pages and Kristall's battle menu columns. */
+val GEN2_GOLD_DE = GEN2_GOLD.copy(
+    pokedex = POKEDEX_GOLD_DE,
+    language = 'D',
+    gameCode = "AAUD",
+    battleMenuLeft = 0x05,
+    switchMenuLeft = 0x0A,
+)
+val GEN2_SILVER_DE = GEN2_GOLD_DE.copy(pokedex = POKEDEX_SILVER_DE, gameCode = "AAXD")
 
 /**
  * Pokémon Crystal Clear (ShockSlayer's open-world hack of Crystal): v2.6.0 and v2.5.11, each in a Standard Colors and a
@@ -413,7 +471,6 @@ fun decodeGen2BattleMon(raw: ByteArray, speciesCount: Int = 251): BattleMon? {
 }
 
 private const val BATTLE_MENU_TOP = 0x0E      // BattleMenu's _2DMenu: 2 x 2 from (9, 14), 6 across / 2 down
-private const val BATTLE_MENU_LEFT = 0x09
 private const val MOVE_MENU_TOP = 0x0D        // MoveSelectionScreen: a column from (5, 13)
 private const val MOVE_MENU_LEFT = 0x05
 
@@ -441,7 +498,7 @@ fun readGen2BattleInput(r: MemoryReader, cfg: Gen2Config): Pair<Int, Int> {
     val ty = top + (y - 1) * (spacing shr 4)
     val shown = tx < 20 && ty < 18 && u8(r.readCoreMemory(cfg.tileMap + ty * 20 + tx, 1), 0) == cfg.cursorTile
     if (!shown) return BATTLE_INPUT_BUSY to -1
-    if (top == BATTLE_MENU_TOP && left == BATTLE_MENU_LEFT && rows == 2 && cols == 2) {
+    if (top == BATTLE_MENU_TOP && left == cfg.battleMenuLeft && rows == 2 && cols == 2) {
         return BATTLE_INPUT_ACTION_SELECT to (x - 1) + 2 * (y - 1)
     }
     if (top == MOVE_MENU_TOP && left == MOVE_MENU_LEFT && cols == 1 && rows in 1..4 &&
@@ -578,8 +635,13 @@ fun readGen2Telemetry(r: MemoryReader, cfg: Gen2Config): Telemetry {
         money = ((u8(m, 0).toLong() shl 16) or (u8(m, 1).toLong() shl 8) or u8(m, 2).toLong()),
         playerGender = if (cfg.playerGender < 0) 0 else u8(r.readCoreMemory(cfg.playerGender, 1), 0) and 1,
         pokedex = cfg.pokedex?.let { runCatching { readGen2PokedexState(r, cfg, it) }.getOrNull() },
-        // The GUIDE's flags, badges and clock (Polished Crystal's: GuidePolishedCrystal.kt).
-        progress = if (cfg.polished) runCatching { readPolishedProgress(r) }.getOrNull() else null,
+        // The GUIDE's flags, badges and clock (Polished Crystal's: GuidePolishedCrystal.kt; Crystal's: GuideCrystal.kt).
+        progress = when {
+            cfg.polished -> runCatching { readPolishedProgress(r) }.getOrNull()
+            cfg === GEN2_CRYSTAL || cfg === GEN2_CRYSTAL_DE -> runCatching { readCrystalProgress(r) }.getOrNull()
+            cfg === GEN2_CRYSTAL_LEGACY -> runCatching { readCrystalProgress(r, CRYSTAL_LEGACY_GUIDE_RAM) }.getOrNull()
+            else -> null
+        },
     )
 }
 
@@ -588,7 +650,7 @@ val GameKind?.isGameBoyGame: Boolean get() = isGen1 || isGen2
 
 /** Crystal or a hack of it (Crystal Clear, Prism, Polished Crystal). */
 val GameKind?.isCrystalFamily: Boolean get() = this == GameKind.CRYSTAL || this == GameKind.CRYSTAL_CLEAR || this == GameKind.PRISM ||
-    this == GameKind.POLISHED_CRYSTAL
+    this == GameKind.POLISHED_CRYSTAL || this == GameKind.CRYSTAL_LEGACY
 
 /** Gold, Silver: retail Gen 2 before Crystal, one RAM layout and one look ([GEN2_GOLD]). */
 val GameKind?.isGoldSilver: Boolean get() = this == GameKind.GOLD || this == GameKind.SILVER

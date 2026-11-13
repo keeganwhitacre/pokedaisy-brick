@@ -1,0 +1,11 @@
+---
+// A game's page (src/views/GamePage.astro, src/lib/gamePages.js); src/pages/[lang]/g/ has it in the other languages.
+import GamePage from '../../views/GamePage.astro';
+import { GAME_PAGES } from '../../lib/gamePages.js';
+
+export function getStaticPaths() {
+  return GAME_PAGES.map((page) => ({ params: { slug: page.slug }, props: { page } }));
+}
+const { page } = Astro.props;
+---
+<GamePage page={page} />

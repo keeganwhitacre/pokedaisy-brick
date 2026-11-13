@@ -7,6 +7,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -66,6 +70,27 @@ fun CompactTextOnSmallWindows(content: @Composable () -> Unit) {
     }
 }
 
+/**
+ * A list that should show more where the screen has room (the Thor's companion: SETTINGS, GUIDE, DEX): the main text a font
+ * pixel smaller ([LocalTextStep] -1) where that still leaves three screen pixels a font pixel - so not on a side panel's two,
+ * nor where the step is already taken (a short screen, the one-screen window). [LocalDenseText] keeps the subtitles from
+ * going below the main text's new size ([subtitleMetrics]).
+ */
+@Composable
+fun DenseText(content: @Composable () -> Unit) {
+    val density = LocalDensity.current
+    val k = with(density) { (20.dp.toPx() / 16f).roundToInt().coerceAtLeast(2) }
+    val apply = LocalTextStep.current == 0 && k >= 3
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalTextStep provides if (apply) -1 else LocalTextStep.current,
+        LocalDenseText provides apply,
+        content = content,
+    )
+}
+
+/** Inside a [DenseText] that took the step. */
+val LocalDenseText = androidx.compose.runtime.staticCompositionLocalOf { false }
+
 const val COMPACT_WINDOW_WIDTH_DP = 500
 const val COMPACT_WINDOW_HEIGHT_DP = 380
 
@@ -106,7 +131,9 @@ fun gbaTextStyle(font: FontFamily, m: GbaTextMetrics, scaleX: Float = 1f) = Text
 /**
  * GBA-style text: the game draws its shadow one pixel right, down AND
  * diagonally (a thick bottom-right edge), which a single Compose Shadow can't
- * do - so three offset copies sit under the text.
+ * do - so three offset copies sit under the text. They're drawn from the text's own
+ * layout ([drawBehind]): three more Text nodes laid the same string out three more times,
+ * most of a weak tablet's time opening a tab (2026-11-08).
  */
 @Composable
 fun GbaText(
@@ -125,20 +152,50 @@ fun GbaText(
     val style = gbaTextStyle(pixelFontFamily(), m, scaleX)
     val k = m.fontPixel.roundToInt()
     val b = if (bold) boldOffsetPx(m.fontPixel * scaleX) else 0
+    // The layout the text was given, for its copies; set before each draw (layout comes first), read only there.
+    val laid = remember { arrayOfNulls<androidx.compose.ui.text.TextLayoutResult>(1) }
     Box(modifier) {
-        if (shadow.alpha > 0f) for ((dx, dy) in listOf(k to 0, 0 to k, k to k)) {
-            Text(
-                text, color = shadow, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.offset { IntOffset(dx + b, dy) },
-            )
+        Text(
+            text, color = color, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
+            onTextLayout = { laid[0] = it },
+            modifier = Modifier.drawBehind {
+                val layout = laid[0] ?: return@drawBehind
+                if (shadow.alpha > 0f) for ((dx, dy) in listOf(k to 0, 0 to k, k to k)) {
+                    drawText(layout, color = shadow, topLeft = Offset((dx + b).toFloat(), dy.toFloat()))
+                }
+                if (b > 0) drawText(layout, color = color, topLeft = Offset(b.toFloat(), 0f))
+            },
+        )
+    }
+}
+
+/**
+ * [GbaText] in more than one colour, wrapping as one text: each part is (text, colour, its shadow) - WHAT'S NEW's
+ * red lead-in before the grey rest of the line.
+ */
+@Composable
+fun GbaRichText(
+    parts: List<Triple<String, Color, Color>>,
+    m: GbaTextMetrics,
+    modifier: Modifier = Modifier,
+    maxLines: Int = Int.MAX_VALUE,
+) {
+    val style = gbaTextStyle(pixelFontFamily(), m, gameFontScaleX(m))
+    val k = m.fontPixel.roundToInt()
+    fun build(shadow: Boolean) = androidx.compose.ui.text.buildAnnotatedString {
+        for ((text, color, shade) in parts) {
+            pushStyle(androidx.compose.ui.text.SpanStyle(color = if (shadow) shade else color))
+            append(text)
+            pop()
         }
-        if (b > 0) {
-            Text(
-                text, color = color, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.offset { IntOffset(b, 0) },
-            )
+    }
+    val shadow = remember(parts) { build(true) }
+    val main = remember(parts) { build(false) }
+    Box(modifier) {
+        for ((dx, dy) in listOf(k to 0, 0 to k, k to k)) {
+            Text(shadow, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis, modifier = Modifier.offset { IntOffset(dx, dy) })
         }
-        Text(text, color = color, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
+        Text(main, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -171,8 +228,8 @@ fun List<Pair<Color, Int>>.inPx(px: Float) = map { (color, u) -> color to u * px
 /**
  * Nested pixel-cornered rects, outermost layer first, then [fill]. [openRight] runs
  * the shape past the right edge and clips it, dropping the right-hand frame
- * (a folder tab that continues into the window beside it); [openBottom] and
- * [openTop] do the same downwards / upwards.
+ * (a folder tab that continues into the window beside it); [openBottom],
+ * [openTop] and [openLeft] do the same downwards / upwards / leftwards.
  */
 fun DrawScope.drawLayeredBox(
     layers: List<Pair<Color, Float>>,
@@ -181,9 +238,15 @@ fun DrawScope.drawLayeredBox(
     openRight: Boolean = false,
     openBottom: Boolean = false,
     openTop: Boolean = false,
+    openLeft: Boolean = false,
+    /** A button's two-tone face ([drawTwoTone]) instead of plain [fill]. */
+    twoTone: Boolean = false,
+    /** The two-tone face's lower colour, if not [twoToneLow]'s. */
+    low: Color? = null,
 ) {
     val run = radius + layers.sumOf { it.second.toDouble() }.toFloat() + 1f
-    val extraW = if (openRight) run else 0f
+    val left = if (openLeft) run else 0f
+    val extraW = (if (openRight) run else 0f) + left
     val top = if (openTop) run else 0f
     val extraH = (if (openBottom) run else 0f) + top
     clipRect {
@@ -191,15 +254,50 @@ fun DrawScope.drawLayeredBox(
         var r = radius
         for ((color, width) in layers) {
             drawPixelRoundRect(
-                color, Offset(inset, inset - top), Size(size.width + extraW - 2 * inset, size.height + extraH - 2 * inset),
+                color, Offset(inset - left, inset - top), Size(size.width + extraW - 2 * inset, size.height + extraH - 2 * inset),
                 r.coerceAtLeast(0f),
             )
             inset += width
             r -= width
         }
-        drawPixelRoundRect(
-            fill, Offset(inset, inset - top), Size(size.width + extraW - 2 * inset, size.height + extraH - 2 * inset),
-            r.coerceAtLeast(0f),
-        )
+        val at = Offset(inset - left, inset - top)
+        val box = Size(size.width + extraW - 2 * inset, size.height + extraH - 2 * inset)
+        if (twoTone) {
+            drawTwoTone(fill, low ?: twoToneLow(fill), layers.lastOrNull()?.second ?: 1f) { color -> drawPixelRoundRect(color, at, box, r.coerceAtLeast(0f)) }
+        } else drawPixelRoundRect(fill, at, box, r.coerceAtLeast(0f))
+    }
+}
+
+/** A two-tone button's lower colour, for a window-coloured one: [fill] a step down, on a light or a dark look alike. */
+fun twoToneLow(fill: Color): Color = androidx.compose.ui.graphics.lerp(fill, Color(0xFF40485A), 0.3f)
+
+/**
+ * HeartGold's button face, every companion button's: [top] down to just under half way, two lines stepping between the
+ * colours ([line] tall each) so the edge looks soft, then [low]. [paint] fills the button's shape in a colour, so the rounded
+ * corners stay the shape's.
+ */
+fun DrawScope.drawTwoTone(top: Color, low: Color, line: Float, paint: DrawScope.(Color) -> Unit) {
+    val split = size.height * 0.47f
+    paint(low)
+    clipRect(bottom = split) { paint(top) }
+    clipRect(top = split, bottom = split + line) { paint(androidx.compose.ui.graphics.lerp(top, low, 0.35f)) }
+    clipRect(top = split + line, bottom = split + line * 2) { paint(androidx.compose.ui.graphics.lerp(top, low, 0.7f)) }
+}
+
+/**
+ * A one-line label wider than its room drawn narrower instead of cut short: its letters lose whole font pixels of width
+ * (4 wide -> 3 -> 2 -> 1, the height kept, like [FittedGbaText]), centred. A plain layout, so a row measuring its
+ * children's intrinsic sizes (the tab bar) can hold it.
+ */
+internal fun Modifier.narrowToFit(m: GbaTextMetrics): Modifier = layout { measurable, constraints ->
+    val p = measurable.measure(constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity))
+    val room = constraints.maxWidth
+    val scale = if (p.width <= room) 1f else {
+        val steps = (m.fontPixel.toInt() - 1 downTo 1).map { it / m.fontPixel }
+        steps.firstOrNull { p.width * it <= room } ?: (room.toFloat() / p.width)
+    }
+    val w = minOf(p.width, room).coerceAtLeast(constraints.minWidth)
+    layout(w, p.height) {
+        p.placeWithLayer((w - p.width) / 2, 0) { scaleX = scale }
     }
 }

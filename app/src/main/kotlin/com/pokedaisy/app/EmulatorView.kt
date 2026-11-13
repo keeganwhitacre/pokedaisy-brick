@@ -1,6 +1,8 @@
 package com.pokedaisy.app
 
 import android.content.Context
+import android.graphics.SurfaceTexture
+import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
@@ -64,6 +66,15 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
     /** ZOOM and the look-around: which window of the scene this view shows. */
     val camera = WideCamera()
 
+    /**
+     * A DS game (DS RESOLUTION, nds/pk_nds_gl.h): the view hands the core a SurfaceTexture for each GL context it gets,
+     * and frames the core put out on the GPU ([MgbaCore.pkNdsGlPresented]) are taken from there at their own
+     * resolution - several texels a DS pixel - instead of uploaded from the frame buffer.
+     */
+    var gpuFrames: Boolean
+        get() = renderer.gpuFrames
+        set(v) { renderer.gpuFrames = v }
+
     /** Called (UI thread) with one GBA pixel's height on screen, in view px, whenever it changes -
      * SHADERS on the companion draw their grid at that size ([CompanionColors]). */
     var onGamePixel: ((Float) -> Unit)? = null
@@ -77,7 +88,8 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
     private var frameW = 0
     private var frameH = 0
 
-    private fun reportGamePixel() {
+    /** Tells [onGamePixel] / [onGameRect] / [onCoreRect] again (the view moved in its parent: DS LAYOUT). */
+    fun reportGamePixel() {
         if (frameW == 0 || width == 0 || height == 0) return
         // As FrameRenderer.recomputeQuad: the game's height on screen, letterboxed or stretched, or in the overlay
         // (WIDE's frame is never wider than the view and has no overlay, so it's always the view's height).
@@ -300,6 +312,11 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         try {
             // A fast-forward frame the window wasn't drawn for: the screen keeps the last one (never a plain frame between).
             if (wide && MgbaCore.pkWideSkipped()) return
+            if (gpuFrames && MgbaCore.pkNdsGlPresented()) {
+                // The core put it into the SurfaceTexture: the window it shows (EXPAND's), or the plain screen.
+                renderer.publishGpu(if (wide) camera.current else null)
+                return
+            }
             val w = MgbaCore.pkWideWidth()
             val win = camera.current
             if (w > 0 && win != null) renderer.publish(w, MgbaCore.pkWideHeight(), win) else renderer.publish(0, 0, null)
@@ -323,6 +340,8 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
      * (it showed a refresh later) - for FPS / CPU's performance panel. */
     val framesShown: Long get() = renderer.framesShown
     val lateFrames: Long get() = renderer.lateFrames
+    val repeatedDraws: Long get() = renderer.repeatedDraws
+    val unshownFrames: Long get() = renderer.unshownFrames
 
     /**
      * Drops the renderer's reference to the current framebuffer and blocks
@@ -408,8 +427,29 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         private var unlitTarget = RenderTarget()
         private var effectTarget = RenderTarget()
         @Volatile var holdFrame: () -> Boolean = { false }
+
+        // DS RESOLUTION's frames (EmulatorView.gpuFrames): the core draws them into [gpuTexture]'s Surface on its own
+        // GL context; each is copied into [gpuTarget] at its own size and goes on from there like an uploaded frame.
+        @Volatile var gpuFrames = false
+        private var gpuTexture: SurfaceTexture? = null
+        /** A core was bound since the window was handed over: hand it over again (GL thread, [draw]). */
+        @Volatile private var gpuRehand = false
+        private var gpuSurface: android.view.Surface? = null
+        private var oesTex = 0
+        private var oesProgram: Program? = null
+        private var gpuTarget = RenderTarget()
+        /** [ready] stands for a frame in [gpuTexture] (under [frameLock]). */
+        private var readyGpu = false
+        /** The texture shown is [gpuTarget]'s (its texels finer than [texW] x [texH], the frame's DS pixels). */
+        private var gpuShown = false
+        private val gpuInfo = IntArray(6)
+
         @Volatile var framesShown = 0L
         @Volatile var lateFrames = 0L
+        /** Refreshes that drew no new game frame, and game frames replaced before any refresh drew them: together the
+         * judder a log line reads (a steady 1x shows neither). */
+        @Volatile var repeatedDraws = 0L
+        @Volatile var unshownFrames = 0L
 
         /** Ticks the engine; returns how long this draw may wait for the game frame that tick starts (0 = none due). */
         @Volatile var onVsync: (() -> Long)? = null
@@ -455,13 +495,26 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             shownWin = null
             texW = w
             texH = h
+            // A DS core lets go of the window it was handed when it ends (pk_nds_gl_end): a new one (RESTART GAME, which
+            // keeps this GL context) gets it again, else its frames - EXPAND's, ZOOM's - had nowhere to go.
+            gpuRehand = true
             texAllocated = false
             dirtyGeometry = true
+        }
+
+        /** Emu thread: the frame the core just put into [gpuTexture] (with [win], EXPAND's window) is the next to show. */
+        fun publishGpu(win: WideCamera.Window?) = synchronized(frameLock) {
+            if (fresh) unshownFrames++
+            readyGpu = true
+            readyWin = win
+            fresh = true
+            (frameLock as Object).notifyAll()
         }
 
         /** Emu thread, between frames (so [buffer] is whole): copies it - or, with [win], the WIDE window
          * [wideW] x [wideH] - into [ready]. */
         fun publish(wideW: Int, wideH: Int, win: WideCamera.Window?) = synchronized(frameLock) {
+            readyGpu = false
             val wideSrc = wideBuffer?.takeIf { wideW > 0 && wideH > 0 && win != null }
             val src = wideSrc ?: buffer ?: return
             val dst = ready ?: return
@@ -475,6 +528,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             readyW = w
             readyH = h
             readyWin = if (wideSrc != null) win else null
+            if (fresh) unshownFrames++
             fresh = true
             (frameLock as Object).notifyAll()
         }
@@ -518,6 +572,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
                 buffer = null
                 wideBuffer = null   // pkDeinit frees it too: the next core's wide frames read it until its bind
                 fresh = false
+                readyGpu = false
             }
         }
 
@@ -538,17 +593,89 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             smoothBuiltFor = null
             smoothFailed = false
             smoothTargets.clear()
-            val ids = IntArray(2)
-            GLES20.glGenTextures(2, ids, 0)
+            val ids = IntArray(3)
+            GLES20.glGenTextures(3, ids, 0)
             texId = ids[0]
             overlayTex = ids[1]
-            for (t in ids) {
+            for (t in ids.take(2)) {
                 GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, t)
                 GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
                 GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
             }
             texAllocated = false
             overlayUploaded = false
+            // The SurfaceTexture belonged to the old context: a new one for this context, handed to the core in draw().
+            oesTex = ids[2]
+            oesProgram = null
+            gpuTarget = RenderTarget()
+            dropGpuTexture()
+            gpuShown = false
+        }
+
+        /** GL thread: a SurfaceTexture on this context for the core's frames, its Surface handed to the core. */
+        private fun makeGpuTexture() {
+            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTex)
+            GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST)
+            GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST)
+            GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+            GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+            val st = SurfaceTexture(oesTex, false)
+            val surface = android.view.Surface(st)
+            gpuTexture = st
+            gpuSurface = surface
+            MgbaCore.pkNdsGlSetWindow(surface)
+        }
+
+        private fun dropGpuTexture() {
+            if (gpuTexture == null) return
+            MgbaCore.pkNdsGlSetWindow(null)
+            gpuSurface?.release()
+            gpuTexture?.release()
+            gpuSurface = null
+            gpuTexture = null
+        }
+
+        /** GL thread: the newest frame in [gpuTexture] into [gpuTarget] (top row first, like an upload); its DS
+         * window size into [texW] x [texH]. False when there's none to take. */
+        private fun takeGpuFrame(): Boolean {
+            val st = gpuTexture ?: return false
+            try {
+                st.updateTexImage()
+            } catch (e: RuntimeException) {
+                Log.w("pokedaisy", "DS frame not taken", e)
+                return false
+            }
+            if (!MgbaCore.pkNdsGlFrameInfo(st.timestamp, gpuInfo)) return false
+            val w = gpuInfo[2]
+            val h = gpuInfo[3]
+            if (w <= 0 || h <= 0 || gpuInfo[4] <= 0 || gpuInfo[5] <= 0) return false
+            if (!gpuTarget.ensure(gpuInfo[4], gpuInfo[5])) return false
+            val program = oesProgram ?: Program(OES_COPY).also { oesProgram = it }
+            val matrix = FloatArray(16)
+            st.getTransformMatrix(matrix)
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, gpuTarget.fbo)
+            GLES20.glViewport(0, 0, gpuTarget.w, gpuTarget.h)
+            GLES20.glUseProgram(program.id)
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTex)
+            GLES20.glUniform1i(program.uTex, 0)
+            GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program.id, "uSt"), 1, false, matrix, 0)
+            GLES20.glEnableVertexAttribArray(program.aPos)
+            GLES20.glVertexAttribPointer(program.aPos, 2, GLES20.GL_FLOAT, false, 0, fullQuad)
+            GLES20.glEnableVertexAttribArray(program.aUv)
+            GLES20.glVertexAttribPointer(program.aUv, 2, GLES20.GL_FLOAT, false, 0, passUv)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+            GLES20.glDisableVertexAttribArray(program.aPos)
+            GLES20.glDisableVertexAttribArray(program.aUv)
+            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, 0)
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+            GLES20.glViewport(0, 0, surfaceW, surfaceH)
+            if (w != texW || h != texH) {
+                texW = w
+                texH = h
+                dirtyGeometry = true
+            }
+            return true
         }
 
         override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) = synchronized(lock) {
@@ -564,6 +691,12 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         }
 
         private fun draw() {
+            if (gpuRehand) {
+                gpuRehand = false
+                dropGpuTexture()
+            }
+            if (gpuFrames && gpuTexture == null && oesTex != 0) makeGpuTexture()
+            else if (!gpuFrames && gpuTexture != null) dropGpuTexture()
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
             GLES20.glViewport(0, 0, surfaceW, surfaceH)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
@@ -571,18 +704,25 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             val plain = plain ?: return
             if (texW == 0 || surfaceW == 0) return
 
-            if (dirtyGeometry) {
-                recomputeQuad()
-                dirtyGeometry = false
-            }
-
-            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texId)
             // glTex(Sub)Image2D has taken the pixels by the time it returns, so frameLock
             // is held only for the copy into GL, not the passes below.
             synchronized(frameLock) {
                 val buf = ready ?: return  // set with buffer by bind
-                if (fresh && !holdFrame() && (readyW != texW || readyH != texH)) {
+                if (!fresh) repeatedDraws++
+                if (readyGpu) {
+                    // A held frame keeps what's up, as below; without one taken yet the last upload stays.
+                    if (fresh && !holdFrame() && takeGpuFrame()) {
+                        fresh = false
+                        shownWin = readyWin
+                        framesShown++
+                        gpuShown = true
+                        texAllocated = false   // a frame uploaded after this is a texture of its own size again
+                    }
+                    return@synchronized
+                }
+                GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texId)
+                if (fresh && !holdFrame() && (gpuShown || readyW != texW || readyH != texH)) {
                     // WIDE came on or off, or ZOOM / the look-around changed the window's size: a texture of the new size.
                     texW = readyW
                     texH = readyH
@@ -599,6 +739,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
                     fresh = false
                     shownWin = readyWin
                     framesShown += 1
+                    gpuShown = false
                 } else if (fresh && !holdFrame()) {
                     // A held frame keeps the texture as is: the last frame shown stays up.
                     buf.position(0)
@@ -610,6 +751,10 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
                     shownWin = readyWin
                     framesShown++
                 }
+            }
+            if (dirtyGeometry) {
+                recomputeQuad()
+                dirtyGeometry = false
             }
             val win = shownWin
             try {
@@ -623,12 +768,16 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             // No window: the overlay is a background, under the game. A WIDE window has none (it fills the view).
             if (!overlayOnTop && win == null) drawOverlay()
 
-            var input = texId
+            // A DS frame from the GPU: its texels finer than the DS's pixels, read smoothly from here on (SMOOTHING and
+            // UNLIT SCREEN work on the game's own pixels: not on these).
+            val gpu = gpuShown
+            var input = if (gpu) gpuTarget.tex else texId
             var last = plain
-            var smooth = false
+            var smooth = gpu
             val color = colorProgram
-            if (gbaColors && color != null && colorTarget.ensure(texW, texH)) {
-                pass(color, input, colorTarget)
+            if (gbaColors && color != null &&
+                (if (gpu) colorTarget.ensure(gpuTarget.w, gpuTarget.h) else colorTarget.ensure(texW, texH))) {
+                pass(color, input, colorTarget, sample = gpu)
                 input = colorTarget.tex
             }
             // The largest whole multiple of the game that fits, per axis (STRETCH scales them apart).
@@ -637,7 +786,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             val fx = effectProgram()
             val prescaled = fx != null && effect?.prescale == true
             // SMOOTHING: upscales the game; FILTER then draws over its picture (`uSmoothed`).
-            val smoothed = runSmoothing(input, kx, ky, prescaled)
+            val smoothed = if (gpu) 0 else runSmoothing(input, kx, ky, prescaled)
             if (smoothed != 0) {
                 input = smoothed
                 smooth = true
@@ -646,7 +795,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
             // since its shadow falls between GBA pixels; that pass then reads it where it is, like SMOOTHING's.
             val shade = unlitProgram
             var unlitDrawn = false
-            if (unlit && shade != null) {
+            if (unlit && shade != null && !gpu) {
                 val (w, h) = if (prescaled) texW * kx to texH * ky
                     else maxOf(1, quadW.roundToInt()) to maxOf(1, quadH.roundToInt())
                 if (unlitTarget.ensure(w, h)) {
@@ -659,7 +808,7 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
                     unlitDrawn = true
                 }
             }
-            val readsPicture = smoothed != 0 || unlitDrawn
+            val readsPicture = smoothed != 0 || unlitDrawn || gpu
             if (prescaled) {
                 if (effectTarget.ensure(texW * kx, texH * ky)) {
                     pass(fx!!, input, effectTarget, sample = readsPicture)
@@ -999,6 +1148,19 @@ class EmulatorView(context: Context) : GLSurfaceView(context) {
         }
 
         companion object {
+            /** A frame from the SurfaceTexture into a texture of its own size, top row first (vUv.y 0): the image's
+             * top is the texture's t = 1 once its transform is applied. */
+            private val OES_COPY = """
+                #extension GL_OES_EGL_image_external : require
+                precision mediump float;
+                uniform samplerExternalOES uTex;
+                uniform mat4 uSt;
+                varying vec2 vUv;
+                void main() {
+                    gl_FragColor = texture2D(uTex, (uSt * vec4(vUv.x, 1.0 - vUv.y, 0.0, 1.0)).xy);
+                }
+            """.trimIndent()
+
             private val VERT = """
                 attribute vec2 aPos;
                 attribute vec2 aUv;

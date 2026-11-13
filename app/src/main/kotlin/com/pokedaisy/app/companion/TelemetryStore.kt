@@ -155,15 +155,23 @@ class TelemetryStore {
 
     /** The detected game's gPartyMenu + gPlayerParty, when its config has them. */
     fun knownPartyMenu(): Pair<Long, Long>? = sampler.knownPartyMenu
+    /** The detected game's layout for overworld party reordering, including verified English Unbound. */
+    fun knownPartyReorderConfig(): com.pokedaisy.app.companion.data.NativeConfig? = sampler.knownPartyReorderConfig
+    fun knownPartyMenuStyle(): Pair<Long, Int>? = sampler.knownPartyMenuStyle
+    fun retailEnginePartyMenu(): Pair<Long, Long>? = sampler.retailEnginePartyMenu
 
     /** The detected game's own USE / GIVE / TAKE tables, when its config has them (FieldItems.kt). */
     fun knownFieldItems(): com.pokedaisy.app.companion.data.FieldItemFns? = sampler.knownFieldItems
+
+    /** SHINY ODDS' foe party and player ID, on retail FireRed / Emerald only (ShinyOdds.kt). */
+    fun knownShinyTarget(): com.pokedaisy.app.companion.data.ShinyOdds.Target? = sampler.knownShinyTarget
 
     /** A Game Boy game's battle party menu, for the POKéMON switch, or null. */
     fun gbPartySwitch(): com.pokedaisy.app.companion.data.GbPartySwitch? = sampler.gbPartySwitch
 
     /** The battle menus' cursors, where the ROM's RAM is known to be its config's. */
     fun knownCursorAddrs(): Pair<Long, Long>? = sampler.knownCursorAddrs
+    fun retailRom(): Boolean = sampler.retailRom
 
     private companion object {
         /** ~1 sample a second: a game whose data never comes in drops the copy after this long. */

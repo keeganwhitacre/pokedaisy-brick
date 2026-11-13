@@ -63,9 +63,18 @@ class WideCamera {
     /** A direction is held: the player is walking (or trying to). */
     @Volatile var walking = false
 
-    /** SETTINGS > AUTO ZOOM IN: whether a text box or a menu screen pulls in to 1x ([SCENE_TEXT], [SCENE_MENU]);
-     * battles and anything else off the map always do, a picture over the field never. */
+    /** SETTINGS > AUTO ZOOM IN: whether a text box pulls in to 1x ([SCENE_TEXT]); battles, the game's menu screens
+     * ([SCENE_MENU]: a zoomed-out one sat small in the middle) and anything else off the map always do, a picture over
+     * the field never. */
     @Volatile var zoomOnText = true
+    /** The scenic FLY is in the air (EmulatorEngine.scenicFlight): the widest step, whatever the player picked, and the
+     * map's name sign over the field (the controls are locked, so it reads as text) leaves it out there. */
+    @Volatile var flightZoom = false
+    /** Any flight is up (FREE FLIGHT too): the map's name sign crossing into a new area (the controls are locked, so it
+     * reads as a text box) never pulls the zoom in. */
+    @Volatile var flying = false
+    /** LOOK AROUND off: the right stick does nothing. */
+    @Volatile var lookAround = true
 
     /** What the screen shows: the window pk_wide drew ([x], [y], [w], [h] in the frame's GBA pixels), placed on the
      * view at ([offX], [offY]) screen pixels from its top-left (<= 0: the window's whole pixels reach past the
@@ -126,7 +135,7 @@ class WideCamera {
 
         val wantsClose = when (scene) {
             SCENE_FIELD -> false
-            SCENE_TEXT, SCENE_MENU -> zoomOnText
+            SCENE_TEXT -> zoomOnText && !flying && !flightZoom
             else -> true
         }
         // A fade decides nothing; nor does a picture over the field (FireRed's map preview, ~2 s): a pull-in and a
@@ -135,7 +144,7 @@ class WideCamera {
         else if (wantsClose) closeOverSince = 0L
         else if (closeOverSince == 0L) closeOverSince = now
         val close = closeOverSince == 0L || now - closeOverSince < RETURN_DELAY_NANOS
-        val target = if (close) fit else steps[level.coerceIn(0, steps.size - 1)]
+        val target = if (close) fit else if (flightZoom) steps.last() else steps[level.coerceIn(0, steps.size - 1)]
         // The zoom is a timed ease-in-out in log space (the same feel at every step): a new target starts a new
         // motion from wherever the last one is - a pull-in at the pace of what's coming, the way back out slower.
         if (target != tweenTarget) {
@@ -155,8 +164,8 @@ class WideCamera {
 
         val fw = vw / scale
         val fh = vh / scale
-        val sx = deadZone(stickX)
-        val sy = deadZone(stickY)
+        val sx = if (lookAround) deadZone(stickX) else 0f
+        val sy = if (lookAround) deadZone(stickY) else 0f
         val stick = sx != 0f || sy != 0f
         when {
             close -> spring(0f, 0f, dt, LOOK_TAU)

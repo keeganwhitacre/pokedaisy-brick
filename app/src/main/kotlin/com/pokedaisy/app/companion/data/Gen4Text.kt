@@ -12,6 +12,9 @@ object Gen4Text {
         val values = GEN4_CHAR_VALUES.split('\u0000')
         HashMap<Int, String>(GEN4_CHAR_CODES.length * 2).also { m ->
             for ((i, c) in GEN4_CHAR_CODES.withIndex()) m[c.code] = values.getOrElse(i) { "" }
+            // 0xF1 is the Japanese carts' katakana long vowel (マスターボール), which pret's charmap writes as a full-width
+            // hyphen: the Japanese names would read マスタ－ボ－ル.
+            m[0xF1] = "ー"
         }
     }
 
@@ -36,6 +39,10 @@ object Gen4Text {
             decode(codes)
         }
     }
+
+    /** A name in a Pokémon's record ([max] codes from [off], 0xFFFF-ended): the nickname. */
+    fun name(b: ByteArray, off: Int, max: Int): String =
+        decode(IntArray(max) { if (off + it * 2 + 1 < b.size) u16(b, off + it * 2) else 0xFFFF })
 
     private fun decode(codes: IntArray): String {
         val sb = StringBuilder()

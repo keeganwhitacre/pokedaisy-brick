@@ -207,13 +207,67 @@ internal object TabIcons {
         mapOf('k' to OUTLINE, 'y' to Color(0xFFF8C830), 'h' to Color(0xFFFFF0A0), 'o' to Color(0xFFD89820), 'd' to Color(0xFF905830)),
     )
 
+    /** A grey gravestone with a cross on grass: the NUZLOCKE tab (and a fainted Pokémon's mark). */
+    val grave = TabIcon(
+        listOf(
+            "................",
+            ".....kkkkkk.....",
+            "...kkwwsssskk...",
+            "..kwwssddsssdk..",
+            "..kwsssddsssdk..",
+            "..kwsddddddsdk..",
+            "..kwsddddddsdk..",
+            "..kwsssddsssdk..",
+            "..kwsssddsssdk..",
+            "..kwsssddsssdk..",
+            "..kwssssssssdk..",
+            "..kwssssssssdk..",
+            ".gkkkkkkkkkkkkg.",
+            "gggGggggggGggggg",
+            "ggggggGgggggggGg",
+            "GGGGGGGGGGGGGGGG",
+        ),
+        mapOf(
+            'k' to OUTLINE, 'w' to Color(0xFFE0E0E8), 's' to Color(0xFFA8A8B8), 'd' to Color(0xFF686878),
+            'g' to Color(0xFF58B848), 'G' to Color(0xFF388830),
+        ),
+    )
+
+    /** A PC whose screen is a box on a grassy wallpaper, three Pokémon in it: the BOXES tab. */
+    private val boxes = TabIcon(
+        listOf(
+            "................",
+            ".kkkkkkkkkkkkkk.",
+            ".kwwwwwwwwwwwwk.",
+            ".kwkkkkkkkkkkwk.",
+            ".kwkggggggggkwk.",
+            ".kwkgrgggbggkwk.",
+            ".kwkggggggggkwk.",
+            ".kwkggyggggrkwk.",
+            ".kwkggggggggkwk.",
+            ".kwkkkkkkkkkkwk.",
+            ".kwwwwwwwwwwwwk.",
+            ".kkkkkkkkkkkkkk.",
+            "......kssk......",
+            ".....kssssk.....",
+            "...kkkkkkkkkk...",
+            "...kssssssssk...",
+        ),
+        mapOf(
+            'k' to OUTLINE, 'w' to Color(0xFFD8D8E0), 's' to Color(0xFF9898A8), 'g' to Color(0xFF78C058),
+            'r' to Color(0xFFE83838), 'b' to Color(0xFF3878E8), 'y' to Color(0xFFF8C830),
+        ),
+    )
+
     /** A tab id's icon; null for a tab without one (BATTLE and SETTINGS never sit on the MORE grid). */
     fun forTab(id: String): TabIcon? = when (id) {
         "PARTY" -> party
         "DEX" -> dex
         "MAP" -> map
         "ITEMS" -> bag
+        "BOXES" -> boxes
         "GUIDE" -> guide
+        "NUZLOCKE" -> grave
         "CARD" -> card
         "STATES" -> states
         "ACHIEVEMENTS" -> achievements

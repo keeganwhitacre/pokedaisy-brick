@@ -27,7 +27,7 @@ class BestEffortTest {
         Game("Pokemon - FireRed Version (USA, Europe) (Rev 1).gba", "firered_vanilla", "BPRE", "FIRERED_REV1"),
         Game("Pokemon - LeafGreen Version (USA, Europe) (Rev 1).gba", "leafgreen_rev1", "BPGE", "LEAFGREEN_REV1"),
         Game("Pokemon - Emerald Version (USA, Europe).gba", "emerald_vanilla", "BPEE", "EMERALD"),
-        Game("emerald-multilang/Pokemon - Edicion Esmeralda (Spain).gba", "emerald_es", "BPES", "EMERALD_ES"),
+        Game("Pokemon - Edicion Esmeralda (Spain).gba", "emerald_es", "BPES", "EMERALD_ES"),
         Game("Pokemon - Ruby Version (USA, Europe) (Rev 1).gba", "ruby_rev1", "AXVE", "RUBY"),
         Game("Pokemon Unbound (v2.1.1.1).gba", "unbound", "BPRE", "UNBOUND"),
         Game("Pokemon Unbound (v2.1.1.1) (French).gba", "unbound_fr", "BPRE", "UNBOUND_FR"),
@@ -51,6 +51,7 @@ class BestEffortTest {
         Game("Pokemon SoulGold (v1.1.4).gba", "soulgold", "BPEE", "SOULGOLD"),
         Game("Pokemon SoulGold (v1.2).gba", "soulgold_v12", "BPEE", "SOULGOLD_V1_2"),
         Game("Pokemon SoulGold (v1.2) (Alt 1).gba", "soulgold_v12b", "BPEE", "SOULGOLD_V1_2B"),
+        Game("Pokemon SoulGold (v1.2.1).gba", "soulgold_v121", "BPEE", "SOULGOLD_V1_2_1"),
         Game("Pokemon Heart and Soul (v2.0.6).gba", "heart_and_soul", "BPEE", "HEART_AND_SOUL"),
         Game("Pokemon Lazarus (v2.0).gba", "lazarus", "BPEE", "LAZARUS"),
         Game("Pokemon Emerald Seaglass (v3.0).gba", "emerald_seaglass", "BPEE", "EMERALD_SEAGLASS"),
@@ -67,6 +68,8 @@ class BestEffortTest {
         Game("Super Mariomon (v1.5.1 Anniversary).gba", "mariomon_v1_5_1", "BPEE", "MARIOMON_V1_5_1"),
         Game("Pokemon Elite Redux (2.65.4.1b).gba", "elite_redux", "BPEE", "ELITE_REDUX_V2_65_4_1B"),
         Game("Pokemon Team Rocket Dragonsden Version.gba", "team_rocket", "BPEE", "TEAM_ROCKET"),
+        Game("Pokemon Wishes of Tomorrow (v1.2.6).gba", "wishes", "BPEE", "WISHES"),
+        Game("Pokemon Dreamstone Mysteries.gba", "dreamstone", "BPEE", "DREAMSTONE"),
         Game("Super Mariomon (v1.3).gba", "mariomon_v1_3", "BPEE", "MARIOMON_V1_3"),
     )
 

@@ -135,6 +135,15 @@ object RetroAchievements : CompanionAchievements {
      * until every cheat is off again, like other emulators do. Emu thread. */
     @Volatile private var cheatsActive = false
 
+    /** SHINY ODDS is raised on a game it works in (ShinyOdds.kt): paused the same way, since sets reward catching a shiny. */
+    @Volatile private var shinyOddsActive = false
+    /** FLIGHT AREA is ANYWHERE and the player took off with it (companion.data.FlightArea): flying past the story could
+     * reach a set's places early, so paused the same way until it's VISITED again. */
+    @Volatile private var flightActive = false
+    /** A co-op battle is running on this device (CoopBattles): the link battle is not the player's own game,
+     * so achievements idle as they do with cheats (no popup: the battle is short). Any thread. */
+    @Volatile var coopBattle = false
+
     /** Plays the game's fanfare (set by the game's activity); from the emu thread, on an unlock. */
     @Volatile var onUnlockSound: (() -> Unit)? = null
 
@@ -407,7 +416,7 @@ object RetroAchievements : CompanionAchievements {
             resumeProgress?.let { RaNative.raDeserializeProgress(it) }
             resumeProgress = null
         }
-        if (cheatsActive) RaNative.raIdle() else RaNative.raDoFrame()
+        if (cheatsActive || shinyOddsActive || flightActive || coopBattle) RaNative.raIdle() else RaNative.raDoFrame()
         // Debug builds: what rc_client sees, every ~10 s of emulated time.
         if (BuildConfig.DEBUG && ++debugFrames >= 600) {
             debugFrames = 0
@@ -429,6 +438,30 @@ object RetroAchievements : CompanionAchievements {
         if (!ready || !coreAttached) return
         if ((_state.value.game?.total ?: 0) > 0) _popups.tryEmit(cheatsPopup(active))
     }
+
+    fun setShinyOddsActive(active: Boolean) {
+        if (active == shinyOddsActive) return
+        shinyOddsActive = active
+        _state.update { it.copy(shinyOddsPaused = active) }
+        if (!ready || !coreAttached) return
+        if ((_state.value.game?.total ?: 0) > 0) _popups.tryEmit(shinyOddsPopup(active))
+    }
+
+    fun setFlightAnywhere(active: Boolean) {
+        if (active == flightActive) return
+        flightActive = active
+        _state.update { it.copy(flightPaused = active) }
+        if (!ready || !coreAttached) return
+        if ((_state.value.game?.total ?: 0) > 0) _popups.tryEmit(flightPopup(active))
+    }
+
+    private fun flightPopup(active: Boolean) =
+        if (active) AchievementPopup(AchievementPopup.Kind.NOTICE, tr("FLIGHT AREA") + ": " + tr("ANYWHERE"), tr("Achievements are paused while FLIGHT AREA is ANYWHERE."))
+        else AchievementPopup(AchievementPopup.Kind.NOTICE, tr("FLIGHT AREA") + ": " + tr("VISITED"), tr("Achievements are back on."))
+
+    private fun shinyOddsPopup(active: Boolean) =
+        if (active) AchievementPopup(AchievementPopup.Kind.NOTICE, tr("SHINY ODDS RAISED"), tr("Achievements are paused while SHINY ODDS is raised."))
+        else AchievementPopup(AchievementPopup.Kind.NOTICE, tr("SHINY ODDS NORMAL"), tr("Achievements are back on."))
 
     private fun cheatsPopup(active: Boolean) =
         if (active) AchievementPopup(AchievementPopup.Kind.NOTICE, tr("CHEATS ON"), tr("Achievements are paused until every cheat is off."))
@@ -581,6 +614,8 @@ object RetroAchievements : CompanionAchievements {
                     )
                     // The game started with cheats on: say why nothing will unlock.
                     if (cheatsActive) _popups.tryEmit(cheatsPopup(true))
+                    if (shinyOddsActive) _popups.tryEmit(shinyOddsPopup(true))
+                    if (flightActive) _popups.tryEmit(flightPopup(true))
                 }
             }
             // An unknown hash: rc_client still keeps a placeholder game (id 0).

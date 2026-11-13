@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { deflateRawSync } from 'node:zlib';
 import { readFileSync } from 'node:fs';
-import { checkFile, readHeader, retailDumpOf, sha1Hex, verdict } from '../src/lib/compat.js';
+import { checkFile, dsHackOf, maskRanges, randomizedRetailOf, readHeader, retailDumpOf, sha1Hex, verdict } from '../src/lib/compat.js';
 
 const data = JSON.parse(readFileSync(new URL('../src/data/compat.json', import.meta.url)));
 const MB = 1024 * 1024;
@@ -66,7 +66,60 @@ test('DS: Platinum rev 1, HeartGold / SoulSilver, by the header', () => {
   assert.deepEqual(ds('CPUE', 0), { status: 'unsupported', reason: 'revision', base: 'Pokémon Platinum' });
   assert.equal(ds('IPKE', 0).title, 'Pokémon HeartGold');
   assert.equal(ds('IPGE', 0).title, 'Pokémon SoulSilver');
+  assert.deepEqual(ds('IPKD', 0), { status: 'supported', title: 'Pokémon Goldene Edition HeartGold', family: 'Nintendo DS' });
+  assert.deepEqual(ds('IPGD', 0), { status: 'supported', title: 'Pokémon Silberne Edition SoulSilver', family: 'Nintendo DS' });
+  for (const code of ['IPKD', 'IPGD']) {
+    for (const rev of [1, 255]) assert.equal(ds(code, rev).reason, 'revision');
+  }
+  assert.deepEqual(ds('CPUF', 0), { status: 'supported', title: 'Pokémon Version Platine', family: 'Nintendo DS' });
+  assert.deepEqual(ds('IPKF', 0), { status: 'supported', title: 'Pokémon Version Or HeartGold', family: 'Nintendo DS' });
+  assert.deepEqual(ds('IPGF', 0), { status: 'supported', title: 'Pokémon Version Argent SoulSilver', family: 'Nintendo DS' });
+  assert.deepEqual(ds('IRBF', 0), { status: 'supported', title: 'Pokémon Version Noire', family: 'Nintendo DS' });
+  assert.deepEqual(ds('IRAF', 0), { status: 'supported', title: 'Pokémon Version Blanche', family: 'Nintendo DS' });
   assert.equal(ds('ADAE', 0).reason, 'ds');
+});
+
+test('DS: Origin HeartGold by its code word; without it, a Japanese HeartGold', () => {
+  const hack = data.dsHacks.find((h) => h.code === 'IPKJ');
+  const cart = (word) => {
+    const b = new Uint8Array(hack.offset + 4);
+    b.set(nds('IPKJ', 0));
+    new DataView(b.buffer).setUint32(hack.offset, word, true);
+    return b;
+  };
+  const check = (bytes) => verdict(data, { ...readHeader(bytes), size: bytes.length, sha1: '0'.repeat(40), dsHack: dsHackOf(data, readHeader(bytes), bytes) });
+  assert.deepEqual(check(cart(hack.word)), { status: 'supported', title: 'Pokémon Origin HeartGold', version: hack.version, family: 'Nintendo DS' });
+  const japanese = { status: 'supported', title: 'ポケットモンスター ハートゴールド', family: 'Nintendo DS' };
+  assert.deepEqual(check(cart(0)), japanese);
+  assert.deepEqual(check(nds('IPKJ', 0)), japanese);
+});
+
+test('DS: Renegade Platinum by its code word, retail Platinum by its header', () => {
+  const hack = data.dsHacks.find((h) => h.code === 'CPUE');
+  const cart = (word) => {
+    const b = new Uint8Array(hack.offset + 4);
+    b.set(nds('CPUE', 1));
+    new DataView(b.buffer).setUint32(hack.offset, word, true);
+    return b;
+  };
+  const check = (bytes) => verdict(data, { ...readHeader(bytes), size: bytes.length, sha1: '0'.repeat(40), dsHack: dsHackOf(data, readHeader(bytes), bytes) });
+  assert.deepEqual(check(cart(hack.word)), { status: 'supported', title: 'Pokémon Renegade Platinum', version: 'v1.3.0', family: 'Nintendo DS' });
+  assert.deepEqual(check(cart(0)), { status: 'supported', title: 'Pokémon Platinum', family: 'Nintendo DS' });
+});
+
+test('DS: Blaze Black 2 / Volt White 2 Redux by their code word, retail Black 2 / White 2 by the header', () => {
+  for (const [code, title, retail] of [['IREO', 'Pokémon Blaze Black 2 Redux', 'Pokémon Black 2'], ['IRDO', 'Pokémon Volt White 2 Redux', 'Pokémon White 2']]) {
+    const hack = data.dsHacks.find((h) => h.code === code);
+    const cart = (word) => {
+      const b = new Uint8Array(hack.offset + 4);
+      b.set(nds(code, 0));
+      new DataView(b.buffer).setUint32(hack.offset, word, true);
+      return b;
+    };
+    const check = (bytes) => verdict(data, { ...readHeader(bytes), size: bytes.length, sha1: '0'.repeat(40), dsHack: dsHackOf(data, readHeader(bytes), bytes) });
+    assert.deepEqual(check(cart(hack.word)), { status: 'supported', title, version: 'v1.4.1', family: 'Nintendo DS' });
+    assert.deepEqual(check(cart(0)), { status: 'supported', title: retail, family: 'Nintendo DS' });
+  }
 });
 
 test('Game Boy: Yellow only', () => {
@@ -161,4 +214,62 @@ test('a retail dump with its end trimmed and its save code patched reads as reta
   assert.equal(await retailDumpOf(fake, readHeader(modded), modded), null);
   assert.equal((await checkFile(fake, 'mod.gba', modded)).verdict.reason, 'unknown-hack');
   assert.equal(await retailDumpOf(fake, readHeader(patched), patched.slice(0, end - 1)), null);
+});
+
+test('a mask spec expands like RandomizedRetail.kt', () => {
+  assert.deepEqual(maskRanges('c4:6,100:2:3:10'), [[0xc4, 0xca], [0x100, 0x102], [0x110, 0x112], [0x120, 0x122]]);
+  assert.deepEqual(maskRanges(''), []);
+});
+
+test('retail randomized by Universal Pokemon Randomizer reads as retail, randomized', async () => {
+  // A stand-in retail ROM: names (upper-case Gen 3 text) at 0x200, data around them, and its entry built the way
+  // gen_randomized_retail.py builds the real ones.
+  const full = gba('BPRE', 1);
+  const big = new Uint8Array(0x1000).fill(0xff);
+  big.set(full);
+  for (let i = 0x200; i < 0x210; i++) big[i] = 0xbb + (i & 0x0f);
+  for (let i = 0x300; i < 0x800; i++) big[i] = i & 0x7f;
+  const end = 0x800;
+  const mask = '400:2:4:10,600:10';
+  const zeroed = big.slice(0, end);
+  for (const [a, z] of maskRanges(mask)) zeroed.fill(0, a, z);
+  const retailSha1 = await sha1Hex(big);
+  const fake = { ...data, randomizedRetail: [{ code: 'BPRE', rev: 1, end, fold: '200:10', mask, sha1: await sha1Hex(zeroed), retailSha1 }],
+    titles: { ...data.titles, [retailSha1]: 'Pokémon FireRed' } };
+
+  // Randomized inside the mask, its names in lower case: FireRed, randomized.
+  const rando = big.slice();
+  rando[0x411] ^= 0x55;
+  rando[0x605] ^= 0x33;
+  for (let i = 0x201; i < 0x208; i++) rando[i] += 0x1a;
+  assert.equal(await randomizedRetailOf(fake, readHeader(rando), rando), retailSha1);
+  assert.deepEqual((await checkFile(fake, 'rando.gba', rando)).verdict, { status: 'supported', title: 'Pokémon FireRed (Randomized)' });
+  // A byte between the strided fields, or a name spelled differently: a hack.
+  for (const at of [0x404, 0x203]) {
+    const other = rando.slice();
+    other[at] ^= 0x01;
+    assert.equal(await randomizedRetailOf(fake, readHeader(other), other), null);
+  }
+});
+
+test('DS: the language ports, each at its own revision', () => {
+  const ds = (code, rev) => verdict(data, { ...readHeader(nds(code, rev)), size: 256 * MB, sha1: '0'.repeat(40) });
+  // Europe's rev 10 HeartGold / SoulSilver: the US carts' code under the same game code, a revision of its own.
+  assert.deepEqual(ds('IPKE', 10), { status: 'supported', title: 'Pokémon HeartGold', family: 'Nintendo DS' });
+  assert.deepEqual(ds('IPGE', 10), { status: 'supported', title: 'Pokémon SoulSilver', family: 'Nintendo DS' });
+  assert.equal(ds('IPKE', 5).reason, 'revision');
+  assert.deepEqual(ds('IPKS', 0), { status: 'supported', title: 'Pokémon Edición Oro HeartGold', family: 'Nintendo DS' });
+  assert.deepEqual(ds('CPUS', 0), { status: 'supported', title: 'Pokémon Edición Platino', family: 'Nintendo DS' });
+  assert.deepEqual(ds('IRBI', 0), { status: 'supported', title: 'Pokémon Versione Nera', family: 'Nintendo DS' });
+  assert.deepEqual(ds('IRDD', 0), { status: 'supported', title: 'Pokémon Weiße Edition 2', family: 'Nintendo DS' });
+  assert.deepEqual(ds('IREF', 1), { status: 'unsupported', reason: 'revision', base: 'Pokémon Version Noire 2' });
+});
+
+test('DS: the Japanese and Korean carts', () => {
+  const ds = (code, rev) => verdict(data, { ...readHeader(nds(code, rev)), size: 128 * MB, sha1: '0'.repeat(40) });
+  assert.deepEqual(ds('IPKK', 0), { status: 'supported', title: '포켓몬스터 하트골드', family: 'Nintendo DS' });
+  assert.deepEqual(ds('IRBJ', 0), { status: 'supported', title: 'ポケットモンスター ブラック', family: 'Nintendo DS' });
+  // Japanese Black 2 / White 2: revision 1 only.
+  assert.deepEqual(ds('IREJ', 1), { status: 'supported', title: 'ポケットモンスター ブラック2', family: 'Nintendo DS' });
+  assert.equal(ds('IREJ', 0).reason, 'revision');
 });

@@ -7,11 +7,16 @@
 
 #include <jni.h>
 #include <android/log.h>
+#include <android/native_window_jni.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <time.h>
 
 #include <mgba/core/core.h>
+#include <mgba/core/log.h>
 #include <mgba/core/config.h>
 #include <mgba/core/blip_buf.h>
 #include <mgba/core/serialize.h>
@@ -23,16 +28,52 @@
 #include <mgba/internal/gb/io.h>
 #include <mgba/internal/sm83/sm83.h>
 
+#include "pk_call.h"
 #include "pk_cheats.h"
+#include "pk_coop.h"
+#include "pk_coop_after.h"
+#include "pk_coop_field.h"
+#include "pk_coop_lock.h"   // coop-lock (plan 5 Task 5)
+#include "pk_core_access.h"   // coop-lock (plan 5 Task 5)
 #include "pk_rewind.h"
 #include "pk_savevf.h"
 #include "pk_wide.h"
+#include "pk_flight.h"
 #include "pk_gb_field.h"
+#include "pk_gb_audio.h"
+#include "pk_host.h"
 #include "nds/pk_nds.h"
 
 #define LOG_TAG "pokedaisy/jni"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+// mGBA's log, for every core in the process (the player's, STEADY's render core, LINK PLAY's). With no logger mGBA
+// printf()s each message, and a game reading unmapped memory logs every byte: a hack's BIOS LZ77 copy from a bad
+// address held one frame for seconds, and RESTART GAME's wait for the emu thread became an ANR (Crashlytics, 1.4.0).
+// Only errors reach logcat, at most a few a second; game errors, stubs and the rest are dropped unformatted.
+static void pk_mgba_log(struct mLogger* logger, int category, enum mLogLevel level, const char* format, va_list args) {
+    (void) logger;
+    if (!(level & (mLOG_FATAL | mLOG_ERROR))) return;
+    static struct timespec windowStart;
+    static int inWindow;
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    if (now.tv_sec != windowStart.tv_sec) {
+        windowStart = now;
+        inWindow = 0;
+    }
+    if (++inWindow > 5) return;
+    char line[256];
+    vsnprintf(line, sizeof(line), format, args);
+    __android_log_print(ANDROID_LOG_ERROR, "pokedaisy/mgba", "%s: %s", mLogCategoryName(category), line);
+}
+
+static struct mLogger pk_mgbaLogger = { .log = pk_mgba_log, .filter = NULL };
+
+__attribute__((constructor)) static void pk_install_mgba_logger(void) {
+    mLogSetDefaultLogger(&pk_mgbaLogger);
+}
 
 // GBA hardware key bit positions (GBA_KEY_* in mgba/gba/input.h). Kept local so
 // this file doesn't depend on the GBA-specific header.
@@ -43,42 +84,30 @@ enum {
 };
 
 #define PK_SAMPLE_RATE 48000
+/** The GB core's master volume (mGBA's full is 0x100): see pk_gb_config. */
+#define PK_GB_VOLUME 0x80
 
 // Game Boy / Color ROMs run on mGBA's GB core too (M_CORE_GB). Red/Blue/Yellow
 // are SGB-enhanced, so the core would frame them in a 256x224 Super Game Boy
-// border: turn borders off, which keeps every GB game at its 160x144 screen.
+// border: turn borders off, which keeps every GB game at its 160x144 screen. And half volume (below).
 static void pk_gb_config(struct mCore* core) {
     if (core->platform(core) != mPLATFORM_GB) {
         return;
     }
-    // Just this one option: mCoreLoadForeignConfig maps the whole config, and with
+    // Option by option: mCoreLoadForeignConfig maps the whole config, and with
     // no "volume" key in it the GB core's master volume went to 0 (Yellow was silent).
     mCoreConfigSetIntValue(&core->config, "sgb.borders", 0);
     core->reloadConfigOption(core, "sgb.borders", &core->config);
+    // Half of mGBA's full volume: at 0x100 its GB mixer scales the channels by 12 into an int16, which four loud
+    // channels overflow - Crystal and Yellow wrapped and clipped in every loud passage (the "crushed" sound players
+    // reported). Recorded headless at both volumes (mgba_dump's `volume` + `wav`): at 0x80 the loudest peak is ~28,700
+    // of 32,767 and the music is about as loud as FireRed's.
+    mCoreConfigSetIntValue(&core->config, "volume", PK_GB_VOLUME);
+    core->reloadConfigOption(core, "volume", &core->config);
 }
 
 static int pk_is_gba(const struct mCore* core) {
     return core && core->platform(core) == mPLATFORM_GBA;
-}
-/** A clock the save file brought back broken: mGBA keeps the cart RTC's state in 16 bytes after the save data and
- * restores it on reset (GBASavedataRTCRead), so a save dumped from a real cartridge whose battery had died - its
- * power-fail flag set - or written by a tool that left the 24-hour bit off made Ruby / Sapphire / Emerald say "The
- * internal battery has run dry" on every boot (sErrorStatus 0x20 / 0x10), where emulators that ignore those bytes
- * didn't. The emulated battery never runs dry: such a clock goes back to mGBA's fresh one (24-hour, the device's
- * time), and mGBA writes it into the save with the next save. 12-hour is only undone for the Pokémon games (they
- * always set 24-hour); a state loaded from before this keeps the old byte too, hence the call after a load. */
-static void pkHealRtc(struct mCore* core) {
-    if (!pk_is_gba(core)) return;
-    struct GBA* gba = (struct GBA*) core->board;
-    struct GBARTC* rtc = &gba->memory.hw.rtc;
-    if (!(gba->memory.hw.devices & HW_RTC)) return;
-    const char* code = gba->memory.rom && gba->memory.romSize > 0xB0 ? (const char*) gba->memory.rom + 0xAC : "";
-    bool pokemon = !strncmp(code, "AXV", 3) || !strncmp(code, "AXP", 3) || !strncmp(code, "BPE", 3);
-    if (!RTCControlIsPoweroff(rtc->control) && (RTCControlIsHour24(rtc->control) || !pokemon)) return;
-    LOGI("RTC from the save: control 0x%02x (%s), reset to a running 24-hour clock", (unsigned) rtc->control,
-         RTCControlIsPoweroff(rtc->control) ? "battery dead" : "12-hour");
-    rtc->control = RTCControlFillHour24(0);
-    rtc->offset = 0;
 }
 #define PK_AUDIO_SCRATCH_SAMPLES 8192   // per-channel; * 2 shorts for interleave
 
@@ -95,6 +124,7 @@ static struct {
     size_t romFileSize;
     int16_t audio[PK_AUDIO_SCRATCH_SAMPLES * 2];
     int audioAvail;                     // interleaved shorts ready in audio[]
+    struct pk_gb_audio gbAudio;         // a Game Boy game's sound, resampled here (pk_gb_audio.c); zeroed for a GBA game
     // REWIND (pk_rewind.c): a state every PK_REWIND_INTERVAL frames while rewindEntries > 0;
     // while rewinding, each frame goes back one of them instead.
     struct mCoreRewindContext rewind;
@@ -126,9 +156,14 @@ static struct {
     color_t* video;
     int16_t audio[PK_AUDIO_SCRATCH_SAMPLES * 2];
     int audioAvail;
+    struct pk_gb_audio gbAudio;         // as g's: STEADY clips of a Game Boy game's music
 } rg;
 
 static void pkDrainAudio(void) {
+    if (g.gbAudio.left) {
+        g.audioAvail = pk_gb_audio_read(&g.gbAudio, g.audio, PK_AUDIO_SCRATCH_SAMPLES) * 2;
+        return;
+    }
     struct blip_t* left = g.core->getAudioChannel(g.core, 0);
     struct blip_t* right = g.core->getAudioChannel(g.core, 1);
     int avail = blip_samples_avail(left);
@@ -164,9 +199,12 @@ static void pkTeardown(void) {
     pk_nds_deinit();
     pkRewindOff();
     if (g.core) {
+        pk_coop_uninstall(g.core);      // co-op's patches / block / RAM first (while the core is still up)
+        pk_coop_lock_uninstall(g.core);  // coop-lock (plan 5 Task 5)
         pk_cheats_clear(g.core);        // and forgets the ROM bytes it kept
         pk_cheats_unpatch(g.core);      // the game options' (REUSABLE TMS) too
         pk_cheats_unblock(g.core);      // and PLAYER LOOK's blocks
+        pk_gb_audio_detach(&g.gbAudio, g.core);
         g.core->deinit(g.core);         // unloads ROM, flushes and closes the save VFile
         g.core = NULL;
         // Both cores close the save VFile they were given themselves (GBUnloadROM: sramRealVf;
@@ -184,12 +222,16 @@ static void pkTeardown(void) {
     g.romFileVf = NULL;
     g.romFile = NULL;
     g.romFileSize = 0;
+    pk_coop_reset();                // never a stale "installed" for the next game
+    pk_coop_lock_reset();           // coop-lock (plan 5 Task 5)
     g.saveReadOnly = false;
     free(g.video);
     g.video = NULL;
     g.vw = g.vh = 0;
     g.audioAvail = 0;
     pk_wide_configure(0);
+    pk_wide_extras_reset();   // FOLLOWER and DAY AND NIGHT: the closed game's lead walked on in the next one
+    pk_flight_configure(NULL, 0);   // FREE FLIGHT: the next game configures its own
     g.wideCrc = 0;
     g.wideW = 0;
     free(g.wide);
@@ -203,6 +245,10 @@ struct mCore* pkMainCore(void) {
 }
 
 static void pkRenderDrainAudio(void) {
+    if (rg.gbAudio.left) {
+        rg.audioAvail = pk_gb_audio_read(&rg.gbAudio, rg.audio, PK_AUDIO_SCRATCH_SAMPLES) * 2;
+        return;
+    }
     struct blip_t* left = rg.core->getAudioChannel(rg.core, 0);
     struct blip_t* right = rg.core->getAudioChannel(rg.core, 1);
     int avail = blip_samples_avail(left);
@@ -220,6 +266,7 @@ static void pkRenderDrainAudio(void) {
 
 static void pkRenderTeardown(void) {
     if (rg.core) {
+        pk_gb_audio_detach(&rg.gbAudio, rg.core);
         rg.core->deinit(rg.core);       // no save VFile ever attached — nothing to flush
         rg.core = NULL;
     }
@@ -227,48 +274,6 @@ static void pkRenderTeardown(void) {
     rg.video = NULL;
     rg.vw = rg.vh = 0;
     rg.audioAvail = 0;
-}
-
-// Where the game's main loop waits for VBlank, as a stack depth: the System-mode stack pointer most frames end with
-// (the game in its wait - a spin on gMain.intrCheck in FireRed, VBlankIntrWait in Emerald - with nothing of its own
-// in progress). pk_call_safe calls the game's functions only at that depth. Counted per loaded game.
-#define PK_REST_SLOTS 8
-static uint32_t pkRestSp[PK_REST_SLOTS];
-static uint32_t pkRestCount[PK_REST_SLOTS];
-
-static uint32_t pk_sys_sp(struct ARMCore* cpu) {
-    return cpu->privilegeMode == MODE_SYSTEM || cpu->privilegeMode == MODE_USER
-        ? (uint32_t) cpu->gprs[ARM_SP] : (uint32_t) cpu->bankedRegisters[BANK_NONE][0];
-}
-
-static void pk_rest_reset(void) {
-    memset(pkRestSp, 0, sizeof(pkRestSp));
-    memset(pkRestCount, 0, sizeof(pkRestCount));
-}
-
-static void pk_rest_note(struct mCore* core) {
-    struct ARMCore* cpu = (struct ARMCore*) core->cpu;
-    if (cpu->privilegeMode == MODE_IRQ) {
-        return;
-    }
-    uint32_t sp = pk_sys_sp(cpu);
-    int low = 0;
-    for (int i = 0; i < PK_REST_SLOTS; i++) {
-        if (pkRestSp[i] == sp) {
-            if (pkRestCount[i] < 100000) pkRestCount[i]++;
-            return;
-        }
-        if (pkRestCount[i] < pkRestCount[low]) low = i;
-    }
-    pkRestSp[low] = sp;
-    pkRestCount[low] = 1;
-}
-
-/** The main loop's waiting depth, or 0 until enough frames have ended (about a second's worth). */
-static uint32_t pk_rest_sp(void) {
-    int best = 0;
-    for (int i = 1; i < PK_REST_SLOTS; i++) if (pkRestCount[i] > pkRestCount[best]) best = i;
-    return pkRestCount[best] >= 30 ? pkRestSp[best] : 0;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -361,7 +366,7 @@ Java_com_pokedaisy_app_MgbaCore_pkInit(JNIEnv* env, jobject thiz,
     }
 
     core->reset(core);
-    pkHealRtc(core);
+    pk_heal_rtc(core);
     pk_rest_reset();   // a new game: its own main loop depth
 
     const uint8_t* romFile = NULL;
@@ -387,6 +392,7 @@ Java_com_pokedaisy_app_MgbaCore_pkInit(JNIEnv* env, jobject thiz,
     g.vh = h;
     g.saveVf = saveVf;
     g.audioAvail = 0;
+    pk_gb_audio_attach(&g.gbAudio, core, PK_SAMPLE_RATE);
     // EXPAND's window: the GBA's, and a Game Boy game's (pk_wide_gb.c: Yellow so far).
     g.wide = calloc((size_t) PK_WIDE_MAX_VIEW_W * PK_WIDE_MAX_VIEW_H, sizeof(uint32_t));
     pthread_rwlock_unlock(&pk_coreLock);
@@ -437,7 +443,9 @@ Java_com_pokedaisy_app_MgbaCore_pkSetAudioRate(JNIEnv* env, jobject thiz, jdoubl
         pk_nds_set_audio_rate(rate);
         return;
     }
-    if (g.core && rate > 0) {
+    if (g.gbAudio.left) {
+        pk_gb_audio_set_rate(&g.gbAudio, rate);
+    } else if (g.core && rate > 0) {
         blip_set_rates(g.core->getAudioChannel(g.core, 0), g.core->frequency(g.core), rate);
         blip_set_rates(g.core->getAudioChannel(g.core, 1), g.core->frequency(g.core), rate);
     }
@@ -454,32 +462,17 @@ Java_com_pokedaisy_app_MgbaCore_pkSetKeys(JNIEnv* env, jobject thiz, jint mask) 
     }
 }
 
-/** The game wrote its save within the last ~15 frames: mGBA's dirty flag, cleared (and the file synced) once the
- * writes have been quiet that long. A Gen 3 save spans several frames, sector after sector. */
-static bool pkSaveDirty(struct mCore* core) {
-    if (pk_is_gba(core)) return ((struct GBA*) core->board)->memory.savedata.dirty != 0;
-    if (core->platform(core) == mPLATFORM_GB) return ((struct GB*) core->board)->sramDirty != 0;
-    return false;
+/** pkFinishSave's frames go unheard. */
+static void pkDropAudio(void) {
+    pkDrainAudio();
+    g.audioAvail = 0;
 }
 
-/** Lets a save the game is writing finish before the core stops (leaving the app, CLOSE GAME, a suspend state): the
- * loop used to stop between any two frames, so leaving mid-"SAVING..." and then removing the app from recents (no
- * resume to finish it) left the newer slot half written - the game said its save was corrupt and loaded the one
- * before. Runs frames with no keys, unheard and undrawn, until mGBA has synced the save, at most [maxFrames].
- * Emu thread, like pkRunFrame. Returns the frames run. */
 JNIEXPORT jint JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkFinishSave(JNIEnv* env, jobject thiz, jint maxFrames) {
     if (pk_nds_active()) return pk_nds_finish_save(maxFrames);
     if (!g.core) return 0;
-    int n = 0;
-    if (pkSaveDirty(g.core)) g.core->setKeys(g.core, 0);
-    while (n < maxFrames && pkSaveDirty(g.core)) {
-        g.core->runFrame(g.core);
-        pkDrainAudio();
-        g.audioAvail = 0;
-        n++;
-    }
-    return n;
+    return pk_finish_save(g.core, maxFrames, pkDropAudio);
 }
 
 // WIDE: the core's frame is the size the configured game's rebuild expects (the GBA's 240 x 160, a Game Boy's 160 x 144).
@@ -497,8 +490,9 @@ Java_com_pokedaisy_app_MgbaCore_pkRunFrame(JNIEnv* env, jobject thiz) {
         // Not drawn (fast-forward's unseen frames, or one whose 3D the frame before skipped): nothing new to show.
         if (g.wide && g.wideCrc && g.viewW > 0 && g.viewH > 0 && (g.wideSkipNext || !pk_nds_frame_drawn())) {
             g.wideSkipped = true;
-        } else if (g.wide && g.wideCrc && g.viewW > 0 && g.viewH > 0 &&
+        } else if (pk_nds_scale() <= 1 && g.wide && g.wideCrc && g.viewW > 0 && g.viewH > 0 &&
                    pk_nds_wide_draw(g.wide, g.viewX, g.viewY, g.viewW, g.viewH)) {
+            // (the GPU path puts its window out itself: pk_nds_presented)
             g.wideW = g.viewW;
             g.wideH = g.viewH;
         } else {
@@ -523,6 +517,16 @@ Java_com_pokedaisy_app_MgbaCore_pkRunFrame(JNIEnv* env, jobject thiz) {
     }
     g.core->runFrame(g.core);
     if (pk_is_gba(g.core)) pk_rest_note(g.core);
+    if (pk_is_gba(g.core)) {   // coop-lock (plan 5 Task 5): RAM only, under the read lock (an uninstall takes the write lock)
+        pthread_rwlock_rdlock(&pk_coreLock);
+        if (g.core) pk_coop_lock_tick(g.core);
+        pthread_rwlock_unlock(&pk_coreLock);
+        pk_flight_tick(g.core);   // FREE FLIGHT's next step (nothing until a game configures it)
+        // Its shadow, clouds and bird; with EXPAND drawing its picture next, the clouds go over that (pk_flight_draw_wide).
+        bool wideNext = g.wide && g.wideCrc && g.viewW > 0 && g.viewH > 0 && g.viewW <= PK_WIDE_MAX_VIEW_W &&
+            g.viewH <= PK_WIDE_MAX_VIEW_H && pkWideFrameFits() && !g.wideSkipNext;
+        if (sizeof(color_t) == 4) pk_flight_draw((uint32_t*) g.video, (int) g.vw, (int) g.vh, (int) g.vw, !wideNext);
+    }
     pkDrainAudio();
     // WIDE: only with a game it knows and a window set. 32-bit colour, like the screen's upload.
     struct PkWideView v = { g.viewX, g.viewY, g.viewW, g.viewH };
@@ -534,6 +538,7 @@ Java_com_pokedaisy_app_MgbaCore_pkRunFrame(JNIEnv* env, jobject thiz) {
     } else if (g.wide && g.wideCrc && v.w > 0 && v.h > 0 && v.w <= PK_WIDE_MAX_VIEW_W && v.h <= PK_WIDE_MAX_VIEW_H &&
         sizeof(color_t) == 4 && pkWideFrameFits()) {
         pk_wide_view(g.core, (const uint32_t*) g.video, g.wide, v, NULL);
+        pk_flight_draw_wide(g.wide, v.w, v.h, v.x, v.y);   // FREE FLIGHT's clouds over the whole picture
         g.wideW = v.w;
         g.wideH = v.h;
         if (pk_wide_fault()) {
@@ -611,9 +616,64 @@ Java_com_pokedaisy_app_MgbaCore_pkFollowerSet(JNIEnv* env, jobject thiz, jbyteAr
     (*env)->ReleaseByteArrayElements(env, pal, p, JNI_ABORT);
 }
 
+// RIDE ON: the vehicle's views + palette (null = none) and whether it's drawn. Emu thread.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkRideSet(JNIEnv* env, jobject thiz, jbyteArray frames, jbyteArray pal, jint width) {
+    if (!frames || !pal || (width != 32 && width != 64) || (*env)->GetArrayLength(env, frames) != PK_RIDE_BYTES ||
+        (*env)->GetArrayLength(env, pal) != 32) {
+        pk_ride_set(NULL, NULL, 32);
+        return;
+    }
+    jbyte* f = (*env)->GetByteArrayElements(env, frames, NULL);
+    jbyte* p = (*env)->GetByteArrayElements(env, pal, NULL);
+    pk_ride_set((const uint8_t*) f, (const uint8_t*) p, width);
+    (*env)->ReleaseByteArrayElements(env, frames, f, JNI_ABORT);
+    (*env)->ReleaseByteArrayElements(env, pal, p, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkRideShow(JNIEnv* env, jobject thiz, jboolean on) {
+    if (g.core && pk_is_gba(g.core)) pk_ride_show(g.core, on);
+}
+
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkFollowerShow(JNIEnv* env, jobject thiz, jboolean on) {
     if (g.core && pk_is_gba(g.core)) pk_follower_show(g.core, on);
+}
+
+// Co-op presence: the player's map, fine position, facing, mode and step count this frame (pk_partner_self's
+// PK_PARTNER_SELF_N ints), or null off a GBA game the field reads know. Emu thread, once a frame between frames.
+JNIEXPORT jintArray JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkPartnerSelf(JNIEnv* env, jobject thiz) {
+    int32_t v[PK_PARTNER_SELF_N];
+    if (!g.core || !pk_is_gba(g.core) || !pk_partner_self(g.core, v)) return NULL;
+    jintArray out = (*env)->NewIntArray(env, PK_PARTNER_SELF_N);
+    if (out) (*env)->SetIntArrayRegion(env, out, 0, PK_PARTNER_SELF_N, (const jint*) v);
+    return out;
+}
+
+// Co-op presence: the partner's art (PK_PARTNER_ART_BYTES: 42 32x32 frames + palette), or null / any other length = none
+// (a wrong-sized array is refused, never read past its end). Emu thread.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkPartnerSet(JNIEnv* env, jobject thiz, jbyteArray art) {
+    if (!art || (*env)->GetArrayLength(env, art) != PK_PARTNER_ART_BYTES) {
+        pk_partner_set(NULL);
+        return;
+    }
+    jbyte* a = (*env)->GetByteArrayElements(env, art, NULL);
+    if (!a) {
+        pk_partner_set(NULL);
+        return;
+    }
+    pk_partner_set((const uint8_t*) a);
+    (*env)->ReleaseByteArrayElements(env, art, a, JNI_ABORT);
+}
+
+// Co-op presence: where the partner is drawn from the next frame on (pk_partner_place). Emu thread, between frames.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkPartnerPlace(JNIEnv* env, jobject thiz, jboolean visible, jint fineX, jint fineY, jint frame,
+                                               jboolean hflip, jint blobFrame, jint bob) {
+    if (g.core && pk_is_gba(g.core)) pk_partner_place(g.core, visible ? 1 : 0, fineX, fineY, frame, hflip ? 1 : 0, blobFrame, bob);
 }
 
 // DAY AND NIGHT: the map's and sprites' palettes tinted (256 = as is). Emu thread.
@@ -633,6 +693,19 @@ Java_com_pokedaisy_app_MgbaCore_pkFieldKnows(JNIEnv* env, jobject thiz, jint crc
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkWideKnows(JNIEnv* env, jobject thiz, jint crc) {
     return pk_wide_knows((uint32_t) crc) ? JNI_TRUE : JNI_FALSE;
+}
+
+// WIDE and the field reads: a hack RetailEngine.kt proved to keep a retail build's engine, by its own row. Any thread, no core
+// needed; before the game is configured.
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkWideAddDerived(JNIEnv* env, jobject thiz, jint crc, jint baseCrc, jintArray row) {
+    if (!row) return JNI_FALSE;
+    jsize n = (*env)->GetArrayLength(env, row);
+    jint* a = (*env)->GetIntArrayElements(env, row, NULL);
+    if (!a) return JNI_FALSE;
+    int ok = pk_wide_add_derived((uint32_t) crc, (uint32_t) baseCrc, (const int32_t*) a, (int) n);
+    (*env)->ReleaseIntArrayElements(env, row, a, JNI_ABORT);
+    return ok ? JNI_TRUE : JNI_FALSE;
 }
 
 // WIDE: the window to draw from the next frame on, in the frame's pixels (its top-left (0, 0)); w 0 = none.
@@ -774,6 +847,7 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderInit(JNIEnv* env, jobject thiz, jstring 
     rg.vw = w;
     rg.vh = h;
     rg.audioAvail = 0;
+    pk_gb_audio_attach(&rg.gbAudio, core, PK_SAMPLE_RATE);
     LOGI("render core up: %ux%u", w, h);
     return JNI_TRUE;
 }
@@ -811,105 +885,6 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderReadAudio(JNIEnv* env, jobject thiz, jsh
     return n;
 }
 
-// Calls Thumb function `fn` with r0-r3 = `args` and returns once it has, leaving
-// the CPU exactly as it was (registers, pipeline, halt). A frame can end
-// anywhere - mid-way through the game's own code - and a bare PC hijack
-// clobbered its live registers (Unbound then reset its sound engine). So:
-// run instruction by instruction with IRQs masked until the call returns to
-// PK_CALL_SENTINEL (an address in the ROM header, never executed), then put
-// everything back. Tested headless with native-capture/mgba_dump's `call`.
-#define PK_CALL_SENTINEL 0x080000C0u
-// Whether the game's own code can be called right now (pk_call): parked on a `b .` (the render core), or the game
-// waiting for VBlank with nothing of its own in progress - not in an interrupt, its System stack back at the main
-// loop's depth (pk_rest_sp). A frame often ends part-way through the game's code instead (its VBlank handler running,
-// a lag frame's logic), and a call there lands in the middle of the game's own read-modify-writes: FadeScreen while
-// VBlank's handler was part-way through updating the palette fade, the handler then wrote its stale copy back, and the
-// FLY warp that followed never finished loading (2026-10-20: a black screen, then a reset, on the Thor; reproduced
-// with mgba_dump's `stepinto 3` + FLY's calls). The caller waits for a frame that ends well. Before the depth is
-// known (the game's first second) a call goes ahead, as it always did.
-static int pk_call_safe(struct mCore* core) {
-    struct ARMCore* cpu = (struct ARMCore*) core->cpu;
-    uint32_t pc = (uint32_t) cpu->gprs[ARM_PC];
-    if (cpu->executionMode == MODE_THUMB && core->rawRead16(core, pc - WORD_SIZE_THUMB * 2, -1) == 0xE7FE) {
-        return 1;   // b . - parked
-    }
-    if (cpu->privilegeMode == MODE_IRQ) {
-        return 0;
-    }
-    uint32_t rest = pk_rest_sp();
-    return !rest || pk_sys_sp(cpu) == rest;
-}
-
-static __thread uint32_t pk_call_r0; // what this thread's last pk_call returned in r0 (the render core calls on another thread)
-static int pk_call(struct mCore* core, uint32_t fn, const uint32_t args[4]) {
-    if (!pk_is_gba(core)) {
-        return 0;   // an ARM-only trick: the GB core's CPU is an SM83
-    }
-    if (!pk_call_safe(core)) {
-        return 0;
-    }
-    struct ARMCore* cpu = (struct ARMCore*) core->cpu;
-    struct ARMRegisterFile saved = cpu->regs;
-    uint32_t prefetch0 = cpu->prefetch[0], prefetch1 = cpu->prefetch[1];
-    // The memory region the CPU fetches from, and the idle-loop detector that region switches feed: the call
-    // moves both to the ROM. A frame often ends just inside the interrupt handler (IWRAM, or the BIOS), and
-    // with only the registers put back the CPU went on fetching that address from the ROM - garbage: the game
-    // froze or reset (a TAKE on the Thor, reproduced with mgba_dump's `stepinto 3` + `call`).
-    struct ARMMemory mem = cpu->memory;
-    struct GBA* gba = (struct GBA*) core->board;
-    int region = gba->memory.activeRegion;
-    uint32_t biosPrefetch = gba->memory.biosPrefetch;
-    uint32_t idleLoop = gba->idleLoop, lastJump = gba->lastJump;
-    bool haltPending = gba->haltPending;
-    int idleStep = gba->idleDetectionStep, idleFailures = gba->idleDetectionFailures;
-    int32_t cached[16];
-    memcpy(cached, gba->cachedRegisters, sizeof(cached));
-    enum ExecutionMode exec = cpu->executionMode;
-    int halted = cpu->halted;
-    enum PrivilegeMode priv = cpu->privilegeMode;
-    cpu->halted = 0;
-    cpu->cpsr.i = 1;
-    // On the main stack, in System mode: inside an interrupt the IRQ stack is 160 bytes with the main one right
-    // under it (and the BIOS's SVC stack is smaller still), while below the main stack's SP nothing is in use.
-    if (priv != MODE_SYSTEM && priv != MODE_USER) {
-        ARMSetPrivilegeMode(cpu, MODE_SYSTEM);
-        cpu->cpsr.priv = MODE_SYSTEM;
-    }
-    for (int i = 0; i < 4; i++) {
-        cpu->gprs[i] = (int32_t) args[i];
-    }
-    cpu->gprs[ARM_LR] = (int32_t) (PK_CALL_SENTINEL | 1);
-    cpu->gprs[ARM_PC] = (int32_t) (fn & ~1u);
-    _ARMSetMode(cpu, MODE_THUMB);
-    ThumbWritePC(cpu);
-    int ok = 0;
-    for (int i = 0; i < 2000000; i++) {
-        if (cpu->executionMode == MODE_THUMB && (uint32_t) cpu->gprs[ARM_PC] - WORD_SIZE_THUMB == PK_CALL_SENTINEL) {
-            ok = 1;
-            break;
-        }
-        core->step(core);
-    }
-    pk_call_r0 = (uint32_t) cpu->gprs[0];
-    cpu->regs = saved; // the banked registers too: the mode's own SP / LR are back as they were
-    cpu->privilegeMode = priv;
-    cpu->executionMode = exec == MODE_ARM ? MODE_THUMB : MODE_ARM; // so _ARMSetMode applies
-    _ARMSetMode(cpu, exec);
-    cpu->prefetch[0] = prefetch0;
-    cpu->prefetch[1] = prefetch1;
-    cpu->memory = mem;
-    gba->memory.activeRegion = region;
-    gba->memory.biosPrefetch = biosPrefetch;
-    gba->idleLoop = idleLoop;
-    gba->lastJump = lastJump;
-    gba->haltPending = haltPending;
-    gba->idleDetectionStep = idleStep;
-    gba->idleDetectionFailures = idleFailures;
-    memcpy(gba->cachedRegisters, cached, sizeof(cached));
-    cpu->halted = halted;
-    return ok;
-}
-
 // Whether a pkCall on the player's core can run now (pk_call_safe): the field-item jobs wait a frame when it can't.
 JNIEXPORT jboolean JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCallSafe(JNIEnv* env, jobject thiz) {
@@ -924,10 +899,88 @@ Java_com_pokedaisy_app_MgbaCore_pkCallSafe(JNIEnv* env, jobject thiz) {
 JNIEXPORT jlong JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkCall(JNIEnv* env, jobject thiz, jlong fn, jint a0, jint a1, jint a2, jint a3) {
     const uint32_t args[4] = {(uint32_t) a0, (uint32_t) a1, (uint32_t) a2, (uint32_t) a3};
-    if (!g.core || !pk_call(g.core, (uint32_t) fn, args)) {
+    uint32_t r0;
+    if (!g.core || !pk_call(g.core, (uint32_t) fn, args, &r0)) {
         return -1;
     }
-    return (jlong) pk_call_r0;
+    return (jlong) r0;
+}
+
+// FREE FLIGHT (pk_flight.h): the game's functions through pk_call.
+static int pkFlightCall(struct mCore* core, uint32_t fn, const uint32_t args[4], uint32_t* r0) {
+    return pk_call(core, fn, args, r0);
+}
+
+// The game's addresses (FlightFns.words(), PK_FLIGHT_WORDS of them), or null to switch it off. Emu thread.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkFlightConfigure(JNIEnv* env, jobject thiz, jintArray words) {
+    pk_flight_set_call(pkFlightCall);
+    if (!words || (*env)->GetArrayLength(env, words) < PK_FLIGHT_WORDS) {
+        pk_flight_configure(NULL, 0);
+        return;
+    }
+    uint32_t w[PK_FLIGHT_WORDS];
+    (*env)->GetIntArrayRegion(env, words, 0, PK_FLIGHT_WORDS, (jint*) w);
+    pk_flight_configure(w, PK_FLIGHT_WORDS);
+}
+
+// Take off (PK_FLIGHT_OK, or why not: pk_flight.h). Emu thread, between frames.
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkFlightTakeOff(JNIEnv* env, jobject thiz) {
+    return g.core && pk_is_gba(g.core) ? pk_flight_take_off(g.core) : PK_FLIGHT_NOT_CONFIGURED;
+}
+
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkFlightLand(JNIEnv* env, jobject thiz) {
+    pk_flight_land();
+}
+
+// The scenic FLY's route: directions 1 down, 2 up, 3 left, 4 right. Emu thread.
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkFlightRoute(JNIEnv* env, jobject thiz, jbyteArray dirs) {
+    jsize n = (*env)->GetArrayLength(env, dirs);
+    jbyte* b = (*env)->GetByteArrayElements(env, dirs, NULL);
+    int r = pk_flight_route((const uint8_t*) b, n);
+    (*env)->ReleaseByteArrayElements(env, dirs, b, JNI_ABORT);
+    return r;
+}
+
+// FLIGHT AREA: a bit per map (group << 8 | num) the flight may cross into, or null = anywhere. Emu thread.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkFlightArea(JNIEnv* env, jobject thiz, jbyteArray bits) {
+    if (!bits) {
+        pk_flight_set_area(NULL, 0);
+        return;
+    }
+    jsize n = (*env)->GetArrayLength(env, bits);
+    jbyte* b = (*env)->GetByteArrayElements(env, bits, NULL);
+    pk_flight_set_area((const uint8_t*) b, n);
+    (*env)->ReleaseByteArrayElements(env, bits, b, JNI_ABORT);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkFlightAreaTurned(JNIEnv* env, jobject thiz) {
+    return pk_flight_area_turned() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkFlightState(JNIEnv* env, jobject thiz) {
+    return pk_flight_state();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkFlightRouteDone(JNIEnv* env, jobject thiz) {
+    return pk_flight_route_done();
+}
+
+// coop-lock (plan 5 Task 5): what pk_coop_lock_jni.c needs of the player's core (pk_core_access.h)
+void pk_core_rdlock(void) { pthread_rwlock_rdlock(&pk_coreLock); }
+void pk_core_wrlock(void) { pthread_rwlock_wrlock(&pk_coreLock); }
+void pk_core_unlock(void) { pthread_rwlock_unlock(&pk_coreLock); }
+int pk_core_is_gba(const struct mCore* core) { return pk_is_gba(core); }
+uint32_t pk_core_call(struct mCore* core, uint32_t fn, const uint32_t args[4]) {   // a pk_coop_call_fn
+    uint32_t r0;
+    return pk_call(core, fn, args, &r0) ? r0 : 0xFFFFFFFFu;
 }
 
 // Calls the ROM's own m4aSongNumStart(songId, alt) at `addr` (FfMusicRenderer
@@ -939,7 +992,7 @@ Java_com_pokedaisy_app_MgbaCore_pkRenderForceSong(JNIEnv* env, jobject thiz, jlo
         return JNI_FALSE;
     }
     const uint32_t args[4] = {(uint32_t) songId, (uint32_t) alt, 0, 0};
-    return pk_call(rg.core, (uint32_t) addr, args) ? JNI_TRUE : JNI_FALSE;
+    return pk_call(rg.core, (uint32_t) addr, args, NULL) ? JNI_TRUE : JNI_FALSE;
 }
 
 // Parks the render core's main loop on `spin` (a Thumb `b .`) so the booted
@@ -1165,7 +1218,7 @@ Java_com_pokedaisy_app_MgbaCore_pkLoadState(JNIEnv* env, jobject thiz, jstring j
     }
     bool ok = mCoreLoadStateNamed(g.core, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC);
     vf->close(vf);
-    if (ok) pkHealRtc(g.core);
+    if (ok) pk_heal_rtc(g.core);
     pk_wide_reset();   // the RAM it kept from the last frame is another moment's
     return ok ? JNI_TRUE : JNI_FALSE;
 }
@@ -1469,6 +1522,8 @@ JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRomUnpatch(JNIEnv* env, jobject thiz) {
     pthread_rwlock_wrlock(&pk_coreLock);
     if (g.core) {
+        pk_coop_uninstall(g.core);   // its patches go with all the rest
+        pk_coop_lock_uninstall(g.core);   // coop-lock (plan 5 Task 5)
         pk_cheats_unpatch(g.core);
     }
     pthread_rwlock_unlock(&pk_coreLock);
@@ -1492,6 +1547,8 @@ Java_com_pokedaisy_app_MgbaCore_pkRomBlocks(JNIEnv* env, jobject thiz, jintArray
     int done = 0;
     pthread_rwlock_wrlock(&pk_coreLock);
     if (g.core) {
+        pk_coop_uninstall(g.core);   // its block is in the ROM overlay this replaces (and may overlap a new one)
+        pk_coop_lock_uninstall(g.core);   // coop-lock (plan 5 Task 5)
         pk_cheats_unblock(g.core);
         jsize at = 0;
         for (; done < n; done++) {
@@ -1518,11 +1575,450 @@ JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkRomUnblock(JNIEnv* env, jobject thiz) {
     pthread_rwlock_wrlock(&pk_coreLock);
     if (g.core) {
+        pk_coop_uninstall(g.core);
+        pk_coop_lock_uninstall(g.core);   // coop-lock (plan 5 Task 5)
         pk_cheats_unblock(g.core);
     }
     pthread_rwlock_unlock(&pk_coreLock);
 }
 
+// --- co-op (pk_coop.c's retail check, the link bridge, the after-battle steps; Emerald, GBA only) ---------
+// Emu thread, like pkCall. The bridge's install / begin change the ROM overlay and so take the core lock alone (like
+// pkRomPatch); the rest only read or write RAM and share it.
+
+// pk_coop's pk_coop_call_fn over the file's pk_call: r0, or 0xFFFFFFFF when the call couldn't run or never returned.
+static uint32_t pk_coop_call(struct mCore* core, uint32_t fn, const uint32_t args[4]) {
+    uint32_t r0;
+    return pk_call(core, fn, args, &r0) ? r0 : 0xFFFFFFFFu;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopInstall(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int ok = g.core && pk_is_gba(g.core) ? pk_coop_install(g.core) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopRefused(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    const char* r = pk_coop_refused();
+    jstring s = (*env)->NewStringUTF(env, r ? r : "");
+    pthread_rwlock_unlock(&pk_coreLock);
+    return s;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkRefused(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    const char* r = pk_coop_link_refused();
+    jstring s = (*env)->NewStringUTF(env, r ? r : "");
+    pthread_rwlock_unlock(&pk_coreLock);
+    return s;
+}
+
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopUninstall(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core) {
+        pk_coop_uninstall(g.core);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopBattleStarting(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    int r = g.core && pk_is_gba(g.core) ? pk_coop_battle_starting(g.core) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return r ? JNI_TRUE : JNI_FALSE;
+}
+
+// --- plan 6: the link bridge (pk_coop_link.c). Main core only, never the render core. ---
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkInstall(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int ok = g.core && pk_is_gba(g.core) ? pk_coop_link_install(g.core, pk_coop_call) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkBegin(JNIEnv* env, jobject thiz, jboolean master, jint kind, jint trainerA,
+                                                jint trainerB, jbyteArray jName, jint gender, jint otId) {
+    if (!jName || (*env)->GetArrayLength(env, jName) < 8 || kind < PK_COOP_LINK_WILD || kind > PK_COOP_LINK_STORY) {
+        return JNI_FALSE;
+    }
+    struct pk_coop_link_setup s;
+    memset(&s, 0, sizeof(s));
+    s.master = master ? 1 : 0;
+    s.kind = (uint8_t) kind;
+    s.trainerA = (uint16_t) trainerA;
+    s.trainerB = (uint16_t) trainerB;
+    (*env)->GetByteArrayRegion(env, jName, 0, 8, (jbyte*) s.partnerName);
+    s.partnerGender = gender ? 1 : 0;
+    s.partnerOtId = (uint32_t) otId;
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int ok = g.core && pk_is_gba(g.core) ? pk_coop_link_begin(g.core, &s) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkTake(JNIEnv* env, jobject thiz) {
+    uint8_t buf[PK_COOP_LINK_WIRE_HEADER + PK_COOP_LINK_BLOCK_MAX];
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int n = g.core && pk_is_gba(g.core) ? pk_coop_link_take(g.core, buf, (int) sizeof(buf)) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    if (n <= 0) {
+        return NULL;
+    }
+    jbyteArray out = (*env)->NewByteArray(env, n);
+    if (out) {
+        (*env)->SetByteArrayRegion(env, out, 0, n, (const jbyte*) buf);
+    }
+    return out;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkGive(JNIEnv* env, jobject thiz, jbyteArray jBlock) {
+    if (!jBlock) {
+        return JNI_FALSE;
+    }
+    jsize n = (*env)->GetArrayLength(env, jBlock);
+    if (n < PK_COOP_LINK_WIRE_HEADER || n > PK_COOP_LINK_WIRE_HEADER + PK_COOP_LINK_BLOCK_MAX) {
+        return JNI_FALSE;
+    }
+    uint8_t buf[PK_COOP_LINK_WIRE_HEADER + PK_COOP_LINK_BLOCK_MAX];
+    (*env)->GetByteArrayRegion(env, jBlock, 0, n, (jbyte*) buf);
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int ok = g.core && pk_is_gba(g.core) ? pk_coop_link_give(g.core, buf, (int) n) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+// The blocks the bridge last refused as malformed / could not classify (pk_coop_link_bad_blocks), for the log; null = none.
+JNIEXPORT jbyteArray JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkBadBlocks(JNIEnv* env, jobject thiz) {
+    uint8_t buf[4 * (6 + PK_COOP_LINK_WIRE_HEADER + PK_COOP_LINK_BLOCK_MAX)];
+    int n = 0;
+    pthread_rwlock_rdlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) n = pk_coop_link_bad_blocks(buf, (int) sizeof(buf));
+    pthread_rwlock_unlock(&pk_coreLock);
+    if (n <= 0) return NULL;
+    jbyteArray out = (*env)->NewByteArray(env, n);
+    if (out) (*env)->SetByteArrayRegion(env, out, 0, n, (const jbyte*) buf);
+    return out;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkState(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) pk_coop_link_tick(g.core);   // task 5: the end's steps ride the app's per-frame state pump
+    int s = g.core && pk_is_gba(g.core) ? pk_coop_link_state(g.core) : PK_COOP_LINK_IDLE;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return s;
+}
+
+// Ends this game's side of the link battle now (pk_coop_link_leave, task 7): blackout = the game's whiteout, else back to the field.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkLeave(JNIEnv* env, jobject thiz, jboolean blackout) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) {
+        pk_coop_link_leave(g.core, blackout ? 1 : 0);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+// The finished battle's result (PK_COOP_LINK_RESULT_SIZE bytes, pk_coop_link_result), null until the end's steps are through.
+JNIEXPORT jbyteArray JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkResult(JNIEnv* env, jobject thiz) {
+    uint8_t r[PK_COOP_LINK_RESULT_SIZE];
+    int n = 0;
+    pthread_rwlock_rdlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) {
+        n = pk_coop_link_result(g.core, r, sizeof(r));
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+    if (n != PK_COOP_LINK_RESULT_SIZE) {
+        return NULL;
+    }
+    jbyteArray out = (*env)->NewByteArray(env, n);
+    if (out) {
+        (*env)->SetByteArrayRegion(env, out, 0, n, (const jbyte*) r);
+    }
+    return out;
+}
+
+// --- plan 6 task 8b: how a joined battle starts and ends from the app (pk_coop_link_start.c, pk_coop_link_story.c, pk_coop_link_end.c) ---
+
+// The partner's identity for host_go / story_go (the OTHER player's name, gender and trainer ID), or the host's for partner_go.
+static int pk_link_other(JNIEnv* env, jbyteArray jName, jint gender, jint otId, struct pk_coop_link_setup* s) {
+    memset(s, 0, sizeof(*s));
+    if (!jName || (*env)->GetArrayLength(env, jName) < 8) {
+        return 0;
+    }
+    (*env)->GetByteArrayRegion(env, jName, 0, 8, (jbyte*) s->partnerName);
+    s->partnerName[7] = 0xFF;   // the name came over the network: it always ends
+    s->partnerGender = gender ? 1 : 0;
+    s->partnerOtId = (uint32_t) otId;
+    return 1;
+}
+
+// 1 while the host's game is held where a joined battle is offered (wild, two trainers, one trainer with 2+ Pokemon).
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkHostHold(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    int r = g.core && pk_is_gba(g.core) ? pk_coop_link_host_hold(g.core) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return r ? JNI_TRUE : JNI_FALSE;
+}
+
+// The held battle becomes the link battle (the partner said yes): 1 entered, 0 refused (the held battle exactly as it was).
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkHostGo(JNIEnv* env, jobject thiz, jbyteArray jName, jint gender, jint otId) {
+    struct pk_coop_link_setup s;
+    if (!pk_link_other(env, jName, gender, otId, &s)) {
+        return JNI_FALSE;
+    }
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int ok = g.core && pk_is_gba(g.core) ? pk_coop_link_host_go(g.core, &s) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+// The partner's start from its free field: 1 started, -1 the field is not free yet (ask again), 0 refused.
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkPartnerGo(JNIEnv* env, jobject thiz, jint kind, jint trainerA, jint trainerB,
+                                                    jbyteArray jName, jint gender, jint otId) {
+    struct pk_coop_link_setup s;
+    if (kind < PK_COOP_LINK_WILD || kind > PK_COOP_LINK_SINGLE || trainerA < 0 || trainerA > 0xFFFF || trainerB < 0
+        || trainerB > 0xFFFF || !pk_link_other(env, jName, gender, otId, &s)) {
+        return 0;
+    }
+    s.master = 0;
+    s.kind = (uint8_t) kind;
+    s.trainerA = (uint16_t) trainerA;
+    s.trainerB = (uint16_t) trainerB;
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int r = g.core && pk_is_gba(g.core) ? pk_coop_link_partner_go(g.core, &s) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return r;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopStoryArm(JNIEnv* env, jobject thiz, jint trainerId) {
+    if (trainerId <= 0 || trainerId > 0xFFFF) {
+        return JNI_FALSE;
+    }
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int ok = g.core && pk_is_gba(g.core) ? pk_coop_story_arm(g.core, pk_coop_call, (uint16_t) trainerId) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+// PK_COOP_STORY_*: pk_coop_story_state takes a mismatched hook out itself, so it writes.
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopStoryState(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int s = g.core && pk_is_gba(g.core) ? pk_coop_story_state(g.core) : PK_COOP_STORY_IDLE;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return s;
+}
+
+// Both teams are picked: the link battle begins ([master] = the host; the other player's identity as for host_go). 1 entered, 0 not yet / refused.
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopStoryGo(JNIEnv* env, jobject thiz, jboolean master, jbyteArray jName, jint gender, jint otId) {
+    struct pk_coop_link_setup s;
+    if (!pk_link_other(env, jName, gender, otId, &s)) {
+        return JNI_FALSE;
+    }
+    s.master = master ? 1 : 0;
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int ok = g.core && pk_is_gba(g.core) ? pk_coop_story_go(g.core, &s) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+// The pick screen was backed out of, or the join fell through: the game's own solo battle starts. 1 = started.
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopStoryCancel(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int ok = g.core && pk_is_gba(g.core) ? pk_coop_story_cancel(g.core) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopStoryDisarm(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) {
+        pk_coop_story_disarm(g.core);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+// What the battle caught: [0] who threw the ball (1 the host, 2 the partner), then the Pokemon's 100 bytes; null when nothing was caught.
+// Read before pk_coop_link_reset / leave (they zero it).
+JNIEXPORT jbyteArray JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkCaught(JNIEnv* env, jobject thiz) {
+    uint8_t buf[101];
+    int who = 0;
+    pthread_rwlock_rdlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) {
+        who = pk_coop_link_caught(g.core, buf + 1);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+    if (who != 1 && who != 2) {
+        return NULL;
+    }
+    buf[0] = (uint8_t) who;
+    jbyteArray out = (*env)->NewByteArray(env, 101);
+    if (out) {
+        (*env)->SetByteArrayRegion(env, out, 0, 101, (const jbyte*) buf);
+    }
+    return out;
+}
+
+// A story script held by its trainerbattle is let go (pk_coop_release_script): 1 released, 0 nothing held, -1 not yet (ask again).
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopReleaseScript(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    int r = -1;
+    if (g.core && pk_is_gba(g.core)) {
+        pk_coop_after_set_call(pk_coop_call);
+        r = pk_coop_release_script(g.core);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+    return r;
+}
+
+// The battle is over and its result read: the bridge goes (hooks out, area zeroed) and the result is dropped.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopLinkReset(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_wrlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) {
+        pk_coop_link_result_clear(g.core);
+        pk_coop_link_reset(g.core);
+    }
+    pthread_rwlock_unlock(&pk_coreLock);
+}
+
+// Emu thread: 1 while the game stands free on the field (pk_coop_on_free_field).
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopOnFreeField(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    int r = g.core && pk_is_gba(g.core) ? pk_coop_on_free_field(g.core) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return r ? JNI_TRUE : JNI_FALSE;
+}
+
+// Emu thread: 0 not joinable, 1 wild, 2 two trainers (while Task_BattleStart runs; pk_coop_join_kind).
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopJoinKind(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    int r = g.core && pk_is_gba(g.core) ? pk_coop_join_kind(g.core) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return r;
+}
+
+// Emu thread: [trainerA, trainerB] of a two-trainer battle, zeros otherwise.
+JNIEXPORT jintArray JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopJoinTrainers(JNIEnv* env, jobject thiz) {
+    int ids[2] = {0, 0};
+    pthread_rwlock_rdlock(&pk_coreLock);
+    if (g.core && pk_is_gba(g.core)) pk_coop_join_trainers(g.core, ids);
+    pthread_rwlock_unlock(&pk_coreLock);
+    jintArray out = (*env)->NewIntArray(env, 2);
+    if (out) (*env)->SetIntArrayRegion(env, out, 0, 2, (const jint*) ids);
+    return out;
+}
+
+// Emu thread: free on the field, or on the START menu's top level.
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopPartnerFree(JNIEnv* env, jobject thiz) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    int r = g.core && pk_is_gba(g.core) ? pk_coop_partner_free(g.core) : 0;
+    pthread_rwlock_unlock(&pk_coreLock);
+    return r ? JNI_TRUE : JNI_FALSE;
+}
+
+// coop-field (plan 4 Task 7)
+// coop-after (plan 4 Task 8): the battle's results written through the game's own functions (pk_coop_after.c); each takes
+// the core lock shared (they call the game like pkCall does) and answers 1 / 0 / -1 as pk_coop_after.h says.
+static void pk_coop_cap(long steps) {   // the step cap of pk_call: the game's save takes ~16M steps (0 = the default again)
+    pk_call_set_cap(steps);
+}
+
+#define COOP_AFTER_GUARD(expr)                                                  \
+    pthread_rwlock_rdlock(&pk_coreLock);                                        \
+    int r = -1;                                                                 \
+    if (g.core && pk_is_gba(g.core)) {                                          \
+        pk_coop_after_set_call(pk_coop_call);                                   \
+        pk_coop_after_set_cap(pk_coop_cap);                                     \
+        r = (expr);                                                             \
+    }                                                                           \
+    pthread_rwlock_unlock(&pk_coreLock);                                        \
+    return r;
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopGiveMon(JNIEnv* env, jobject thiz, jbyteArray jMon) {
+    if (!jMon || (*env)->GetArrayLength(env, jMon) != 100) {
+        return 2;
+    }
+    uint8_t mon[100];
+    (*env)->GetByteArrayRegion(env, jMon, 0, 100, (jbyte*) mon);
+    COOP_AFTER_GUARD(pk_coop_give_mon(g.core, mon))
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopRemoveItem(JNIEnv* env, jobject thiz, jint item, jint count) {
+    COOP_AFTER_GUARD(pk_coop_remove_item(g.core, item, count))
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopSetTrainerFlag(JNIEnv* env, jobject thiz, jint id) {
+    COOP_AFTER_GUARD(pk_coop_set_trainer_flag(g.core, id))
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopPrize(JNIEnv* env, jobject thiz, jint id, jboolean single) {
+    pthread_rwlock_rdlock(&pk_coreLock);
+    int r = !g.core || !pk_is_gba(g.core) ? -1 : single ? pk_coop_prize_single(g.core, id) : pk_coop_prize(g.core, id);
+    pthread_rwlock_unlock(&pk_coreLock);
+    return r;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopAddMoney(JNIEnv* env, jobject thiz, jint amount) {
+    COOP_AFTER_GUARD(pk_coop_add_money(g.core, amount))
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopWritePartyMon(JNIEnv* env, jobject thiz, jint slot, jbyteArray jMon) {
+    if (!jMon || (*env)->GetArrayLength(env, jMon) != 100) {
+        return 0;
+    }
+    uint8_t mon[100];
+    (*env)->GetByteArrayRegion(env, jMon, 0, 100, (jbyte*) mon);
+    COOP_AFTER_GUARD(pk_coop_write_party_mon(g.core, slot, mon))
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopWhiteOut(JNIEnv* env, jobject thiz) {
+    COOP_AFTER_GUARD(pk_coop_white_out(g.core))
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopEvolve(JNIEnv* env, jobject thiz, jint slot) {
+    COOP_AFTER_GUARD(pk_coop_evolve(g.core, slot))
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkCoopSaveGame(JNIEnv* env, jobject thiz) {
+    COOP_AFTER_GUARD(pk_coop_save_game(g.core))
+}
 // Emu thread: the 32-byte palettes in `from` (back to back) swapped for `to` wherever the
 // game has one loaded (pk_cheats_repalette). Returns how many.
 JNIEXPORT jint JNICALL
@@ -1566,6 +2062,89 @@ Java_com_pokedaisy_app_MgbaCore_pkNdsSetDraw(JNIEnv* env, jobject thiz, jboolean
     if (pk_nds_active()) pk_nds_set_draw(draw == JNI_TRUE, drawNext == JNI_TRUE);
 }
 
+// DS CPU BOOST: the ARM9 at twice the DS's clock. Emu thread, between frames.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsCpuBoost(JNIEnv* env, jobject thiz, jboolean on) {
+    if (pk_nds_active()) pk_nds_set_cpu_boost(on == JNI_TRUE);
+}
+
+// DS CORE: which DS core the next pkInit of a DS cart starts (MgbaCore.NDS_CORE_*: 0 melonDS, 1 DSperate). Emu thread.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsSetCore(JNIEnv* env, jobject thiz, jint core) {
+    pk_nds_set_core(core);
+}
+
+// The DS core that's up (MgbaCore.NDS_CORE_*), or -1 with no DS game.
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsCore(JNIEnv* env, jobject thiz) {
+    return pk_nds_core();
+}
+
+// A DS game's Action Replay codes (cheats/Cheats.kt DsCheats): words, and how many belong to each cheat. Emu thread.
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsCheats(JNIEnv* env, jobject thiz, jintArray jWords, jintArray jLengths) {
+    if (!pk_nds_active()) return -1;
+    jsize nWords = (*env)->GetArrayLength(env, jWords);
+    jsize nCheats = (*env)->GetArrayLength(env, jLengths);
+    jint* words = (*env)->GetIntArrayElements(env, jWords, NULL);
+    jint* lengths = (*env)->GetIntArrayElements(env, jLengths, NULL);
+    int n = pk_nds_set_cheats((const uint32_t*) words, nWords, (const int32_t*) lengths, nCheats);
+    (*env)->ReleaseIntArrayElements(env, jLengths, lengths, JNI_ABORT);
+    (*env)->ReleaseIntArrayElements(env, jWords, words, JNI_ABORT);
+    return n;
+}
+
+// DS LAYOUT floats the X menu on one screen: it comes back after a menu screen left by touch. Emu thread.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsKeepStartMenu(JNIEnv* env, jobject thiz, jboolean on) {
+    if (pk_nds_active()) pk_nds_set_keep_start_menu(on == JNI_TRUE);
+}
+
+// DS LAYOUT's transition hold (EmulatorEngine.dsHold): the two screens' brightness fade (pk_nds_fade). Emu thread, after a frame.
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsFade(JNIEnv* env, jobject thiz) {
+    return pk_nds_active() ? pk_nds_fade() : 0;
+}
+
+// DS RESOLUTION (nds/pk_nds_gl.h): 1 = the software renderer, 2-8 the GPU's. Taken before the next frame. Emu thread.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsSetScale(JNIEnv* env, jobject thiz, jint scale) {
+    if (pk_nds_active()) pk_nds_set_scale(scale);
+}
+
+// The scale in effect (1: software), and whether the GPU path can run here (-1 not tried yet, 0 no, 1 yes).
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsScale(JNIEnv* env, jobject thiz) {
+    return pk_nds_active() ? pk_nds_scale() : 1;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsGpuSupported(JNIEnv* env, jobject thiz) {
+    return pk_nds_gpu_supported();
+}
+
+// The game screen's SurfaceTexture's Surface for the GPU path's frames (null: none). Any thread.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsGlSetWindow(JNIEnv* env, jobject thiz, jobject surface) {
+    pk_nds_set_window(surface ? ANativeWindow_fromSurface(env, surface) : NULL);
+}
+
+// Whether the last frame went out through the GPU path (the view then takes it from the SurfaceTexture). Emu thread.
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsGlPresented(JNIEnv* env, jobject thiz) {
+    return pk_nds_active() && pk_nds_presented() ? JNI_TRUE : JNI_FALSE;
+}
+
+// The GPU path's frame presented at [timestamp] (SurfaceTexture.getTimestamp): x, y, w, h in DS pixels, texels wide,
+// high into out (6 ints). False when it's not known. Any thread.
+JNIEXPORT jboolean JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsGlFrameInfo(JNIEnv* env, jobject thiz, jlong timestamp, jintArray out) {
+    int32_t v[6];
+    if (!out || (*env)->GetArrayLength(env, out) < 6 || !pk_nds_gpu_frame_info((int64_t) timestamp, v)) return JNI_FALSE;
+    (*env)->SetIntArrayRegion(env, out, 0, 6, (const jint*) v);
+    return JNI_TRUE;
+}
+
 // STEADY FF music for a DS game (nds/pk_nds_music.h): the song id the game plays (-1 = not mapped), a copy of the game
 // that plays on from now at 1x, a frame of its audio, its fade-out, and stopping it. Emu thread, between frames.
 JNIEXPORT jint JNICALL
@@ -1573,9 +2152,9 @@ Java_com_pokedaisy_app_MgbaCore_pkNdsBgm(JNIEnv* env, jobject thiz) {
     return pk_nds_active() ? pk_nds_bgm() : -1;
 }
 
-JNIEXPORT jboolean JNICALL
-Java_com_pokedaisy_app_MgbaCore_pkNdsBgmFading(JNIEnv* env, jobject thiz) {
-    return pk_nds_active() && pk_nds_bgm_fading() ? JNI_TRUE : JNI_FALSE;
+JNIEXPORT jint JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsBgmState(JNIEnv* env, jobject thiz) {
+    return pk_nds_active() ? pk_nds_bgm_state() : -1;
 }
 
 JNIEXPORT jboolean JNICALL

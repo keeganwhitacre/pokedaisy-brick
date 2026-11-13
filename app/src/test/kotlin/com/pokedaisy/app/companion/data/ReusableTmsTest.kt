@@ -31,11 +31,14 @@ class ReusableTmsTest {
         // One of FireRed's three left: none, it would still use TMs up elsewhere.
         "Pokemon Ash Gray (v4.5.3).gba" to 0,
         "Pokemon Ghost Grey (v1.0.4).gba" to 0,
+        // Let's Go: none of FireRed's three sites kept (its TM code isn't checked: the row stays off).
+        "Pokemon Let's Go Pikachu.gba" to 0,
         // Their own TM code: Radical Red / Unbound / SoulGold's TMs never run out ([ReusableTms.BUILT_IN]).
         "Pokemon Radical Red (v4.1).gba" to 0,
         "Pokemon Unbound (v2.1.1.1).gba" to 0,
         "Pokemon SoulGold (v1.1.4).gba" to 0,
         "Pokemon SoulGold (v1.2) (Alt 2).gba" to 0,
+        "Pokemon SoulGold (v1.2.1).gba" to 0,
         "Pokemon Glazed (v9.2.0).gba" to 0,
         "Pokemon Lazarus (v2.0).gba" to 0,
     )
@@ -57,14 +60,14 @@ class ReusableTmsTest {
         if (rom.isFile) assertEquals("%08X".format(FIELD_ITEMS_EMERALD_LEGACY.removeBagItem), "%08X".format(ReusableTms.find(rom).single().calls))
     }
 
-    /** Every retail cart in the user's "Pokemon Multi Language" folder (-DmultiRomDir=...): as many sites as its engine
+    /** Every retail cart in the retail ROM dir (-DmultiRomDir=...): as many sites as its engine
      * has, each calling the RemoveBagItem of that build's field-item table. */
     @Test
     fun everyRetailBuild() {
-        val dir = File(System.getProperty("multiRomDir") ?: (System.getProperty("user.home") + "/Downloads/Game ROMs & Emulation/Pokemon Multi Language"))
+        val dir = File(System.getProperty("multiRomDir") ?: RETAIL_ROM_DIR)
         assumeTrue(dir.isDirectory)
         var checked = 0
-        for (f in dir.walk().filter { it.isFile && it.extension == "gba" && listOf("Pirate", "Debug").none { x -> x in it.name } }) {
+        for (f in retailRomFiles(dir).filter { listOf("Pirate", "Debug").none { x -> x in it.name } }) {
             val h = f.inputStream().use { ByteArray(0xC0).also { b -> it.read(b) } }
             val code = String(h, 0xAC, 4)
             val sites = ReusableTms.find(f)

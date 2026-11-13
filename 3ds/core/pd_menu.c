@@ -1,5 +1,4 @@
 #include "pd_menu.h"
-#include <stddef.h>
 
 #include "pd_style.h"
 
@@ -23,8 +22,6 @@ void pd_menu_init(struct pd_menu* m, const char* title, const char* const* items
     m->scroll = 0;
     m->touching = false;
     m->pressed = -1;
-    m->emptyHint = NULL;
-    m->emptyPath = NULL;
 }
 
 static void keep_visible(struct pd_menu* m, int rows) {
@@ -34,7 +31,7 @@ static void keep_visible(struct pd_menu* m, int rows) {
 }
 
 void pd_menu_draw(struct pd_menu* m, struct pd_canvas* c) {
-    pd_backdrop(c);
+    if (!m->overlay) pd_backdrop(c);
     int w = c->w - 2 * MARGIN;
     int f = pd_title_box(c, MARGIN, MARGIN, w, TITLE_H, PD_TITLE_FILL);
     pd_text(c, MARGIN + f + 6, pd_text_y(MARGIN, TITLE_H), m->title, PD_TITLE_TEXT, PD_TITLE_SHADOW);
@@ -46,10 +43,8 @@ void pd_menu_draw(struct pd_menu* m, struct pd_canvas* c) {
     int y = LIST_Y + LIST_FRAME + 2;
     if (m->count == 0) {
         pd_text(c, x + 6, y, "No games found.", PD_LABEL, PD_LABEL_SHADOW);
-        pd_text(c, x + 6, y + ROW_H,
-                m->emptyHint ? m->emptyHint : "Put .gba files in", PD_MUTED, PD_MUTED_SHADOW);
-        pd_text(c, x + 6, y + 2 * ROW_H,
-                m->emptyPath ? m->emptyPath : "sdmc:/pokedaisy/roms/", PD_VALUE, PD_VALUE_SHADOW);
+        pd_text(c, x + 6, y + ROW_H, "Put .gba files in", PD_MUTED, PD_MUTED_SHADOW);
+        pd_text(c, x + 6, y + 2 * ROW_H, "sdmc:/pokedaisy/roms/", PD_VALUE, PD_VALUE_SHADOW);
         return;
     }
     for (int r = 0; r < rows && m->scroll + r < m->count; r++) {

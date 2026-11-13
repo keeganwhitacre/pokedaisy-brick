@@ -41,8 +41,6 @@ data class DexFlags(
 
 /** struct Pokedex in SaveBlock2 (+0x18: owned[52] at +0x10, seen[52] at +0x44) + SaveBlock1's copies. */
 private fun vanillaDexFlags(seen1: Long, seen2: Long) = DexFlags(DexFlagBlock.SAVE_BLOCK_2, 0x5C, 0x28, 52, listOf(seen1, seen2))
-val FIRERED_DEX_FLAGS = vanillaDexFlags(0x5F8, 0x3A18)
-val EMERALD_DEX_FLAGS = vanillaDexFlags(0x988, 0x3B24)
 
 /**
  * pokeemerald-expansion keeps a species' whole dex page in its gSpeciesInfo
@@ -213,22 +211,11 @@ data class BaseStatsLayout(
     val statsU16: Boolean = false,
     val typesOff: Int = 6,
     val catchRateOff: Int = 8,
+    /** Both egg groups packed into the byte at [eggGroupsOff], a nibble each (Monomyth's), not a byte each. */
+    val eggGroupsPacked: Boolean = false,
 )
 
 val VANILLA_BASE_STATS = BaseStatsLayout()
-
-val POKEDEX_FIRERED_REV1 = PokedexTables(
-    entries = 0x0844E8B0L,
-    frontPics = 0x0823511CL,
-    palettes = 0x0823737CL,
-    speciesInfo = 0x082547F4L,
-    speciesToNational = 0x0825205EL,
-    abilityNames = 0x0824FCB0L,
-    footprints = 0x0843FB20L,
-    evolutions = 0x082597C4L,
-    tmhmLearnsets = 0x08252C38L,
-    tmhmMoves = 0x0845A604L,
-)
 
 /**
  * CFRU moves the flags out of struct Pokedex into SaveBlock1 (the old bag
@@ -281,33 +268,6 @@ val POKEDEX_UNBOUND_FR = POKEDEX_UNBOUND.copy(
     probeCategory = "Graine",
 )
 
-/** LeafGreen: FireRed's layout, its own tables (and dex text). */
-val POKEDEX_LEAFGREEN_REV0 = PokedexTables(
-    entries = 0x0844E270L,
-    frontPics = 0x08235088L,
-    palettes = 0x082372E8L,
-    speciesInfo = 0x08254760L,
-    speciesToNational = 0x08251FCAL,
-    abilityNames = 0x0824FC1CL,
-    footprints = 0x0843F8ECL,
-    evolutions = 0x08259734L,
-    tmhmLearnsets = 0x08252BA4L,
-    tmhmMoves = 0x08459FC4L,
-)
-
-val POKEDEX_LEAFGREEN_REV1 = PokedexTables(
-    entries = 0x0844E2E0L,
-    frontPics = 0x082350F8L,
-    palettes = 0x08237358L,
-    speciesInfo = 0x082547D0L,
-    speciesToNational = 0x0825203AL,
-    abilityNames = 0x0824FC8CL,
-    footprints = 0x0843F95CL,
-    evolutions = 0x082597A4L,
-    tmhmLearnsets = 0x08252C14L,
-    tmhmMoves = 0x0845A034L,
-)
-
 /** Ruby (rev 1 and rev 2 share every address): Emerald's flag rules,
  * seen copies at SaveBlock1+0x938/+0x3A8C, two-page dex text. */
 val POKEDEX_RUBY = PokedexTables(
@@ -343,26 +303,6 @@ val POKEDEX_SAPPHIRE = POKEDEX_RUBY.copy(
     regionalOrder = 0x081FC7F4L,
     tmhmLearnsets = 0x081FD098L,
     tmhmMoves = 0x083764ACL,
-)
-
-val POKEDEX_EMERALD = PokedexTables(
-    entries = 0x0856B5B0L,
-    frontPics = 0x0830A18CL,
-    palettes = 0x08303678L,
-    speciesInfo = 0x083203CCL,
-    speciesToNational = 0x0831DC82L,
-    abilityNames = 0x0831B6DBL,
-    footprints = 0x0856E694L,
-    entryStride = 0x20,
-    regionalCount = 202, // HOENN_DEX_COUNT (Jirachi and Deoxys included)
-    regionName = "HOENN",
-    regionalOrder = 0x0831DFB8L,
-    flags = EMERALD_DEX_FLAGS,
-    nationalMagicOff = 2,
-    nationalMagic = 0xDA,
-    evolutions = 0x0832531CL,
-    tmhmLearnsets = 0x0831E898L,
-    tmhmMoves = 0x08615B94L,
 )
 
 /*
@@ -703,6 +643,61 @@ val POKEDEX_TMT2 = PokedexTables(
  * in both arrays on the user's save; a wild WURMPLE marked seen only). Its START menu has no POKéDEX
  * yet on this save, so not compared with the game's own screen.
  */
+/**
+ * Pokémon Monomyth's ATHANTO dex, its only one (no National switch), from the ROM and the user's save (its dex screen:
+ * SEEN 22 / OWN 11; No.007 MISHIMIZU "Rookie Pokémon" 0.5 m 9.1 kg, No.033 VENIPEDE "Centipede Pokémon" 0.4 m 5.3 kg,
+ * metric as it prints them): gPokedexEntries 0x089D3798, 0x28-byte entries by dex number (a 14-byte category, height +0x0E,
+ * weight +0x10, text +0x14, two scale / offset sets), No.1 MARMROOT "Groundhog"; the species -> number table 0x084F4520
+ * (1-362, forms on their base's number; an identical copy follows it); gMonFrontPicTable 0x0849F718 (smol, as
+ * pokeemerald-expansion packs them; its back pictures are at 0x08487428), gMonPaletteTable 0x084880D0 (LZ77); its 24-byte
+ * gBaseStats (genderRatio +9, both egg groups in the nibbles of +0x0D, abilities +0x14 / +0x15, the hidden one +0x16) and
+ * 13-byte gAbilityNames 0x084EE603 (35 Torrent, MISHIMIZU's, as its summary says); gEvolutionTable 0x0850010C, eight
+ * 8-byte rows a species. The flags are SaveBlock1's, a bit per dex number: seen +0x37F4, caught +0x3827, 51 bytes.
+ */
+val POKEDEX_MONOMYTH = PokedexTables(
+    entries = 0x089D3798L,
+    frontPics = 0x0849F718L,
+    palettes = 0x084880D0L,
+    speciesInfo = 0x084F6DBCL,
+    speciesToNational = 0x084F4520L,
+    abilityNames = 0x084EE603L,
+    footprints = 0,
+    hiddenAbilityOff = 0x16,
+    entryStride = 0x28,
+    entryCategoryLen = 14,
+    entryHeightOff = 0x0E,
+    entryDescOff = 0x14,
+    baseStats = BaseStatsLayout(stride = 24, genderOff = 0x09, eggGroupsOff = 0x0D, eggGroupsPacked = true, abilitiesOff = 0x14),
+    categorySuffix = "Pokémon",
+    metric = true,
+    decimalPoint = '.',
+    probeCategory = "Groundhog",
+    probeHeight = 4,
+    probeWeight = 85,
+    probeSpecies = 176,
+    evoLayout = EvoLayout(EvoScheme.MONOMYTH, table = 0x0850010CL, perMon = 8, probeLevel = 31),
+    // gLevelUpLearnsets: {u16 move, u16 level} lists (its moves pass 511), as GUIDE_TABLES_MONOMYTH reads them.
+    levelUpLearnsets = 0x0850664CL,
+    speciesCount = 405,
+    nationalCount = 362,
+    regionalCount = 362,
+    regionName = null,
+    flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, seen = 0x37F4, caught = 0x3827, bytes = 0x33),
+    nationalMagicOff = -1,
+)
+
+/** Monomyth v1.1: v1.0's tables, the same bytes (gen_monomyth_tables.py checks them), moved. */
+val POKEDEX_MONOMYTH_V1_1 = POKEDEX_MONOMYTH.copy(
+    entries = 0x089D3BB0L,
+    frontPics = 0x0849FBA0L,
+    palettes = 0x0848855CL,
+    speciesInfo = 0x084F7244L,
+    speciesToNational = 0x084F49A8L,
+    abilityNames = 0x084EEA8BL,
+    evoLayout = EvoLayout(EvoScheme.MONOMYTH, table = 0x08500594L, perMon = 8, probeLevel = 31),
+    levelUpLearnsets = 0x08506AD4L,
+)
+
 val POKEDEX_ROWE = PokedexTables(
     entries = 0x08F592C8L,
     frontPics = 0x083E0AA4L,
@@ -797,6 +792,106 @@ val POKEDEX_IMPERIUM = PokedexTables(
     expansion = SpeciesInfoDex(stride = 0x104, paletteOff = 0x60, footprintOff = 0x80, levelUpOff = 0x94, teachableOff = 0x98, evolutionsOff = 0xA0),
     evoLayout = EvoLayout(EvoScheme.EXPANSION),
     flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x2F58, 0x2FD9, 129),
+    nationalMagicOff = 2,
+    nationalMagic = 0xDA,
+)
+
+/**
+ * Pokémon Wishes of Tomorrow v1.2.6 (expansion 1.15.3): the page from gSpeciesInfo (0x104-byte entries with Imperium's
+ * field offsets: natDexNum +0x3C, category +0x1F, text +0x4C, smol front pic +0x58, a plain palette +0x60, footprint
+ * +0x80; level-up / teachable / evolutions +0x94 / +0x98 / +0xA0, 12-byte evolution records with a condition list),
+ * gAbilitiesInfo 0x08CC1EFC (0x1C-byte records, from its RHHEXP block). Its dex is expansion's own Hoenn list (214, u32
+ * national numbers at 0x08CC18B0, what HoennToNationalOrder reads), then National (1025) once unlocked; flags in
+ * SaveBlock1 +0x359C / +0x361D (the GF header's seen offset). Checked against its own dex screen on the headless save:
+ * SEEN 1 / OWN 1 in the regional list (PIKACHU, No. 164; the party's other four aren't in it).
+ */
+val POKEDEX_WISHES = PokedexTables(
+    entries = 0,
+    frontPics = 0,
+    palettes = 0,
+    speciesInfo = 0x087011C0L,
+    speciesToNational = 0,
+    abilityNames = 0x08CC1EFCL,
+    footprints = 0,
+    abilityNameLength = 17,
+    abilityNameStride = 0x1C,
+    categorySuffix = "Pokémon",
+    speciesCount = 1581,
+    nationalCount = 1025,
+    regionalCount = 214,
+    regionName = "HOENN",
+    regionalOrder = 0x08CC18B0L,
+    regionalOrderStride = 4,
+    expansion = SpeciesInfoDex(stride = 0x104, paletteOff = 0x60, footprintOff = 0x80, levelUpOff = 0x94, teachableOff = 0x98, evolutionsOff = 0xA0),
+    evoLayout = EvoLayout(EvoScheme.EXPANSION_PARAMS, record = 12, conditionsEnd = 39),
+    flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x359C, 0x361D, 129),
+    nationalMagicOff = 2,
+    nationalMagic = 0xDA,
+)
+
+/**
+ * Pokémon Team Rocket Edition 2026, Spanish (v3.0.9, expansion 1.14.4): the page from gSpeciesInfo (0xA8-byte entries:
+ * category +0x1F, natDexNum +0x3C, text +0x4C, smol front pic +0x58, a plain palette +0x60, no footprints; level-up /
+ * teachable / evolutions +0x90 / +0x94 / +0x9C, 12-byte evolution records with a condition list ending at 39: EEVEE's
+ * SYLVEON / LEAFEON / GLACEON), gAbilitiesInfo 0x08E60C48 (its RHHEXP block; 0x1C-byte records, HEDOR first). One national
+ * list, 1-1062: the 1025 then its own 37 (TRXATU 1026 ... ZAPDOS-Z 1062). Flags in SaveBlock1: seen +0x3740 (the GF
+ * header's), caught +0x37C5 (8 literal-pool words), 133 bytes each - the save's ZUBAT seen and caught, a MEOWTH seen.
+ * BULBASAUR reads "Semilla", 0,7 m, 6,9 kg.
+ */
+val POKEDEX_TEAM_ROCKET_V3 = PokedexTables(
+    entries = 0,
+    frontPics = 0,
+    palettes = 0,
+    speciesInfo = 0x08970CE8L,
+    speciesToNational = 0,
+    abilityNames = 0x08E60C48L,
+    footprints = 0,
+    abilityNameLength = 17,
+    abilityNameStride = 0x1C,
+    categoryPrefix = "Pokémon",
+    categorySuffix = "",
+    metric = true,
+    probeCategory = "Semilla",
+    speciesCount = 1698,
+    nationalCount = 1062,
+    regionName = null,
+    expansion = SpeciesInfoDex(stride = 0xA8, paletteOff = 0x60, levelUpOff = 0x90, teachableOff = 0x94, evolutionsOff = 0x9C),
+    evoLayout = EvoLayout(EvoScheme.EXPANSION_PARAMS, record = 12, conditionsEnd = 39),
+    flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x3740, 0x37C5, 133),
+    nationalMagicOff = -1,
+)
+
+/** Team Rocket Edition 2026 v3.1: v3.0.9's, gSpeciesInfo 0x089758C0 (its GF header's) and gAbilitiesInfo 0x08E65B68 (its
+ * RHHEXP block's; "Hedor" first) moved; the save's flags where v3.0.9 keeps them. */
+val POKEDEX_TEAM_ROCKET_V3_1 = POKEDEX_TEAM_ROCKET_V3.copy(speciesInfo = 0x089758C0L, abilityNames = 0x08E65B68L)
+
+/**
+ * Pokémon Dreamstone Mysteries (expansion 1.11.2): Imperium's gSpeciesInfo page (the same 0x104-byte entries and
+ * offsets; gSpeciesInfo 0x087B0160, gAbilitiesInfo 0x08E65E98), its own regional order - 315 national numbers from
+ * 0x08E65C20 (GOTHITA first; CHIKORITA No. 054, OSHAWOTT No. 224) - and the flags in its SaveBlock1 (+0x3494 seen,
+ * +0x3515 caught; the bits of the five a new game was given). Checked against its own dex screen headless: "No054
+ * Chikorita, Leaf POKéMON", 2'11", 14.1 lbs., SEEN 2 / OWN 2 (of the five, only CHIKORITA and OSHAWOTT are in its
+ * list). The game titles that list HOENN (expansion's leftover word); the app names the region the game is in.
+ */
+val POKEDEX_DREAMSTONE = PokedexTables(
+    entries = 0,
+    frontPics = 0,
+    palettes = 0,
+    speciesInfo = 0x087B0160L,
+    speciesToNational = 0,
+    abilityNames = 0x08E65E98L,
+    footprints = 0,
+    abilityNameLength = 17,
+    abilityNameStride = 0x1C,
+    categorySuffix = "Pokémon",
+    speciesCount = 1524,
+    nationalCount = 1025,
+    regionalCount = 315,
+    regionName = "CORMORIA",
+    regionalOrder = 0x08E65C20L,
+    expansion = SpeciesInfoDex(stride = 0x104, paletteOff = 0x60, footprintOff = 0x80, levelUpOff = 0x94, teachableOff = 0x98, evolutionsOff = 0xA0),
+    evoLayout = EvoLayout(EvoScheme.EXPANSION),
+    flags = DexFlags(DexFlagBlock.SAVE_BLOCK_1, 0x3494, 0x3515, 129),
     nationalMagicOff = 2,
     nationalMagic = 0xDA,
 )
@@ -981,6 +1076,28 @@ val POKEDEX_ROCKET_EDITION = POKEDEX_ULTRA_VIOLET.copy(abilityNames = 0x08950000
 /** Pokémon Ghost Grey: Rocket Edition's layout - rev 0's tables rewritten in place (its ghosts' entries), its
  * ability names at 0x08950000, its mixed-case text. */
 val POKEDEX_GHOST_GREY = POKEDEX_ROCKET_EDITION
+
+/**
+ * Pokémon Let's Go Pikachu / Eevee (both versions share these): FireRed's dex screens over 987 species, every table found
+ * through rev 0's literal-pool words - entries 0x08AB7AF0 (No. 0-855: its own numbering, Kanto's 151 first; the newest
+ * species past it have no entry), front pics 0x08A0A6B0, palettes 0x08A0E460, base stats 0x08A02B50, species -> No.
+ * 0x08A9E40C, footprints 0x08AB6B84, evolutions 0x08AA19D0 (vanilla's five rows), TM / HM learnsets 0x08A9F374 (rev 0's
+ * machines). Rocket Edition's ability names (0x08950000). The seen / caught bits left the save blocks for two 0x6B-byte
+ * arrays in EWRAM (GetSetPokedexFlag's literals; a wild battle sets 0x0203C0C8's bit alone: seen).
+ */
+val POKEDEX_LETS_GO = POKEDEX_ROCKET_EDITION.copy(
+    entries = 0x08AB7AF0L,
+    frontPics = 0x08A0A6B0L,
+    palettes = 0x08A0E460L,
+    speciesInfo = 0x08A02B50L,
+    speciesToNational = 0x08A9E40CL,
+    footprints = 0x08AB6B84L,
+    evolutions = 0x08AA19D0L,
+    tmhmLearnsets = 0x08A9F374L,
+    speciesCount = 987,
+    nationalCount = 855,
+    flags = DexFlags(DexFlagBlock.FIXED, 0x0203C0C8L, 0x0203C133L, 0x6B),
+)
 
 /**
  * Pokémon Sword and Shield Ultimate Plus v1.2.1.2 (CFRU): every table found through the
@@ -1305,6 +1422,13 @@ val POKEDEX_SOULGOLD_V1_2C = POKEDEX_SOULGOLD_V1_2.copy(
     regionalOrder = 0x08F0EF6CL,
 )
 
+/** SoulGold v1.2.1 (both builds): the same tables again, 0x7BA0 (gSpeciesInfo) / 0xB61C later than the third v1.2's. */
+val POKEDEX_SOULGOLD_V1_2_1 = POKEDEX_SOULGOLD_V1_2.copy(
+    speciesInfo = 0x087DD964L,
+    abilityNames = 0x08F1B3D8L,
+    regionalOrder = 0x08F1A588L,
+)
+
 /**
  * Whether the running ROM really has these tables where [t] says: entry 1 is
  * BULBASAUR's (SEED, 7 dm, 69 hg), species 1 is dex number 1 and its front
@@ -1418,6 +1542,8 @@ object PokedexSource {
     private val entries = ConcurrentHashMap<Int, DexEntry>()
     private val sprites = ConcurrentHashMap<Int, Bitmap>()
     private val footprints = ConcurrentHashMap<Int, Bitmap>()
+    private val baseStats = ConcurrentHashMap<Int, IntArray>()
+    private val growthRates = ConcurrentHashMap<Int, Int>()
     @Volatile private var nationalToSpecies: IntArray? = null
     @Volatile private var speciesToNational: IntArray? = null
     @Volatile private var regional: IntArray? = null
@@ -1427,9 +1553,39 @@ object PokedexSource {
         if (cachedFor == t) return
         synchronized(this) {
             if (cachedFor == t) return
-            entries.clear(); sprites.clear(); footprints.clear(); nationalToSpecies = null; speciesToNational = null; regional = null
+            entries.clear(); sprites.clear(); footprints.clear(); baseStats.clear(); growthRates.clear(); nationalToSpecies = null; speciesToNational = null; regional = null
             cachedFor = t
         }
+    }
+
+    /**
+     * [species]' base stats in the struct's order (HP, ATTACK, DEFENSE, SPEED, SP. ATK, SP. DEF) from the ROM's
+     * gBaseStats - the BOXES tab's stats, which a box record doesn't keep. Null = no table / unreadable.
+     */
+    fun baseStats(t: PokedexTables, species: Int): IntArray? {
+        if (species <= 0 || t.speciesInfo == 0L || t.cartDex) return null
+        sync(t)
+        baseStats[species]?.let { return it }
+        val bs = t.baseStats
+        val stride = t.expansion?.stride ?: bs.stride
+        return runCatching {
+            val info = rd(t.speciesInfo + species.toLong() * stride, 12)
+            IntArray(6) { if (t.expansion == null && bs.statsU16) u16le(info, it * 2) else info[it].toInt() and 0xFF }
+        }.getOrNull()?.also { baseStats[species] = it }
+    }
+
+    /**
+     * [species]' growth rate (GROWTH_*, gExperienceTables' row) from the same table: the byte before the egg groups in
+     * vanilla's gBaseStats (+0x13) and in expansion's gSpeciesInfo (+0x15) alike. A box record's level comes from it.
+     */
+    fun growthRate(t: PokedexTables, species: Int): Int? {
+        if (species <= 0 || t.speciesInfo == 0L || t.cartDex || (t.expansion == null && t.baseStats.statsU16)) return null
+        sync(t)
+        growthRates[species]?.let { return it }
+        val stride = t.expansion?.stride ?: t.baseStats.stride
+        val off = (t.expansion?.eggGroupsOff ?: t.baseStats.eggGroupsOff) - 1
+        return runCatching { rd(t.speciesInfo + species.toLong() * stride + off, 1)[0].toInt() and 0xFF }
+            .getOrNull()?.also { growthRates[species] = it }
     }
 
     /**
@@ -1441,6 +1597,7 @@ object PokedexSource {
         synchronized(this) { cachedFor = null }
         DexDetails.romChanged()
         GuideRomSource.romChanged()
+        EvolutionSource.romChanged()
     }
 
     /** Already-loaded data only (no ROM read) - composables start from these,
@@ -1655,7 +1812,8 @@ object PokedexSource {
             hiddenAbility = hidden,
             catchRate = b(bs.catchRateOff),
             genderRatio = b(bs.genderOff),
-            eggGroups = listOf(b(bs.eggGroupsOff), b(bs.eggGroupsOff + 1)).distinct().mapNotNull { EGG_GROUP_NAMES.getOrNull(it) },
+            eggGroups = (if (bs.eggGroupsPacked) listOf(b(bs.eggGroupsOff) shr 4, b(bs.eggGroupsOff) and 0x0F)
+                else listOf(b(bs.eggGroupsOff), b(bs.eggGroupsOff + 1))).distinct().mapNotNull { EGG_GROUP_NAMES.getOrNull(it) },
         )
     }
 

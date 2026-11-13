@@ -451,14 +451,16 @@ class FieldItemsTest {
         assertTrue(s.marked(13) && s.canTake && s.picksMove(34))
     }
 
-    /** FireRed Rocket Edition, Ash Gray (both builds) and Ghost Grey (three) keep rev 0's code: rev 0's table, its CRCs,
-     * their own gItems (Ghost Grey's 86 lasts 250 steps, not 100). */
+    /** FireRed Rocket Edition, Ash Gray (both builds), Ghost Grey (three) and Let's Go (four) keep rev 0's code: rev 0's
+     * table, its CRCs, their own gItems (Ghost Grey's 86 lasts 250 steps, not 100). */
     @Test
     fun `the FireRed hacks edited in place run rev 0's table`() {
         val fns = fieldItemsForGame(GameKind.FIRERED, "BPRE", 0)!!
         var ran = 0
         for (file in listOf("Pokemon FireRed Rocket Edition.gba", "Pokemon Ash Gray (v4.5.3).gba", "Pokemon Ash Gray Fork Bug Fix (v1.0).gba",
-            "Pokemon Ghost Grey (v1.0.1).gba", "Pokemon Ghost Grey (v1.0.2).gba", "Pokemon Ghost Grey (v1.0.4).gba")) {
+            "Pokemon Ghost Grey (v1.0.1).gba", "Pokemon Ghost Grey (v1.0.2).gba", "Pokemon Ghost Grey (v1.0.4).gba",
+            "Pokemon Let's Go Pikachu.gba", "Pokemon Let's Go Pikachu (Translation Only).gba", "Pokemon Let's Go Eevee.gba",
+            "Pokemon Let's Go Eevee (Translation Only).gba")) {
             val bytes = File(RETAIL_ROM_DIR + file).takeIf { it.isFile }?.readBytes() ?: continue
             val s = fieldItemSupport(fns, romReader(bytes))
             assertTrue(file, s != null && s.marked(13) && s.canUse(13) && s.canGive(200) && s.canTake)
@@ -503,13 +505,13 @@ class FieldItemsTest {
 
     /** The generated tables (scripts/port_field_items.py) against the other-language ROMs they came from: each
      * matches its own ROM's code and gItems, and is the only table that does. -DmultiRomDir=..., else the
-     * user's "Pokemon Multi Language" folder; skipped without it. */
+     * retail ROM dir; skipped without it. */
     @Test
     fun `each ported table matches its ROM`() {
-        val dir = File(System.getProperty("multiRomDir") ?: (System.getProperty("user.home") + "/Downloads/Game ROMs & Emulation/Pokemon Multi Language"))
+        val dir = File(System.getProperty("multiRomDir") ?: RETAIL_ROM_DIR)
         assumeTrue(dir.isDirectory)
         // By header only (~50 ROMs of up to 16 MB): each one read whole when its table comes up.
-        val roms = dir.walk().filter { it.isFile && it.extension == "gba" && listOf("Pirate", "Debug", "Pokemon Box").none { x -> x in it.name } }
+        val roms = retailRomFiles(dir).filter { listOf("Pirate", "Debug", "Pokemon Box").none { x -> x in it.name } }
             .associateBy { f -> f.inputStream().use { val h = ByteArray(0xC0); it.read(h); "${String(h, 0xAC, 4)}${h[0xBC].toInt()}" } }
         var checked = 0
         for ((key, fns) in FIELD_ITEMS_PORTS) {

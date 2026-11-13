@@ -16,12 +16,16 @@ class WildEncountersTest {
     private val cases = listOf(
         "Pokemon - Emerald Version (USA, Europe).gba" to 0x02038C00L,
         "Pokemon - FireRed Version (USA).gba" to 0x020386DCL,
+        // Let's Go Pikachu / Eevee keep rev 0's StandardWildEncounter (its wild Pokémon also walk the grass, which the
+        // switch doesn't touch).
+        "Pokemon Let's Go Pikachu.gba" to 0x020386DCL,
+        "Pokemon Let's Go Eevee (Translation Only).gba" to 0x020386DCL,
         "Pokemon - FireRed Version (USA, Europe) (Rev 1).gba" to 0x020386DCL,
         "Pokemon - LeafGreen Version (USA, Europe) (Rev 1).gba" to 0x020386DCL,
         "Pokemon - Ruby Version (USA, Europe) (Rev 1).gba" to 0x0202FF7CL,
         "Pokemon - Sapphire Version (USA, Europe) (Rev 2).gba" to 0x0202FF7CL,
-        "emerald-multilang/Pocket Monsters - Emerald (Japan).gba" to 0x020388A0L,
-        "emerald-multilang/Pokemon - Smaragd-Edition (Germany).gba" to 0x02038C00L,
+        "Pocket Monsters - Emerald (Japan).gba" to 0x020388A0L,
+        "Pokemon - Smaragd-Edition (Germany).gba" to 0x02038C00L,
         "Pokemon Glazed (v9.2.0).gba" to 0x02038C00L,
         "Pokemon Emerald Kaizo (v2.0).gba" to 0x02038C00L,
         // Emerald Legacy: its own agbcc build of Emerald's code (its ELF's sWildEncountersDisabled).
@@ -39,6 +43,8 @@ class WildEncountersTest {
         "Pokemon SoulGold (v1.2).gba" to 0x0203E434L,
         "Pokemon SoulGold (v1.2) (Alt 1).gba" to 0x0203E434L,
         "Pokemon SoulGold (v1.2) (Alt 2).gba" to 0x0203E434L,
+        "Pokemon SoulGold (v1.2.1).gba" to 0x0203E35CL,
+        "Pokemon SoulGold (v1.2.1) (Alt 1).gba" to 0x0203E35CL,
         "Pokemon Recharged Yellow (v1.8.0).gba" to 0x0203E374L,
         "Pokemon Recharged Yellow (v1.9.0).gba" to 0x0203E39CL,
         "Pokemon Recharged Yellow (v1.9.4).gba" to 0x0203E3A8L,
@@ -54,7 +60,16 @@ class WildEncountersTest {
         // Elite Redux (its own gcc pokeemerald): 2.65.4.1b reads the player's coordinates before the header lookup's call.
         "Pokemon Elite Redux (2.65.3b).gba" to 0x0203D214L,
         "Pokemon Elite Redux (2.65.4.1b).gba" to 0x0203D21CL,
-        // Not found: no WILD ENCOUNTERS there.
+        // Wishes of Tomorrow (expansion 1.15.3): +0xAC from an expansion 1.15.3 build's, like the globals around it. Not
+        // walked: without field reads (no WIDE rows) the app doesn't roll it yet (ROM_FEATURES' note 21).
+        "Pokemon Wishes of Tomorrow (v1.2.6).gba" to 0x0203788CL,
+        // Dreamstone Mysteries (expansion 1.11.2): checked headless - set, 160 steps in ROUTE 1's grass met nothing; left
+        // alone, a PIDOVE came. Not offered yet: the switch is rolled by the field read, which doesn't know this game.
+        "Pokemon Dreamstone Mysteries.gba" to 0x02037F88L,
+        // Not found: no WILD ENCOUNTERS there. Monomyth's StandardWildEncounter (0x080B3F58) has no switch; a function of
+        // the gcc shape at 0x081B3D64 loads 0xFFFF as an argument, not to compare (its byte 0x02020A44 sits at 1).
+        "Pokemon Monomyth (v1.0).gba" to 0L,
+        "Pokemon Monomyth (v1.1).gba" to 0L,
         "Pokemon Emerald Rogue (v2.2.1-EX).gba" to 0L,
         "Pokemon Quetzal (Alpha 9.0) (English).gba" to 0L,
     )

@@ -30,6 +30,8 @@ data class Gen1MusicTables(
      * PlayMusic takes it in DE (the render core's call puts the id there). */
     val crystal: Boolean = false,
     val musicChannelFlags: List<Long> = emptyList(),
+    /** How far before a channel's flags byte its MusicID sits: 3 in Crystal's struct, 7 in Polished Crystal's. */
+    val musicIdBack: Int = 3,
 )
 
 val GEN1_MUSIC_YELLOW = Gen1MusicTables(
@@ -90,6 +92,33 @@ val GEN1_MUSIC_RED = GEN1_MUSIC_YELLOW.copy(
 val GEN1_MUSIC_BLUE = GEN1_MUSIC_RED.copy(sha1 = TelemetrySampler.BLUE_SHA1)
 
 /**
+ * PureRed / PureBlue v2.7.6 (pureRGB's pokered.sym, the same in both): Red's sound engine and audio RAM, its own PlayMusic
+ * (0x21D1), and its songs: Red's, but EVOLUTION where Red has SAFARI ZONE and bank 0x08's / 0x1F's ids from the gym battle
+ * / CINNABAR MANSION on shifted (constants/music_constants.asm). Its added songs (bank 0x36's RONALD and the others it starts
+ * its own way) aren't in the list: heard live, they don't start from PlayMusic and play SPED-UP. The park: 0x0DAE, the
+ * `18 FE` inside `jr .x` / `cp $ff` in bank 0 (the jr's operand: nothing jumps there). Checked headless (mgba_dump gbpark /
+ * gbcall / gbloop): ROUTES1 loops at 22.9 s, the wild battle at 31.3 s after a 13.1 s intro - Red's numbers.
+ */
+val GEN1_MUSIC_PURE_RED = GEN1_MUSIC_RED.copy(
+    sha1 = TelemetrySampler.PURE_RED_V2_7_6_SHA1,
+    playMusic = 0x21D1,
+    spin = 0x0DAE,
+    songs = listOf(
+        2 to 186, 2 to 189, 2 to 192, 2 to 195, 2 to 199, 2 to 202, 2 to 205, 2 to 208, 2 to 212, 2 to 216,
+        2 to 219, 2 to 222, 2 to 225, 2 to 229, 2 to 232, 2 to 235, 2 to 239, 2 to 243, 2 to 247, 2 to 251,
+        8 to 236, 8 to 239, 8 to 242, 8 to 245, 8 to 248, 8 to 251, 8 to 254,
+        0x1F to 195, 0x1F to 199, 0x1F to 202, 0x1F to 205, 0x1F to 208, 0x1F to 210, 0x1F to 214, 0x1F to 217,
+        0x1F to 220, 0x1F to 224, 0x1F to 228, 0x1F to 232, 0x1F to 235, 0x1F to 239, 0x1F to 242, 0x1F to 245,
+        0x1F to 248, 0x1F to 251,
+    ),
+)
+val GEN1_MUSIC_PURE_BLUE = GEN1_MUSIC_PURE_RED.copy(sha1 = TelemetrySampler.PURE_BLUE_V2_7_6_SHA1)
+
+/** Yellow Legacy v1.0.10 (its pokeyellow.sym): Yellow's sound engine, songs and audio RAM; bank 0 moved PlayMusic and the park
+ * (PlaceNextChar's `jp z`, the same instruction 12 bytes on). */
+val GEN1_MUSIC_YELLOW_LEGACY = GEN1_MUSIC_YELLOW.copy(sha1 = TelemetrySampler.YELLOW_LEGACY_V1_0_10_SHA1, playMusic = 0x21AE, spin = 0x1763)
+
+/**
  * Crystal (rev 0, rev 1, Australia: pret/pokecrystal, the same addresses in all three). Gen 2's sound engine: songs are ids
  * 1..0x66 (MUSIC_TITLE .. MUSIC_MOBILE_CENTER) with their banks in its own pointer table; PlayMusic (00:3B97) takes the id in
  * DE. Its channel structs are 0x32 bytes from wChannel1 (C101): Flags1 +3, MusicAddress / LastMusicAddress +6, NoteDuration
@@ -98,28 +127,105 @@ val GEN1_MUSIC_BLUE = GEN1_MUSIC_RED.copy(sha1 = TelemetrySampler.BLUE_SHA1)
  * the Johto wild battle 36.6 s after a 15.7 s intro, ROUTE 29 62.3 s; HEAL ends by itself - once the render core starts each
  * song from silence (Gen1MusicRenderer: _PlayMusic leaves the channels a song doesn't use playing the last one's).
  */
-private fun crystalMusic(sha1: String) = Gen1MusicTables(
+private fun crystalMusic(
+    sha1: String,
+    playMusic: Int = 0x3B97,
+    spin: Int = 0x28B2,
+    channel1: Long = 0xC101L,
+    lastSong: Int = 0x66,
+) = Gen1MusicTables(
     sha1 = sha1,
-    playMusic = 0x3B97,
-    spin = 0x28B2,
+    playMusic = playMusic,
+    spin = spin,
     audioRomBank = 0L,
-    channelSoundIds = 0xC101L,    // wChannel1MusicID (unused: current() reads each channel's)
+    channelSoundIds = channel1,   // wChannel1MusicID (unused: current() reads each channel's)
     channelState = (0 until 4).flatMap { ch ->
-        val b = 0xC101L + 0x32L * ch
+        val b = channel1 + 0x32L * ch
         listOf(b + 3 to 1, b + 6 to 4, b + 0x15 to 1, b + 0x18 to 1)
     },
-    songs = (1..0x66).map { 0 to it },
+    songs = (1..lastSong).map { 0 to it },
     crystal = true,
-    musicChannelFlags = (0 until 4).map { 0xC104L + 0x32L * it },
+    musicChannelFlags = (0 until 4).map { channel1 + 3 + 0x32L * it },
 )
 
 val GEN2_MUSIC_CRYSTAL = crystalMusic(TelemetrySampler.CRYSTAL_SHA1)
 val GEN2_MUSIC_CRYSTAL_REV1 = crystalMusic(TelemetrySampler.CRYSTAL_REV1_SHA1)
 val GEN2_MUSIC_CRYSTAL_AU = crystalMusic(TelemetrySampler.CRYSTAL_AU_SHA1)
+/** German Crystal (Kristall): Crystal's sound engine and songs; bank 0 moved PlayMusic and SaveScreen's park. */
+val GEN2_MUSIC_CRYSTAL_DE = crystalMusic(TelemetrySampler.CRYSTAL_DE_SHA1, playMusic = 0x3B81, spin = 0x289C)
+/** Crystal Legacy v1.3.1: Crystal's sound engine, songs and channels; bank 0 moved PlayMusic and SaveScreen's park. */
+val GEN2_MUSIC_CRYSTAL_LEGACY = crystalMusic(TelemetrySampler.CRYSTAL_LEGACY_V1_3_1_SHA1, playMusic = 0x3B62, spin = 0x287B)
+
+/**
+ * Crystal Clear (v2.5.11, v2.6.0, each with its Color Filter build: the same bank 0): Crystal's engine and channels, its bank 0
+ * moved. PlayMusic is 00:3CDC, a wrapper that can swap the song for a map's (D9FB-D9FD, zero on the parked title screen);
+ * the park is 0x28C8, the `18 FE` inside the same `jr z` / `cp` as Crystal's. Checked headless on both versions (gbpark / gbcall /
+ * `gbloop N crystal`): song 2 loops at 24.1 s after 5.2 s.
+ */
+private fun crystalClearMusic(sha1: String) = crystalMusic(sha1, playMusic = 0x3CDC, spin = 0x28C8)
+private val GEN2_MUSIC_CRYSTAL_CLEAR = listOf(
+    TelemetrySampler.CRYSTAL_CLEAR_V2_5_11_SHA1, TelemetrySampler.CRYSTAL_CLEAR_V2_5_11_COLOR_FILTER_SHA1,
+    TelemetrySampler.CRYSTAL_CLEAR_V2_6_0_SHA1, TelemetrySampler.CRYSTAL_CLEAR_V2_6_0_COLOR_FILTER_SHA1,
+).map(::crystalClearMusic)
+
+/**
+ * Gold / Silver (pret/pokegold's .sym, the same addresses in both): Crystal's engine and structs, wChannel1 at C001, PlayMusic
+ * 00:3D98, 92 songs; the park is 0x29A3, the only `18 FE` in bank 0 (a `jr z`'s operand). Checked headless on Gold (`gbloop N
+ * gold`): song 2 loops at 27.7 s after 9.5 s.
+ */
+private fun goldSilverMusic(sha1: String) = crystalMusic(sha1, playMusic = 0x3D98, spin = 0x29A3, channel1 = 0xC001L, lastSong = 0x5C)
+private val GEN2_MUSIC_GOLD_SILVER = listOf(TelemetrySampler.GOLD_SHA1, TelemetrySampler.SILVER_SHA1).map(::goldSilverMusic)
+/** German Gold / Silver: English's sound engine and songs; bank 0 moved PlayMusic and the park. */
+private val GEN2_MUSIC_GOLD_SILVER_DE = listOf(TelemetrySampler.GOLD_DE_SHA1, TelemetrySampler.SILVER_DE_SHA1)
+    .map { crystalMusic(it, playMusic = 0x3D8F, spin = 0x29D0, channel1 = 0xC001L, lastSong = 0x5C) }
+
+/**
+ * Polished Crystal 3.2.0 - 3.2.3 (each release's .sym): its own channel_struct, 0x24 bytes from wChannel1 (CB7F) - MusicAddress /
+ * LastMusicAddress +3, Flags +7, NoteDuration +0x12, LoopCount +0x14 - and 196 songs. PlayMusic moved between releases; the normal
+ * / debug builds share it, the faithful ones sit 0xE lower. The park is the `18 FE` inside a `jr z` / `cp 1` in bank 0. Checked
+ * headless on 3.2.3 (`gbloop N polished`): NEW BARK TOWN loops at 37.6 s, the Johto wild battle at 37.6 s after 16.1 s.
+ */
+private fun polishedCrystalMusic(sha1: String, playMusic: Int, spin: Int) = Gen1MusicTables(
+    sha1 = sha1,
+    playMusic = playMusic,
+    spin = spin,
+    audioRomBank = 0L,
+    channelSoundIds = 0xCB7FL,
+    channelState = (0 until 4).flatMap { ch ->
+        val b = 0xCB7FL + 0x24L * ch
+        listOf(b + 7 to 1, b + 3 to 4, b + 0x12 to 1, b + 0x14 to 1)
+    },
+    songs = (1..0xC4).map { 0 to it },
+    crystal = true,
+    musicChannelFlags = (0 until 4).map { 0xCB86L + 0x24L * it },
+    musicIdBack = 7,
+)
+private val GEN2_MUSIC_POLISHED_CRYSTAL = with(TelemetrySampler) {
+    listOf(
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_0_SHA1, 0x394F, 0x220A),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_1_SHA1, 0x394F, 0x220A),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_2_SHA1, 0x3967, 0x220A),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_3_SHA1, 0x3967, 0x220A),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_0_Debug_SHA1, 0x394F, 0x220A),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_1_Debug_SHA1, 0x394F, 0x220A),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_2_Debug_SHA1, 0x3967, 0x220A),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_3_Debug_SHA1, 0x3967, 0x220A),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_0_Faithful_SHA1, 0x3941, 0x21FC),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_1_Faithful_SHA1, 0x3941, 0x21FC),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_2_Faithful_SHA1, 0x3959, 0x21FC),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_3_Faithful_SHA1, 0x3959, 0x21FC),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_0_Faithful_Debug_SHA1, 0x3941, 0x21FC),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_1_Faithful_Debug_SHA1, 0x3941, 0x21FC),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_2_Faithful_Debug_SHA1, 0x3959, 0x21FC),
+        polishedCrystalMusic(POLISHED_CRYSTAL_V3_2_3_Faithful_Debug_SHA1, 0x3959, 0x21FC),
+    )
+}
 
 object Gen1Music {
     private val GAMES = listOf(GEN1_MUSIC_YELLOW, GEN1_MUSIC_YELLOW_DE, GEN1_MUSIC_YELLOW_FR, GEN1_MUSIC_YELLOW_IT, GEN1_MUSIC_YELLOW_ES,
-        GEN1_MUSIC_RED, GEN1_MUSIC_BLUE, GEN2_MUSIC_CRYSTAL, GEN2_MUSIC_CRYSTAL_REV1, GEN2_MUSIC_CRYSTAL_AU)
+        GEN1_MUSIC_RED, GEN1_MUSIC_BLUE, GEN1_MUSIC_PURE_RED, GEN1_MUSIC_PURE_BLUE, GEN1_MUSIC_YELLOW_LEGACY, GEN2_MUSIC_CRYSTAL, GEN2_MUSIC_CRYSTAL_REV1,
+        GEN2_MUSIC_CRYSTAL_AU, GEN2_MUSIC_CRYSTAL_DE, GEN2_MUSIC_CRYSTAL_LEGACY) +
+        GEN2_MUSIC_CRYSTAL_CLEAR + GEN2_MUSIC_GOLD_SILVER + GEN2_MUSIC_GOLD_SILVER_DE + GEN2_MUSIC_POLISHED_CRYSTAL
 
     fun forSha1(sha1: String): Gen1MusicTables? = GAMES.firstOrNull { it.sha1 == sha1 }
 
@@ -135,9 +241,9 @@ object Gen1Music {
     /** What [r]'s music channels are playing, or null (silence / unreadable). */
     fun current(r: MemoryReader, t: Gen1MusicTables): String? = runCatching {
         if (t.crystal) {
-            // The first music channel that's on: its own MusicID (the struct's first word, 3 bytes before Flags1).
+            // The first music channel that's on: its own MusicID (the struct's first word, before its flags byte).
             val flags = t.musicChannelFlags.firstOrNull { (r.readCoreMemory(it, 1)[0].toInt() and 1) != 0 } ?: return null
-            val b = r.readCoreMemory(flags - 3, 2)
+            val b = r.readCoreMemory(flags - t.musicIdBack, 2)
             val id = (b[0].toInt() and 0xFF) or ((b[1].toInt() and 0xFF) shl 8)
             return if (id in 1..0xFF) key(0, id) else null
         }

@@ -64,6 +64,7 @@ import com.pokedaisy.app.companion.data.NATIVE_LAZARUS
 import com.pokedaisy.app.companion.data.NATIVE_SOULGOLD
 import com.pokedaisy.app.companion.data.NATIVE_SOULGOLD_V1_2
 import com.pokedaisy.app.companion.data.NATIVE_SOULGOLD_V1_2B
+import com.pokedaisy.app.companion.data.NATIVE_SOULGOLD_V1_2_1
 import com.pokedaisy.app.companion.data.NATIVE_HEART_AND_SOUL
 import com.pokedaisy.app.companion.data.NATIVE_CELIA
 import com.pokedaisy.app.companion.data.NATIVE_GAIA_V3_2
@@ -204,6 +205,44 @@ open class CompanionScreenshotTest {
     @Test fun partyHeldItems() = snapshot {
         val party = SampleCompanion.snapshot.party.mapIndexed { i, m -> m.copy(heldItemId = if (i == 0) 200 else 121) }
         CompanionScreen(SampleCompanion.snapshot.copy(party = party), SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = "PARTY")
+    }
+
+    /** The NUZLOCKE tab mid-run: HERE free, the team, encounters both ways and one Pokémon in the graveyard. */
+    @Test fun nuzlocke() = nuzlockeShot("NUZLOCKE")
+
+    /** NUZLOCKE's gravestone on a fainted-for-good Pokémon's party slot (healed since), beside a held item. */
+    @Test fun partyNuzlocke() = nuzlockeShot("PARTY")
+
+    /** NUZLOCKE on: its gravestone tile joins MORE. */
+    @Test fun moreNuzlocke() = nuzlockeShot("MORE")
+
+    /** NUZLOCKE on a full tab bar: the chip's label narrows to fit. */
+    @Test fun nuzlockeOnBar() = nuzlockeShot("NUZLOCKE", listOf("PARTY", "DEX", "MAP", "ITEMS", "NUZLOCKE"))
+
+    private fun nuzlockeShot(tab: String, barTabs: List<String> = com.pokedaisy.app.companion.DEFAULT_COMPANION_TABS) {
+        val party = SampleCompanion.snapshot.party.mapIndexed { i, m -> m.copy(personality = i + 1L, heldItemId = if (i == 1) 200 else 0) }
+        com.pokedaisy.app.companion.Nuzlocke.preview(
+            com.pokedaisy.app.companion.data.NuzlockeRun(
+                encounters = listOf(
+                    com.pokedaisy.app.companion.data.NuzlockeEncounter(89, "ROUTE 1", 16, com.pokedaisy.app.companion.data.NuzlockeOutcome.CAUGHT),
+                    com.pokedaisy.app.companion.data.NuzlockeEncounter(90, "ROUTE 2", 19, com.pokedaisy.app.companion.data.NuzlockeOutcome.MISSED),
+                    com.pokedaisy.app.companion.data.NuzlockeEncounter(117, "VIRIDIAN FOREST", 10, com.pokedaisy.app.companion.data.NuzlockeOutcome.CAUGHT),
+                ),
+                mons = party.mapIndexed { i, m ->
+                    com.pokedaisy.app.companion.data.NuzlockeMon(
+                        m.personality, m.species, m.shownName, m.level, areaName = if (i == 0) "" else "ROUTE 1",
+                        dead = i == 1, diedIn = if (i == 1) "VIRIDIAN FOREST" else "", diedLevel = if (i == 1) m.level else 0,
+                    )
+                },
+            ),
+        )
+        try {
+            snapshot {
+                CompanionScreen(SampleCompanion.snapshot.copy(party = party, regionMapSectionId = 88), SampleCompanion.Slots, SampleCompanion.Settings(barTabs), initialTab = tab)
+            }
+        } finally {
+            com.pokedaisy.app.companion.Nuzlocke.load(false, null, {}, {})
+        }
     }
 
     /** SETTINGS > STATUS BAR > COMPANION: the game's status bar over the tabs. */
@@ -358,6 +397,12 @@ open class CompanionScreenshotTest {
     }
 
     /** TAKE (FieldItems.kt): CHARMANDER holds a LEFTOVERS, so the summary's bottom row has TAKE with its icon... */
+    /** SWITCH: the party in the summary's place, the Pokémon being moved selected. */
+    @Test fun partyDetailSwitch() = snapshot {
+        val use = object : com.pokedaisy.app.companion.ItemUse by takeUse { override fun canReorderParty() = true }
+        AppTheme { MonDetailScreen(takeParty, 0, {}, {}, itemUse = use, initialSwitching = true) }
+    }
+
     @Test fun partyDetailTake() = snapshot { AppTheme { MonDetailScreen(takeParty, 0, {}, {}, itemUse = takeUse) } }
 
     /** ...and pops up what it did, like the bag's USE / GIVE. */
@@ -367,6 +412,19 @@ open class CompanionScreenshotTest {
 
     /** ...which asks first. */
     @Test fun partyDetailTakeAsk() = snapshot { AppTheme { MonDetailScreen(takeParty, 0, {}, {}, itemUse = takeUse, initialTakeAsk = true) } }
+
+    /** TRADE EVOLUTIONS (TradeEvolution.kt): the game says the lead would evolve by trade, so its summary has EVOLVE... */
+    @Test fun partyDetailTradeEvolve() = snapshot { AppTheme { MonDetailScreen(takeParty, 0, {}, {}, itemUse = evolveUse) } }
+
+    /** ...which asks first. */
+    @Test fun partyDetailTradeEvolveAsk() = snapshot { AppTheme { MonDetailScreen(takeParty, 0, {}, {}, itemUse = evolveUse, initialEvolveAsk = true) } }
+
+    private val evolveUse = object : com.pokedaisy.app.companion.ItemUse {
+        override fun canUse(itemId: Int) = false
+        override fun use(itemId: Int, done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) {}
+        override fun canTradeEvolve() = true
+        override fun tradeEvolveTargets(done: (Map<Long, Int>) -> Unit) = done(mapOf(1L to 5))
+    }
 
     private val takeParty get() = SampleCompanion.snapshot.party.mapIndexed { i, m -> m.copy(personality = i + 1L, iconAsset = spriteAsset("pokemon", m.species)) }
 
@@ -407,6 +465,30 @@ open class CompanionScreenshotTest {
         }
     }
 
+    /** BATTLE STYLE > GEN 5: your turn, then the move plates (the same states the GEN 4 buttons have). */
+    @Test fun battleControlsGen5() = gen5Shot(com.pokedaisy.app.companion.data.BATTLE_INPUT_ACTION_SELECT)
+
+    @Test fun battleControlsGen5Moves() = gen5Shot(com.pokedaisy.app.companion.data.BATTLE_INPUT_MOVE_SELECT)
+
+    @Test fun battleControlsGen5Waiting() = gen5Shot(0)
+
+    private fun gen5Shot(state: Int) = paparazzi.snapshot {
+        AppTheme {
+            val party = SampleCompanion.snapshot.party
+            val input = object : com.pokedaisy.app.companion.BattleInput {
+                override val busy = false
+                override fun selectAction(actionIndex: Int) {}
+                override fun selectMove(moveIndex: Int) {}
+                override fun back() {}
+            }
+            BattleControlsScreen(
+                activeMon = party[0].withMovesVs(party[1]), battleInput = input, battleInputState = state, party = party,
+                modifier = Modifier.padding(12.dp), foeParty = party.take(3),
+                style = com.pokedaisy.app.companion.BattleStyle.GEN5,
+            )
+        }
+    }
+
     @Test
     fun battleInfo() = snapshot {
         AppTheme {
@@ -422,6 +504,10 @@ open class CompanionScreenshotTest {
     /** FOE DETAILS (GitHub #34): the foe's side widened, the player's narrowed to a column. */
     @Test
     fun battleInfoFoeDetails() = trainerBattle(foeDetails = true)
+
+    /** INFO with BATTLE FOCUS on. */
+    @Test
+    fun battleFocus() = trainerBattle(foeDetails = false, focus = true)
 
     /** FOE DETAILS in a double battle: two sprites / HP bars on the player's strip, two foe cards. */
     @Test
@@ -439,7 +525,7 @@ open class CompanionScreenshotTest {
         }
     }
 
-    private fun trainerBattle(foeDetails: Boolean) = snapshot {
+    private fun trainerBattle(foeDetails: Boolean, focus: Boolean = false) = snapshot {
         AppTheme {
             fun foe(species: Int, level: Int, hp: Int, maxHp: Int): MonView {
                 val mu = com.pokedaisy.app.companion.data.typeMatchups(
@@ -462,7 +548,10 @@ open class CompanionScreenshotTest {
             val team = listOf(foe(74, 12, 0, 33), foe(95, 14, 21, 40), foe(74, 12, 33, 33))
             val me = SampleCompanion.snapshot.party[0].withMovesVs(team[1])
                 .let { it.copy(moves = it.moves.mapIndexed { i, mv -> if (i == 1) mv.copy(pp = 0) else mv }) }
-            BattleInfoScreen(
+            if (focus) BattleFocusScreen(
+                team[1], party = SampleCompanion.snapshot.party, battlePlayer = listOf(me), playerBattlers = listOf(0),
+                showHints = true, onBack = {}, foeTeam = team, seenFoes = setOf(0, 1), shownFoe = 1,
+            ) else BattleInfoScreen(
                 listOf(me), listOf(team[1]), isDouble = false, showHints = true, onBack = {}, onShowSuggestions = {},
                 foeTeam = team, seenFoes = setOf(0, 1), shownFoe = 1,
                 foeDetails = foeDetails, onToggleFoeDetails = {},
@@ -616,6 +705,19 @@ open class CompanionScreenshotTest {
     fun dexEmerald() {
         val shot = emeraldDex() ?: return
         snapshot { CompanionScreen(shot, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = "DEX") }
+    }
+
+    /** A caught row says where the save keeps it: PARTY, BOX 3, MISSING. */
+    @Test
+    fun dexHoldingsEmerald() {
+        val shot = emeraldDex() ?: return
+        fun mon(species: Int) = com.pokedaisy.app.companion.data.MonView(species, "", 5, 1, 1, "", emptyList(), null)
+        val boxes = com.pokedaisy.app.companion.data.BoxesView(
+            0, List(3) { i -> com.pokedaisy.app.companion.data.BoxView("BOX ${i + 1}", 0, if (i == 2) listOf(mon(280)) else emptyList()) },
+        )
+        snapshot {
+            CompanionScreen(shot.copy(party = listOf(mon(277)), pcBoxes = boxes), SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = "DEX")
+        }
     }
 
     @Test
@@ -1004,6 +1106,40 @@ open class CompanionScreenshotTest {
     @Test fun teamRocketBattleMenu() = retail("team_rocket_battle", NATIVE_TR, TR_ROM, GameKind.TEAM_ROCKET, "BATTLE", art = true, controls = true)
     @Test fun teamRocketGuideHere() = retailGuide("team_rocket_route", NATIVE_TR, TR_ROM, "HERE", kind = GameKind.TEAM_ROCKET)
     @Test fun teamRocketTrainer() = retail("team_rocket_trainer_next", NATIVE_TR, TR_ROM, GameKind.TEAM_ROCKET, "BATTLE", art = true)
+    // Wishes of Tomorrow: its headless new game (the fixtures' READMEs); Emerald's party slots and bag from its ROM.
+    @Test fun wishesParty() = retail("wishes", NATIVE_WOT, WOT_ROM, GameKind.WISHES, "PARTY", art = true)
+    @Test fun wishesItems() = retail("wishes", NATIVE_WOT, WOT_ROM, GameKind.WISHES, "ITEMS", art = true)
+    @Test fun wishesMap() = retail("wishes", NATIVE_WOT, WOT_ROM, GameKind.WISHES, "MAP", art = true)
+    @Test fun wishesDex() = retail("wishes", NATIVE_WOT, WOT_ROM, GameKind.WISHES, "DEX", art = true)
+    @Test fun wishesDexEntry() = retail("wishes", NATIVE_WOT, WOT_ROM, GameKind.WISHES, "DEX", entry = 155, art = true)
+    @Test fun wishesBattle() = retail("wishes_battle", NATIVE_WOT, WOT_ROM, GameKind.WISHES, "BATTLE", art = true)
+    @Test fun wishesBattleMenu() = retail("wishes_battle", NATIVE_WOT, WOT_ROM, GameKind.WISHES, "BATTLE", art = true, controls = true)
+    @Test fun wishesTrainer() = retail("wishes_trainer", NATIVE_WOT, WOT_ROM, GameKind.WISHES, "BATTLE", art = true)
+    @Test fun wishesMega() = retail("wishes_mega", NATIVE_WOT, WOT_ROM, GameKind.WISHES, "BATTLE", art = true)
+    @Test fun wishesGuideHere() = retailGuide("wishes_route", NATIVE_WOT, WOT_ROM, "HERE", kind = GameKind.WISHES)
+    // Its randomizer: the same route, the wild Pokémon swapped the way this save's game swaps them.
+    @Test fun wishesGuideHereRandom() = retailGuide("wishes_random", NATIVE_WOT, WOT_ROM, "HERE", kind = GameKind.WISHES)
+    // Pokémon Dreamstone Mysteries: Imperium's party grid colours, Emerald's bag, its Cormoria map, its own DEX order.
+    @Test fun dreamstoneParty() = retail("dreamstone", NATIVE_DSM, DSM_ROM, GameKind.DREAMSTONE, "PARTY", art = true)
+    @Test fun dreamstoneItems() = retail("dreamstone", NATIVE_DSM, DSM_ROM, GameKind.DREAMSTONE, "ITEMS", art = true)
+    @Test fun dreamstoneMap() = retail("dreamstone", NATIVE_DSM, DSM_ROM, GameKind.DREAMSTONE, "MAP", art = true)
+    @Test fun dreamstoneDex() = retail("dreamstone", NATIVE_DSM, DSM_ROM, GameKind.DREAMSTONE, "DEX", art = true)
+    @Test fun dreamstoneDexEntry() = retail("dreamstone", NATIVE_DSM, DSM_ROM, GameKind.DREAMSTONE, "DEX", entry = 152, art = true)
+    @Test fun dreamstoneBattle() = retail("dreamstone_battle", NATIVE_DSM, DSM_ROM, GameKind.DREAMSTONE, "BATTLE", art = true)
+    @Test fun dreamstoneBattleMenu() = retail("dreamstone_battle", NATIVE_DSM, DSM_ROM, GameKind.DREAMSTONE, "BATTLE", art = true, controls = true)
+    @Test fun dreamstoneTrainer() = retail("dreamstone_trainer_next", NATIVE_DSM, DSM_ROM, GameKind.DREAMSTONE, "BATTLE", art = true)
+    @Test fun dreamstoneGuideHere() = retailGuide("dreamstone_route", NATIVE_DSM, DSM_ROM, "HERE", kind = GameKind.DREAMSTONE)
+    @Test fun dreamstoneGuideBoss() = retailGuide("dreamstone", NATIVE_DSM, DSM_ROM, "NEXT BOSS", kind = GameKind.DREAMSTONE)
+    // Pokémon Monomyth: its own party grid and bag colours, its names, natures and battle structs; NEXT BOSS / HERE.
+    @Test fun monomythParty() = retail("monomyth", NATIVE_MMY, MMY_ROM, GameKind.MONOMYTH, "PARTY", art = true)
+    @Test fun monomythItems() = retail("monomyth", NATIVE_MMY, MMY_ROM, GameKind.MONOMYTH, "ITEMS", art = true)
+    @Test fun monomythDex() = retail("monomyth", NATIVE_MMY, MMY_ROM, GameKind.MONOMYTH, "DEX", art = true)
+    @Test fun monomythDexEntry() = retail("monomyth", NATIVE_MMY, MMY_ROM, GameKind.MONOMYTH, "DEX", entry = 7, art = true)
+    @Test fun monomythMap() = retail("monomyth", NATIVE_MMY, MMY_ROM, GameKind.MONOMYTH, "MAP", art = true)
+    @Test fun monomythBattle() = retail("monomyth_battle", NATIVE_MMY, MMY_ROM, GameKind.MONOMYTH, "BATTLE", art = true)
+    @Test fun monomythBattleMenu() = retail("monomyth_battle", NATIVE_MMY, MMY_ROM, GameKind.MONOMYTH, "BATTLE", art = true, controls = true)
+    @Test fun monomythTrainer() = retail("monomyth_trainer_next", NATIVE_MMY, MMY_ROM, GameKind.MONOMYTH, "BATTLE", art = true)
+    @Test fun monomythGuideBoss() = retailGuide("monomyth", NATIVE_MMY, MMY_ROM, "NEXT BOSS", kind = GameKind.MONOMYTH)
     // Ghost Grey: its 1.0.3 save in v1.0.4 (the fixtures' READMEs), its grey map from the ROM.
     @Test fun ghostGreyParty() = retail("ghost_grey", NATIVE_GG, GG_ROM, GameKind.FIRERED, "PARTY", art = true)
     @Test fun ghostGreyItems() = retail("ghost_grey", NATIVE_GG, GG_ROM, GameKind.FIRERED, "ITEMS", art = true)
@@ -1012,6 +1148,15 @@ open class CompanionScreenshotTest {
     @Test fun ghostGreyDexEntry() = retail("ghost_grey", NATIVE_GG, GG_ROM, GameKind.FIRERED, "DEX", entry = 12, art = true)
     @Test fun ghostGreyGuideBoss() = retailGuide("ghost_grey", NATIVE_GG, GG_ROM, "NEXT BOSS", kind = GameKind.FIRERED)
     @Test fun ghostGreyGuideHere() = retailGuide("ghost_grey", NATIVE_GG, GG_ROM, "HERE", kind = GameKind.FIRERED)
+
+    // Let's Go Pikachu: its new game's save (the fixtures' READMEs) - species past FireRed's (FALINKS 413), its dex numbers.
+    @Test fun letsGoParty() = retail("lets_go_pikachu", NATIVE_LETS_GO, LETS_GO_ROM, GameKind.FIRERED, "PARTY", art = true)
+    @Test fun letsGoItems() = retail("lets_go_pikachu", NATIVE_LETS_GO, LETS_GO_ROM, GameKind.FIRERED, "ITEMS", art = true)
+    @Test fun letsGoMap() = retail("lets_go_pikachu", NATIVE_LETS_GO, LETS_GO_ROM, GameKind.FIRERED, "MAP", art = true)
+    @Test fun letsGoBattle() = retail("lets_go_pikachu_battle", NATIVE_LETS_GO, LETS_GO_ROM, GameKind.FIRERED, "BATTLE", art = true)
+    @Test fun letsGoDexEntry() = retail("lets_go_pikachu", NATIVE_LETS_GO, LETS_GO_ROM, GameKind.FIRERED, "DEX", entry = 313, art = true)
+    @Test fun letsGoGuideBoss() = retailGuide("lets_go_pikachu", NATIVE_LETS_GO, LETS_GO_ROM, "NEXT BOSS", kind = GameKind.FIRERED)
+    @Test fun letsGoGuideHere() = retailGuide("lets_go_pikachu", NATIVE_LETS_GO, LETS_GO_ROM, "HERE", kind = GameKind.FIRERED)
     // Sword and Shield Ultimate Plus: Galar on CFRU, its sampled party / bag look, its map from the ROM.
     @Test fun swordShieldParty() = retail("sword_shield_up", NATIVE_SS, SS_ROM, GameKind.SWORD_SHIELD, "PARTY", art = true)
     @Test fun swordShieldItems() = retail("sword_shield_up", NATIVE_SS, SS_ROM, GameKind.SWORD_SHIELD, "ITEMS", art = true)
@@ -1086,7 +1231,57 @@ open class CompanionScreenshotTest {
     @Test fun redMap() = yellow("red", "MAP", cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
     @Test fun redSettings() = yellow("red", "SETTINGS", cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
     @Test fun redDexEntry() = yellow("red", "DEX", dexEntry = 151, cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
+    // PureRed / PureBlue v2.7.6: the retail Red save, converted by the game (the purered / pureblue fixtures).
+    private val pureRedRom = "Pokemon PureRed (v2.7.6).gb"
+    private val pureBlueRom = "Pokemon PureBlue (v2.7.6).gb"
+    private fun pure(fixture: String, tab: String, blue: Boolean = false, controls: Boolean = false, dexEntry: Int? = null) = yellow(
+        fixture, tab, controls = controls, dexEntry = dexEntry,
+        cfg = if (blue) com.pokedaisy.app.companion.data.GEN1_PURE_BLUE else com.pokedaisy.app.companion.data.GEN1_PURE_RED,
+        romFile = if (blue) pureBlueRom else pureRedRom, game = if (blue) GameKind.PURE_BLUE else GameKind.PURE_RED,
+    )
+    // Yellow Legacy v1.0.10 and Crystal Legacy v1.3.1: retail saves, rewritten by scripts/convert_save_legacy.py.
+    private fun yellowLegacy(fixture: String, tab: String, controls: Boolean = false, dexEntry: Int? = null, guidePage: String? = null, onMap: Int? = null) = yellow(
+        fixture, tab, controls = controls, dexEntry = dexEntry, guidePage = guidePage, onMap = onMap,
+        cfg = com.pokedaisy.app.companion.data.GEN1_YELLOW_LEGACY, romFile = "Pokemon Yellow Legacy (v1.0.10).gb", game = GameKind.YELLOW_LEGACY,
+    )
+    @Test fun yellowLegacyParty() = yellowLegacy("yellow_legacy", "PARTY")
+    @Test fun yellowLegacyItems() = yellowLegacy("yellow_legacy", "ITEMS")
+    @Test fun yellowLegacyMap() = yellowLegacy("yellow_legacy", "MAP")
+    @Test fun yellowLegacyDexEntry() = yellowLegacy("yellow_legacy", "DEX", dexEntry = 25)
+    @Test fun yellowLegacyBattle() = yellowLegacy("yellow_legacy_battle", "BATTLE")
+    @Test fun yellowLegacyBattleMoves() = yellowLegacy("yellow_legacy_battle", "BATTLE", controls = true)
+    @Test fun yellowLegacyGuideRoute() = yellowLegacy("yellow_legacy", "GUIDE", guidePage = "HERE", onMap = 12)
+    @Test fun yellowLegacyGuideNextBoss() = yellowLegacy("yellow_legacy", "GUIDE", guidePage = "NEXT BOSS")
+    @Test fun crystalLegacyParty() = crystal("crystal_legacy", "PARTY", legacy = true)
+    @Test fun crystalLegacyItems() = crystal("crystal_legacy", "ITEMS", legacy = true)
+    @Test fun crystalLegacyMap() = crystal("crystal_legacy", "MAP", legacy = true)
+    @Test fun crystalLegacyDexEntry() = crystal("crystal_legacy", "DEX", dexEntry = 152, legacy = true)
+    @Test fun crystalLegacyBattle() = crystal("crystal_legacy_battle", "BATTLE", legacy = true)
+    @Test fun crystalLegacyBattleMoves() = crystal("crystal_legacy_battle", "BATTLE", controls = true, legacy = true)
+    @Test fun crystalLegacyGuideHere() = crystal("crystal_legacy", "GUIDE", guidePage = "HERE", legacy = true)
+    @Test fun crystalLegacyGuideNextBoss() = crystal("crystal_legacy", "GUIDE", guidePage = "NEXT BOSS", legacy = true)
+    @Test fun pureRedParty() = pure("purered", "PARTY")
+    @Test fun pureRedItems() = pure("purered", "ITEMS")
+    @Test fun pureRedMap() = pure("purered", "MAP")
+    @Test fun pureRedDex() = pure("purered", "DEX")
+    @Test fun pureRedDexEntry() = pure("purered", "DEX", dexEntry = 1)
+    @Test fun pureRedBattle() = pure("purered_battle", "BATTLE")
+    @Test fun pureRedBattleMoves() = pure("purered_battle", "BATTLE", controls = true)
+    @Test fun pureBlueParty() = pure("pureblue", "PARTY", blue = true)
+    @Test fun pureBlueMap() = pure("pureblue", "MAP", blue = true)
+    @Test fun pureBlueDexEntry() = pure("pureblue", "DEX", blue = true, dexEntry = 100)
     @Test fun yellowParty() = yellow("yellow", "PARTY")
+    // The GUIDE (a player's request): HERE in VERMILION CITY (its people and items), on ROUTE 1 and in VIRIDIAN FOREST
+    // (the wild Pokémon, caught ones marked), NEXT BOSS, the generated WHERE IS; Red's HERE on ROUTE 1 too.
+    @Test fun yellowGuide() = yellow("yellow", "GUIDE", guidePage = "HERE")
+    @Test fun yellowGuideRoute() = yellow("yellow", "GUIDE", guidePage = "HERE", onMap = 12)
+    @Test fun yellowGuideForest() = yellow("yellow", "GUIDE", guidePage = "HERE", onMap = 51)
+    @Test fun yellowGuideNextBoss() = yellow("yellow", "GUIDE", guidePage = "NEXT BOSS")
+    @Test fun yellowGuideWhereIs() = yellow("yellow", "GUIDE", guidePage = "WHERE IS")
+    @Test fun yellowGuideGerman() = yellow("yellow_de", "GUIDE", guidePage = "HERE", onMap = 12, cfg = com.pokedaisy.app.companion.data.GEN1_YELLOW_DE,
+        romFile = yellowDeRom)
+    @Test fun redGuideRoute() = yellow("red", "GUIDE", guidePage = "HERE", onMap = 12, cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
+    @Test fun redGuideNextBoss() = yellow("red", "GUIDE", guidePage = "NEXT BOSS", cfg = com.pokedaisy.app.companion.data.GEN1_RED, romFile = redRom, game = GameKind.RED)
     /** A Normal / Flying summary (all three matchup groups) in Yellow's taller font, under the tab bar: its headings sit on
      * their chips' lines there, and once were clipped to a chip's height. */
     @Test fun yellowPartyDetail() = yellow("yellow", "PARTY", monIndex = 4)
@@ -1129,6 +1324,9 @@ open class CompanionScreenshotTest {
     @Test fun silverParty() = crystal("silver", "PARTY", silver = true)
     @Test fun silverDexEntry() = crystal("silver", "DEX", dexEntry = 155, silver = true)
     @Test fun crystalParty() = crystal("crystal", "PARTY")
+    @Test fun crystalGuide() = crystal("crystal", "GUIDE", guidePage = "HERE")
+    @Test fun crystalGuideNextBoss() = crystal("crystal", "GUIDE", guidePage = "NEXT BOSS")
+    @Test fun crystalGuideWhereIs() = crystal("crystal", "GUIDE", guidePage = "WHERE IS")
     @Test fun crystalItems() = crystal("crystal", "ITEMS")
     @Test fun crystalBattle() = crystal("crystal_battle", "BATTLE")
     @Test fun crystalBattleMenu() = crystal("crystal_battle_menu", "BATTLE", controls = true)
@@ -1185,6 +1383,11 @@ open class CompanionScreenshotTest {
     @Test fun soulGoldV12bParty() = retail("soulgold_v12b_battle", NATIVE_SOULGOLD_V1_2B, SG12B_ROM, GameKind.SOULGOLD, "PARTY", art = true)
     @Test fun soulGoldV12bItems() = retail("soulgold_v12b", NATIVE_SOULGOLD_V1_2B, SG12B_ROM, GameKind.SOULGOLD, "ITEMS", art = true)
     @Test fun soulGoldV12bDexEntry() = hackDex("soulgold_v12b", NATIVE_SOULGOLD_V1_2B, SG12B_ROM, GameKind.SOULGOLD, 25)
+    @Test fun soulGoldV121Party() = retail("soulgold_v121_battle", NATIVE_SOULGOLD_V1_2_1, SG121_ROM, GameKind.SOULGOLD, "PARTY", art = true)
+    @Test fun soulGoldV121Items() = retail("soulgold_v121", NATIVE_SOULGOLD_V1_2_1, SG121_ROM, GameKind.SOULGOLD, "ITEMS", art = true)
+    @Test fun soulGoldV121Battle() = retail("soulgold_v121_battle", NATIVE_SOULGOLD_V1_2_1, SG121_ROM, GameKind.SOULGOLD, "BATTLE", art = true)
+    @Test fun soulGoldV121Map() = retail("soulgold_v121", NATIVE_SOULGOLD_V1_2_1, SG121_ROM, GameKind.SOULGOLD, "MAP", art = true)
+    @Test fun soulGoldV121DexEntry() = hackDex("soulgold_v121", NATIVE_SOULGOLD_V1_2_1, SG121_ROM, GameKind.SOULGOLD, 25)
     @Test fun soulGoldDex() = hackDex("soulgold", NATIVE_SOULGOLD, SG_ROM, GameKind.SOULGOLD)
     @Test fun soulGoldDexEntry() = hackDex("soulgold", NATIVE_SOULGOLD, SG_ROM, GameKind.SOULGOLD, 155)
 
@@ -1197,6 +1400,9 @@ open class CompanionScreenshotTest {
         game: GameKind = GameKind.YELLOW,
         /** PARTY with this slot's summary open. */
         monIndex: Int? = null,
+        guidePage: String? = null,
+        /** The save as if it stood on this map (wCurMap): the fixtures are all in a Pokémon Center. */
+        onMap: Int? = null,
     ) {
         activeGame = game
         romLanguage = cfg.language   // another test's ROM may have left Japanese names on
@@ -1205,6 +1411,7 @@ open class CompanionScreenshotTest {
         if (rom.isFile) com.pokedaisy.app.companion.data.Gen1Art.extractTo(rom.readBytes(), RomArt.dirOverride!!)
         com.pokedaisy.app.companion.data.Gen1Dex.rom = if (rom.isFile) rom.readBytes() else null
         val t = com.pokedaisy.app.companion.data.readGen1Telemetry(FixtureMemoryReader.load(fixture), cfg)
+            .let { if (onMap == null) it else it.copy(mapNum = onMap, regionMapSectionId = onMap) }
         val v = buildSnapshotView(t).copy(game = game)
         // The icon sheets load asynchronously in the app; decode them before the snapshot.
         (v.party + v.battlePlayer + v.battleOpponent).forEach { m -> m.iconAsset?.let { GameArt.get(paparazzi.context, it) } }
@@ -1217,6 +1424,26 @@ open class CompanionScreenshotTest {
         }
         val dex = v.pokedex
         if (dex != null) (1..12).forEach { PokedexSource.entry(dex.tables, it); PokedexSource.frontSprite(dex.tables, it) }
+        if (guidePage != null) {
+            val world = gameGuide(guideId(game, null))!!.world!!
+            val here = world.encounters(v.mapGroup, v.mapNum, v.progress)
+            val teams = gameGuide(guideId(game, null))?.bosses.orEmpty().flatMap { b -> v.progress?.let { p -> b.trainers(p).flatMap { world.party(it, p) } }.orEmpty() }
+            ((here.grass + here.water + here.oldRod + here.goodRod + here.superRod).map { it.species } + teams.map { it.species })
+                .forEach { sp -> com.pokedaisy.app.companion.data.spriteAsset("pokemon", sp)?.let { GameArt.get(paparazzi.context, it) } }
+            snapshot {
+                AppTheme {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        com.pokedaisy.app.companion.ui.theme.LocalGameFont provides com.pokedaisy.app.companion.ui.theme.rememberGameFont(game),
+                        com.pokedaisy.app.companion.ui.theme.LocalGameTextScale provides com.pokedaisy.app.companion.ui.theme.gameTextScale(game),
+                        com.pokedaisy.app.companion.ui.theme.LocalGameFontWidth provides com.pokedaisy.app.companion.ui.theme.gameFontWidth(game),
+                    ) {
+                        val ui = androidx.compose.runtime.remember { GuideUiState().apply { this.page = guidePage } }
+                        GuideScreen(rememberGuide(v.game, v.pokedex, v.guideTables)!!, ui, v)
+                    }
+                }
+            }
+            return
+        }
         if (dexEntry != null && dex != null) {
             PokedexSource.entry(dex.tables, dexEntry); PokedexSource.frontSprite(dex.tables, dexEntry)
             snapshot {
@@ -1248,10 +1475,10 @@ open class CompanionScreenshotTest {
     private fun crystal(fixture: String, tab: String, controls: Boolean = false, dexEntry: Int? = null, statusBar: Boolean = false,
                         clear: Boolean = false, prism: Boolean = false, gold: Boolean = false, silver: Boolean = false,
                         polished: Boolean = false, describe: Boolean = false, guidePage: String? = null,
-                        guideOpen: Pair<String, Int>? = null) {
-        val game = if (polished) GameKind.POLISHED_CRYSTAL else if (prism) GameKind.PRISM else if (clear) GameKind.CRYSTAL_CLEAR else if (gold) GameKind.GOLD
+                        guideOpen: Pair<String, Int>? = null, legacy: Boolean = false) {
+        val game = if (legacy) GameKind.CRYSTAL_LEGACY else if (polished) GameKind.POLISHED_CRYSTAL else if (prism) GameKind.PRISM else if (clear) GameKind.CRYSTAL_CLEAR else if (gold) GameKind.GOLD
             else if (silver) GameKind.SILVER else GameKind.CRYSTAL
-        var cfg = if (polished) com.pokedaisy.app.companion.data.GEN2_POLISHED_CRYSTAL
+        var cfg = if (legacy) com.pokedaisy.app.companion.data.GEN2_CRYSTAL_LEGACY else if (polished) com.pokedaisy.app.companion.data.GEN2_POLISHED_CRYSTAL
             else if (prism) com.pokedaisy.app.companion.data.GEN2_PRISM
             else if (clear) com.pokedaisy.app.companion.data.GEN2_CRYSTAL_CLEAR_V2_6_0
             else if (gold) com.pokedaisy.app.companion.data.GEN2_GOLD else if (silver) com.pokedaisy.app.companion.data.GEN2_SILVER
@@ -1261,7 +1488,8 @@ open class CompanionScreenshotTest {
         romLanguage = 'E'
         romGameCode = ""
         val rom = java.io.File(java.io.File(RETAIL_ROM_DIR).parentFile,
-            if (polished) "gbc/polishedcrystal-3.2.3.gbc"
+            if (legacy) "gbc/Pokemon Crystal Legacy (v1.3.1).gbc"
+            else if (polished) "gbc/Pokemon Polished Crystal (v3.2.3).gbc"
             else if (prism) "gbc/Pokemon Prism (v0.95 build 254 Hotfix 5).gbc"
             else if (gold) "gbc/Pokemon - Gold Version (USA, Europe) (SGB Enhanced) (GB Compatible).gbc"
             else if (silver) "gbc/Pokemon - Silver Version (USA, Europe) (SGB Enhanced) (GB Compatible).gbc"
@@ -1290,7 +1518,7 @@ open class CompanionScreenshotTest {
         listOf(16, 97, 152, 161).forEach { warm(it) }
         if (guidePage != null) {
             // The guide's own icons (HERE's wild Pokémon, the bosses' teams), loaded as the app's tab would have them.
-            val world = com.pokedaisy.app.companion.data.PolishedCrystalWorld
+            val world = gameGuide(guideId(game, null))!!.world!!
             val here = world.encounters(v.mapGroup, v.mapNum, v.progress)
             val teams = gameGuide(guideId(game, null))?.bosses.orEmpty().take(3).flatMap { b -> v.progress?.let { world.party(b.trainer(it), it) }.orEmpty() }
             ((here.grass + here.headbutt + here.headbuttRare).map { it.species } + teams.map { it.species })
@@ -1357,6 +1585,12 @@ open class CompanionScreenshotTest {
         learn: Boolean = false, tmRow: Boolean = false,
         /** The battle tab's touch controls (FIGHT / BAG / POKéMON / RUN), with a battle input to drive. */
         controls: Boolean = false,
+        /** BOXES: SWAP's animation over the tab at this moment (ms), the box's first Pokémon trading with the party's lead. */
+        swapAnimAt: Long? = null,
+        /** With [swapAnimAt]: "swap", or "deposit" (the party's second into the box) / "withdraw" (the box's first out). */
+        pcMove: String = "swap",
+        /** A summary with the PC's button: "deposit" (the party's second), "pick" (its box pick), "withdraw" (the box's first). */
+        summary: String? = null,
     ) {
         val rom = RomFileReader.load(RETAIL_ROM_DIR + romFile) ?: return
         if (art) RomArt.extractTo(java.io.File(RETAIL_ROM_DIR + romFile).readBytes(), RomArt.dirOverride!!)
@@ -1386,6 +1620,18 @@ open class CompanionScreenshotTest {
             (if (dex == null) emptyList() else (1..10).map { PokedexSource.speciesFor(dex.tables, it) } +
                 (PokedexSource.regionalOrder(dex.tables) ?: IntArray(0)).take(10).map { PokedexSource.speciesFor(dex.tables, it) }))
             .forEach { DecompIconSource.get(it) }
+        // BOXES: every box Pokémon's icon, and PKMN DATA's first picture.
+        t.pcBoxes?.boxes?.flatMap { it.mons }?.filterNotNull()?.forEach { DecompIconSource.get(it.species) }
+        if (dex != null) t.pcBoxes?.boxes?.get(t.pcBoxes!!.currentBox)?.mons?.firstOrNull { it != null }?.let { PokedexSource.frontSprite(dex.tables, it.species) }
+        val swapBoxMon = v.pcBoxes?.let { b -> b.boxes[b.currentBox].mons.firstOrNull { it != null } }
+        val boxName = v.pcBoxes?.let { b -> b.boxes[b.currentBox].name }.orEmpty()
+        val ok = com.pokedaisy.app.companion.data.BoxSwapResult.SWAPPED
+        val pcAnim = when (pcMove) {
+            "deposit" -> BoxSwapAnim(null, v.party[1], boxName, boxDepositMessage(ok, v.party[1], boxName))
+            "withdraw" -> swapBoxMon?.let { BoxSwapAnim(it, null, boxName, boxWithdrawMessage(ok, it, boxName)) }
+            else -> swapBoxMon?.let { BoxSwapAnim(it, v.party.first(), boxName, boxSwapMessage(ok, it, v.party.first(), boxName)) }
+        }
+        if (swapAnimAt != null && dex != null) listOfNotNull(pcAnim?.boxMon, pcAnim?.partyMon).forEach { PokedexSource.frontSprite(dex.tables, it.species) }
         v.items.forEach { DecompIconSource.getItem(it.itemId) }
         if (entry != null && dex != null) {
             val species = PokedexSource.speciesFor(dex.tables, entry)
@@ -1417,6 +1663,25 @@ open class CompanionScreenshotTest {
                 )
             }
             else if (describe) AppTheme { ItemsScreen(v.items, androidx.compose.ui.Modifier.fillMaxSize(), initialItemId = v.items.first().itemId) }
+            else if (swapAnimAt != null) androidx.compose.foundation.layout.Box {
+                CompanionScreen(v, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = tab)
+                AppTheme {
+                    BoxSwapAnimation(pcAnim!!, dex?.tables, onDone = {}, at = swapAnimAt)
+                }
+            }
+            else if (summary == "withdraw") AppTheme {
+                MonDetailScreen(boxSummaryList(v.pcBoxes!!.boxes[v.pcBoxes!!.currentBox]), 0, {}, {}, onWithdraw = {})
+            }
+            else if (summary != null) androidx.compose.foundation.layout.Box {
+                // The party summary as the tab opens it, its PC moves on.
+                val pc = object : com.pokedaisy.app.companion.ItemUse {
+                    override fun canUse(itemId: Int) = false
+                    override fun use(itemId: Int, done: (com.pokedaisy.app.companion.data.ItemUseOutcome) -> Unit) = Unit
+                    override fun canSwapBox() = true
+                }
+                CompanionScreen(v, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = tab, initialMonIndex = 1, itemUse = pc)
+                if (summary == "pick") AppTheme { BoxDepositPicker(v.pcBoxes!!, v.party[1], onPick = {}, onDismiss = {}) }
+            }
             else if (entry == null) CompanionScreen(
                 v, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = tab,
                 battleInput = if (!controls) null else object : com.pokedaisy.app.companion.BattleInput {
@@ -1479,7 +1744,7 @@ open class CompanionScreenshotTest {
     @Test fun portFireRedJaDexEntry() = retail("port_bprj1", port("BPRJ1"), ML_FR_JA, GameKind.FIRERED, "DEX", entry = 6)
     @Test fun portRubyJaMap() = retail("port_axvj1", port("AXVJ1"), ML_RU_JA, GameKind.EMERALD, "MAP", art = true)
     @Test fun portRubyJaDex() = retail("port_axvj1", port("AXVJ1"), ML_RU_JA, GameKind.EMERALD, "DEX")
-    @Test fun portRubyEnDex() = retail("port_en_axve1", com.pokedaisy.app.companion.data.NATIVE_RUBY, ML + "Pokemon - Ruby Version (USA, Europe) (Rev 1)/Pokemon - Ruby Version (USA, Europe) (Rev 1).gba", GameKind.EMERALD, "DEX")
+    @Test fun portRubyEnDex() = retail("port_en_axve1", com.pokedaisy.app.companion.data.NATIVE_RUBY, "Pokemon - Ruby Version (USA, Europe) (Rev 1).gba", GameKind.EMERALD, "DEX")
     @Test fun portRubyJaBattle() = retail("port_axvj1/battle", port("AXVJ1"), ML_RU_JA, GameKind.EMERALD, "BATTLE", art = true)
     @Test fun gaiaDex() = hackDex("gaia_dex", NATIVE_GAIA_V3_2, "Pokemon Gaia (v3.2).gba", GameKind.GAIA)
     @Test fun gaiaDexEntry() = hackDex("gaia_dex", NATIVE_GAIA_V3_2, "Pokemon Gaia (v3.2).gba", GameKind.GAIA, 390)
@@ -1527,6 +1792,63 @@ open class CompanionScreenshotTest {
 
     // The dex page's EVOLVE / AREA / MOVES (GitHub #28), each from the game's own ROM and save.
     // The move advice (original games): PARTY > LEARN with a pick, and a TM's party row on ITEMS.
+    // The PC's boxes on FireRed's own box screen (its art rebuilt from the ROM), at every size the subclasses run.
+    @Test fun fireRedBoxes() = retail(
+        "firered_vanilla", NATIVE_FIRERED_REV1.copy(pokemonStoragePtr = NATIVE_FIRERED_REV1.saveBlock2Ptr + 4), FR_ROM, GameKind.FIRERED, "BOXES", art = true,
+    )
+    @Test fun emeraldBoxes() = retail(
+        "emerald_vanilla", NATIVE_EMERALD_RETAIL.copy(pokemonStoragePtr = NATIVE_EMERALD_RETAIL.saveBlock2Ptr + 4), EM_ROM, GameKind.EMERALD, "BOXES", art = true,
+    )
+    @Test fun leafGreenBoxes() = retail(
+        "leafgreen_rev1", NATIVE_LEAFGREEN_REV1.copy(pokemonStoragePtr = NATIVE_LEAFGREEN_REV1.saveBlock2Ptr + 4), LG_ROM, GameKind.FIRERED, "BOXES", art = true,
+    )
+    @Test fun soulGoldBoxes() = retail("soulgold_party", NATIVE_SOULGOLD, SG_ROM, GameKind.SOULGOLD, "BOXES", art = true)
+    @Test fun unboundBoxes() = retail("unbound_boxes", NATIVE_UNBOUND_WITH_DEX, "Pokemon Unbound (v2.1.1.1).gba", GameKind.UNBOUND, "BOXES", art = true)
+    /** SWAP's animation, held at the pictures turning white, the sparks crossing and the landing. */
+    @Test fun fireRedBoxesSwapWhite() = retail(
+        "firered_vanilla", NATIVE_FIRERED_REV1.copy(pokemonStoragePtr = NATIVE_FIRERED_REV1.saveBlock2Ptr + 4), FR_ROM, GameKind.FIRERED, "BOXES", art = true, swapAnimAt = 330,
+    )
+    @Test fun fireRedBoxesSwapCrossing() = retail(
+        "firered_vanilla", NATIVE_FIRERED_REV1.copy(pokemonStoragePtr = NATIVE_FIRERED_REV1.saveBlock2Ptr + 4), FR_ROM, GameKind.FIRERED, "BOXES", art = true, swapAnimAt = 840,
+    )
+    @Test fun fireRedBoxesSwapLanding() = retail(
+        "firered_vanilla", NATIVE_FIRERED_REV1.copy(pokemonStoragePtr = NATIVE_FIRERED_REV1.saveBlock2Ptr + 4), FR_ROM, GameKind.FIRERED, "BOXES", art = true, swapAnimAt = 1250,
+    )
+    @Test fun fireRedBoxesSwapLanded() = retail(
+        "firered_vanilla", NATIVE_FIRERED_REV1.copy(pokemonStoragePtr = NATIVE_FIRERED_REV1.saveBlock2Ptr + 4), FR_ROM, GameKind.FIRERED, "BOXES", art = true, swapAnimAt = 1600,
+    )
+    /** The swap's end: what happened, in a window under the two wells. */
+    @Test fun fireRedBoxesSwapMessage() = retail(
+        "firered_vanilla", NATIVE_FIRERED_REV1.copy(pokemonStoragePtr = NATIVE_FIRERED_REV1.saveBlock2Ptr + 4), FR_ROM, GameKind.FIRERED, "BOXES", art = true, swapAnimAt = 2000,
+    )
+    /** WITHDRAW with room in the party: the box's Pokémon alone, over the top, then its message. */
+    @Test fun fireRedBoxesWithdrawing() = retail(
+        "firered_vanilla", NATIVE_FIRERED_REV1.copy(pokemonStoragePtr = NATIVE_FIRERED_REV1.saveBlock2Ptr + 4), FR_ROM, GameKind.FIRERED, "BOXES", art = true,
+        swapAnimAt = 840, pcMove = "withdraw",
+    )
+    @Test fun fireRedBoxesWithdrawn() = retail(
+        "firered_vanilla", NATIVE_FIRERED_REV1.copy(pokemonStoragePtr = NATIVE_FIRERED_REV1.saveBlock2Ptr + 4), FR_ROM, GameKind.FIRERED, "BOXES", art = true,
+        swapAnimAt = 2000, pcMove = "withdraw",
+    )
+    /** DEPOSIT over the PARTY tab: the party's second into the box, then its message. */
+    @Test fun fireRedPartyDeposited() = retail(
+        "firered_vanilla", NATIVE_FIRERED_REV1.copy(pokemonStoragePtr = NATIVE_FIRERED_REV1.saveBlock2Ptr + 4), FR_ROM, GameKind.FIRERED, "PARTY", art = true,
+        swapAnimAt = 2000, pcMove = "deposit",
+    )
+    /** The summaries with the PC's buttons: a party Pokémon's DEPOSIT (and its box pick), a box one's WITHDRAW; the
+     * Pokémon in a column on the right. */
+    @Test fun fireRedPartySummaryDeposit() = retail(
+        "firered_vanilla", NATIVE_FIRERED_REV1.copy(pokemonStoragePtr = NATIVE_FIRERED_REV1.saveBlock2Ptr + 4), FR_ROM, GameKind.FIRERED, "PARTY", art = true,
+        summary = "deposit",
+    )
+    @Test fun fireRedPartyDepositPick() = retail(
+        "firered_vanilla", NATIVE_FIRERED_REV1.copy(pokemonStoragePtr = NATIVE_FIRERED_REV1.saveBlock2Ptr + 4), FR_ROM, GameKind.FIRERED, "PARTY", art = true,
+        summary = "pick",
+    )
+    @Test fun fireRedBoxSummaryWithdraw() = retail(
+        "firered_vanilla", NATIVE_FIRERED_REV1.copy(pokemonStoragePtr = NATIVE_FIRERED_REV1.saveBlock2Ptr + 4), FR_ROM, GameKind.FIRERED, "BOXES", art = true,
+        summary = "withdraw",
+    )
     @Test fun fireRedLearn() = retail("firered_vanilla", NATIVE_FIRERED_REV1, FR_ROM, GameKind.FIRERED, "PARTY", art = true, learn = true)
     @Test fun fireRedTmRow() = retail("firered_vanilla", NATIVE_FIRERED_REV1, FR_ROM, GameKind.FIRERED, "ITEMS", art = true, tmRow = true)
     @Test fun emeraldLearn() = retail("emerald_vanilla", NATIVE_EMERALD_RETAIL, EM_ROM, GameKind.EMERALD, "PARTY", art = true, learn = true)
@@ -1603,6 +1925,21 @@ open class CompanionScreenshotTest {
 
     @Test fun mapFly() = snapshot {
         CompanionScreen(flyer, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = "MAP", fly = flyAction)
+    }
+
+    /** FREE FLIGHT (Flight.kt): TAKE OFF under FLY, in FLY's blue... */
+    @Test fun mapTakeOff() = snapshot {
+        CompanionScreen(flyer, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = "MAP", fly = object : com.pokedaisy.app.companion.FlyAction by flyAction {
+            override fun canFreeFlight() = true
+        })
+    }
+
+    /** ... which reads LAND while up. */
+    @Test fun mapLand() = snapshot {
+        CompanionScreen(flyer, SampleCompanion.Slots, SampleCompanion.Settings(), initialTab = "MAP", fly = object : com.pokedaisy.app.companion.FlyAction by flyAction {
+            override fun canFreeFlight() = true
+            override fun flying() = true
+        })
     }
 
     /** ... which lists the towns visited (PALLET, VIRIDIAN, PEWTER, CERULEAN), the flyer by the title. */
@@ -1772,23 +2109,23 @@ open class CompanionScreenshotTest {
 /** Fake companion inputs for screenshots / previews. */
 private const val LG_ROM = "Pokemon - LeafGreen Version (USA, Europe) (Rev 1).gba"
 private const val RUBY_ROM = "Pokemon - Ruby Version (USA, Europe) (Rev 1).gba"
-private const val RR_ROM = "1636 - Pokemon Radical Red.gba"
+private const val RR_ROM = "Pokemon Radical Red (v4.1).gba"
 private const val SG_ROM = "Pokemon SoulGold (v1.1.4).gba"
 private const val SG12_ROM = "Pokemon SoulGold (v1.2).gba"
 private const val SG12B_ROM = "Pokemon SoulGold (v1.2) (Alt 1).gba"
+private const val SG121_ROM = "Pokemon SoulGold (v1.2.1).gba"
 private const val AM141_ROM = "Pokemon Amethyst (v1.4.1).gba"
-private const val EM_ES_ROM = "emerald-multilang/Pokemon - Edicion Esmeralda (Spain).gba"
-private const val EM_DE_ROM = "emerald-multilang/Pokemon - Smaragd-Edition (Germany).gba"
-private const val EM_FR_ROM = "emerald-multilang/Pokemon - Version Emeraude (France).gba"
-private const val EM_IT_ROM = "emerald-multilang/Pokemon - Versione Smeraldo (Italy).gba"
-private const val EM_JA_ROM = "emerald-multilang/Pocket Monsters - Emerald (Japan).gba"
-// The other-language FireRed / LeafGreen / Ruby / Sapphire ROMs, beside the retail dir.
-private const val ML = "../../Pokemon Multi Language/"
-private const val ML_FR_DE = ML + "Pokemon - Feuerrote Edition (Germany)/Pokemon - Feuerrote Edition (Germany).gba"
-private const val ML_LG_ES = ML + "Pokemon - Edicion Verde Hoja (Spain)/Pokemon - Edicion Verde Hoja (Spain).gba"
-private const val ML_SA_FR = ML + "Pokemon - Version Saphir (France) (Rev 1)/Pokemon - Version Saphir (France) (Rev 1).gba"
-private const val ML_FR_JA = ML + "Pocket Monsters - FireRed (Japan) (Rev 1)/Pocket Monsters - FireRed (Japan) (Rev 1).gba"
-private const val ML_RU_JA = ML + "Pocket Monsters - Ruby (Japan) (Rev 1)/Pocket Monsters - Ruby (Japan) (Rev 1).gba"
+// The other-language ROMs sit in the retail dir with the English ones.
+private const val EM_ES_ROM = "Pokemon - Edicion Esmeralda (Spain).gba"
+private const val EM_DE_ROM = "Pokemon - Smaragd-Edition (Germany).gba"
+private const val EM_FR_ROM = "Pokemon - Version Emeraude (France).gba"
+private const val EM_IT_ROM = "Pokemon - Versione Smeraldo (Italy).gba"
+private const val EM_JA_ROM = "Pocket Monsters - Emerald (Japan).gba"
+private const val ML_FR_DE = "Pokemon - Feuerrote Edition (Germany).gba"
+private const val ML_LG_ES = "Pokemon - Edicion Verde Hoja (Spain).gba"
+private const val ML_SA_FR = "Pokemon - Version Saphir (France) (Rev 1).gba"
+private const val ML_FR_JA = "Pocket Monsters - FireRed (Japan) (Rev 1).gba"
+private const val ML_RU_JA = "Pocket Monsters - Ruby (Japan) (Rev 1).gba"
 private fun port(key: String) = com.pokedaisy.app.companion.data.RETAIL_PORTS.getValue(key)()
 private const val SEAGLASS_ROM = "Pokemon Emerald Seaglass (v3.0).gba"
 private const val LAZARUS_ROM = "Pokemon Lazarus (v2.0).gba"
@@ -1812,11 +2149,19 @@ private const val AG_ROM = "Pokemon Ash Gray (v4.5.3).gba"
 private val NATIVE_RE get() = com.pokedaisy.app.companion.data.NATIVE_ROCKET_EDITION
 private val NATIVE_AG get() = com.pokedaisy.app.companion.data.NATIVE_ASH_GRAY
 private const val GG_ROM = "Pokemon Ghost Grey (v1.0.4).gba"
+private const val LETS_GO_ROM = "Pokemon Let's Go Pikachu.gba"
 private const val ER_ROM = "Pokemon Elite Redux (2.65.4.1b).gba"
 private const val TR_ROM = "Pokemon Team Rocket Dragonsden Version.gba"
+private const val DSM_ROM = "Pokemon Dreamstone Mysteries.gba"
+private val NATIVE_DSM get() = com.pokedaisy.app.companion.data.NATIVE_DREAMSTONE
+private const val MMY_ROM = "Pokemon Monomyth (v1.0).gba"
+private val NATIVE_MMY get() = com.pokedaisy.app.companion.data.NATIVE_MONOMYTH
 private val NATIVE_TR get() = com.pokedaisy.app.companion.data.NATIVE_TEAM_ROCKET
+private const val WOT_ROM = "Pokemon Wishes of Tomorrow (v1.2.6).gba"
+private val NATIVE_WOT get() = com.pokedaisy.app.companion.data.NATIVE_WISHES
 private val NATIVE_ER get() = com.pokedaisy.app.companion.data.NATIVE_ELITE_REDUX_V2_65_4_1B
 private val NATIVE_GG get() = com.pokedaisy.app.companion.data.NATIVE_GHOST_GREY
+private val NATIVE_LETS_GO get() = com.pokedaisy.app.companion.data.NATIVE_LETS_GO_PIKACHU
 private val NATIVE_SS get() = com.pokedaisy.app.companion.data.NATIVE_SWORD_SHIELD
 private const val RY_ROM = "Pokemon Recharged Yellow (v1.9.7).gba"
 private const val RY180_ROM = "Pokemon Recharged Yellow (v1.8.0).gba"
@@ -1929,6 +2274,7 @@ object SampleCompanion {
         override val currentIndex = 1
         override fun requestSave(index: Int) {}
         override fun requestLoad(index: Int) {}
+        override fun requestDelete(index: Int) {}
         override fun requestUndoSave() {}
         override fun requestUndoLoad() {}
     }
@@ -1944,6 +2290,10 @@ object SampleCompanion {
         private var tabs: List<String> = com.pokedaisy.app.companion.DEFAULT_COMPANION_TABS,
         private var cheatList: List<com.pokedaisy.app.cheats.Cheat> = emptyList(),
     ) : CompanionSettings {
+        override val coopEnabled = true
+        override val coopLiveRefresh = false
+        override val coopState get() = com.pokedaisy.app.companion.coop.CoopSession.link.state.value
+        override val coopRelayValue = "BUILT-IN"
         override val cheats get() = cheatList
         override val cheatsEnabled get() = cheatList.isNotEmpty()
         override val companionTabs get() = tabs
@@ -1962,7 +2312,7 @@ object SampleCompanion {
         override val touchStyle = com.pokedaisy.app.companion.TouchControlsStyle()
         override fun setTouchStyle(style: com.pokedaisy.app.companion.TouchControlsStyle) {}
         override fun gbaControlBindings() = GbaControls.Btn.entries.associateWith {
-        listOf(when (it) { GbaControls.Btn.X -> "BUTTON_X"; GbaControls.Btn.Y -> "BUTTON_Y"; else -> "BUTTON_${it.name}" })
+        listOf(when (it) { GbaControls.Btn.X, GbaControls.Btn.START_2, GbaControls.Btn.TO_COMPANION -> "BUTTON_X"; GbaControls.Btn.Y, GbaControls.Btn.SELECT_2 -> "BUTTON_Y"; else -> "BUTTON_${it.name}" })
     }
         override fun setGbaControlBinding(btn: GbaControls.Btn, keyName: String) {}
         override val hotkeysEnabled = true

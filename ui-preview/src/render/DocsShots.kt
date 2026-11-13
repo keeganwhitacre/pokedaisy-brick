@@ -228,6 +228,7 @@ fun docsCompanion(
     tab: String,
     mon: Int? = null,
     oneTap: Boolean = false,
+    style: com.pokedaisy.app.companion.BattleStyle = com.pokedaisy.app.companion.BattleStyle.GEN4,
     achievements: CompanionAchievements? = null,
     popup: AchievementPopup? = null,
     snap: () -> SnapshotView = { snapshot().withBench() },
@@ -238,7 +239,7 @@ fun docsCompanion(
     val back = com.pokedaisy.app.companion.ui.CompanionBack().also { previewBack = it }
     val content: @Composable () -> Unit = {
         CompanionScreen(
-            sv, FakeSlots(), FakeSettings(true, oneTap = oneTap), FakeBattleInput(false), initialTab = tab, initialMonIndex = mon,
+            sv, FakeSlots(), FakeSettings(true, oneTap = oneTap, style = style), FakeBattleInput(false), initialTab = tab, initialMonIndex = mon,
             back = back, achievements = achievements, initialPopup = popup,
         )
     }
@@ -255,7 +256,7 @@ fun docsShots(all: List<Shot>, bw: Int, bh: Int, bd: Float, tw: Int, th: Int, td
     val reuse = linkedMapOf(
         "library-views" to "library-list", "library-views-gbc" to "library-views", "library-grid" to "library-grid", "library-list-menu" to "library-menu",
         "library-info" to "library-info", "library-sort" to "library-sort", "library-cover-picker" to "library-cover-picker",
-        "library-update" to "library-update", "library-list-phone" to "phone-library",
+        "library-update" to "library-update", "library-list-phone" to "phone-library", "library-tools-open" to "library-tools",
         "setup-roms" to "setup-roms", "setup-saves" to "setup-saves", "setup-buttons" to "setup-buttons", "setup-covers" to "setup-covers",
         "setup-buttons-capture" to "setup-buttons-capture", "game-capture-hotkey" to "game-capture",
         "settings-home" to "settings-home", "settings-search" to "settings-search", "settings-aspect" to "settings-aspect",
@@ -263,8 +264,10 @@ fun docsShots(all: List<Shot>, bw: Int, bh: Int, bd: Float, tw: Int, th: Int, td
         "settings-cheats" to "settings-cheats", "settings-cheats-add" to "settings-cheats-add",
         "settings-retroachievements" to "settings-retroachievements", "settings-coverart" to "settings-coverart",
         "settings-overlay" to "settings-overlay", "settings-theme" to "settings-theme", "overlay-daisy" to "overlay-daisy",
+        "library-theme-cherry" to "library-theme-cherry", "library-seasonal-popup" to "library-seasonal-popup",
         "overlay-bezel" to "overlay-bezel",
         "settings-touch-phone" to "settings-touch-phone", "settings-touch-edit" to "settings-touch-edit",
+        "settings-folders-backups" to "settings-folders-backups",
     )
     val byName = all.associateBy { it.name }
     val top = reuse.mapNotNull { (from, to) ->
@@ -281,6 +284,8 @@ fun docsShots(all: List<Shot>, bw: Int, bh: Int, bd: Float, tw: Int, th: Int, td
         },
         Shot("companion-battle", bw, bh, bd, docsCompanion("PARTY", snap = trainer)),
         Shot("companion-battle-moves", bw, bh, bd, docsCompanion("PARTY") { battle(BATTLE_INPUT_MOVE_SELECT).withBench() }),
+        Shot("companion-battle-gen5", bw, bh, bd, docsCompanion("PARTY", style = com.pokedaisy.app.companion.BattleStyle.GEN5, snap = trainer)),
+        Shot("companion-battle-gen5-moves", bw, bh, bd, docsCompanion("PARTY", style = com.pokedaisy.app.companion.BattleStyle.GEN5) { battle(BATTLE_INPUT_MOVE_SELECT).withBench() }),
         Shot("companion-battle-onetap", bw, bh, bd, docsCompanion("PARTY", oneTap = true) { battle(BATTLE_INPUT_ACTION_SELECT).withBench() }),
         Shot("companion-battle-info", bw, bh, bd, docsCompanion("PARTY", snap = trainer)) { onNodeWithText("INFO").performClick() },
         Shot("companion-battle-suggestions", bw, bh, bd, docsCompanion("PARTY", snap = trainer)) { onNodeWithText("SUGGESTIONS").performClick() },
@@ -308,7 +313,7 @@ fun docsShots(all: List<Shot>, bw: Int, bh: Int, bd: Float, tw: Int, th: Int, td
         )),
         Shot("companion-settings", bw, bh, bd, docsCompanion("SETTINGS")),
         Shot("companion-settings-ffspeed", bw, bh, bd, docsCompanion("SETTINGS")) { onNodeWithText("FF SPEED").performClick() },
-        Shot("companion-settings-companion", bw, bh, bd, docsCompanion("SETTINGS")) { onNodeWithText("ONE-TAP MOVES").performScrollTo() },
+        Shot("companion-settings-companion", bw, bh, bd, docsCompanion("SETTINGS")) { onNodeWithText("BATTLE STYLE").performScrollTo() },
         Shot("companion-settings-tabs", bw, bh, bd, docsCompanion("SETTINGS")) {
             onNodeWithText("TAB BAR").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         },

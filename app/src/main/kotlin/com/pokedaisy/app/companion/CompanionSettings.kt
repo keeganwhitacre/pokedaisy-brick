@@ -46,6 +46,8 @@ interface CompanionSettings {
 
     /** AUTO-RUN: B held while walking (holding it walks) - see [com.pokedaisy.app.Prefs.autoRun]. */
     val autoRun: Boolean get() = false
+    /** The game has its own, on by default ([com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN]): the row says so. */
+    val autoRunBuiltIn: Boolean get() = false
     fun setAutoRun(on: Boolean) {}
 
     /** RUN INDOORS - see [com.pokedaisy.app.Prefs.runIndoors]; [runIndoorsSupported]: a FireRed / Emerald engine the
@@ -60,6 +62,19 @@ interface CompanionSettings {
     fun setWildEncounters(percent: Int) {}
     val wildEncountersSupported: Boolean get() = false
 
+    /** FLY STYLE - see [com.pokedaisy.app.Prefs.flyStyleId]; [flyStyleSupported]: this game has FREE FLIGHT (Flight.kt). */
+    val flyStyle: FlyStyle get() = FlyStyle.CLASSIC
+    fun setFlyStyle(style: FlyStyle) {}
+    val flyStyleSupported: Boolean get() = false
+    /** FLIGHT AREA (where [flyStyleSupported]) - see [com.pokedaisy.app.Prefs.flightAreaId]. */
+    val flightArea: FlightAreaMode get() = FlightAreaMode.SEEN
+    fun setFlightArea(mode: FlightAreaMode) {}
+    /** MAKEOVER > FLY ON (where [flyStyleSupported]): the bird, or a vehicle with the player in it. */
+    val flightVehicle: com.pokedaisy.app.companion.data.FlightVehicle get() = com.pokedaisy.app.companion.data.FlightVehicle.BIRD
+    fun setFlightVehicle(v: com.pokedaisy.app.companion.data.FlightVehicle) {}
+    /** The first scenic FLY's question (ui.FlyStyleAsk) answered: CLASSIC switches, SCENIC / null (it timed out) keeps it. */
+    fun answerFlyStyle(style: FlyStyle?) {}
+
     /** REUSABLE TMS - see [com.pokedaisy.app.Prefs.reusableTms]; [reusableTmsSupported]: the ROM's code that uses a TM
      * up is known ([com.pokedaisy.app.companion.data.ReusableTms]). */
     val reusableTms: Boolean get() = false
@@ -67,6 +82,53 @@ interface CompanionSettings {
     val reusableTmsSupported: Boolean get() = false
     /** The game's own TMs never run out ([com.pokedaisy.app.companion.data.ReusableTms.BUILT_IN]): the row says so. */
     val reusableTmsBuiltIn: Boolean get() = false
+    /** INSTANT TEXT - see [com.pokedaisy.app.Prefs.instantText]; [instantTextSupported]: the ROM's text code is known
+     * ([com.pokedaisy.app.companion.data.InstantText]). */
+    val instantText: Boolean get() = false
+    fun setInstantText(on: Boolean) {}
+    val instantTextSupported: Boolean get() = false
+
+    /** TRADE EVOLUTIONS - see [com.pokedaisy.app.Prefs.tradeEvolutions]; [tradeEvolutionsSupported]: this game's
+     * evolution code is known ([com.pokedaisy.app.companion.data.tradeEvoFor]). */
+    val tradeEvolutions: Boolean get() = false
+    fun setTradeEvolutions(on: Boolean) {}
+    val tradeEvolutionsSupported: Boolean get() = false
+
+    /** DS RESOLUTION ([com.pokedaisy.app.Prefs.dsResolution]): the scale, null when the game isn't a DS one (no row);
+     * [dsGpuAvailable] false = this device can't run the GPU renderer (no OpenGL ES 3.2), so the DS's own it is. */
+    val dsResolution: Int? get() = null
+    val dsGpuAvailable: Boolean get() = true
+    fun setDsResolution(scale: Int) {}
+
+    /** DS CORE ([com.pokedaisy.app.Prefs.dsCore]): null when the game isn't a DS one (no row); taken at the game's next
+     * start. [dsMelonDs]: the game runs on melonDS - on DSperate DS RESOLUTION and DS CPU BOOST are greyed out. */
+    val dsCore: DsCore? get() = null
+    fun setDsCore(core: DsCore) {}
+    val dsMelonDs: Boolean get() = true
+
+    /** DS CPU BOOST ([com.pokedaisy.app.Prefs.dsCpuBoost]): null when the game isn't a DS one (no row). */
+    val dsCpuBoost: Boolean? get() = null
+    fun setDsCpuBoost(on: Boolean) {}
+
+    /** DS TOUCH SCREEN ([com.pokedaisy.app.Prefs.dsTouchFill]): null when there's no row (not a DS game on two screens). */
+    val dsTouchFill: Boolean? get() = null
+    fun setDsTouchFill(on: Boolean) {}
+
+    /** DS LAYOUT ([com.pokedaisy.app.Prefs.dsLayout]): null when there's no row (not a DS game, or one on two screens). */
+    val dsLayout: DsLayout? get() = null
+    fun setDsLayout(layout: DsLayout) {}
+
+    /** NUZLOCKE ([Nuzlocke]): [nuzlockeSupported] = a GBA game whose party and battles are read; the switch is per game. */
+    val nuzlockeSupported: Boolean get() = false
+    val nuzlocke: Boolean get() = false
+    fun setNuzlocke(on: Boolean) {}
+    /** SHINY ODDS: a wild foe is shiny 1 in [shinyOdds] - see [com.pokedaisy.app.Prefs.shinyOdds]; [shinyOddsChoices] the
+     * pick-list's (a debug build's has 1 in 4 and 1 in 1); [shinyOddsSupported]: a version the Poller knows by
+     * its hash ([com.pokedaisy.app.companion.data.ShinyOdds.targetFor]). */
+    val shinyOdds: Int get() = com.pokedaisy.app.companion.data.ShinyOdds.NORMAL
+    fun setShinyOdds(odds: Int) {}
+    val shinyOddsChoices: List<Int> get() = com.pokedaisy.app.companion.data.ShinyOdds.CHOICES
+    val shinyOddsSupported: Boolean get() = false
 
     /** PLAYER LOOK ([com.pokedaisy.app.companion.data.PlayerLook]): [playerLookSupported] = a FireRed / LeafGreen /
      * Emerald game; [playerLooks] = the heroes it can wear now (another game's, kept from the player's own ROMs);
@@ -79,6 +141,9 @@ interface CompanionSettings {
     fun setPlayerLook(look: String?) {}
     /** A PLAYER LOOK pick's name as the row and its tile show it (a hero's, or a Pokémon's in the game). */
     fun playerLookLabel(name: String): String = com.pokedaisy.app.companion.data.LookChar.byName(name)?.label ?: name
+    /** MAKEOVER > RIDE ON (where [playerLookSupported]): the game's bike, or one of our vehicles in its place. */
+    val rideVehicle: com.pokedaisy.app.companion.data.RideVehicle get() = com.pokedaisy.app.companion.data.RideVehicle.BIKE
+    fun setRideVehicle(v: com.pokedaisy.app.companion.data.RideVehicle) {}
     /** RIVAL LOOK: the rival of the other gender ([rivalLookSupported]: Emerald, Ruby, Sapphire) dressed up with the player. */
     val rivalLookSupported: Boolean get() = false
     val rivalLook: Boolean get() = true
@@ -121,6 +186,9 @@ interface CompanionSettings {
     val touchStyle: TouchControlsStyle
     fun setTouchStyle(style: TouchControlsStyle)
 
+    /** TOUCH CONTROLS > SKINS: the imported Delta skins (picked here, imported on the top screen). */
+    val touchSkins: List<InstalledSkin> get() = emptyList()
+
     /** The game's screen as the touch controls see it, for TOUCH CONTROLS' preview; null = laid out like a phone's. */
     val touchStage: TouchStage? get() = null
 
@@ -145,8 +213,12 @@ interface CompanionSettings {
     /** Rebinds a GBA button to a single key, by display name (no "KEYCODE_" prefix). */
     fun setGbaControlBinding(btn: GbaControls.Btn, keyName: String)
 
-    /** Leaves TURBO A / B unbound ([GbaControls.Btn.canClear]). */
+    /** Leaves TURBO A / B and the GBA / Game Boy rows unbound ([GbaControls.Btn.canClear]). */
     fun clearGbaControlBinding(btn: GbaControls.Btn) {}
+
+    /** GAME BUTTONS' rows for the game running besides every game's ([GbaControls.Group.DS] or [GbaControls.Group.GBA]);
+     * null = both groups (previews). */
+    val buttonGroup: GbaControls.Group? get() = null
 
     /** Whether the hotkeys fire at all ([com.pokedaisy.app.Prefs.hotkeysEnabled]). */
     val hotkeysEnabled: Boolean
@@ -187,6 +259,16 @@ interface CompanionSettings {
     /** Puts the companion back on its own screen (the main one, the game back on the second). */
     fun openCompanion() {}
 
+    /** SETTINGS > DISCORD: opens PokeDaisy's Discord server ([Discord.URL]) in the browser or the Discord app. */
+    fun openDiscord() {}
+
+    /** The running game is one its makers asked PokéDaisy not to read ([com.pokedaisy.app.companion.data.BlockedGames]):
+     * SETTINGS shows the emulator's rows only. */
+    val gameBlocked: Boolean get() = false
+
+    /** Opens a web link ([url]) in the browser - a blocked game's button ([com.pokedaisy.app.companion.data.BlockedAction]). */
+    fun openUrl(url: String) {}
+
     /** Whether battle-only strategic hints (move effectiveness chips, foe
      * Weak-to/Resists/Immune-to) are shown — see [Prefs.showHints]. */
     val showHints: Boolean
@@ -199,17 +281,43 @@ interface CompanionSettings {
     /** Saves DARK MODE (an ordinal of DarkModeSetting, see [Prefs.darkMode]); the look itself is DarkMode's state. */
     fun setDarkMode(v: Int) {}
 
+    /** Saves THEME (a ThemeSpec.id, see [Prefs.appTheme]; ui.theme.pickTheme); the screen puts the theme on itself. */
+    fun setAppTheme(id: Int) {}
+
     /** Whether battle INFO has a STATS page with the foe's IVs - see [Prefs.showFoeIvs]. */
     val showFoeIvs: Boolean get() = false
     fun setShowFoeIvs(on: Boolean) {}
+
+    /** BATTLE INFO - see [com.pokedaisy.app.Prefs.battleInfo]. */
+    val battleInfo: Boolean get() = true
+    fun setBattleInfo(on: Boolean) {}
+
+    /** BATTLE VIEW - see [com.pokedaisy.app.Prefs.battleInfoFirst]. */
+    val battleInfoFirst: Boolean get() = false
+    fun setBattleInfoFirst(on: Boolean) {}
+    /** BATTLE VIEW > SUGGESTIONS - see [com.pokedaisy.app.Prefs.battleSuggestionsFirst]. */
+    val battleSuggestionsFirst: Boolean get() = false
+    fun setBattleSuggestionsFirst(on: Boolean) {}
+
+    /** CHALLENGE ICONS - see [com.pokedaisy.app.Prefs.raIcons]. */
+    val raIcons: Boolean get() = true
+    fun setRaIcons(on: Boolean) {}
 
     /** ONE-TAP MOVES - see [Prefs.oneTapMoves]. */
     val oneTapMoves: Boolean get() = false
     fun setOneTapMoves(on: Boolean) {}
 
+    /** BATTLE STYLE - see [Prefs.battleStyle]. */
+    val battleStyle: BattleStyle get() = BattleStyle.GEN4
+    fun setBattleStyle(style: BattleStyle) {}
+
     /** Whether battle INFO shows FOE DETAILS - see [Prefs.foeDetails]. */
     val foeDetails: Boolean get() = false
     fun setFoeDetails(on: Boolean) {}
+
+    /** See [Prefs.battleFocus]. */
+    val battleFocus: Boolean get() = false
+    fun setBattleFocus(on: Boolean) {}
 
     /** Whether a launch picks up where the game was left - see [Prefs.autoResume]; off, CLOSE GAME warns. */
     val autoResume: Boolean get() = true
@@ -250,6 +358,16 @@ interface CompanionSettings {
     val quickMenuLabels: Boolean get() = true
     fun setQuickMenuLabels(on: Boolean) {}
 
+    /** SOUND > GAME VOLUME, in percent of the device's volume (100 = the device's) - see [Prefs.gameVolume]. */
+    val gameVolume: Int get() = 100
+    fun setGameVolume(percent: Int) {}
+    /** SOUND > MUTE GAME (also the MUTE hotkey) - see [Prefs.gameMuted]. */
+    val gameMuted: Boolean get() = false
+    fun setGameMuted(on: Boolean) {}
+    /** SOUND > AUDIO EFFECTS: the device's audio effects on the game's sound, from its next start - see [Prefs.audioEffects]. */
+    val audioEffects: Boolean get() = false
+    fun setAudioEffects(on: Boolean) {}
+
     /** FPS / CPU over the game's corner - see [Prefs.showPerformance]. */
     val showPerformance: Boolean get() = false
     fun setShowPerformance(on: Boolean) {}
@@ -261,6 +379,20 @@ interface CompanionSettings {
     /** Whether WIDE knows the running game (WideScreen.gameFor); it shows as ORIGINAL otherwise. */
     val wideSupported: Boolean get() = false
 
+    /** EXPAND's LOOK AROUND - see [com.pokedaisy.app.Prefs.lookAround]. */
+    val lookAround: Boolean get() = true
+    fun setLookAround(on: Boolean) {}
+
+    /** EXPAND's ZOOM steps, as how much more of the map each shows (1x first, [com.pokedaisy.app.WideCamera.factor]),
+     * picked from SETTINGS > ZOOM - a device with no right stick has no R3 to step them; empty with no game view. */
+    val zoomSteps: List<Float> get() = emptyList()
+    /** The step picked on this game ([com.pokedaisy.app.Prefs.zoomLevelFor]). */
+    val zoomLevel: Int get() = 0
+    fun setZoomLevel(level: Int) {}
+
+    /** TOUCH CONTROLS > VIBRATION / STRENGTH changed: one buzz at [level] (com.pokedaisy.app.TouchHaptics). */
+    fun feelVibration(level: Int) {}
+
     /** EXPAND's AUTO ZOOM IN - see [com.pokedaisy.app.Prefs.expandZoomOnText]. */
     val expandZoomOnText: Boolean get() = true
     fun setExpandZoomOnText(on: Boolean) {}
@@ -269,6 +401,19 @@ interface CompanionSettings {
      * true while it's up (Compose state). Shown once ever - the setting is global. */
     val expandOffer: Boolean get() = false
     fun answerExpandOffer(turnOn: Boolean) {}
+
+    /** APP > TIPS ([com.pokedaisy.app.Prefs.tips], ON): a card now and then about a feature the player hasn't found. */
+    val tips: Boolean get() = true
+    fun setTips(on: Boolean) {}
+
+    /** The tip card shows on this companion (it's on a screen of its own, not over the game: Compose state). */
+    val showsTips: Boolean get() = false
+
+    /** The keys a tip names (the player's own bindings), as key and what it does. */
+    fun tipKeys(tip: TipId): List<Pair<String, String>> = emptyList()
+
+    /** A tip's TRY IT. */
+    fun tryTip(tip: TipId) {}
 
     /** SCREEN > OVERLAY's choices, as (key, label) - see [com.pokedaisy.app.Prefs.overlay]; empty = no row (no game).
      * Imported in the top screen's Settings (a file picker); picked here, live. */
@@ -337,6 +482,10 @@ interface CompanionSettings {
     val companionWindow: Boolean? get() = null
     fun setCompanionWindow(on: Boolean) {}
 
+    /** SETTINGS > FOLD LAYOUT ([com.pokedaisy.app.Prefs.foldLayout]); null = not a foldable (no row). */
+    val foldLayout: Boolean? get() = null
+    fun setFoldLayout(on: Boolean) {}
+
     /** SETTINGS > COMPANION BUTTON: the edge tab that opens the companion ([com.pokedaisy.app.Prefs.companionTab]). Null
      * where [companionWindow] is (no row). */
     val companionTab: Boolean? get() = null
@@ -372,13 +521,34 @@ interface CompanionSettings {
      * (a [com.pokedaisy.app.companion.data.GameKind] name). */
     fun guideNoticeAccepted(game: String): Boolean
     fun acceptGuideNotice(game: String)
+
+    /** CO-OP shows only while its feature flag is on (read once by the activity, never per recomposition). */
+    val coopEnabled: Boolean get() = false
+    /** SETTINGS re-reads the link once a second while it shows (LINK's retry countdown); previews turn it off so they can go idle. */
+    val coopLiveRefresh: Boolean get() = true
+    /** CO-OP (see [com.pokedaisy.app.companion.coop.CoopSession]): the link's state, the pairings, the relay and its RELAY ONLY switch. */
+    val coopState: com.pokedaisy.app.companion.coop.CoopState get() = com.pokedaisy.app.companion.coop.CoopState.Off()
+    val coopPairs: List<com.pokedaisy.app.companion.coop.CoopPair> get() = emptyList()
+    val coopRelayValue: String get() = ""
+    val coopRelayOnly: Boolean get() = false
+    fun setCoopRelayOnly(on: Boolean) {}
+    /** NEARBY RANGE in steps (2 / 4 / 8 / 16 / 32): how close a partner's battle must be to join; the activity reads Prefs. */
+    var coopNearbyRange: Int
+        get() = 8
+        set(_) {}
+    fun coopUnpair(save: com.pokedaisy.app.companion.coop.CoopSaveId) {}
+    /** PLAY TOGETHER ONLY: the running game's lock state and actions (null = the row is hidden). */
+    val coopLock: com.pokedaisy.app.companion.coop.lock.CoopLockUi? get() = null
+    val coopLockActions: com.pokedaisy.app.companion.coop.lock.CoopLockActions? get() = null
+    /** Show the partner's PLAY TOGETHER ONLY proposal on the companion itself (two screens: the game screen can't be touched). */
+    val coopProposalHere: Boolean get() = false
 }
 
 /** Every tab the player can show or hide, in tab-bar order. BATTLE (while a
  * battle runs) and SETTINGS (the way to the hidden ones) are always there.
  * CARD (the TRAINER CARD) and ACHIEVEMENTS (RetroAchievements) start off the
  * bar, under the MORE tab. */
-val COMPANION_TABS = listOf("PARTY", "DEX", "MAP", "ITEMS", "GUIDE", "CARD", "STATES", "ACHIEVEMENTS")
+val COMPANION_TABS = listOf("PARTY", "DEX", "MAP", "ITEMS", "BOXES", "GUIDE", "NUZLOCKE", "CARD", "STATES", "ACHIEVEMENTS")
 val DEFAULT_COMPANION_TABS = listOf("PARTY", "DEX", "MAP", "ITEMS", "GUIDE")
 
 /** Tabs next to SETTINGS: six chips in all is as many as fit. During a
@@ -477,3 +647,48 @@ enum class FfMusicMode(val label: String) {
     /** Silent. */
     OFF(tk("OFF")),
 }
+
+/** SETTINGS > FLIGHT AREA: where FREE FLIGHT and the scenic FLY may go (companion.data.FlightArea). [label] stays English. */
+enum class FlightAreaMode(val id: Int, val label: String) {
+    /** Only over maps the player has seen: the save's towns, the routes between them, maps with a beaten trainer, every map stood on. */
+    SEEN(0, tk("VISITED")),
+
+    /** Anywhere the game's world goes; RetroAchievements pause from the first take-off. */
+    ANYWHERE(1, tk("ANYWHERE")),
+    ;
+
+    companion object {
+        fun of(id: Int): FlightAreaMode = entries.firstOrNull { it.id == id } ?: SEEN
+    }
+}
+
+/** SETTINGS > FLY STYLE: how the companion's FLY (MAP, QUICK MENU) gets there. [label] stays English; the row translates it. */
+enum class FlyStyle(val id: Int, val label: String) {
+    /** The game's own cut-in, flight and landing. */
+    CLASSIC(0, tk("CLASSIC")),
+
+    /** Up on the bird and over the field to the town (companion.data.ScenicFly), the view zoomed out on EXPAND. */
+    SCENIC(1, tk("SCENIC")),
+    ;
+
+    companion object {
+        fun of(id: Int): FlyStyle = entries.firstOrNull { it.id == id } ?: CLASSIC
+    }
+}
+
+/** SETTINGS > BATTLE STYLE: the battle controls' look. [label] stays English; the rows translate it. */
+enum class BattleStyle(val id: Int, val label: String) {
+    /** Platinum-like coloured buttons (BattleControlsScreen). */
+    GEN4(0, tk("GEN 4")),
+
+    /** Black-like: a Poké Ball split red / white, dark octagon plates. */
+    GEN5(1, tk("GEN 5")),
+    ;
+
+    companion object {
+        fun of(id: Int): BattleStyle = entries.firstOrNull { it.id == id } ?: GEN4
+    }
+}
+
+/** An EXPAND zoom step as the HUD and SETTINGS > ZOOM show it: how much more of the map it shows ("1x", "1.4x"). */
+fun zoomLabel(factor: Float): String = "%.1fx".format(java.util.Locale.ROOT, factor).replace(".0x", "x")

@@ -30,6 +30,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -53,20 +54,25 @@
 // literal pools: only FireRed's VMap and gSaveBlock1Ptr differ from them) and checked frame by frame
 // headless (scripts/verify_wide.py).
 #include "pk_wide_games.h"
+#include "pk_coop_emerald.h"   // gPaletteFade, for the co-op partner's colours
 
 // Each engine's layout.
 static const int32_t FAMILIES[][PK_WIDE_CONFIG_SIZE - PK_WIDE_ADDRS] = {
-    [PK_WIDE_FAMILY_FR] = { 640, 0x14, 4, 29, 3, 1, 0, 0x439, 4, 4, 0x8E0, 0xEE0, 0x1000, 7, 2 },    // u32 attributes, layer in bits 29-30; sized border
-    [PK_WIDE_FAMILY_EM] = { 512, 0x10, 2, 12, 0xF, 0, 0, 0x439, 4, 4, 0xC70, 0x1270, 0x139C, 6, 2 },  // u16 attributes, layer in bits 12-15; 2x2 border
+    [PK_WIDE_FAMILY_FR] = { 640, 0x14, 4, 29, 3, 1, 0, 0x439, 4, 4, 0x8E0, 0xEE0, 0x1000, 7, 2, 0, 64 },    // u32 attributes, layer in bits 29-30; sized border
+    [PK_WIDE_FAMILY_EM] = { 512, 0x10, 2, 12, 0xF, 0, 0, 0x439, 4, 4, 0xC70, 0x1270, 0x139C, 6, 2, 0, 64 },  // u16 attributes, layer in bits 12-15; 2x2 border
     // Emerald's map; a static SaveBlock1, a longer gMain, 16-bit subsprite offsets.
-    [PK_WIDE_FAMILY_RS] = { 512, 0x10, 2, 12, 0xF, 0, 1, 0x43D, 8, 4, 0xC20, 0x1220, 0x1340, 6, 2 },
+    [PK_WIDE_FAMILY_RS] = { 512, 0x10, 2, 12, 0xF, 0, 1, 0x43D, 8, 4, 0xC20, 0x1220, 0x1340, 6, 2, 0, 64 },
     // Japanese Ruby / Sapphire: the static SaveBlock1, but gMain's inBattle and 8-bit subsprites as later games.
-    [PK_WIDE_FAMILY_RS_JA] = { 512, 0x10, 2, 12, 0xF, 0, 1, 0x439, 4, 4, 0xC20, 0x1220, 0x1340, 6, 2 },
+    [PK_WIDE_FAMILY_RS_JA] = { 512, 0x10, 2, 12, 0xF, 0, 1, 0x439, 4, 4, 0xC20, 0x1220, 0x1340, 6, 2, 0, 64 },
     // pokeemerald-expansion: Emerald's map and sprites, ObjectEvent.spriteId at +0x23, 16-bit template graphics ids;
     // each hack's SaveBlock1 its own (PK_WIDE_SB1_OFFSETS).
-    [PK_WIDE_FAMILY_EX] = { 512, 0x10, 2, 12, 0xF, 0, 0, 0x439, 4, 0x23, 0, 0, 0, 6, 3 },
+    [PK_WIDE_FAMILY_EX] = { 512, 0x10, 2, 12, 0xF, 0, 0, 0x439, 4, 0x23, 0, 0, 0, 6, 3, 0, 64 },
     // FireRed's map (its tilesets, attributes and sized border) with expansion's objects (Recharged Yellow).
-    [PK_WIDE_FAMILY_FR_EX] = { 640, 0x14, 4, 29, 3, 1, 0, 0x439, 4, 0x23, 0, 0, 0, 7, 3 },
+    [PK_WIDE_FAMILY_FR_EX] = { 640, 0x14, 4, 29, 3, 1, 0, 0x439, 4, 0x23, 0, 0, 0, 7, 3, 0, 64 },
+    // Monomyth: Emerald's map and objects; its struct Main keeps inBattle 0x17 bytes before callback1 (PK_WIDE_GMAIN is
+    // callback1 there), its sFieldCameraOffset is four s16, it has 80 sprites (its snow and rain sit past 64); its SaveBlock1
+    // is its own (PK_WIDE_SB1_OFFSETS / _FLAGS_AT).
+    [PK_WIDE_FAMILY_MM] = { 512, 0x10, 2, 12, 0xF, 0, 0, -0x17, 4, 4, 0, 0, 0, 6, 2, 1, 80 },
 };
 
 // Every engine row and every ROM row fills its part of the config, no more, no less.
@@ -81,19 +87,38 @@ static const struct PkWideRom* find(const struct PkWideRom* roms, size_t n, uint
 
 #define FIND(roms, crc) find(roms, sizeof(roms) / sizeof(roms[0]), crc)
 
+// A hack nothing here knows by its CRC that kept a retail build's engine (RetailEngine.kt proves it from the ROM's code):
+// its row, rebuilt from that build's row with the ROM tables the hack moved. One at a time, set before the game starts.
+static struct PkWideRom derivedRom;
+
+int pk_wide_add_derived(uint32_t crc, uint32_t baseCrc, const int32_t* a, int n) {
+    const struct PkWideRom* base = FIND(PK_WIDE_ROMS, baseCrc);
+    if (!crc || !base || n != PK_WIDE_ADDRS || FIND(PK_WIDE_ROMS, crc) || FIND(PK_FIELD_ONLY_ROMS, crc)) return 0;
+    derivedRom.crc = 0;   // not found while it's half written
+    derivedRom.family = base->family;
+    memcpy(derivedRom.a, a, sizeof(derivedRom.a));
+    derivedRom.crc = crc;
+    return 1;
+}
+
+static const struct PkWideRom* findDerived(uint32_t crc) {
+    return crc && derivedRom.crc == crc ? &derivedRom : NULL;
+}
+
 /** WIDE's table for the ROM; the pending hacks too in verify_wide.py's build (PK_WIDE_PENDING). */
 static const struct PkWideRom* lookup(uint32_t crc) {
     const struct PkWideRom* rom = FIND(PK_WIDE_ROMS, crc);
 #ifdef PK_WIDE_PENDING
     if (!rom) rom = FIND(PK_FIELD_ONLY_ROMS, crc);
 #endif
-    return rom;
+    return rom ? rom : findDerived(crc);
 }
 
 /** The field reads' table: WIDE's, or a hack WIDE doesn't draw yet (PK_FIELD_ONLY_ROMS). */
 static const struct PkWideRom* lookupField(uint32_t crc) {
     const struct PkWideRom* rom = FIND(PK_WIDE_ROMS, crc);
-    return rom ? rom : FIND(PK_FIELD_ONLY_ROMS, crc);
+    if (!rom) rom = FIND(PK_FIELD_ONLY_ROMS, crc);
+    return rom ? rom : findDerived(crc);
 }
 
 static int32_t C[PK_WIDE_CONFIG_SIZE];
@@ -166,6 +191,9 @@ struct Ghost {
 };
 #define MAX_GHOSTS 256
 
+/** The most sprites a game has ([PK_WIDE_MAX_SPRITES]: 64, Monomyth 80). */
+#define SPRITES_CAP 128
+
 struct Snap {
     bool ok;
     int posX, posY, xTile, yTile;
@@ -179,8 +207,8 @@ struct Snap {
     struct Conn conn[MAX_CONNS];
     int nconn;
     uint16_t vmap[MAX_MAP_DATA];
-    uint8_t sprites[64 * 0x44];
-    uint8_t order[64];
+    uint8_t sprites[SPRITES_CAP * 0x44];   // gSprites' first PK_WIDE_MAX_SPRITES entries
+    uint8_t order[SPRITES_CAP];
     uint8_t objects[16 * 0x24];
     int coordX, coordY;
     struct Ghost ghosts[MAX_GHOSTS];   // the map's objects the game hasn't spawned (far off), front first
@@ -189,6 +217,7 @@ struct Snap {
 
 static struct Snap snaps[2];
 static int prev = -1;              // snaps[prev]: the RAM after the frame before this one
+static bool mixSnap;               // pk_wide_jump: the next drawn scene at full strength, no crossfade
 
 /** FlagGet as the game has it. Flags past SaveBlock1's own array read on into it (the engine doesn't stop there, so
  * a hack that uses them - Odyssey, Glazed - keeps them there); CFRU's GetFlagPointer (PK_WIDE_EXPANDED_FLAGS) puts
@@ -451,13 +480,16 @@ static void take(struct Snap* s) {
     s->group = (int) r8(pos + 4);
     s->num = (int) r8(pos + 5);
     uint32_t co = (uint32_t) C[PK_WIDE_CAMERA_OFFSET];
-    s->xTile = (int) r8(co + 2);
-    s->yTile = (int) r8(co + 3);
+    // { xPixelOffset, yPixelOffset, xTileOffset, yTileOffset }: u8s, or s16s in Monomyth (PK_WIDE_CAMERA_WIDE).
+    bool wideCam = C[PK_WIDE_CAMERA_WIDE] != 0;
+    s->xTile = wideCam ? (int) (uint8_t) s16(co + 4) : (int) r8(co + 2);
+    s->yTile = wideCam ? (int) (uint8_t) s16(co + 6) : (int) r8(co + 3);
     // FieldUpdateBgTilemapScroll: HOFS = xPixelOffset + sHorizontalCameraPan, VOFS = yPixelOffset +
     // sVerticalCameraPan + 8 (the pans follow the offset struct).
     uint32_t pan = (uint32_t) ((int32_t) co + C[PK_WIDE_PAN_OFF]);
-    s->href = ((int) r8(co) + s16(pan)) & 0x1FF;
-    s->vref = ((int) r8(co + 1) + s16(pan + 2) + 8) & 0x1FF;
+    int xPixel = wideCam ? s16(co) : (int) r8(co), yPixel = wideCam ? s16(co + 2) : (int) r8(co + 1);
+    s->href = (xPixel + s16(pan)) & 0x1FF;
+    s->vref = (yPixel + s16(pan + 2) + 8) & 0x1FF;
     uint32_t vm = (uint32_t) C[PK_WIDE_VMAP];
     s->vw = s32(vm);
     s->vh = s32(vm + 4);
@@ -492,8 +524,10 @@ static void take(struct Snap* s) {
         readConnections(s, s->conn[i].header, s->conn[i].w, s->conn[i].h, s->conn[i].ox, s->conn[i].oy, 2);
 
     const uint8_t* p;
-    if ((p = mem((uint32_t) C[PK_WIDE_SPRITES], sizeof(s->sprites)))) memcpy(s->sprites, p, sizeof(s->sprites));
-    if ((p = mem((uint32_t) C[PK_WIDE_SPRITE_ORDER], sizeof(s->order)))) memcpy(s->order, p, sizeof(s->order));
+    uint32_t nspr = (uint32_t) C[PK_WIDE_MAX_SPRITES];
+    memset(s->order, 0xFF, sizeof(s->order));
+    if ((p = mem((uint32_t) C[PK_WIDE_SPRITES], nspr * 0x44))) memcpy(s->sprites, p, nspr * 0x44);
+    if ((p = mem((uint32_t) C[PK_WIDE_SPRITE_ORDER], nspr))) memcpy(s->order, p, nspr);
     if ((p = mem((uint32_t) C[PK_WIDE_OBJECT_EVENTS], sizeof(s->objects)))) memcpy(s->objects, p, sizeof(s->objects));
     s->coordX = s16((uint32_t) C[PK_WIDE_COORD_OFFSET]);
     s->coordY = s16((uint32_t) C[PK_WIDE_COORD_OFFSET_Y]);
@@ -737,6 +771,9 @@ static inline uint16_t io(int reg) { return R[reg >> 1]; }
 #define LINE_REGS 0x58   // DISPCNT .. BLDY
 static uint16_t lineIo[PK_WIDE_H][LINE_REGS / 2];
 static int lineIoFrames;   // frames drawn since the hook went in (lineIo is whole from the second)
+// A core whose renderer can't be hooked (the 3DS's armGBA draws on another core from a log of its own): every line is
+// taken as drawn with the registers the frame ended with, and the VRAM tiles that changed are found by comparing.
+static bool lineHookless;
 static struct GBA* hookGba;
 static void (*origDrawScanline)(struct GBAVideoRenderer*, int);
 
@@ -757,9 +794,33 @@ static int drawingLine = PK_WIDE_H;   // the line last drawn; PK_WIDE_H between 
 static bool vramTorn, vramTornLast;
 static void (*origWriteVRAM)(struct GBAVideoRenderer*, uint32_t);
 static void followWrote(uint32_t address);
+static void partnerWrote(uint32_t address);
+#ifdef PK_WIDE_CACHE
+static uint32_t tileWritten[2][2048 / 32];   // BG VRAM's 32-byte tiles written since the margin cache last looked: the
+static int tileSide;                         // game's side, and the one being looked at (the drawing may be on another thread)
+#endif
+// A line's OAM and palette need comparing with the last ones kept only after something wrote them.
+static bool lineOamWritten, linePalWritten;
+static void (*origWriteOAM)(struct GBAVideoRenderer*, uint32_t);
+static void (*origWritePalette)(struct GBAVideoRenderer*, uint32_t, uint16_t);
+
+static void hookWriteOAM(struct GBAVideoRenderer* r, uint32_t oam) {
+    lineOamWritten = true;
+    origWriteOAM(r, oam);
+}
+
+static void hookWritePalette(struct GBAVideoRenderer* r, uint32_t address, uint16_t value) {
+    linePalWritten = true;
+    origWritePalette(r, address, value);
+}
+
 static void hookWriteVRAM(struct GBAVideoRenderer* r, uint32_t address) {
     if (drawingLine < PK_WIDE_H - 1) vramTorn = true;
+#ifdef PK_WIDE_CACHE
+    if (address < 0x10000) tileWritten[tileSide][address >> 10] |= 1u << ((address >> 5) & 31);
+#endif
     followWrote(address);
+    partnerWrote(address);
     origWriteVRAM(r, address);
 }
 
@@ -799,20 +860,68 @@ static int followState;                      // 0 none (after a warp: until a st
 static int followFromX, followFromY, followToX, followToY;   // tiles from the player's (now) tile
 static int followPrevCx, followPrevCy, followDir;            // the player's last tile; the follower's facing (0 S 1 N 2 W 3 E)
 static int followScroll0X, followScroll0Y;                   // BG2's scroll when this step started
+static int followStepX, followStepY;                         // the player's last tile from its new one, for the whole step
 static bool followMoving;
 static int followWhy, followDbg[8];                                        // why the last frame drew none (mgba_dump's followinfo)
 static int followOam = -1, followSlot = -1;                  // this frame's OAM entry / palette slot (-1: not drawn)
+static int followShown[2] = { -1, -1 };                  // the last frame's, kept after followEnd put them back (followinfo)
 static uint16_t followSavedOam[4];
 static uint8_t followSavedVram[512];
 static uint8_t followDirty[256];                             // halfwords the game wrote over this frame
 
+// RIDE ON (companion/data/RideOn.kt): the vehicle the player rides in place of their bike, drawn like FOLLOWER - one more
+// hardware sprite right behind the player's (at their priority), OBJ tiles 944-975 and a palette slot no shown sprite
+// uses, put in as each frame starts and taken out after its last line, and its exhaust smoke (a 16 x 8 sprite behind it,
+// tiles 942-943, the same palette). The ROM's bike frames hold the rider alone (RideOn's patch); the vehicle keeps its own
+// colours. Its view is the player's facing (south, north, west; east = west flipped), 32 x 64 (the rider's frame on top,
+// the wheels below it) or 64 x 32, centred on the player's sprite, its top on theirs. Only while the player is on a bike
+// (onBike) and shown. Its OAM entries go right after the player's last one, the game's shown entries from there each moved
+// down a place for the frame (an earlier entry is drawn over a later one: the bike's tyre tracks on sand, a sprite of the
+// game's after the player's, were drawn over the wheels).
+#define RIDE_SMOKE_TILE 942
+#define RIDE_TILE 944
+#define RIDE_VRAM_FIRST (0x10000 + RIDE_SMOKE_TILE * 32)
+#define RIDE_VRAM (0x10000 + RIDE_TILE * 32)
+#define RIDE_VRAM_BYTES (1024 + 64)
+#define RIDE_PLACES (3 * 1024 + PK_RIDE_SMOKE_FRAMES * 64)
+static bool rideOn, rideHave;
+static uint8_t rideFrames[PK_RIDE_BYTES], ridePal[32];
+static int rideW = 32;
+static int rideOam = -1, rideSlot = -1, rideWhy;
+// The bob: rider and vehicle a pixel up now and then - an engine idling while still (12 frames up, 12 down), the road's
+// bumps while moving (every 4). The player's own OAM entries are nudged with the vehicle's and put back after the frame.
+static unsigned rideTick;
+static int rideBobbed[8], rideBobbedN;
+static uint16_t rideBobSaved[8];
+static uint8_t rideSavedVram[RIDE_VRAM_BYTES];
+static uint8_t rideDirty[RIDE_VRAM_BYTES / 2];
+static int rideRangeFirst = -1, rideRangeN;                     // the OAM entries moved this frame, saved
+static uint16_t rideSavedRange[128 * 4];
+static int rideSmoke = -1;                                      // this frame's smoke frame (-1 none)
+
 static void followWrote(uint32_t address) {
     if (followOam >= 0 && address >= FOLLOW_VRAM && address < FOLLOW_VRAM + 512) followDirty[(address - FOLLOW_VRAM) >> 1] = 1;
+    if (rideOam >= 0 && address >= RIDE_VRAM_FIRST && address < RIDE_VRAM_FIRST + RIDE_VRAM_BYTES) rideDirty[(address - RIDE_VRAM_FIRST) >> 1] = 1;
+}
+
+void pk_ride_set(const uint8_t* frames, const uint8_t* pal, int w) {
+    if (frames && pal && (w == 32 || w == 64)) {
+        memcpy(rideFrames, frames, sizeof(rideFrames));
+        memcpy(ridePal, pal, sizeof(ridePal));
+        rideW = w;
+        rideHave = true;
+    } else {
+        rideHave = false;
+    }
+}
+
+void pk_ride_info(char* out, int n) {
+    snprintf(out, (size_t) n, "on %d have %d w %d why %d oam %d slot %d smoke %d", rideOn, rideHave, rideW, rideWhy, rideOam, rideSlot, rideSmoke);
 }
 
 void pk_follower_info(char* out, int n) {
     snprintf(out, (size_t) n, "on %d have %d state %d why %d oam %d slot %d to %d,%d from %d,%d dir %d box %d,%d-%d,%d at %d,%d p %d base %d",
-             followOn, followHave, followState, followWhy, followOam, followSlot, followToX, followToY, followFromX, followFromY, followDir,
+             followOn, followHave, followState, followWhy, followShown[0], followShown[1], followToX, followToY, followFromX, followFromY, followDir,
              followDbg[0], followDbg[1], followDbg[2], followDbg[3], followDbg[4], followDbg[5], followDbg[6], followDbg[7]);
 }
 
@@ -827,50 +936,156 @@ void pk_follower_set(const uint8_t* frames, const uint8_t* pal) {
 }
 
 static void hookScanlines(struct GBA* gba);
+void pk_ride_show(struct mCore* core, int on) {
+    rideOn = on != 0;
+    if (on && core && core->platform(core) == mPLATFORM_GBA) hookScanlines((struct GBA*) core->board);
+}
+
 void pk_follower_show(struct mCore* core, int on) {
     followOn = on != 0;
     if (!on) followState = 0;
     if (on && core && core->platform(core) == mPLATFORM_GBA) hookScanlines((struct GBA*) core->board);
 }
 
+void pk_wide_extras_reset(void) {
+    rideOn = rideHave = false;
+    rideOam = rideSlot = rideRangeFirst = -1;
+    followOn = followHave = false;
+    followState = 0;
+    followOam = followSlot = -1;
+    tintR = tintG = tintB = 256;
+    tintShown = false;
+}
+
 static void followBegin(struct GBAVideoRenderer* r);
 static void followEnd(struct GBAVideoRenderer* r);
+static void rideBegin(struct GBAVideoRenderer* r);
+static void rideEnd(struct GBAVideoRenderer* r);
+
+// FREE FLIGHT's smooth camera (pk_flight.c, pk_wide_flight): the game steps one tile at a time in four directions, so a
+// diagonal flight scrolls the map in a staircase (a tile across, a tile up). While a flight is up, each frame's camera
+// is followed from the map's scroll (BG2HOFS / VOFS at line 0: continuous across map connections, unlike the map's own
+// coordinates), and the view moves at the velocity the flight means (pk_flight: the route's way, the D-pad's), pulled
+// gently toward that camera - so a diagonal comes out straight at a steady speed whatever the steps under it (an
+// average over the last steps couldn't hide an uneven staircase, 2:1 or 3:1). The window drawn is moved by the difference
+// (viewInner) and so are the bird's and its shadow's OAM entries (here, put back after the last line), so the bird stays
+// put on screen and the map glides under it. Only where EXPAND draws the window: the margins are the map, exactly.
+static bool flyOn, flyTrack;
+static uint16_t flyTiles[2];
+static int flyTileN;
+static int flyCx, flyCy, flyPrevH, flyPrevV;
+static double flySx, flySy;                      // where the view is, in the same pixels as the camera
+static double flyVx, flyVy, flyVxS, flyVyS;      // the flight's velocity (pk_flight), and eased
+static int flyDx, flyDy;                         // this frame's offset: the view less the real camera
+static int flyOam[4], flyOamN;
+static uint16_t flySaved[4][2];
+static int flyViewAge = 99;                      // frames since viewInner last ran (the window is EXPAND's)
+
+void pk_wide_flight(int on, const uint16_t* tiles, int n, double vx, double vy) {
+    flyOn = on != 0;
+    flyVx = vx;
+    flyVy = vy;
+    flyTileN = n < 0 ? 0 : n > 2 ? 2 : n;
+    for (int i = 0; i < flyTileN; i++) flyTiles[i] = tiles[i];
+}
+
+// A core whose renderer can't be hooked (lineHookless): the glide's offset worked out after each frame, from the
+// registers the frame ended with, where flyBegin would have at its line 0 (pk_flight draws the bird at it; the game's own
+// sprite can't be moved inside the frame there).
+static bool flyGlide(const uint16_t* io);
+void pk_wide_after_frame(struct mCore* core) {
+    if (!core || core->platform(core) != mPLATFORM_GBA) return;
+    struct GBA* gba = (struct GBA*) core->board;
+    if (gba->video.renderer) return;
+    flyOamN = 0;
+    flyGlide(gba->memory.io);
+}
+
+void pk_wide_flight_offset(int* dx, int* dy) {
+    *dx = flyDx;
+    *dy = flyDy;
+}
+
+void pk_wide_bg2_scroll(struct mCore* core, int* h, int* v) {
+    struct GBA* gba = core && core->platform(core) == mPLATFORM_GBA ? (struct GBA*) core->board : NULL;
+    *h = gba ? gba->memory.io[0x18 >> 1] & 0x1FF : 0;   // BG2HOFS / VOFS: the map's scroll, as this frame was drawn
+    *v = gba ? gba->memory.io[0x1A >> 1] & 0x1FF : 0;
+}
+
+void pk_wide_flight_camera(int* x, int* y) {
+    *x = flyCx + flyDx;
+    *y = flyCy + flyDy;
+}
+
+static void flyBegin(struct GBAVideoRenderer* r);
+static void flyEnd(struct GBAVideoRenderer* r);
+static void partnerBegin(struct GBAVideoRenderer* r);
+static void partnerEnd(struct GBAVideoRenderer* r);
+static int partnerOam = -1, partnerBlobOam = -1;          // this frame's OAM entries (-1: not drawn)
+static uint16_t partnerSavedOam[2][4];
+
+// Off, the frame's per-line record isn't kept: a host that only wants the scene (a 3DS at ASPECT ORIGINAL), where
+// copying and comparing 3 KB a line takes a tenth of the frame.
+static bool linesWanted = true;
+
+void pk_wide_lines(int on) {
+    if (linesWanted == (on != 0)) return;
+    linesWanted = on != 0;
+    lineIoFrames = 0;
+}
+
+// pk_wide_later: the cached view's drawing, running beside the next frame until that frame's lines start to be recorded.
+static void (*laterJoin)(void);
 
 static void hookDrawScanline(struct GBAVideoRenderer* r, int y) {
     if (y == 0) {
+        if (laterJoin) laterJoin();
         vramTornLast = vramTorn;   // the frame before, done
         vramTorn = false;
         if (hookGba) tintPalettes(r, hookGba->video.palette);
     }
     drawingLine = y;
-    if (hookGba && y >= 0 && y < PK_WIDE_H) {
+    if (hookGba && linesWanted && y >= 0 && y < PK_WIDE_H) {
         memcpy(lineIo[y], hookGba->memory.io, sizeof(lineIo[0]));
         const uint16_t* pal = hookGba->video.palette;
         if (y == 0) linePalN = 0;
-        if (!linePalN || (memcmp(pal, linePalBuf[linePalN - 1], sizeof(linePalBuf[0])) && linePalN < LINE_PALS))
+        if (!linePalN || (linePalWritten && memcmp(pal, linePalBuf[linePalN - 1], sizeof(linePalBuf[0])) && linePalN < LINE_PALS))
             memcpy(linePalBuf[linePalN++], pal, sizeof(linePalBuf[0]));
+        linePalWritten = false;
         linePalOf[y] = (uint8_t) (linePalN - 1);
-        const uint16_t* oam = hookGba->video.oam.raw;
-        // WIDE's record of the OAM leaves the follower's entry out: it's not the game's.
-        static uint16_t own[512];
-        if (followOam >= 0) {
-            memcpy(own, oam, sizeof(own));
-            memcpy(&own[followOam * 4], followSavedOam, 8);
-            oam = own;
-        }
         if (y == 0) lineOamN = 0;
-        if (!lineOamN || (memcmp(oam, lineOamBuf[lineOamN - 1], sizeof(lineOamBuf[0])) && lineOamN < LINE_PALS))
-            memcpy(lineOamBuf[lineOamN++], oam, sizeof(lineOamBuf[0]));
+        if (!lineOamN || lineOamWritten) {
+            const uint16_t* oam = hookGba->video.oam.raw;
+            // WIDE's record of the OAM leaves the follower's and the partner's entries out: they're not the game's.
+            static uint16_t own[512];
+            if (followOam >= 0 || partnerOam >= 0 || flyOamN > 0) {
+                memcpy(own, oam, sizeof(own));
+                for (int i = 0; i < flyOamN; i++) memcpy(&own[flyOam[i] * 4], flySaved[i], 4);
+                if (followOam >= 0) memcpy(&own[followOam * 4], followSavedOam, 8);
+                if (partnerOam >= 0) memcpy(&own[partnerOam * 4], partnerSavedOam[0], 8);
+                if (partnerBlobOam >= 0) memcpy(&own[partnerBlobOam * 4], partnerSavedOam[1], 8);
+                oam = own;
+            }
+            if (!lineOamN || (memcmp(oam, lineOamBuf[lineOamN - 1], sizeof(lineOamBuf[0])) && lineOamN < LINE_PALS))
+                memcpy(lineOamBuf[lineOamN++], oam, sizeof(lineOamBuf[0]));
+            lineOamWritten = false;
+        }
         lineOamOf[y] = (uint8_t) (lineOamN - 1);
     }
-    if (y == 0) followBegin(r);
+    if (y == 0) { followBegin(r); rideBegin(r); partnerBegin(r); flyBegin(r); }
     origDrawScanline(r, y);
-    if (y == PK_WIDE_H - 1) followEnd(r);
+    if (y == PK_WIDE_H - 1) { flyEnd(r); partnerEnd(r); rideEnd(r); followEnd(r); }
 }
 
 static void hookScanlines(struct GBA* gba) {
     struct GBAVideoRenderer* r = gba->video.renderer;
-    if (!r || !r->drawScanline) return;
+    if (!r || !r->drawScanline) {
+        lineHookless = true;
+        lineIoFrames = 0;
+        hookGba = NULL;
+        return;
+    }
+    lineHookless = false;
     if (r->drawScanline != hookDrawScanline) {
         origDrawScanline = r->drawScanline;
         r->drawScanline = hookDrawScanline;
@@ -879,6 +1094,14 @@ static void hookScanlines(struct GBA* gba) {
     if (r->writeVRAM && r->writeVRAM != hookWriteVRAM) {
         origWriteVRAM = r->writeVRAM;
         r->writeVRAM = hookWriteVRAM;
+    }
+    if (r->writeOAM && r->writeOAM != hookWriteOAM) {
+        origWriteOAM = r->writeOAM;
+        r->writeOAM = hookWriteOAM;
+    }
+    if (r->writePalette && r->writePalette != hookWritePalette) {
+        origWritePalette = r->writePalette;
+        r->writePalette = hookWritePalette;
     }
     hookGba = gba;
 }
@@ -946,6 +1169,22 @@ static int windowLayers(int x, int y) {
         if (inX && inY) return (io(0x48) >> (8 * w)) & 0x3F;
     }
     return io(0x4A) & 0x3F;   // outside them (an OBJ window would need the sprites: not the field's)
+}
+
+/** True when windowLayers(x, y) is the same for every x in sx .. sx+n-1: it only changes where a window starts or ends
+ * (its left / right edge), and answers the edge column's for x outside the frame. */
+static bool windowsUniform(int sx, int n) {
+    uint16_t disp = io(0);
+    if (!(disp & 0xE000)) return true;
+    int xa = sx < 0 ? 0 : sx >= PK_WIDE_W ? PK_WIDE_W - 1 : sx;
+    int e = sx + n - 1;
+    int xb = e < 0 ? 0 : e >= PK_WIDE_W ? PK_WIDE_W - 1 : e;
+    for (int w = 0; w < 2; w++) {
+        if (!(disp & (0x2000 << w))) continue;
+        int l = io(0x40 + 2 * w) >> 8, r = io(0x40 + 2 * w) & 0xFF;
+        if ((xa < l && l <= xb) || (xa < r && r <= xb)) return false;
+    }
+    return true;
 }
 
 /** The field's BG setup: mode 0, BG1-3 on and 256x256. Windows (Flash's dark circle, battle
@@ -1025,19 +1264,39 @@ static struct Foreign* connForeign[MAX_CONNS];   // this frame's: each connectio
 
 /** One map pixel: its colour (BGR555; the backdrop's when nothing's there), the priority of the BG it's
  * from (4 = backdrop) and that BG (5 = backdrop: BLDCNT's bit numbering). */
-static uint16_t mapPixel(const struct Snap* s, int mx, int my, int enabled, int* prio, int* layer, bool real) {
-    const uint8_t* vram = (const uint8_t*) G->video.vram;
+// The 64 pixels of one 8x8 map tile share its metatile, connection and BG entries: found once per tile in a draw
+// (foreignFrame counts the draws), not once per pixel.
+static struct { uint32_t epoch; int tx, ty, enabled; bool real, ok; const struct Snap* snap; struct Foreign* f; uint16_t e[3]; } tc;
+
+static void loadTile(const struct Snap* s, int mx, int my, int enabled, bool real) {
+    int tx = mx >> 3, ty = my >> 3;
+#ifndef PK_WIDE_NOCACHE
+    if (tc.ok && tc.epoch == foreignFrame && tc.snap == s && tc.tx == tx && tc.ty == ty && tc.enabled == enabled && tc.real == real) return;
+#endif
     int conn;
     int mid = blockIn(s, mx >> 4, my >> 4, &conn, real);
     // On the real screen a connected map's strip is drawn as the game draws it: with the current map's tilesets.
     struct Foreign* f = !real && conn >= 0 && conn < MAX_CONNS ? connForeign[conn] : NULL;
     int q = ((my >> 3) & 1) * 2 + ((mx >> 3) & 1);
+    for (int i = 0; i < 3; i++) {
+        int b = order3[i];
+        tc.e[i] = 0;
+        if (!(enabled & (1 << b))) continue;
+        if (f) syncSplit(s);
+        tc.e[i] = f ? metatileIn(&f->t, mid, b)[q] : metatile(s, mid, b)[q];
+    }
+    tc.epoch = foreignFrame; tc.snap = s; tc.tx = tx; tc.ty = ty; tc.enabled = enabled; tc.real = real; tc.f = f; tc.ok = true;
+}
+
+static uint16_t mapPixel(const struct Snap* s, int mx, int my, int enabled, int* prio, int* layer, bool real) {
+    const uint8_t* vram = (const uint8_t*) G->video.vram;
+    loadTile(s, mx, my, enabled, real);
+    struct Foreign* f = tc.f;
     int nt = C[PK_WIDE_PRIMARY_METATILES], np = C[PK_WIDE_PRIMARY_PALS];
     for (int i = 0; i < 3; i++) {
         int b = order3[i];
         if (!(enabled & (1 << b))) continue;
-        if (f) syncSplit(s);
-        uint16_t e = f ? metatileIn(&f->t, mid, b)[q] : metatile(s, mid, b)[q];
+        uint16_t e = tc.e[i];
         int px = mx & 7, py = my & 7;
         if (e & 0x400) px = 7 - px;
         if (e & 0x800) py = 7 - py;
@@ -1060,6 +1319,112 @@ static uint16_t mapPixel(const struct Snap* s, int mx, int my, int enabled, int*
     *prio = 4;
     *layer = 5;
     return P[0];
+}
+
+/** Up to 8 map pixels of one tile row at once ([mx, mx + n) on map row my, all in one 8x8 tile): the same answers as n
+ * calls of mapPixel, from the tile row's packed bytes. out[k] = colour (BGR555), outPrio[k], outLayer[k]. */
+static void mapTileRow(const struct Snap* s, int mx, int my, int n, int enabled, uint16_t* out, uint8_t* outPrio, uint8_t* outLayer) {
+    const uint8_t* vram = (const uint8_t*) G->video.vram;
+    loadTile(s, mx, my, enabled, false);
+    struct Foreign* f = tc.f;
+    int nt = C[PK_WIDE_PRIMARY_METATILES], np = C[PK_WIDE_PRIMARY_PALS];
+    uint8_t ci[3][8];
+    int pal[3];
+    bool ownPal[3], have[3];
+    for (int i = 0; i < 3; i++) {
+        have[i] = false;
+        int b = order3[i];
+        if (!(enabled & (1 << b))) continue;
+        uint16_t e = tc.e[i];
+        int py = my & 7;
+        if (e & 0x800) py = 7 - py;
+        int tile = e & 0x3FF;
+        const uint8_t* src;
+        pal[i] = e >> 12;
+        if (f && (f->ownPrimary || tile >= nt)) {
+            src = f->tiles + tile * 32 + py * 4;
+        } else {
+            uint32_t off = bgChar[b] + (uint32_t) tile * 32 + (uint32_t) (py * 4);
+            if (off + 4 > 0x10000 + 0) { if (off >= 0x10000) continue; }   // BG tiles can't reach OBJ VRAM
+            src = vram + off;
+        }
+        ownPal[i] = f && (f->ownPrimary || pal[i] >= np);
+        for (int k = 0; k < 8; k++) {
+            int px = e & 0x400 ? 7 - k : k;
+            uint8_t v = src[px / 2];
+            ci[i][k] = px & 1 ? v >> 4 : v & 15;
+        }
+        have[i] = true;
+    }
+    for (int k = 0; k < n; k++) {
+        int px = (mx + k) & 7;
+        int i = 0;
+        for (; i < 3; i++)
+            if (have[i] && ci[i][px]) break;
+        if (i < 3) {
+            int b = order3[i];
+            outPrio[k] = (uint8_t) bgPrio[b];
+            outLayer[k] = (uint8_t) b;
+            out[k] = ownPal[i] ? f->pal[pal[i] * 16 + ci[i][px]] : P[pal[i] * 16 + ci[i][px]];
+        } else {
+            outPrio[k] = 4;
+            outLayer[k] = 5;
+            out[k] = P[0];
+        }
+    }
+}
+
+/** [mapPixel] for n pixels of one row off the real screen, inside one 8x8 cell of the map: what the cell holds is looked up
+ * once, not per pixel (EXPAND's margins are most of a 3DS's frame at 1x). The same answers, pixel for pixel. */
+static void mapSpan(const struct Snap* s, int mx, int my, int n, int enabled, uint16_t* out, uint8_t* prios, uint8_t* layers) {
+    const uint8_t* vram = (const uint8_t*) G->video.vram;
+    int conn;
+    int mid = blockIn(s, mx >> 4, my >> 4, &conn, false);
+    struct Foreign* f = conn >= 0 && conn < MAX_CONNS ? connForeign[conn] : NULL;
+    int q = ((my >> 3) & 1) * 2 + ((mx >> 3) & 1);
+    int nt = C[PK_WIDE_PRIMARY_METATILES], np = C[PK_WIDE_PRIMARY_PALS];
+    const uint8_t* rows[3];
+    const uint16_t* pals[3];
+    bool flip[3];
+    int count = 0, bgs[3];
+    for (int i = 0; i < 3; i++) {
+        int b = order3[i];
+        if (!(enabled & (1 << b))) continue;
+        if (f) syncSplit(s);
+        uint16_t e = f ? metatileIn(&f->t, mid, b)[q] : metatile(s, mid, b)[q];
+        int py = my & 7;
+        if (e & 0x800) py = 7 - py;
+        int tile = e & 0x3FF, pal = e >> 12;
+        const uint8_t* row;
+        if (f && (f->ownPrimary || tile >= nt)) {
+            row = &f->tiles[tile * 32 + py * 4];
+        } else {
+            uint32_t off = bgChar[b] + (uint32_t) tile * 32 + (uint32_t) (py * 4);
+            if (off >= 0x10000) continue;            // BG tiles can't reach OBJ VRAM
+            row = vram + off;
+        }
+        rows[count] = row;
+        pals[count] = f && (f->ownPrimary || pal >= np) ? &f->pal[pal * 16] : &P[pal * 16];
+        flip[count] = e & 0x400;
+        bgs[count++] = b;
+    }
+    for (int k = 0; k < n; k++) {
+        int x = (mx + k) & 7, i;
+        for (i = 0; i < count; i++) {
+            int px = flip[i] ? 7 - x : x, v = rows[i][px / 2], ci = px & 1 ? v >> 4 : v & 15;
+            if (ci) {
+                out[k] = pals[i][ci];
+                prios[k] = (uint8_t) bgPrio[bgs[i]];
+                layers[k] = (uint8_t) bgs[i];
+                break;
+            }
+        }
+        if (i == count) {
+            out[k] = P[0];
+            prios[k] = 4;
+            layers[k] = 5;
+        }
+    }
 }
 
 struct Piece {
@@ -1101,17 +1466,18 @@ static void hardwareWrap(struct Piece* p) {
 /** The OAM entries the game would build if the screen were wider, front first (BuildOamBuffer +
  * AddSubspritesToOamBuffer), positions kept as s16 instead of OAM's 9 / 8 bits. */
 static int buildPieces(const struct Snap* s, struct Piece* out) {
-    bool offscreen[64] = { false };   // sprites the game hid only for being off screen
+    int nspr = C[PK_WIDE_MAX_SPRITES];
+    bool offscreen[SPRITES_CAP] = { false };   // sprites the game hid only for being off screen
     for (int i = 0; i < 16; i++) {
         const uint8_t* oe = s->objects + 0x24 * i;
         uint32_t flags = (uint32_t) oe[0] | (uint32_t) oe[1] << 8;
         int id = C[PK_WIDE_SPRITE_ID_OFF] >= 0 && C[PK_WIDE_SPRITE_ID_OFF] < 0x24 ? oe[C[PK_WIDE_SPRITE_ID_OFF]] : 0xFF;
-        if ((flags & 1) && (flags & (1 << 14)) && !(flags & (1 << 13)) && id < 64) offscreen[id] = true;
+        if ((flags & 1) && (flags & (1 << 14)) && !(flags & (1 << 13)) && id < nspr) offscreen[id] = true;
     }
     int n = 0;
-    for (int k = 0; k < 64 && n < 256; k++) {
+    for (int k = 0; k < nspr && n < 256; k++) {
         int id = s->order[k];
-        if (id >= 64) continue;
+        if (id >= nspr) continue;
         const uint8_t* sp = s->sprites + 0x44 * id;
         uint32_t fl = le16(sp + 0x3E);
         if (!(fl & 1) || ((fl & 4) && !offscreen[id])) continue;   // !inUse, or invisible for its own reasons
@@ -1230,6 +1596,22 @@ static uint32_t blend(uint32_t top, uint32_t bottom, int layer) {
 static uint8_t holeBuf[BUF_H][BUF_W];
 static const uint32_t* realFrame;   // the core's 240x160 frame this call draws around
 
+// A host whose renderer has its own thread: the frame's pixels may still be coming during pk_wide_view. A cached view
+// doesn't look at them, so most frames this runs beside the renderer instead of after it.
+static void (*frameWait)(void*);
+static void* frameWaitCtx;
+
+void pk_wide_frame_wait(void (*wait)(void*), void* ctx) {
+    frameWait = wait;
+    frameWaitCtx = ctx;
+}
+
+static void needFrame(void) {
+    if (!frameWait) return;
+    frameWait(frameWaitCtx);
+    frameWait = NULL;
+}
+
 static inline int clampi(int v, int lo, int hi) {
     return v < lo ? lo : v > hi ? hi : v;
 }
@@ -1330,6 +1712,75 @@ static bool ghostPalette(uint32_t tag, uint32_t alpha, uint32_t pal[16]) {
     return true;
 }
 
+static bool holeLeft;   // pk_wide_hole: the host puts the frame's own pixels in itself
+// FREE FLIGHT's area sign kept still (flyLabel): the corner of BG0 it may be in. Wider than POPUP_COLS: a long name's box
+// ("CINNABAR ISLAND") runs past 14 tiles. Only BG0's own pixels are taken.
+#define FL_SIGN_W (20 * 8)
+#define FL_SIGN_H (POPUP_ROWS * 8)
+
+#ifdef PK_WIDE_CACHE
+// The margin cache (pk_wide_cache): the map's own pixels around the frame, kept between frames in world coordinates, so
+// a frame only draws the 8x8 cells that are new or changed - EXPAND's margins are otherwise most of a 3DS's frame, and
+// the more so the bigger the window. Only an ordinary field frame goes through it (cacheReady); anything else
+// takes the full rebuild, and the two give the same pixels. Water and flowers change tiles every few frames: those
+// cells are redrawn a few a frame (CACHE_STALE_CELLS), so in the margins an animation can run a few frames late.
+#define RING_PX 512
+#define RING_CELLS (RING_PX / 8)
+#define CACHE_STALE_CELLS 64
+static uint32_t ringPx[RING_PX][RING_PX];   // the BGs' colour at a world pixel
+static uint8_t ringMeta[RING_PX][RING_PX];  // prio << 4 | layer
+struct RingCell {
+    int x, y;
+    uint32_t stamp;
+    uint16_t e[3];
+    const void* f;
+    bool stale;
+};
+static struct RingCell ringCells[RING_CELLS][RING_CELLS];
+static uint32_t ringStamp = 1, ringKey;
+static uint16_t ringPal[256];
+static int cacheMode;                 // 0 off, 1 on, 2 on with no limit on stale cells (the same pixels as the rebuild)
+static bool ringOn;                   // this frame's sprites read the cache
+static int ringX, ringY;              // the world pixel of the window's corner
+static bool holeWanted;
+static bool cachedLast;               // the last frame came from the cache: raw holds nothing of it
+static struct PkWideView cachedView;
+static bool laterOn, laterFullDue;
+static struct Later {
+    const struct Snap* s;
+    const uint32_t* frame;
+    uint32_t* out;
+    struct PkWideView v;
+    int cx, cy, enabled;
+    uint32_t alpha;
+    bool due;
+    // A flight's camera offset with the area sign up: the frame copied in (no hole), then the sign moved back (flySignMove,
+    // after the cached view: [sign] read on the emulator's thread, the frame's offset and camera with it).
+    bool sign;
+    int href, vref, dx, dy;
+} later;
+static uint8_t laterSign[FL_SIGN_H][FL_SIGN_W];
+static const uint32_t* cachedOut;   // a host may hand a different buffer each frame
+static int cacheHits;
+
+int pk_wide_cache_hits(void) { return cacheHits; }
+
+void pk_wide_hole(int on) { holeWanted = on != 0; }
+int pk_wide_holed(void) { return holeLeft; }
+
+void pk_wide_cache(int mode) {
+    cacheMode = mode;
+    ringStamp++;
+}
+#define OBJ_PRIO(J, X) (ringOn ? ringMeta[(ringY + (J)) & (RING_PX - 1)][(ringX + (X)) & (RING_PX - 1)] >> 4 : prioBuf[J][X])
+#define OBJ_LAYER(J, X) (ringOn ? ringMeta[(ringY + (J)) & (RING_PX - 1)][(ringX + (X)) & (RING_PX - 1)] & 15 : layerBuf[J][X])
+#define OBJ_BELOW(J, X) (ringOn ? ringPx[(ringY + (J)) & (RING_PX - 1)][(ringX + (X)) & (RING_PX - 1)] : below[J][X])
+#else
+#define OBJ_PRIO(J, X) prioBuf[J][X]
+#define OBJ_LAYER(J, X) layerBuf[J][X]
+#define OBJ_BELOW(J, X) below[J][X]
+#endif
+
 /** The snapshot's ghosts over the rectangle, behind every real sprite and each other front first (takenBuf). */
 static void drawGhosts(const struct Snap* s, int cx, int cy, int x0, int y0, int x1, int y1, uint32_t* dst, int stride,
                        uint32_t alpha) {
@@ -1341,8 +1792,11 @@ static void drawGhosts(const struct Snap* s, int cx, int cy, int x0, int y0, int
         if (gx + g->w <= x0 || gx >= x1 || gy + g->h <= y0 || gy >= y1) continue;
         const uint8_t* px4 = mem(g->pixels, (uint32_t) (g->w * g->h / 2));
         uint32_t pal[16];
-        // Only an NPC's own palette: the lights and the like (expansion's 0x8001) are the game's to show, as it does.
-        if (!px4 || !romPalette(g->palTag) || !ghostPalette(g->palTag, alpha, pal)) continue;
+        // Only an NPC's own palette: the lights and the like are the game's to show, as it does. Expansion's lamp lights
+        // (0x8001 / 0x8002) can be in the ROM's table all the same: Lazarus's glowed past the screen's edges by day, cut off
+        // at the frame and gone inside it (GitHub #208).
+        if (!px4 || g->palTag == 0x8001 || g->palTag == 0x8002 || !romPalette(g->palTag) ||
+            !ghostPalette(g->palTag, alpha, pal)) continue;
         for (int yy = 0; yy < g->h; yy++) {
             int Y = gy + yy, J = Y - y0;
             if (Y < y0 || Y >= y1) continue;
@@ -1360,7 +1814,7 @@ static void drawGhosts(const struct Snap* s, int cx, int cy, int x0, int y0, int
                 int ci = px & 1 ? v >> 4 : v & 15;
                 if (!ci) continue;
                 takenBuf[J][X] = 1;
-                if (g->prio > prioBuf[J][X]) continue;
+                if (g->prio > OBJ_PRIO(J, X)) continue;
                 dst[J * stride + X] = wl & 0x20 ? brightness(pal[ci], 4) : pal[ci];
                 holeBuf[J][X] = 0;
             }
@@ -1368,11 +1822,35 @@ static void drawGhosts(const struct Snap* s, int cx, int cy, int x0, int y0, int
     }
 }
 
+#ifdef PK_WIDE_PROFILE
+#include <time.h>
+#include <stdio.h>
+/* Where a window's time goes, for the libretro core's profiling build only. */
+static double pwNow(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1e3 + t.tv_nsec / 1e6; }
+static double pwSum[8]; static int pwN; static long pwFast, pwSlow, pwWhy[4];
+#define PW_MARK(v) double v = pwNow()
+#define PW_ADD(i, a, b) (pwSum[i] += (b) - (a))
+#define PW_COUNT(x) ((x)++)
+#define PW_REPORT() do { if (++pwN >= 300) { fprintf(stderr, "pk_wide: ms avg: camera %.2f  pieces %.2f  drawRegion %.2f  compose %.2f | rows fast %ld slow %ld (windows %ld, nobg %ld, bright %ld, tint %ld) | in drawRegion: foreign %.2f  bgloop %.2f  sprites %.2f  ghosts %.2f\n", pwSum[0] / pwN, pwSum[1] / pwN, pwSum[2] / pwN, pwSum[3] / pwN, pwFast, pwSlow, pwWhy[0], pwWhy[1], pwWhy[2], pwWhy[3], pwSum[4] / pwN, pwSum[5] / pwN, pwSum[6] / pwN, pwSum[7] / pwN); for (int q = 0; q < 8; q++) pwSum[q] = 0; pwN = 0; } } while (0)
+#else
+#define PW_MARK(v) (void)0
+#define PW_ADD(i, a, b) (void)0
+#define PW_COUNT(x) (void)0
+#define PW_REPORT() (void)0
+#endif
+static void drawPartner(int x0, int y0, int x1, int y1, uint32_t* dst, int stride, uint32_t alpha);
+
+static void drawObjects(const struct Snap* s, int cx, int cy, int x0, int y0, int x1, int y1, uint32_t* dst, int stride, uint32_t alpha);
+static bool frameTaken;   // the frame's own pixels aren't drawn (takenBuf has them): sprites skip them unlooked at
+
 static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref, int x0, int y0, int x1, int y1,
                        bool skipFrame, uint32_t* dst, int stride, uint32_t alpha) {
     int w = x1 - x0, h = y1 - y0;
+    PW_MARK(dr0);
     foreignFrame++;
     for (int i = 0; i < MAX_CONNS; i++) connForeign[i] = i < s->nconn ? foreignFor(s, &s->conn[i]) : NULL;
+    PW_MARK(dr1);
+    PW_ADD(4, dr0, dr1);
     for (int j = 0; j < h; j++) {
         int y = y0 + j;
         // This line as the PPU drew it: its layers, windows and scroll (a line scrolled apart from the
@@ -1380,11 +1858,106 @@ static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref,
         useLine(y);
         int dx = signed9((io(0x14) & 0x1FF) - href), dy = signed9((io(0x16) & 0x1FF) - vref);
         int disp = io(0);
+#ifndef PK_WIDE_NOFAST
+        // The common row (no brightness fade, the frame's own pixels skipped): each map tile's row at once - where the
+        // windows give every pixel of it the same layers; a run they cut through goes pixel by pixel as below.
+        if (skipFrame && ((disp >> 8) & 0x0E) && ((io(0x50) >> 6) & 3) < 2 && !tintShown) {
+            PW_COUNT(pwFast);
+            for (int x = 0; x < w;) {
+                int sx = x0 + x;
+                if (onFrame(sx, y)) {
+                    int n = (PK_WIDE_W - sx) < (w - x) ? PK_WIDE_W - sx : w - x;
+                    for (int k = 0; k < n; k++) {
+                        holeBuf[j][x + k] = 0;
+                        takenBuf[j][x + k] = 1;
+                    }
+                    x += n;
+                    continue;
+                }
+                int wx = cx + dx + sx, wy = cy + dy + y;
+                int n = 8 - (wx & 7);                                  // to the end of this map tile
+                if (n > w - x) n = w - x;
+                if (y >= 0 && y < PK_WIDE_H && sx < 0 && n > -sx) n = -sx;   // the frame starts at sx = 0
+                int wl0 = windowLayers(sx, y), enabled = (disp >> 8) & wl0 & 0x0E;
+                bool uniform = enabled != 0;
+#ifdef PK_WIDE_CHECK
+                bool slowU = enabled != 0;
+                for (int k = 1; slowU && k < n; k++)
+                    if (((disp >> 8) & windowLayers(sx + k, y) & 0x0E) != enabled) slowU = false;
+#endif
+                // The layers differ along the run only where a window's edge falls in it.
+                if (uniform && !windowsUniform(sx, n)) {
+                    for (int k = 1; uniform && k < n; k++)
+                        if (((disp >> 8) & windowLayers(sx + k, y) & 0x0E) != enabled) uniform = false;
+                }
+#ifdef PK_WIDE_CHECK
+                if (uniform != slowU) { fprintf(stderr, "windowsUniform MISMATCH sx=%d n=%d y=%d\n", sx, n, y); abort(); }
+#endif
+                if (uniform) {
+                    uint16_t col[8];
+                    uint8_t pr[8], ly[8];
+                    mapTileRow(s, wx, wy, n, enabled, col, pr, ly);
+                    for (int k = 0; k < n; k++) {
+                        uint32_t c32 = color(col[k], alpha);
+                        holeBuf[j][x + k] = 0;
+                        dst[j * stride + x + k] = c32;   // (the brightness fade is off: mode < 2)
+                        prioBuf[j][x + k] = pr[k];
+                        layerBuf[j][x + k] = ly[k];
+                        below[j][x + k] = c32;
+                        takenBuf[j][x + k] = 0;
+                    }
+                } else {
+                    for (int k = 0; k < n; k++) {
+                        int px = sx + k, wl = windowLayers(px, y), en = (disp >> 8) & wl & 0x0E;
+                        int prio = 4, layer = 5, ci = 0;
+                        holeBuf[j][x + k] = !en;
+                        uint16_t c = en ? mapPixel(s, cx + dx + px, cy + dy + y, en, &prio, &layer, false) : P[ci];
+                        uint32_t c32 = color(c, alpha);
+                        dst[j * stride + x + k] = wl & 0x20 ? brightness(c32, layer) : c32;
+                        prioBuf[j][x + k] = (uint8_t) prio;
+                        layerBuf[j][x + k] = (uint8_t) layer;
+                        below[j][x + k] = c32;
+                        takenBuf[j][x + k] = 0;
+                    }
+                }
+                x += n;
+            }
+            continue;
+        }
+#endif
+        PW_COUNT(pwSlow);
+        PW_COUNT(pwWhy[!skipFrame ? 0 : !((disp >> 8) & 0x0E) ? 1 : ((io(0x50) >> 6) & 3) >= 2 ? 2 : 3]);
         for (int x = 0; x < w; x++) {
             int sx = x0 + x;
             if (skipFrame && onFrame(sx, y)) {
-                holeBuf[j][x] = 0;
-                takenBuf[j][x] = 1;   // no sprite drawn there either
+                // A whole row's span at once: byte by byte it took a 3DS a third of the margins' time.
+                int n = PK_WIDE_W - sx < w - x ? PK_WIDE_W - sx : w - x;
+                memset(&holeBuf[j][x], 0, (size_t) n);
+                memset(&takenBuf[j][x], 1, (size_t) n);   // no sprite drawn there either
+                x += n - 1;
+                continue;
+            }
+            // Off the real screen a run of pixels in one cell of the map, under one window setting, goes at once.
+            int spanWl = onFrame(sx, y) ? 0 : windowLayers(sx, y);
+            if ((disp >> 8) & spanWl & 0x0E) {
+                int mx = dx + sx, my = dy + y, n = 8 - ((cx + mx) & 7);
+                if (n > w - x) n = w - x;
+                if (sx < 0 && y >= 0 && y < PK_WIDE_H && sx + n > 0) n = -sx;   // up to the frame's edge
+                for (int k = 1; k < n && (disp & 0xE000); k++)
+                    if (windowLayers(sx + k, y) != spanWl) n = k;
+                uint16_t cs[8];
+                uint8_t ps[8], ls[8];
+                mapSpan(s, cx + mx, cy + my, n, (disp >> 8) & spanWl & 0x0E, cs, ps, ls);
+                for (int k = 0; k < n; k++) {
+                    uint32_t c32 = color(cs[k], alpha);
+                    holeBuf[j][x + k] = 0;
+                    dst[j * stride + x + k] = spanWl & 0x20 ? brightness(c32, ls[k]) : c32;
+                    prioBuf[j][x + k] = ps[k];
+                    layerBuf[j][x + k] = ls[k];
+                    below[j][x + k] = c32;
+                    takenBuf[j][x + k] = 0;
+                }
+                x += n - 1;
                 continue;
             }
             int prio = 4, layer = 5, ci = 0;
@@ -1418,8 +1991,17 @@ static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref,
         }
     }
     useLive();
-    // The PPU's OBJ layer: per pixel the first opaque piece in OAM order wins among sprites,
-    // then shows if its priority is <= the front BG's.
+    PW_MARK(dr2);
+    PW_ADD(5, dr1, dr2);
+    frameTaken = skipFrame;
+    drawObjects(s, cx, cy, x0, y0, x1, y1, dst, stride, alpha);
+}
+
+// The PPU's OBJ layer: per pixel the first opaque piece in OAM order wins among sprites,
+// then shows if its priority is <= the front BG's.
+static void drawObjects(const struct Snap* s, int cx, int cy, int x0, int y0, int x1, int y1, uint32_t* dst, int stride, uint32_t alpha) {
+    PW_MARK(dr2);
+    int w = x1 - x0;
     if (!(io(0) & 0x40)) return;   // 2D tile mapping
     const uint8_t* vram = (const uint8_t*) G->video.vram;
     const uint16_t* oam = G->video.oam.raw;
@@ -1429,6 +2011,8 @@ static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref,
         int sw = p[i].w, sh = p[i].h;
         int bw = p[i].rot == 3 ? 2 * sw : sw, bh = p[i].rot == 3 ? 2 * sh : sh;   // the box it covers on screen
         if (p[i].x + bw <= x0 || p[i].x >= x1 || p[i].y + bh <= y0 || p[i].y >= y1) continue;
+        // Wholly on the frame: nothing of it reaches the margins (Route 113's ash is dozens of these, a 3DS's whole frame).
+        if (frameTaken && p[i].x >= 0 && p[i].y >= 0 && p[i].x + bw <= PK_WIDE_W && p[i].y + bh <= PK_WIDE_H) continue;
         int m = p[i].mat;   // an affine sprite's matrix: the frame's OAM affineParams from entry 4 * m
         int pa = (int16_t) oam[(4 * m) * 4 + 3], pb = (int16_t) oam[(4 * m + 1) * 4 + 3];
         int pc = (int16_t) oam[(4 * m + 2) * 4 + 3], pd = (int16_t) oam[(4 * m + 3) * 4 + 3];
@@ -1437,12 +2021,13 @@ static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref,
             if (Y < y0 || Y >= y1) continue;
             useLine(Y);
             if (!(io(0) & 0x1000)) continue;   // OBJ off on this line
-            for (int xx = 0; xx < bw; xx++) {
+            for (int xx = x0 > p[i].x ? x0 - p[i].x : 0; xx < bw; xx++) {
                 int X = p[i].x + xx - x0;
-                if (X < 0 || X >= w || takenBuf[J][X]) continue;
-                if (p[i].copy && onFrame(p[i].x + xx, Y)) continue;   // the real frame has its own
-                int wl = windowLayers(p[i].x + xx, Y);
-                if (!(wl & 0x10)) continue;
+                if (X >= w) break;
+                if (frameTaken && onFrame(p[i].x + xx, Y)) {
+                    xx = PK_WIDE_W - p[i].x - 1;   // on past the frame
+                    continue;
+                }
                 int px, py;
                 if (p[i].rot & 1) {   // mGBA's: texel = (matrix * (box pixel - box centre) + sprite centre) >> 8
                     px = (pa * (xx - bw / 2) + pb * (yy - bh / 2) + (sw << 7)) >> 8;
@@ -1453,19 +2038,32 @@ static void drawRegion(const struct Snap* s, int cx, int cy, int href, int vref,
                     py = p[i].vflip ? sh - 1 - yy : yy;
                 }
                 int t = p[i].tile + (py / 8) * (p[i].w / 8) + px / 8;   // 1D mapping
-                uint8_t v = vram[0x10000 + ((uint32_t) (t * 32 + (py & 7) * 4 + (px & 7) / 2) & 0x7FFF)];
+                const uint8_t* line = vram + 0x10000 + ((uint32_t) (t * 32 + (py & 7) * 4) & 0x7FFF);
+                if (!(p[i].rot & 1) && !(line[0] | line[1] | line[2] | line[3])) {
+                    xx += p[i].hflip ? px & 7 : 7 - (px & 7);   // nothing in this tile's row: Route 113's ash is mostly this
+                    continue;
+                }
+                uint8_t v = line[(px & 7) / 2];
                 int ci = px & 1 ? v >> 4 : v & 15;
-                if (!ci) continue;
+                if (!ci || takenBuf[J][X]) continue;
+                if (p[i].copy && onFrame(p[i].x + xx, Y)) continue;   // the real frame has its own
+                int wl = windowLayers(p[i].x + xx, Y);
+                if (!(wl & 0x10)) continue;
                 takenBuf[J][X] = 1;
-                if (p[i].prio > prioBuf[J][X]) continue;
+                if (p[i].prio > OBJ_PRIO(J, X)) continue;
                 uint32_t c = color(P[256 + p[i].pal * 16 + ci], alpha);
-                dst[J * stride + X] = p[i].mode == 1 ? blend(c, below[J][X], layerBuf[J][X]) : wl & 0x20 ? brightness(c, 4) : c;
+                dst[J * stride + X] = p[i].mode == 1 ? blend(c, OBJ_BELOW(J, X), OBJ_LAYER(J, X)) : wl & 0x20 ? brightness(c, 4) : c;
                 holeBuf[J][X] = 0;
             }
         }
     }
+    PW_MARK(dr3);
+    PW_ADD(6, dr2, dr3);
     drawGhosts(s, cx, cy, x0, y0, x1, y1, dst, stride, alpha);
+    drawPartner(x0, y0, x1, y1, dst, stride, alpha);
     useLive();
+    PW_MARK(dr4);
+    PW_ADD(7, dr3, dr4);
 }
 
 // --- battles ---------------------------------------------------------------------------------------
@@ -1584,7 +2182,10 @@ static bool battleEdgeBroken(int side) {
 /** Whether BG1 / BG2 ([n - 1]) can be mirrored in past each edge ([side]: 0 left, 1 right) this frame: it isn't a
  * window against that edge. A window or banner the game put there (the level-up stats and banner, GitHub #245) has
  * tiles in the screen's last tile column, the map empty past them on every line; scenery goes on in VRAM on some line
- * above the text box (retail's intro grass, an animation's backdrop), or stops short of the edge (the intro's rocks). */
+ * above the text box (retail's intro grass, an animation's backdrop), or stops short of the edge (the intro's rocks).
+ * The banner's rows don't count as going on: sliding in or out it has tiles past the edge for a moment, and read as
+ * scenery the strip was mirrored in for those frames, a piece of the platform flashing at the side (GitHub #258). */
+#define BATTLE_BANNER_ROWS 32   // Unbound's banner when a Pokémon on the bench levels up, across the top
 static bool battleBgScenery[2][2];
 
 static void findBattleBgScenery(void) {
@@ -1596,7 +2197,7 @@ static void findBattleBgScenery(void) {
             for (int side = 0; side < 2; side++) {
                 if (goesOn[n - 1][side] || !bgTileFilled(n, side ? PK_WIDE_W - 1 : 0, y)) continue;
                 touches[n - 1][side] = true;
-                goesOn[n - 1][side] = bgTileFilled(n, side ? PK_WIDE_W : -1, y);
+                goesOn[n - 1][side] = y >= BATTLE_BANNER_ROWS && bgTileFilled(n, side ? PK_WIDE_W : -1, y);
             }
         }
     }
@@ -2030,11 +2631,22 @@ int pk_wide_knows(uint32_t crc) {
 
 // SCENE SPEEDS, AUTO-RUN and RUN INDOORS (GitHub #43 / #85): the field read through this game's WIDE table whether or
 // not WIDE is drawing - its own copy of the few addresses they need, so WIDE's state is left alone.
-static struct { uint32_t locked, main, inBattleOff, objects, mapHeader, questLog, wild, avatar, sprites, gfxInfo; int family; } F;
+static struct {
+    uint32_t locked, main, inBattleOff, objects, mapHeader, questLog, wild, avatar, sprites, gfxInfo, spriteIdOff;
+    uint32_t saveBlock1, sb1Pos;   // co-op presence: the SaveBlock1 pointer (the block itself where saveStatic) and pos's offset
+    bool saveStatic;
+    int family;
+} F;
+/** Co-op presence (pk_partner_self): the player's tile and previous tile last frame, BG2's scroll when its step began,
+ * the steps taken. */
+static struct { bool have; int cx, cy, px, py, scrollX, scrollY, step, map, mapHold; } selfTrack;
+/** The fine position pk_partner_self last read (the partner is drawn relative to it): valid only while a player stands on a map. */
+static struct { bool valid; int fx, fy; } selfFine;
 /** WILD ENCOUNTERS: we set the game's switch last (so NORMAL puts it back once), and the roll's state. */
 static bool wildOwned;
 static uint32_t wildRng = 0x9E3779B9u;
 static bool textUp(void);
+static void partnerReset(void);
 
 int pk_field_knows(uint32_t crc) {
     const struct PkWideRom* rom = lookupField(crc);
@@ -2044,7 +2656,9 @@ int pk_field_knows(uint32_t crc) {
 int pk_field_configure(uint32_t crc) {
     const struct PkWideRom* rom = lookupField(crc);
     memset(&F, 0, sizeof(F));
+    memset(&selfTrack, 0, sizeof(selfTrack));
     wildOwned = false;
+    partnerReset();
     if (!rom) return 0;
     F.locked = (uint32_t) rom->a[PK_WIDE_CONTROLS_LOCKED];
     F.main = (uint32_t) rom->a[PK_WIDE_GMAIN];
@@ -2054,7 +2668,11 @@ int pk_field_configure(uint32_t crc) {
     F.gfxInfo = (uint32_t) rom->a[PK_WIDE_OBJ_GFX_INFO];
     F.mapHeader = (uint32_t) rom->a[PK_WIDE_MAP_HEADER];
     F.questLog = (uint32_t) rom->a[PK_WIDE_QUEST_LOG];
+    F.saveBlock1 = (uint32_t) rom->a[PK_WIDE_SAVE_BLOCK1_PTR];
+    F.sb1Pos = (uint32_t) rom->a[PK_WIDE_SB1_POS];
+    F.saveStatic = FAMILIES[rom->family][PK_WIDE_SAVE_STATIC - PK_WIDE_ADDRS] != 0;
     F.family = rom->family;
+    F.spriteIdOff = (uint32_t) FAMILIES[rom->family][PK_WIDE_SPRITE_ID_OFF - PK_WIDE_ADDRS];
     return F.locked != 0;
 }
 
@@ -2162,7 +2780,7 @@ static bool followPlayer(int* cx, int* cy, int* px, int* py, uint32_t* spriteId)
     int k = playerObject();
     const uint8_t* oe = k < 0 ? NULL : mem(F.objects + 0x24u * (uint32_t) k, 0x24);
     if (!oe) return false;
-    *spriteId = oe[4];
+    *spriteId = oe[F.spriteIdOff];   // 4, expansion 0x23
     *cx = (int16_t) le16(oe + 0x10); *cy = (int16_t) le16(oe + 0x12);
     *px = (int16_t) le16(oe + 0x14); *py = (int16_t) le16(oe + 0x16);
     return true;
@@ -2176,10 +2794,123 @@ static inline bool oamHidden(uint16_t a0) {
 
 static inline int sgn(int v) { return v > 0 ? 1 : v < 0 ? -1 : 0; }
 
-/** Line 0: where the follower stands this frame, then its sprite into the hardware (saved first). */
+/** An OAM entry's size in pixels, by its shape (a0 bits 14-15) and size (a1 bits 14-15); shape 3 doesn't exist. */
+static const int OAM_W[3][4] = { { 8, 16, 32, 64 }, { 16, 32, 32, 64 }, { 8, 8, 16, 32 } };
+static const int OAM_H[3][4] = { { 8, 16, 32, 64 }, { 8, 8, 16, 32 }, { 16, 32, 32, 64 } };
+
+/** The player's sprite on screen: the shown OAM entries whose tiles are the player's (subsprites split it), their box,
+ * the last of them, its priority; [used] = which palette slots any shown entry has. last -1 = not shown. */
+struct PlayerBox { int x0, y0, x1, y1, prio, last; bool used[16]; };
+static void playerBox(const uint16_t* oam, int base, struct PlayerBox* b) {
+    b->x0 = 999; b->y0 = 999; b->x1 = -999; b->y1 = -999; b->prio = 2; b->last = -1;
+    memset(b->used, 0, sizeof(b->used));
+    for (int k = 0; k < 128; k++) {
+        uint16_t a0 = oam[k * 4], a1 = oam[k * 4 + 1], a2 = oam[k * 4 + 2];
+        if (oamHidden(a0)) continue;
+        b->used[a2 >> 12] = true;
+        int t = a2 & 0x3FF, shape = a0 >> 14, size = a1 >> 14;
+        if (shape > 2) continue;
+        if (t < base || t >= base + 16) continue;
+        int x = a1 & 0x1FF, yy = a0 & 0xFF;
+        if (x >= 256) x -= 512;
+        if (yy >= 160) yy -= 256;
+        if (x < b->x0) b->x0 = x;
+        if (yy < b->y0) b->y0 = yy;
+        if (x + OAM_W[shape][size] > b->x1) b->x1 = x + OAM_W[shape][size];
+        if (yy + OAM_H[shape][size] > b->y1) b->y1 = yy + OAM_H[shape][size];
+        b->prio = (a2 >> 10) & 3;
+        b->last = k;
+    }
+}
+
+/** Line 0: FREE FLIGHT's camera this frame (see flyOn): the averaged camera's offset, and the bird / shadow moved by it. */
+/** This frame's glide (flyDx / flyDy) from the map's scroll it's drawn with; false: nothing to move. */
+static bool flyGlide(const uint16_t* io) {
+    flyDx = flyDy = 0;
+    if (flyViewAge < 99) flyViewAge++;
+    if ((!flyOn && !flyTrack) || !io || flyViewAge > 2) {
+        flyTrack = false;
+        return false;
+    }
+    int h = io[0x18 >> 1] & 0x1FF, v = io[0x1A >> 1] & 0x1FF;   // BG2HOFS / VOFS: the map's scroll
+    int dh = ((h - flyPrevH + 128) & 0xFF) - 128, dv = ((v - flyPrevV + 128) & 0xFF) - 128;   // its 256 px square wraps
+    if (!flyTrack || abs(dh) > 16 || abs(dv) > 16) {
+        // Starting, or a jump (a warp, a state loaded): from here, nothing to ease.
+        flyTrack = true;
+        flyCx = flyCy = 0;
+        flySx = flySy = 0;
+        flyVxS = flyVyS = 0;
+        dh = dv = 0;
+    }
+    flyPrevH = h;
+    flyPrevV = v;
+    flyCx += dh;
+    flyCy += dv;
+    // The window: 32 px of travel at the speed going lately (a diagonal mixes step speeds, 2 / 3 or 4 / 8 px a frame:
+    // a frame's own would flip the window's length every step).
+    // The view moves at the velocity the flight means (eased a little: a route turns over a few steps), pulled toward
+    // the real camera so it never drifts: a staircase's tile steps, a diagonal's uneven step times, a frame the map
+    // load held back - all within a few pixels of it, none of it on screen. Standing, it settles on the camera.
+    flyVxS += (flyVx - flyVxS) * 0.2;
+    flyVyS += (flyVy - flyVyS) * 0.2;
+    bool moving = flyVx != 0 || flyVy != 0;
+    double k = moving ? 0.03 : 0.12;
+    flySx += flyVxS + (flyCx - flySx) * k;
+    flySy += flyVyS + (flyCy - flySy) * k;
+    double ax = flySx - flyCx, ay = flySy - flyCy;
+    flyDx = (int) (ax < 0 ? ax - 0.5 : ax + 0.5);
+    flyDy = (int) (ay < 0 ? ay - 0.5 : ay + 0.5);
+    if (!flyOn && !flyDx && !flyDy && fabs(ax) < 0.5 && fabs(ay) < 0.5) {
+        flyTrack = false;   // the flight's over and the camera has caught up
+        return false;
+    }
+    return flyDx || flyDy;
+}
+
+static void flyBegin(struct GBAVideoRenderer* r) {
+    flyOamN = 0;
+    if (!flyGlide(hookGba ? hookGba->memory.io : NULL)) return;
+    uint16_t* oam = hookGba->video.oam.raw;
+    for (int k = 0; k < 128 && flyOamN < 4; k++) {
+        uint16_t a0 = oam[k * 4], a1 = oam[k * 4 + 1];
+        if (oamHidden(a0)) continue;
+        uint16_t tile = oam[k * 4 + 2] & 0x3FF;
+        bool ours = false;
+        for (int t = 0; t < flyTileN; t++) if (tile == flyTiles[t]) ours = true;
+        if (!ours) continue;
+        flySaved[flyOamN][0] = a0;
+        flySaved[flyOamN][1] = a1;
+        flyOam[flyOamN++] = k;
+        oam[k * 4] = (uint16_t) ((a0 & 0xFF00) | (((a0 & 0xFF) + flyDy) & 0xFF));
+        oam[k * 4 + 1] = (uint16_t) ((a1 & 0xFE00) | (((a1 & 0x1FF) + flyDx) & 0x1FF));
+        r->writeOAM(r, (uint32_t) k * 4);
+        r->writeOAM(r, (uint32_t) k * 4 + 1);
+    }
+}
+
+/** After the last line: the bird's and shadow's own OAM entries back (but one the game wrote meanwhile). */
+static void flyEnd(struct GBAVideoRenderer* r) {
+    if (!hookGba) return;
+    uint16_t* oam = hookGba->video.oam.raw;
+    for (int i = 0; i < flyOamN; i++) {
+        int k = flyOam[i];
+        oam[k * 4] = flySaved[i][0];
+        oam[k * 4 + 1] = flySaved[i][1];
+        r->writeOAM(r, (uint32_t) k * 4);
+        r->writeOAM(r, (uint32_t) k * 4 + 1);
+    }
+    flyOamN = 0;
+}
+
+static bool onBike(void);
+
+/** Line 0: where the follower stands this frame, then its sprite into the hardware (saved first). Not while the player
+ * rides RIDE ON's vehicle (it kept pace behind a motorcycle): it still follows their steps, so it's back behind them,
+ * where it belongs, as soon as they get off. */
 static void followBegin(struct GBAVideoRenderer* r) {
     followOam = followSlot = -1;
-    if (!followOn || !followHave || !hookGba || !F.objects || F.family == PK_WIDE_FAMILY_EX || F.family == PK_WIDE_FAMILY_FR_EX) { followWhy = 1; return; }
+    followShown[0] = followShown[1] = -1;
+    if (!followOn || !followHave || !hookGba || !F.objects) { followWhy = 1; return; }
     G = hookGba;
     int cx, cy, px, py;
     uint32_t spriteId;
@@ -2205,44 +2936,34 @@ static void followBegin(struct GBAVideoRenderer* r) {
             int mx = followToX - followFromX, my = followToY - followFromY;
             followDir = mx > 0 ? 3 : mx < 0 ? 2 : my < 0 ? 1 : 0;
             followScroll0X = sx; followScroll0Y = sy;
+            followStepX = -dx; followStepY = -dy;
             followMoving = mx || my;
         }
         followPrevCx = cx; followPrevCy = cy;
     }
     if (followState != 1) { followWhy = 3; return; }
+    if (rideOn && rideHave && onBike()) { followWhy = 7; return; }
     // How far the step has gone: the map's scroll moves 16 px a tile with the camera.
-    int moved = abs(((sx - followScroll0X + 256) & 0x1FF) - 256) + abs(((sy - followScroll0Y + 256) & 0x1FF) - 256);
+    // The field's background is 256 px square and its scroll wraps there (0 -> 254 walking left): a step is at most 16 px,
+    // so the difference is taken mod 256 - mod 512 read that wrap as a step done, and the follower jumped a tile ahead.
+    int moved = abs(((sx - followScroll0X + 128) & 0xFF) - 128) + abs(((sy - followScroll0Y + 128) & 0xFF) - 128);
     int p = moved >= 16 ? 256 : moved * 16;   // 0..256
     if (!followMoving) p = 256;
     // The player's sprite on screen: the OAM entries showing its tiles (subsprites split it), their box.
     uint32_t s = F.sprites + 0x44 * spriteId;
     int base = (int) (r16(s + 4) & 0x3FF);
     const uint16_t* oam = hookGba->video.oam.raw;
-    int x0 = 999, y0 = 999, x1 = -999, y1 = -999, prio = 2, last = -1;
-    static const int W[3][4] = { { 8, 16, 32, 64 }, { 16, 32, 32, 64 }, { 8, 8, 16, 32 } };
-    static const int H[3][4] = { { 8, 16, 32, 64 }, { 8, 8, 16, 32 }, { 16, 32, 32, 64 } };
-    bool used[16] = { false };
-    for (int k = 0; k < 128; k++) {
-        uint16_t a0 = oam[k * 4], a1 = oam[k * 4 + 1], a2 = oam[k * 4 + 2];
-        if (oamHidden(a0)) continue;
-        used[a2 >> 12] = true;
-        int t = a2 & 0x3FF, shape = a0 >> 14, size = a1 >> 14;
-        if (shape > 2) continue;
-        if (t < base || t >= base + 16) continue;
-        int x = a1 & 0x1FF, yy = a0 & 0xFF;
-        if (x >= 256) x -= 512;
-        if (yy >= 160) yy -= 256;
-        if (x < x0) x0 = x;
-        if (yy < y0) y0 = yy;
-        if (x + W[shape][size] > x1) x1 = x + W[shape][size];
-        if (yy + H[shape][size] > y1) y1 = yy + H[shape][size];
-        prio = (a2 >> 10) & 3;
-        last = k;
-    }
+    struct PlayerBox pb;
+    playerBox(oam, base, &pb);
+    int x0 = pb.x0, y0 = pb.y0, x1 = pb.x1, y1 = pb.y1, prio = pb.prio, last = pb.last;
+    const bool* used = pb.used;
     if (last < 0) { followWhy = 4; return; }
     // Its place: (from + p (to - from)) - the player's own (from the last tile towards this one) in tiles, from the
     // player's feet.
-    int pfx = (px - cx) * (256 - p), pfy = (py - cy) * (256 - p);          // the player, x256, from its tile
+    // The step's own start, not the object's previous tile: the game sets that to the new tile a frame before the camera's
+    // last pixel, which put the follower a pixel off and back at the end of every step.
+    (void) px; (void) py;
+    int pfx = followStepX * (256 - p), pfy = followStepY * (256 - p);      // the player, x256, from its tile
     int fx = followFromX * 256 + (followToX - followFromX) * p, fy = followFromY * 256 + (followToY - followFromY) * p;
     int cxPix = (x0 + x1) / 2 + (fx - pfx) * 16 / 256, feet = y1 + (fy - pfy) * 16 / 256;
     int ox = cxPix - 16, oy = feet - 32;
@@ -2275,6 +2996,7 @@ static void followBegin(struct GBAVideoRenderer* r) {
     }
     followOam = entry;
     followSlot = slot;
+    followShown[0] = entry; followShown[1] = slot;
     followWhy = 0;
 }
 
@@ -2294,6 +3016,418 @@ static void followEnd(struct GBAVideoRenderer* r) {
         r->writePalette(r, (uint32_t) (0x200 + followSlot * 32 + i * 2), tintShown ? tint555(c) : c);
     }
     followOam = followSlot = -1;
+}
+
+static bool onBike(void);
+
+/** Line 0 (after followBegin): RIDE ON's vehicle into the hardware behind the player, the game's bytes saved first. */
+static void rideBegin(struct GBAVideoRenderer* r) {
+    rideOam = rideSlot = -1;
+    if (!rideOn || !rideHave || !hookGba || !F.objects) { rideWhy = 1; return; }
+    G = hookGba;
+    if (!onBike()) { rideWhy = 2; return; }
+    int k = playerObject();
+    const uint8_t* oe = k < 0 ? NULL : mem(F.objects + 0x24u * (uint32_t) k, 0x24);
+    if (!oe) { rideWhy = 3; return; }
+    uint32_t spriteId = oe[F.spriteIdOff];
+    if (spriteId >= 64) { rideWhy = 3; return; }
+    int facing = oe[0x18] & 0xF;   // DIR_SOUTH 1, NORTH 2, WEST 3, EAST 4
+    int view = facing == 2 ? 1 : facing == 3 || facing == 4 ? 2 : 0;
+    bool flip = facing == 4;
+    uint32_t s = F.sprites + 0x44 * spriteId;
+    int base = (int) (r16(s + 4) & 0x3FF);
+    const uint16_t* oam = hookGba->video.oam.raw;
+    struct PlayerBox pb;
+    playerBox(oam, base, &pb);
+    if (pb.last < 0) { rideWhy = 4; return; }   // the player not shown (FREE FLIGHT, a warp's fade)
+    // Moving: the object's current tile isn't its previous one (a step under way).
+    bool moving = le16(oe + 0x10) != le16(oe + 0x14) || le16(oe + 0x12) != le16(oe + 0x16);
+    rideTick++;
+    int bob = moving ? ((rideTick >> 2) & 1) : ((rideTick % 24) < 12 ? 0 : 1);
+    int w = rideW, ox = (pb.x0 + pb.x1) / 2 - w / 2, oy = pb.y1 - 32 - bob;
+    if (ox <= -w || ox >= 240 || oy <= -64 || oy >= 160) { rideWhy = 5; return; }
+    // The smoke: from the exhaust (none from the front: the vehicle hides it), a puff every 3 frames while moving, now and
+    // then standing.
+    int ex = (int8_t) rideFrames[RIDE_PLACES + view * 2], ey = (int8_t) rideFrames[RIDE_PLACES + view * 2 + 1];
+    int smoke = -1;
+    if (ex != -128) {
+        int k = moving ? (int) ((rideTick / 3) % 6) : (int) ((rideTick / 6) % 14);
+        if (k < 6) smoke = (view == 1 ? 6 : 0) + k;
+    }
+    int sx = flip ? ox + w - ex - 16 : ox + ex, sy = oy + ey;
+    if (smoke >= 0 && (sx <= -16 || sx >= 240 || sy <= -8 || sy >= 160)) smoke = -1;
+    int need = smoke >= 0 ? 2 : 1;
+    int holes[2], nh = 0;
+    for (int e = pb.last + 1; e < 128 && nh < need; e++) if (oamHidden(oam[e * 4])) holes[nh++] = e;
+    int slot = -1;
+    for (int e = 15; e >= 0; e--) if (!pb.used[e]) { slot = e; break; }
+    if (nh == 0 || slot < 0) { rideWhy = 6; return; }
+    if (nh < need) smoke = -1, need = 1;
+    uint8_t* vram = (uint8_t*) hookGba->video.vram;
+    memcpy(rideSavedVram, vram + RIDE_VRAM_FIRST, RIDE_VRAM_BYTES);
+    memset(rideDirty, 0, sizeof(rideDirty));
+    memcpy(vram + RIDE_VRAM, rideFrames + view * 1024, 1024);
+    if (smoke >= 0) memcpy(vram + RIDE_VRAM_FIRST, rideFrames + 3 * 1024 + smoke * 64, 64);
+    for (int i = 0; i < RIDE_VRAM_BYTES; i += 2) origWriteVRAM(r, RIDE_VRAM_FIRST + (uint32_t) i);
+    // Our entries right after the player's, the game's shown ones up to the last hole used moved down a place each.
+    int first = pb.last + 1, last = holes[need - 1];
+    rideRangeFirst = first;
+    rideRangeN = last - first + 1;
+    memcpy(rideSavedRange, &oam[first * 4], (size_t) rideRangeN * 8);
+    uint16_t* raw = hookGba->video.oam.raw;
+    int to = first + need;
+    for (int e = first; e <= last; e++) {
+        const uint16_t* was = &rideSavedRange[(e - first) * 4];
+        if (oamHidden(was[0])) continue;
+        memcpy(&raw[to * 4], was, 6);   // attr0-2: an OAM entry's 4th halfword is the affine parameters', not its own
+        to++;
+    }
+    int entry = first;
+    raw[entry * 4] = (uint16_t) ((oy & 0xFF) | (w == 64 ? 1 << 14 : 2 << 14));                     // wide / tall, 4bpp, shown
+    raw[entry * 4 + 1] = (uint16_t) ((ox & 0x1FF) | (3 << 14) | (flip ? 0x1000 : 0));         // 64x32 / 32x64
+    raw[entry * 4 + 2] = (uint16_t) (RIDE_TILE | pb.prio << 10 | slot << 12);
+    if (smoke >= 0) {
+        raw[(entry + 1) * 4] = (uint16_t) ((sy & 0xFF) | 1 << 14);                                 // wide, 4bpp, shown
+        raw[(entry + 1) * 4 + 1] = (uint16_t) ((sx & 0x1FF) | (flip ? 0x1000 : 0));               // 16x8
+        raw[(entry + 1) * 4 + 2] = (uint16_t) (RIDE_SMOKE_TILE | pb.prio << 10 | slot << 12);
+    }
+    for (int e = first; e <= last; e++) for (int i = 0; i < 3; i++) r->writeOAM(r, (uint32_t) e * 4 + (uint32_t) i);
+    rideSmoke = smoke;
+    for (int i = 0; i < 16; i++) {
+        uint16_t c = (uint16_t) (ridePal[i * 2] | ridePal[i * 2 + 1] << 8);
+        r->writePalette(r, (uint32_t) (0x200 + slot * 32 + i * 2), tintShown ? tint555(c) : c);
+    }
+    // The rider up with it: the player's shown entries (their tiles), a pixel higher this frame.
+    rideBobbedN = 0;
+    if (bob) for (int e = 0; e < 128 && rideBobbedN < 8; e++) {
+        uint16_t a0 = oam[e * 4], a2 = oam[e * 4 + 2];
+        int t = a2 & 0x3FF;
+        if (oamHidden(a0) || t < base || t >= base + 16) continue;
+        rideBobbed[rideBobbedN] = e;
+        rideBobSaved[rideBobbedN++] = a0;
+        hookGba->video.oam.raw[e * 4] = (uint16_t) ((a0 & 0xFF00) | ((a0 - bob) & 0xFF));
+        r->writeOAM(r, (uint32_t) e * 4);
+    }
+    rideOam = entry;
+    rideSlot = slot;
+    rideWhy = 0;
+}
+
+/** After the last line: the game's own OAM entry, tiles (but those it wrote meanwhile) and palette back. */
+static void rideEnd(struct GBAVideoRenderer* r) {
+    if (rideOam < 0 || !hookGba) return;
+    uint8_t* vram = (uint8_t*) hookGba->video.vram;
+    for (int i = 0; i < RIDE_VRAM_BYTES / 2; i++) {
+        if (rideDirty[i]) continue;
+        memcpy(vram + RIDE_VRAM_FIRST + i * 2, rideSavedVram + i * 2, 2);
+        origWriteVRAM(r, RIDE_VRAM_FIRST + (uint32_t) i * 2);
+    }
+    if (rideRangeFirst >= 0) {
+        uint16_t* raw = hookGba->video.oam.raw;
+        for (int e = 0; e < rideRangeN; e++) {
+            memcpy(&raw[(rideRangeFirst + e) * 4], &rideSavedRange[e * 4], 6);
+            for (int k = 0; k < 3; k++) r->writeOAM(r, (uint32_t) (rideRangeFirst + e) * 4 + (uint32_t) k);
+        }
+        rideRangeFirst = -1;
+    }
+    for (int i = 0; i < rideBobbedN; i++) {
+        hookGba->video.oam.raw[rideBobbed[i] * 4] = rideBobSaved[i];
+        r->writeOAM(r, (uint32_t) rideBobbed[i] * 4);
+    }
+    rideBobbedN = 0;
+    for (int i = 0; i < 16; i++) {
+        uint16_t c = hookGba->video.palette[256 + rideSlot * 16 + i];
+        r->writePalette(r, (uint32_t) (0x200 + rideSlot * 32 + i * 2), tintShown ? tint555(c) : c);
+    }
+    rideOam = rideSlot = -1;
+}
+
+// CO-OP PARTNER (companion/data/coop/PartnerArt.kt, pk_partner_place): the other player's hero drawn like FOLLOWER - one
+// or two (surfing: the rider and the surf blob under it) more hardware sprites at line 0, taken out after line 159, so
+// the game, its save and its states never hold them. OBJ tiles 976-991 hold the rider, 992-1007 the blob (FOLLOWER has
+// 1008-1023), both 32x32 4bpp in one palette slot no shown sprite uses; the OAM entries are hidden ones after the game's
+// last shown one, the blob at the higher index (drawn under the rider). Where it stands is the player's own sprite box
+// (as followBegin finds it) moved by (partner's fine position - the player's, pk_partner_self's last read). Never put in
+// OAM past the screen edge (its 9-bit x / 8-bit y would wrap to the far side): that's EXPAND's margins' job.
+#define PARTNER_TILE 976
+#define PARTNER_BLOB_TILE 992
+#define PARTNER_VRAM (0x10000 + PARTNER_TILE * 32)
+static bool partnerHave;
+static uint8_t partnerArt[PK_PARTNER_ART_BYTES];
+static struct { int visible, fx, fy, frame, hflip, blob, bob; } partnerReq;
+static int partnerWhy = PK_PARTNER_OFF, partnerSlot = -1, partnerAtX, partnerAtY;
+static bool partnerAtKnown;                        // the place below was worked out this frame
+static int partnerShown[3] = { -1, -1, -1 };      // the last frame's entries and slot, kept after partnerEnd put them back (partnerinfo)
+static int partnerPal1 = -1, partnerFadeY;         // the last colour 1 written (after the fade and the tint), the fade's y it used (0 = none)
+static uint32_t partnerFadeSel;                    // the palettes the last normal fade took (OBJ ones in bits 16-31)
+#define PARTNER_FADE_LAG 3                         // frames the game's OBJ palettes run behind gPaletteFade's y (see partnerFadeRead)
+static struct { int y; uint16_t color; uint32_t sel; } partnerFadeHist[PARTNER_FADE_LAG + 1];   // newest first
+static bool partnerFadePrimed;
+static uint8_t partnerSavedVram[1024];
+static int partnerVramBytes;                      // 512 (rider) or 1024 (with the blob) of it written this frame
+static uint8_t partnerDirty[512];                 // halfwords the game wrote over this frame
+
+static void partnerWrote(uint32_t address) {
+    if (partnerOam >= 0 && address >= PARTNER_VRAM && address < PARTNER_VRAM + (uint32_t) partnerVramBytes)
+        partnerDirty[(address - PARTNER_VRAM) >> 1] = 1;
+}
+
+/** A new game: the last one's request, fine position and fade memory go (the engine may have stopped before the old presence could ask for none). */
+static void partnerReset(void) {
+    partnerReq.visible = 0;
+    selfFine.valid = false;
+    partnerFadeSel = 0;
+    partnerFadePrimed = false;
+}
+
+void pk_partner_set(const uint8_t* art) {
+    partnerFadeSel = 0;
+    partnerFadePrimed = false;
+    if (art) {
+        memcpy(partnerArt, art, sizeof(partnerArt));
+        partnerHave = true;
+    } else {
+        partnerHave = false;
+    }
+}
+
+void pk_partner_place(struct mCore* core, int visible, int fineX, int fineY, int frame, int hflip, int blobFrame, int bob) {
+    partnerReq.visible = visible; partnerReq.fx = fineX; partnerReq.fy = fineY; partnerReq.frame = frame;
+    partnerReq.hflip = hflip; partnerReq.blob = blobFrame; partnerReq.bob = bob;
+    if (visible && core && core->platform(core) == mPLATFORM_GBA) hookScanlines((struct GBA*) core->board);
+}
+
+void pk_partner_info(char* out, int n) {
+    snprintf(out, (size_t) n, "why %d oam %d blobOam %d slot %d at %d,%d frame %d pal1 %04X fadey %d", partnerWhy, partnerShown[0], partnerShown[1],
+             partnerShown[2], partnerAtX, partnerAtY, partnerReq.frame, partnerPal1 < 0 ? 0 : partnerPal1, partnerFadeY);
+}
+
+/** The game's BlendPalette on one colour (palette.c: c + ((blend - c) * y >> 4) per channel). */
+static uint16_t fadeBlend555(uint16_t c, int y, uint16_t blend) {
+    int r = c & 31, g = (c >> 5) & 31, b = (c >> 10) & 31;
+    r += ((blend & 31) - r) * y >> 4;
+    g += (((blend >> 5) & 31) - g) * y >> 4;
+    b += (((blend >> 10) & 31) - b) * y >> 4;
+    return (uint16_t) (r | g << 5 | b << 10);
+}
+
+/** The screen fade (gPaletteFade, a normal one) as the palettes the game is drawing this frame hold it: y (0 = none),
+ * blend colour and the palettes it took. The struct runs ahead of the OBJ palettes: y steps after the OBJ pass, which
+ * then waits for the next one, and the buffer reaches palette RAM at the following VBlank - measured on Emerald as
+ * exactly 3 frames (y read at line 0 of frame N is what palette RAM holds for frame N + 3), so the partner blends with
+ * the y of 3 frames ago and matches the player's own sprite beside him frame for frame. A fade to black ends with
+ * active and selectedPalettes cleared but y still at its target (the game keeps the faded buffer until the fade back
+ * in), so the palettes the fade took are remembered while it was active, until y is 0 again. Read every frame the
+ * partner is asked for, drawn or not, so a fade that began while he was off screen is known; the history starts from
+ * the current state each time he is (re)asked for. */
+static int partnerFadeRead(uint16_t* color, uint32_t* sel) {
+    const uint8_t* p = F.family == PK_WIDE_FAMILY_EM ? mem(COOP_EM_gPaletteFade, 12) : NULL;
+    int yv = 0;
+    uint16_t blend = 0;
+    if (p) {
+        yv = (int) ((le16(p + COOP_EM_PALFADE_Y_OFF) & COOP_EM_PALFADE_Y_MASK) >> COOP_EM_PALFADE_Y_SHIFT);
+        uint32_t mode = (le16(p + COOP_EM_PALFADE_MODE_OFF) & COOP_EM_PALFADE_MODE_MASK) >> COOP_EM_PALFADE_MODE_SHIFT;
+        bool active = (le16(p + COOP_EM_PALFADE_ACTIVE_OFF) & COOP_EM_PALFADE_ACTIVE_MASK) != 0;
+        if (mode != 0 || yv == 0 || yv > 16) {
+            yv = 0;
+            partnerFadeSel = 0;
+        } else {
+            uint32_t taken = le32(p + COOP_EM_PALFADE_SELECTED_OFF);   // zero once y reached its target, while the fade finishes
+            if (active && taken) partnerFadeSel = taken;
+            else if (!active && !partnerFadeSel) partnerFadeSel = 0xFFFF0000u;   // a fade already done and unseen: it took the OBJ palettes too
+            blend = (uint16_t) ((le16(p + COOP_EM_PALFADE_BLEND_OFF) & COOP_EM_PALFADE_BLEND_MASK) >> COOP_EM_PALFADE_BLEND_SHIFT);
+        }
+    }
+    if (!partnerFadePrimed) {
+        for (int i = 0; i <= PARTNER_FADE_LAG; i++) { partnerFadeHist[i].y = yv; partnerFadeHist[i].color = blend; partnerFadeHist[i].sel = partnerFadeSel; }
+        partnerFadePrimed = true;
+    } else {
+        for (int i = PARTNER_FADE_LAG; i > 0; i--) partnerFadeHist[i] = partnerFadeHist[i - 1];
+        partnerFadeHist[0].y = yv; partnerFadeHist[0].color = blend; partnerFadeHist[0].sel = partnerFadeSel;
+    }
+    *color = partnerFadeHist[PARTNER_FADE_LAG].color;
+    *sel = partnerFadeHist[PARTNER_FADE_LAG].sel;
+    return partnerFadeHist[PARTNER_FADE_LAG].y;
+}
+
+int pk_partner_at(int* x, int* y) {
+    if (!partnerAtKnown) return 0;
+    *x = partnerAtX; *y = partnerAtY;
+    return 1;
+}
+
+/** What partnerBegin worked out for this frame, for the margins (and the middle's rebuild): his place on the screen
+ * (unclipped), palette (faded, not tinted: color() tints), priority, frames. `hardware` = the OAM took him this frame, so
+ * the real frame holds him and the rebuild of the middle must show him too; else only the margins draw him. */
+static struct { bool have, hardware, blob, hflip; int prio, frame, blobFrame, x, y, by; uint16_t pal[16]; } partnerDraw;
+
+/** One 32x32 frame's pixels over the rectangle, as drawGhosts does for an NPC: not over a sprite already drawn (takenBuf),
+ * OBJ enable and window per line, behind the BG layers in front of his priority. */
+static void drawPartnerFrame(int frame, int gx, int gy, int x0, int y0, int x1, int y1, uint32_t* dst, int stride, uint32_t alpha) {
+    int w = x1 - x0;
+    const uint8_t* px4 = partnerArt + frame * 512;
+    uint32_t pal[16];
+    for (int i = 0; i < 16; i++) pal[i] = color(partnerDraw.pal[i], alpha);
+    for (int yy = 0; yy < 32; yy++) {
+        int Y = gy + yy, J = Y - y0;
+        if (Y < y0 || Y >= y1) continue;
+        useLine(Y);
+        if (!(io(0) & 0x1000)) continue;
+        for (int xx = 0; xx < 32; xx++) {
+            int X = gx + xx - x0;
+            if (X < 0 || X >= w || takenBuf[J][X]) continue;
+            // The real frame has him already where the hardware drew him; where it couldn't, the game's view is without him.
+            if (onFrame(gx + xx, Y) && !partnerDraw.hardware) continue;
+            int wl = windowLayers(gx + xx, Y);
+            if (!(wl & 0x10)) continue;
+            int px = partnerDraw.hflip ? 31 - xx : xx;
+            uint8_t v = px4[((yy / 8) * 4 + px / 8) * 32 + (yy & 7) * 4 + (px & 7) / 2];
+            int ci = px & 1 ? v >> 4 : v & 15;
+            if (!ci) continue;
+            takenBuf[J][X] = 1;
+            if (partnerDraw.prio > prioBuf[J][X]) continue;
+            dst[J * stride + X] = wl & 0x20 ? brightness(pal[ci], 4) : pal[ci];
+            holeBuf[J][X] = 0;
+        }
+    }
+}
+
+/** The co-op partner over the rectangle: the rider over his blob, behind the real sprites (the last OAM entries). Only for a
+ * partner placed this frame; EXPAND's margins are the one place he is drawn past the screen (never in OAM: it would wrap). */
+static void drawPartner(int x0, int y0, int x1, int y1, uint32_t* dst, int stride, uint32_t alpha) {
+    if (!partnerDraw.have || !partnerHave || partnerDraw.frame < 0 || partnerDraw.frame >= PK_PARTNER_FRAMES) return;
+    drawPartnerFrame(partnerDraw.frame, partnerDraw.x, partnerDraw.y, x0, y0, x1, y1, dst, stride, alpha);
+    if (partnerDraw.blob && partnerDraw.blobFrame >= 0 && partnerDraw.blobFrame < PK_PARTNER_FRAMES)
+        drawPartnerFrame(partnerDraw.blobFrame, partnerDraw.x, partnerDraw.by, x0, y0, x1, y1, dst, stride, alpha);
+}
+
+/** Whether a shown OAM entry's tiles overlap the partner's (OBJ tiles 976-1007). */
+static bool partnerTilesTouched(uint16_t a0, uint16_t a1, uint16_t a2, bool oneD) {
+    int shape = a0 >> 14, size = a1 >> 14;
+    if (shape > 2) return false;
+    int tw = OAM_W[shape][size] / 8, th = OAM_H[shape][size] / 8, step = (a0 & 0x2000) ? 2 : 1, t = a2 & 0x3FF;
+    for (int r = 0; r < th; r++)
+        for (int c = 0; c < tw; c++) {
+            int tile = t + (oneD ? (r * tw + c) * step : r * 32 + c * step);
+            if (tile >= PARTNER_TILE && tile < PARTNER_TILE + 32) return true;
+        }
+    return false;
+}
+
+/** Line 0 (after followBegin): the partner's sprite (and the blob's) into the hardware, the game's bytes saved first. */
+static void partnerBegin(struct GBAVideoRenderer* r) {
+    partnerOam = partnerBlobOam = partnerSlot = -1;
+    partnerShown[0] = partnerShown[1] = partnerShown[2] = -1;
+    partnerAtKnown = false;
+    partnerAtX = partnerAtY = 0;
+    partnerFadeY = 0;
+    partnerDraw.have = false;
+    if (!partnerReq.visible) { partnerWhy = PK_PARTNER_OFF; partnerFadePrimed = false; partnerFadeSel = 0; return; }
+    uint16_t fadeColor = 0;
+    uint32_t fadeSel = 0;
+    int fadeY = partnerFadeRead(&fadeColor, &fadeSel);
+    if (!partnerHave) { partnerWhy = PK_PARTNER_NO_ART; return; }
+    bool blob = partnerReq.blob >= 0;
+    if (partnerReq.frame < 0 || partnerReq.frame >= PK_PARTNER_FRAMES || partnerReq.blob >= PK_PARTNER_FRAMES || partnerReq.blob < -1 ||
+        partnerReq.bob < -64 || partnerReq.bob > 64) { partnerWhy = PK_PARTNER_BAD_FRAME; return; }
+    if (!hookGba || !F.objects || F.family == PK_WIDE_FAMILY_EX || F.family == PK_WIDE_FAMILY_FR_EX || !selfFine.valid) { partnerWhy = PK_PARTNER_NO_PLAYER; return; }
+    G = hookGba;
+    int cx, cy, px, py;
+    uint32_t spriteId;
+    if (!followPlayer(&cx, &cy, &px, &py, &spriteId) || spriteId >= 64) { partnerWhy = PK_PARTNER_NO_PLAYER; return; }
+    const uint16_t* oam = hookGba->video.oam.raw;
+    struct PlayerBox pb;
+    playerBox(oam, (int) (r16(F.sprites + 0x44 * spriteId + 4) & 0x3FF), &pb);
+    if (pb.last < 0) { partnerWhy = PK_PARTNER_NO_PLAYER; return; }
+    // The sprite's top-left, from the player's feet and middle, moved by the difference of the two fine positions.
+    int ox = (pb.x0 + pb.x1) / 2 + (partnerReq.fx - selfFine.fx) - 16, oy = pb.y1 + (partnerReq.fy - selfFine.fy) - 32;
+    partnerAtX = ox; partnerAtY = oy;
+    partnerAtKnown = true;
+    // What drawPartner needs for the margins (and, where the hardware drew him, the middle): kept whether or not the hardware could.
+    // The screen fade takes the partner with it (the player's own palette is in the fade's set): blended first; color() tints.
+    if (!(fadeSel >> (16 + (oam[pb.last * 4 + 2] >> 12)) & 1)) fadeY = 0;
+    partnerFadeY = fadeY;
+    for (int i = 0; i < 16; i++) {
+        uint16_t c = (uint16_t) (partnerArt[PK_PARTNER_FRAMES * 512 + i * 2] | partnerArt[PK_PARTNER_FRAMES * 512 + i * 2 + 1] << 8);
+        partnerDraw.pal[i] = fadeY ? fadeBlend555(c, fadeY, fadeColor) : c;
+    }
+    partnerDraw.have = true; partnerDraw.hardware = false; partnerDraw.blob = blob; partnerDraw.prio = pb.prio;
+    partnerDraw.frame = partnerReq.frame; partnerDraw.blobFrame = partnerReq.blob; partnerDraw.hflip = partnerReq.hflip != 0;
+    partnerDraw.x = ox; partnerDraw.y = oy;
+    int by = oy + (blob ? partnerReq.bob : 0);
+    partnerDraw.by = by;
+    if (ox < -31 || ox > 239 || oy < -31 || oy > 159 || by < -31 || by > 159) { partnerWhy = PK_PARTNER_OFFSCREEN; return; }
+    // The game's shown entries: its last one, and whether any holds our tiles; the palette slots in use (FOLLOWER's too).
+    bool oneD = (hookGba->memory.io[0] & 0x40) != 0;
+    bool used[16] = { false };
+    int lastShown = -1;
+    for (int k = 0; k < 128; k++) {
+        uint16_t a0 = oam[k * 4], a1 = oam[k * 4 + 1], a2 = oam[k * 4 + 2];
+        if (oamHidden(a0)) continue;
+        used[a2 >> 12] = true;
+        if (k == followOam) continue;
+        lastShown = k;
+        if (partnerTilesTouched(a0, a1, a2, oneD)) { partnerWhy = PK_PARTNER_TILES_USED; return; }
+    }
+    int e[2], found = 0;
+    for (int k = 127; k > lastShown && found < (blob ? 2 : 1); k--) if (oamHidden(oam[k * 4])) e[found++] = k;
+    if (found < (blob ? 2 : 1)) { partnerWhy = PK_PARTNER_NO_ENTRY; return; }
+    int slot = -1;
+    for (int k = 15; k >= 0; k--) if (!used[k]) { slot = k; break; }
+    if (slot < 0) { partnerWhy = PK_PARTNER_NO_SLOT; return; }
+    int rider = blob ? e[1] : e[0];                    // the lower index: above the blob
+    int blobEntry = blob ? e[0] : -1;
+    uint8_t* vram = (uint8_t*) hookGba->video.vram;
+    partnerVramBytes = blob ? 1024 : 512;
+    memcpy(partnerSavedVram, vram + PARTNER_VRAM, (size_t) partnerVramBytes);
+    memset(partnerDirty, 0, sizeof(partnerDirty));
+    memcpy(vram + PARTNER_VRAM, partnerArt + partnerReq.frame * 512, 512);
+    if (blob) memcpy(vram + PARTNER_VRAM + 512, partnerArt + partnerReq.blob * 512, 512);
+    for (int i = 0; i < partnerVramBytes; i += 2) origWriteVRAM(r, PARTNER_VRAM + (uint32_t) i);
+    uint16_t flip = partnerReq.hflip ? 0x1000 : 0;
+    for (int which = 0; which < (blob ? 2 : 1); which++) {
+        int entry = which ? blobEntry : rider, y = which ? by : oy, tile = which ? PARTNER_BLOB_TILE : PARTNER_TILE;
+        memcpy(partnerSavedOam[which], &oam[entry * 4], 8);
+        uint16_t* w = &hookGba->video.oam.raw[entry * 4];
+        w[0] = (uint16_t) (y & 0xFF);                                  // square, 4bpp, shown
+        w[1] = (uint16_t) ((ox & 0x1FF) | (2 << 14) | flip);           // 32x32
+        w[2] = (uint16_t) (tile | pb.prio << 10 | slot << 12);
+        for (int k = 0; k < 3; k++) r->writeOAM(r, (uint32_t) entry * 4 + (uint32_t) k);
+    }
+    for (int i = 0; i < 16; i++) {
+        uint16_t c = partnerDraw.pal[i];
+        if (tintShown) c = tint555(c);
+        if (i == 1) partnerPal1 = c;
+        r->writePalette(r, (uint32_t) (0x200 + slot * 32 + i * 2), c);
+    }
+    partnerDraw.hardware = true;
+    partnerOam = rider;
+    partnerBlobOam = blobEntry;
+    partnerSlot = slot;
+    partnerShown[0] = rider; partnerShown[1] = blobEntry; partnerShown[2] = slot;
+    partnerWhy = PK_PARTNER_DRAWN;
+}
+
+/** After the last line: the game's own OAM entries, tiles (but those it wrote meanwhile) and palette back. */
+static void partnerEnd(struct GBAVideoRenderer* r) {
+    if (partnerOam < 0 || !hookGba) return;
+    uint8_t* vram = (uint8_t*) hookGba->video.vram;
+    for (int i = 0; i < partnerVramBytes / 2; i++) {
+        if (partnerDirty[i]) continue;
+        memcpy(vram + PARTNER_VRAM + i * 2, partnerSavedVram + i * 2, 2);
+        origWriteVRAM(r, PARTNER_VRAM + (uint32_t) i * 2);
+    }
+    for (int which = 0; which < 2; which++) {
+        int entry = which ? partnerBlobOam : partnerOam;
+        if (entry < 0) continue;
+        memcpy(&hookGba->video.oam.raw[entry * 4], partnerSavedOam[which], 8);
+        for (int k = 0; k < 3; k++) r->writeOAM(r, (uint32_t) entry * 4 + (uint32_t) k);
+    }
+    for (int i = 0; i < 16; i++) {
+        uint16_t c = hookGba->video.palette[256 + partnerSlot * 16 + i];
+        r->writePalette(r, (uint32_t) (0x200 + partnerSlot * 32 + i * 2), tintShown ? tint555(c) : c);
+    }
+    partnerOam = partnerBlobOam = partnerSlot = -1;
 }
 
 /** Whether a PlayerAvatar sits at [a]: objectEventId (+5) the player's object, gender (+7) 0 / 1, and flags (+0) one of
@@ -2338,7 +3472,77 @@ static int surfing(void) {
     if (a) return (r8(a) & AVATAR_SURF) != 0;
     if (F.family != PK_WIDE_FAMILY_RS && F.family != PK_WIDE_FAMILY_RS_JA) return -1;
     int g = playerGraphics();
-    return g == 2 || g == 92;
+    // Under the sea too (GitHub #338): no avatar flags here, and the diving sprites are their own. MAP_TYPE_UNDERWATER.
+    return g == 2 || g == 92 || (F.mapHeader && r8(F.mapHeader + 0x17) == 5);
+}
+
+/** Co-op presence: the map (SaveBlock1's location, the bytes Telemetry reads), the player's object's tile, eased between
+ * its previous and current tile by how far BG2's scroll has moved since the current one was set (16 px a tile, any speed:
+ * FOLLOWER's measure), its facing (+0x18's low nibble), the avatar's movement mode, and a count of one-tile steps. */
+int pk_partner_self(struct mCore* core, int32_t out[PK_PARTNER_SELF_N]) {
+    selfFine.valid = false;
+    if (!core || core->platform(core) != mPLATFORM_GBA || !F.locked) return 0;
+    G = (struct GBA*) core->board;
+    memset(out, 0, sizeof(int32_t) * PK_PARTNER_SELF_N);
+    int k = playerObject();
+    const uint8_t* oe = k < 0 ? NULL : mem(F.objects + 0x24u * (uint32_t) k, 0x24);
+    uint32_t sb1 = F.saveStatic ? F.saveBlock1 : r32(F.saveBlock1);
+    const uint8_t* loc = sb1 ? mem(sb1 + F.sb1Pos + 4, 2) : NULL;
+    if (!oe || !loc) {
+        selfTrack.have = false;
+        out[PK_PARTNER_SELF_STEP] = selfTrack.step & 0xFF;
+        return 1;
+    }
+    int cx = (int16_t) le16(oe + 0x10), cy = (int16_t) le16(oe + 0x12);
+    int px = (int16_t) le16(oe + 0x14), py = (int16_t) le16(oe + 0x16);
+    const uint16_t* io = G->memory.io;
+    int sx = io[0x18 >> 1] & 0x1FF, sy = io[0x1A >> 1] & 0x1FF;   // BG2HOFS / BG2VOFS: the map's scroll
+    bool tileChanged = !selfTrack.have || cx != selfTrack.cx || cy != selfTrack.cy, step = false;
+    if (tileChanged) {
+        // A map connection moves both coords by the map's size, the step under way and its scroll kept: neither a step
+        // nor a new one (FOLLOWER's "a connection"). A step = a new tile one from the previous (a warp sets both alike).
+        int dx = cx - selfTrack.cx, dy = cy - selfTrack.cy;
+        bool shifted = selfTrack.have && px - selfTrack.px == dx && py - selfTrack.py == dy && abs(dx) + abs(dy) > 1;
+        if (!shifted) {
+            step = selfTrack.have && abs(cx - px) + abs(cy - py) == 1;
+            if (step) selfTrack.step++;
+            selfTrack.scrollX = sx;
+            selfTrack.scrollY = sy;
+        }
+    }
+    // A step onto a connected map names the new map at once, while the coords are still the old map's until the next
+    // frame shifts them: the old map is kept until the coords move other than by a step (the shift, a warp), at most 4
+    // frames (a warp that lands on the same coords), so the map and the tile always agree.
+    int map = loc[0] << 8 | loc[1];
+    if (!selfTrack.have || (tileChanged && !step) || map == selfTrack.map || ++selfTrack.mapHold > 4) {
+        selfTrack.map = map;
+        selfTrack.mapHold = 0;
+    }
+    selfTrack.have = true;
+    selfTrack.cx = cx;
+    selfTrack.cy = cy;
+    selfTrack.px = px;
+    selfTrack.py = py;
+    int moved = abs(((sx - selfTrack.scrollX + 256) & 0x1FF) - 256) + abs(((sy - selfTrack.scrollY + 256) & 0x1FF) - 256);
+    int progress = moved > 16 ? 16 : moved;
+    int mode = 0;
+    uint32_t a = playerAvatar();
+    if (a) {
+        uint8_t flags = (uint8_t) r8(a);
+        mode = flags & 8 ? 4 : flags & 2 ? 2 : flags & 4 ? 3 : flags & 0x80 ? 1 : 0;   // SURFING, MACH, ACRO, DASH
+    }
+    out[PK_PARTNER_SELF_VALID] = 1;
+    out[PK_PARTNER_SELF_GROUP] = selfTrack.map >> 8;
+    out[PK_PARTNER_SELF_NUM] = selfTrack.map & 0xFF;
+    out[PK_PARTNER_SELF_FX] = px * 16 + (cx - px) * progress;
+    out[PK_PARTNER_SELF_FY] = py * 16 + (cy - py) * progress;
+    out[PK_PARTNER_SELF_FACING] = oe[0x18] & 0x0F;
+    out[PK_PARTNER_SELF_MODE] = mode;
+    selfFine.valid = true;
+    selfFine.fx = out[PK_PARTNER_SELF_FX];
+    selfFine.fy = out[PK_PARTNER_SELF_FY];
+    out[PK_PARTNER_SELF_STEP] = selfTrack.step & 0xFF;
+    return 1;
 }
 
 /** RUN INDOORS: gMapHeader's allowRunning, set - FireRed's at +0x19 bit 1, Emerald's (and expansion's) at +0x1A bit
@@ -2348,7 +3552,7 @@ static void allowRunning(void) {
     uint32_t off;
     uint8_t bit;
     if (F.family == PK_WIDE_FAMILY_FR || F.family == PK_WIDE_FAMILY_FR_EX) { off = 0x19; bit = 2; }
-    else if (F.family == PK_WIDE_FAMILY_EM || F.family == PK_WIDE_FAMILY_EX) { off = 0x1A; bit = 4; }
+    else if (F.family == PK_WIDE_FAMILY_EM || F.family == PK_WIDE_FAMILY_EX || F.family == PK_WIDE_FAMILY_MM) { off = 0x1A; bit = 4; }
     else return;
     uint8_t* p = (uint8_t*) mem(F.mapHeader + off, 1);
     if (p && !(*p & bit)) *p |= bit;
@@ -2364,14 +3568,16 @@ void pk_field_wild(uint32_t addr, bool wasOff) {
 /** WILD ENCOUNTERS: the game's own switch (StandardWildEncounter returns at once while it's 1; fishing, Sweet Scent and
  * scripted battles don't look at it), rolled every frame the player is free on the field, so the step that would have
  * met a Pokémon finds it off with [keep]% left. Left alone in a battle, a script or FireRed's quest log replay (which
- * turns it on itself), and only put back to 0 where we set it. */
+ * turns it on itself). NORMAL puts it back to 0 whenever it finds it on the free field, ours or not: nothing else
+ * sets it there (CFRU only reads it), and a savestate taken while OFF carries it on - loaded with NORMAL, or across a
+ * restart, it stayed on and no wild Pokémon came again (GitHub #298). */
 static void wildRoll(int s, int keep) {
     if (!F.wild || (s & (PK_FIELD_LOCKED | PK_FIELD_BATTLE))) return;
     if (F.questLog && (r8(F.questLog) == 2 || r8(F.questLog) == 3)) return;
     uint8_t* p = (uint8_t*) mem(F.wild, 1);
     if (!p) return;
     if (keep >= 100) {
-        if (wildOwned) *p = 0;
+        if (*p) *p = 0;
         wildOwned = false;
         return;
     }
@@ -2391,6 +3597,7 @@ int pk_field_state(struct mCore* core, int runIndoors, int wildKeep) {
     if (r8(F.locked)) s |= PK_FIELD_LOCKED;
     if (F.main && (r8(F.main + F.inBattleOff) & 2)) s |= PK_FIELD_BATTLE;
     else if ((s & PK_FIELD_LOCKED) && textUp()) s |= PK_FIELD_TEXT;   // a battle's text is BATTLE SPEED's
+    else if (!(s & PK_FIELD_LOCKED) && textUp()) s |= PK_FIELD_WINDOW;
     if (onBike()) s |= PK_FIELD_BIKE;
     int surf = surfing();
     if (surf > 0) s |= PK_FIELD_SURF;
@@ -2401,7 +3608,14 @@ int pk_field_state(struct mCore* core, int runIndoors, int wildKeep) {
 }
 
 void pk_wide_reset(void) {
+    if (laterJoin) laterJoin();
     pk_wide_gb_reset();
+#ifdef PK_WIDE_CACHE
+    ringStamp++;
+    later.due = false;
+    laterFullDue = false;
+    cachedLast = false;
+#endif
     prev = -1;
     memset(seenObjects, 0, sizeof(seenObjects));
     npieces[0] = npieces[1] = 0;
@@ -2415,6 +3629,14 @@ void pk_wide_reset(void) {
     lastScene = PK_WIDE_SCENE_OFF;
     overlayDim = 0;
     edgeAccOk = false;
+    mixSnap = false;
+}
+
+void pk_wide_jump(struct mCore* core, const uint32_t* frame) {
+    pk_wide_reset();
+    pk_wide_skip(core, frame);
+    mixSnap = true;
+    pk_wide_gb_snap();
 }
 
 int pk_wide_last_score(void) { return gbGame ? pk_wide_gb_last_score() : lastScore; }
@@ -2447,6 +3669,59 @@ static bool textUp(void) {
             if (le16(vram + scr + 2 * (uint32_t) (ry * 32 + rx)) & 0x3FF) n++;
         }
     return n >= 8;
+}
+
+/** BG0 is what the frame shows at screen pixel (x, y): it's opaque there and the frame has its colour (BG0 can sit
+ * opaque under the map: Unbound's START menu leaves tiles beside its middle windows). Line y's registers. */
+static bool barEdge(int x, int y) {
+    int pal, ci = (windowLayers(x, y) & 1) ? bgPixel(0, x, y, &pal) : 0;
+    if (!ci) return false;
+    uint16_t c = P[pal + ci];
+    uint32_t v = (uint32_t) (c & 0x1F) << 3 | (uint32_t) ((c >> 5) & 0x1F) << 11 | (uint32_t) ((c >> 10) & 0x1F) << 19;
+    v |= (v >> 5) & 0x070707;   // mColorFrom555, untinted: DAY AND NIGHT leaves the text windows' palettes alone
+    uint32_t f = realFrame[y * PK_WIDE_W + x] & 0xFFFFFF;
+    return f == v || f == (color(c, 0) & 0xFFFFFF);
+}
+
+/** BG0 is opaque all the way across line y (a bar, not two windows that each touch an edge: Unbound's POKéDEX label
+ * and clock reach the screen's edges with the field between them). Sprites over it (the bar's icons) don't matter. */
+static bool bg0Across(int y) {
+    for (int x = 1; x < PK_WIDE_W - 1; x++) {
+        int pal;
+        if (!(windowLayers(x, y) & 1) || !bgPixel(0, x, y, &pal)) return false;
+    }
+    return true;
+}
+
+/** BG0 shows at both of the screen's edges on line y and is opaque all the way across it. Line y's registers. */
+static bool barRow(int y) {
+    useLine(y);
+    return (io(0) & 0x100) && barEdge(0, y) && barEdge(PK_WIDE_W - 1, y) && bg0Across(y);
+}
+
+/** The rows a full-width bar on BG0 crosses (Unbound's START menu, its quest bar over the field and its icons under it;
+ * FireRed's quest-log recap bars): [barRow]s running from the screen's top or bottom edge. Past the edges they're holes -
+ * the row's own edge pixel goes on, as a battle's text box band does - instead of the map going on beside the bar.
+ * Unbound's text box is BG0 across too, its white outline at both edges, but the field shows under it (rows 116-157):
+ * carried out, it was a white box behind every message (1.4.0, a Discord report), so a band that touches neither edge
+ * keeps the map beside it. Line by line, as the PPU drew them. */
+static void barRows(uint8_t bars[PK_WIDE_H]) {
+    memset(bars, 0, PK_WIDE_H);
+    int top = 0;
+    while (top < PK_WIDE_H && barRow(top)) bars[top++] = 1;
+    for (int y = PK_WIDE_H - 1; y >= top && barRow(y); y--) bars[y] = 1;
+    useLive();
+}
+
+static void markBarRows(int x0, int y0, int w, int h) {
+    uint8_t bars[PK_WIDE_H];
+    barRows(bars);
+    for (int j = 0; j < h; j++) {
+        int y = y0 + j;
+        if (y < 0 || y >= PK_WIDE_H || !bars[y]) continue;
+        for (int x = 0; x < w; x++)
+            if (!onFrame(x0 + x, y)) holeBuf[j][x] = 1;
+    }
 }
 
 /** A screen effect is up: lines drawn with their own scroll or windows (a transition's slices, wedges, bands). */
@@ -2619,6 +3894,7 @@ int pk_wide_fault(void) { return lastFault; }
 
 static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView v, uint32_t* centre);
 
+
 int pk_wide_view(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView v, uint32_t* centre) {
 #ifndef PK_WIDE_NO_GUARD
     installGuard();
@@ -2656,25 +3932,463 @@ void pk_wide_skip(struct mCore* core, const uint32_t* frame) {
     pk_wide_view(core, frame, NULL, v, NULL);
 }
 
+int pk_wide_glow(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView v) {
+    pk_wide_skip(core, frame);   // the RAM history, as for any frame nobody sees the window of
+    if (gbGame) {
+        if (v.w > PK_WIDE_MAX_VIEW_W) v.w = PK_WIDE_MAX_VIEW_W;
+        if (v.h > PK_WIDE_MAX_VIEW_H) v.h = PK_WIDE_MAX_VIEW_H;
+        return v.w < 1 || v.h < 1 ? 0 : pk_wide_gb_glow(core, frame, out, v);
+    }
+    if (!core || core->platform(core) != mPLATFORM_GBA || !configured || !out) return 0;
+    if (v.w > PK_WIDE_MAX_VIEW_W) v.w = PK_WIDE_MAX_VIEW_W;
+    if (v.h > PK_WIDE_MAX_VIEW_H) v.h = PK_WIDE_MAX_VIEW_H;
+    if (v.w < 1 || v.h < 1) return 0;
+    uint32_t alpha = frame[0] & 0xFF000000;
+    ambientPrepare(frame);
+    int reach[4] = { -v.x, v.x + v.w - PK_WIDE_W, -v.y, v.y + v.h - PK_WIDE_H };
+    for (int j = 0; j < v.h; j++) {
+        int Y = v.y + j;
+        uint32_t* row = out + j * v.w;
+        for (int i = 0; i < v.w; i++) {
+            int X = v.x + i;
+            if (onFrame(X, Y)) {
+                int n = (PK_WIDE_W - X) < (v.w - i) ? PK_WIDE_W - X : v.w - i;
+                memcpy(row + i, frame + Y * PK_WIDE_W + X, (size_t) n * sizeof(uint32_t));
+                i += n - 1;
+            } else {
+                row[i] = glowAt(frame, X, Y, reach, alpha);
+            }
+        }
+    }
+    return 1;
+}
+
 void pk_wide_probe(struct mCore* core, const uint32_t* frame, int skip) {
     static uint32_t px;
     struct PkWideView v = { 0, 0, 1, 1 };
     if (gbGame) pk_wide_view(core, frame, skip ? NULL : &px, v, NULL);
 }
 
+#ifdef PK_WIDE_CACHE
+/** An ordinary field frame: every line drawn alike, the same window setting all round the frame. *enabled: its BGs. */
+static bool cacheReady(int hofs, int vofs, int href, int vref, int* enabled) {
+    if (!lineHookless && (lineIoFrames < 2 || linePalN != 1)) return false;
+    if (signed9(hofs - href) || signed9(vofs - vref)) return false;
+    useLine(0);
+    int disp = io(0), mode = (io(0x50) >> 6) & 3;
+    if (mode >= 2) return false;      // BLDCNT's brightness: a fade
+    for (int y = 1; y < PK_WIDE_H; y++)
+        if (lineRegs(y)[0] != (uint16_t) disp) return false;
+    if (effectsUp()) return false;
+    useLine(0);
+    int wl = windowLayers(0, 0);
+    if (disp & 0xE000) {
+        for (int y = 0; y < PK_WIDE_H; y++)
+            if (windowLayers(0, y) != wl || windowLayers(PK_WIDE_W - 1, y) != wl) return false;
+        for (int x = 0; x < PK_WIDE_W; x++)
+            if (windowLayers(x, 0) != wl || windowLayers(x, PK_WIDE_H - 1) != wl) return false;
+    }
+    *enabled = (disp >> 8) & wl & 0x0E;
+    return *enabled != 0;
+}
+
+/** What cell (wx, wy) of the world holds: its tile entries, and whose tilesets. */
+static void cellEntries(const struct Snap* s, int wx, int wy, int enabled, uint16_t e[3], const struct Foreign** foreignOut) {
+    int conn;
+    int mid = blockIn(s, wx >> 4, wy >> 4, &conn, false);
+    struct Foreign* f = conn >= 0 && conn < MAX_CONNS ? connForeign[conn] : NULL;
+    int q = ((wy >> 3) & 1) * 2 + ((wx >> 3) & 1);
+    for (int i = 0; i < 3; i++) {
+        int b = order3[i];
+        e[i] = 0;
+        if (!(enabled & (1 << b))) continue;
+        if (f) syncSplit(s);
+        e[i] = f ? metatileIn(&f->t, mid, b)[q] : metatile(s, mid, b)[q];
+    }
+    *foreignOut = f;
+}
+
+// The hook's tileWritten for a hookless core: BG VRAM's 32-byte tiles that differ from the copy kept at the last look.
+static void tilesCompared(void) {
+    static uint32_t seen[0x10000 / 4];
+    const uint32_t* vram = (const uint32_t*) G->video.vram;
+    if (!vram) return;
+    for (int t = 0; t < 2048; t++) {
+        const uint32_t* a = vram + t * 8;
+        uint32_t* b = seen + t * 8;
+        if (a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3] && a[4] == b[4] && a[5] == b[5] && a[6] == b[6] && a[7] == b[7])
+            continue;
+        memcpy(b, a, 32);
+        tileWritten[tileSide][t >> 5] |= 1u << (t & 31);
+    }
+}
+
+static bool cellWritten(const uint16_t e[3], const struct Foreign* f, int enabled) {
+    int nt = C[PK_WIDE_PRIMARY_METATILES];
+    for (int i = 0; i < 3; i++) {
+        int b = order3[i], tile = e[i] & 0x3FF;
+        if (!(enabled & (1 << b)) || (f && (f->ownPrimary || tile >= nt))) continue;
+        uint32_t t = (bgChar[b] >> 5) + (uint32_t) tile;
+        if (t < 2048 && (tileWritten[tileSide ^ 1][t >> 5] >> (t & 31) & 1)) return true;
+    }
+    return false;
+}
+
+static void cellDraw(const struct Snap* s, int wx, int wy, int enabled, uint32_t alpha) {
+    uint16_t cs[8];
+    uint8_t ps[8], ls[8];
+    for (int r = 0; r < 8; r++) {
+        int y = (wy + r) & (RING_PX - 1), x = wx & (RING_PX - 1);
+        mapSpan(s, wx, wy + r, 8, enabled, cs, ps, ls);
+        for (int k = 0; k < 8; k++) {
+            ringPx[y][x + k] = color(cs[k], alpha);
+            ringMeta[y][x + k] = (uint8_t) (ps[k] << 4 | ls[k]);
+        }
+    }
+}
+
+/** n of the cache's pixels from world (wx, wy) on. */
+static void ringRow(uint32_t* to, int wx, int wy, int n) {
+    const uint32_t* row = ringPx[wy & (RING_PX - 1)];
+    int x = wx & (RING_PX - 1), first = RING_PX - x < n ? RING_PX - x : n;
+    memcpy(to, row + x, (size_t) first * sizeof(uint32_t));
+    if (first < n) memcpy(to + first, row, (size_t) (n - first) * sizeof(uint32_t));
+}
+
+/** The window from the cache: what changed drawn, the rows copied, the sprites over them. */
+static void cacheDraw(const struct Snap* s, const uint32_t* frame, uint32_t* out, struct PkWideView v, int cx, int cy, int enabled, uint32_t alpha, bool copyFrame) {
+    foreignFrame++;
+    for (int i = 0; i < MAX_CONNS; i++) connForeign[i] = i < s->nconn ? foreignFor(s, &s->conn[i]) : NULL;
+    useLine(0);
+    // Anything that changes every cell starts them over.
+    uint32_t key = 2166136261u;
+#define MIX(n) (key = (key ^ (uint32_t) (n)) * 16777619u)
+    MIX(s->group); MIX(s->num); MIX(s->primary); MIX(s->secondary); MIX(s->width); MIX(s->height); MIX(s->vw); MIX(s->vh);
+    MIX(s->split); MIX(enabled); MIX(alpha); MIX(tintShown); MIX(tintR); MIX(tintG); MIX(tintB);
+    for (int b = 1; b <= 3; b++) { MIX(bgChar[b]); MIX(bgPrio[b]); MIX(order3[b - 1]); }
+#undef MIX
+    if (key != ringKey || memcmp(ringPal, P, sizeof(ringPal))) {
+        ringKey = key;
+        memcpy(ringPal, P, sizeof(ringPal));
+        ringStamp++;
+    }
+    int staleLeft = cacheMode == 2 ? 1 << 30 : CACHE_STALE_CELLS;
+    int c0 = (cx + v.x) >> 3, c1 = (cx + v.x + v.w - 1) >> 3, r0 = (cy + v.y) >> 3, r1 = (cy + v.y + v.h - 1) >> 3;
+    for (int r = r0; r <= r1; r++) {
+        for (int c = c0; c <= c1; c++) {
+            int sx = c * 8 - cx, sy = r * 8 - cy;
+            struct RingCell* cell = &ringCells[r & (RING_CELLS - 1)][c & (RING_CELLS - 1)];
+            // The frame's own: nothing here watches its tiles, so it's drawn again when it comes out.
+            if (sx >= 0 && sx + 8 <= PK_WIDE_W && sy >= 0 && sy + 8 <= PK_WIDE_H) {
+                cell->stamp = 0;
+                continue;
+            }
+            uint16_t e[3];
+            const struct Foreign* f;
+            cellEntries(s, c * 8, r * 8, enabled, e, &f);
+            bool fresh = cell->stamp != ringStamp || cell->x != c || cell->y != r || cell->f != f || memcmp(cell->e, e, sizeof(e));
+            if (!fresh) {
+                if (cellWritten(e, f, enabled)) cell->stale = true;
+                if (!cell->stale || staleLeft <= 0) continue;
+                staleLeft--;
+            }
+            cellDraw(s, c * 8, r * 8, enabled, alpha);
+            cell->stamp = ringStamp;
+            cell->x = c;
+            cell->y = r;
+            cell->f = f;
+            memcpy(cell->e, e, sizeof(e));
+            cell->stale = false;
+        }
+    }
+    memset(tileWritten[tileSide ^ 1], 0, sizeof(tileWritten[0]));
+    // The rows: the map either side of the frame.
+    int left = v.x < 0 ? -v.x : 0, mid = PK_WIDE_W - (v.x > 0 ? v.x : 0);
+    if (mid > v.w - left) mid = v.w - left;
+    for (int j = 0; j < v.h; j++) {
+        int Y = v.y + j;
+        uint32_t* row = out + j * v.w;
+        if (Y < 0 || Y >= PK_WIDE_H) {
+            ringRow(row, cx + v.x, cy + Y, v.w);
+            memset(takenBuf[j], 0, (size_t) v.w);
+            continue;
+        }
+        ringRow(row, cx + v.x, cy + Y, left);
+        if (!holeWanted || copyFrame) memcpy(row + left, frame + Y * PK_WIDE_W + (v.x > 0 ? v.x : 0), (size_t) mid * sizeof(uint32_t));
+        ringRow(row + left + mid, cx + v.x + left + mid, cy + Y, v.w - left - mid);
+        memset(takenBuf[j], 0, (size_t) left);
+        memset(takenBuf[j] + left, 1, (size_t) mid);
+        memset(takenBuf[j] + left + mid, 0, (size_t) (v.w - left - mid));
+    }
+    // The sprites past the frame, then a full-width bar's rows go on with the row's own edge pixel (markBarRows).
+    ringOn = true;
+    ringX = cx + v.x;
+    ringY = cy + v.y;
+    useLive();
+    frameTaken = true;
+    drawObjects(s, cx, cy, v.x, v.y, v.x + v.w, v.y + v.h, out, v.w, alpha);
+    ringOn = false;
+    uint8_t bars[PK_WIDE_H];
+    barRows(bars);
+    for (int j = 0; j < v.h; j++) {
+        int Y = v.y + j;
+        if (Y < 0 || Y >= PK_WIDE_H || !bars[Y]) continue;
+        needFrame();
+        uint32_t* row = out + j * v.w;
+        for (int x = 0; x < left; x++) row[x] = frame[Y * PK_WIDE_W];
+        for (int x = left + mid; x < v.w; x++) row[x] = frame[Y * PK_WIDE_W + PK_WIDE_W - 1];
+    }
+    useLive();
+}
+#endif
+
+
+/** The rebuild: everything a cached view leaves out (battles, menus, text boxes, what's dissolving). `f` is what viewInner decided. */
+struct FullView {
+    const uint32_t* frame;
+    uint32_t* out;
+    uint32_t* centre;
+    struct PkWideView v;
+    bool valid, battle, menu, overlay;
+    int bestSnap, bestCx, bestCy, bestH, bestV;
+    uint32_t alpha;
+    bool hold;   // FREE FLIGHT's crossing settling: the last window kept as it is (no glow)
+};
+
+/** FREE FLIGHT's smooth camera moves the window, the frame with it, so the map's name sign (BG0, the popup's corner:
+ * POPUP_COLS x POPUP_ROWS tiles at the top-left) would drift with every step. Kept still: where its pixels landed (the
+ * frame's offset), the map rebuilt under it (drawRegion: the field and its people, no BG0); then its own pixels where
+ * they'd be with no offset - as the bird is (flyBegin). Only while one shows and the camera is offset. Where BG0 shows
+ * comes from its tilemap and the line's registers (bgPixel, windowLayers), not the pixels' layer tags: mGBA keeps
+ * those only with the windows off. */
+/** The sign's pixels in the frame's corner (where BG0 shows: its tilemap and the line's registers), false if none. Reads
+ * the frame's line registers: on the emulator's thread, right after the frame. */
+/** bgTileFilled for BG0, each tile's answer kept for the rest of [gen]'s mask (the same tiles under row after row). */
+static bool flySignTileFilled(int x, int y, uint32_t gen) {
+    static uint32_t seen[4][1024];
+    static uint8_t filled[4][1024];
+    uint16_t cnt = io(0x08), e;
+    int bx, by;
+    if (cnt & 0x80) return bgTileFilled(0, x, y);   // 256 colours: not BG0's text tiles, asked directly
+    if (!bgEntry(0, x, y, &e, &bx, &by)) return false;
+    int base = (cnt >> 2) & 3, tile = e & 0x3FF;
+    if (seen[base][tile] != gen) {
+        seen[base][tile] = gen;
+        filled[base][tile] = bgTileFilled(0, x, y);
+    }
+    return filled[base][tile];
+}
+
+static bool flySignMask(uint8_t sign[FL_SIGN_H][FL_SIGN_W]) {
+    if (!(io(0) & 0x100)) return false;   // BG0 off
+    static uint32_t gen;
+    if (++gen == 0) gen = 1;
+    bool any = false;
+    for (int y = 0; y < FL_SIGN_H; y++) {
+        useLine(y);
+        for (int x0 = 0; x0 < FL_SIGN_W; x0 += 8) {
+            // Eight pixels lie on at most two of BG0's tiles, the ones under the first and the last: both blank, none of
+            // them is the sign's (most of the corner while no sign is up: a 3DS spent ~2 ms a frame reading every pixel).
+            if (!flySignTileFilled(x0, y, gen) && !flySignTileFilled(x0 + 7, y, gen)) {
+                memset(&sign[y][x0], 0, 8);
+                continue;
+            }
+            for (int x = x0; x < x0 + 8; x++) {
+                int pal;
+                sign[y][x] = (windowLayers(x, y) & 1) && bgPixel(0, x, y, &pal) ? 1 : 0;
+                any |= sign[y][x] != 0;
+            }
+        }
+    }
+    return any;
+}
+
+/** The sign moved back: where its pixels landed in window [v] ([dx], [dy]: the frame's offset) the map again (drawRegion
+ * from [s]: the field and its people, no BG0), then its own pixels where they'd be with no offset. */
+static void flySignMove(const uint8_t sign[FL_SIGN_H][FL_SIGN_W], const struct Snap* s, int cx, int cy, int href, int vref,
+                        const uint32_t* frame, uint32_t* out, struct PkWideView v, int dx, int dy, uint32_t alpha) {
+    static uint32_t under[FL_SIGN_H][FL_SIGN_W];
+    drawRegion(s, cx, cy, href, vref, 0, 0, FL_SIGN_W, FL_SIGN_H, false, &under[0][0], FL_SIGN_W, alpha);
+    // Where the sign's pixels are now (frame pixel (x, y) at window (x - v.x, y - v.y)): the map again.
+    for (int y = 0; y < FL_SIGN_H; y++) {
+        int oy = y - v.y;
+        if (oy < 0 || oy >= v.h) continue;
+        for (int x = 0; x < FL_SIGN_W; x++) {
+            int ox = x - v.x;
+            if (ox < 0 || ox >= v.w || !sign[y][x]) continue;
+            out[oy * v.w + ox] = under[y][x];
+        }
+    }
+    // The sign where it stays: the window as it would be with no offset.
+    for (int y = 0; y < FL_SIGN_H; y++) {
+        int oy = y - v.y + dy;
+        if (oy < 0 || oy >= v.h) continue;
+        for (int x = 0; x < FL_SIGN_W; x++) {
+            int ox = x - v.x + dx;
+            if (ox < 0 || ox >= v.w || !sign[y][x]) continue;
+            out[oy * v.w + ox] = frame[y * PK_WIDE_W + x];
+        }
+    }
+}
+
+static void flyLabel(const struct FullView* f) {
+    static uint8_t sign[FL_SIGN_H][FL_SIGN_W];
+    if (!flySignMask(sign)) return;
+    flySignMove(sign, &snaps[f->bestSnap], f->bestCx, f->bestCy, f->bestH, f->bestV, f->frame, f->out, f->v, flyDx, flyDy, f->alpha);
+}
+
+static void fullDraw(const struct FullView* f) {
+    const uint32_t* frame = f->frame;
+    uint32_t* out = f->out;
+    uint32_t* centre = f->centre;
+    struct PkWideView v = f->v;
+    bool valid = f->valid, battle = f->battle, menu = f->menu, overlay = f->overlay;
+    int bestSnap = f->bestSnap, bestCx = f->bestCx, bestCy = f->bestCy, bestH = f->bestH, bestV = f->bestV;
+    uint32_t alpha = f->alpha;
+    PW_MARK(pw3);
+    if (valid || battle || menu) {
+        if (valid) {
+            const struct Snap* s = &snaps[bestSnap];
+            drawRegion(s, bestCx, bestCy, bestH, bestV, v.x, v.y, v.x + v.w, v.y + v.h, true, &raw[0][0], BUF_W, alpha);
+            if (!overlay) markBarRows(v.x, v.y, v.w, v.h);   // FireRed's map preview keeps its dimmed map around it
+        } else if (battle) {
+            drawBattleRegion(v.x, v.y, v.x + v.w, v.y + v.h, true, &raw[0][0], BUF_W, alpha);
+        } else {
+            drawMenuRegion(v.x, v.y, v.x + v.w, v.y + v.h, true, &raw[0][0], BUF_W, alpha, frame);
+        }
+        for (int j = 0; j < v.h; j++) memcpy(rawHole[j], holeBuf[j], (size_t) v.w);
+        rawView = v;
+        if (centre) {
+            if (valid) drawRegion(&snaps[bestSnap], bestCx, bestCy, bestH, bestV, 0, 0, PK_WIDE_W, PK_WIDE_H, false, centre, PK_WIDE_W, alpha);
+            else if (battle) drawBattleRegion(0, 0, PK_WIDE_W, PK_WIDE_H, false, centre, PK_WIDE_W, alpha);   // holes show the backdrop, as the PPU does
+            else drawMenuRegion(0, 0, PK_WIDE_W, PK_WIDE_H, false, centre, PK_WIDE_W, alpha, NULL);
+        }
+        mix = mixSnap || mix + MIX_STEP > 256 ? 256 : mix + MIX_STEP;
+        mixSnap = false;
+    } else {
+        if (!f->hold) mix = mix - MIX_STEP < 0 ? 0 : mix - MIX_STEP;   // the last scene, frozen, dissolves into the glow
+        mixSnap = false;   // a jump's cut is the frame after it: a scene drawn much later (after a fade, a reset) fades in
+    }
+    PW_MARK(pw4);
+    PW_ADD(2, pw3, pw4);
+    if (!rawView.w) mix = 0;   // nothing drawn yet
+    if (mix < 256) ambientPrepare(frame);
+    else edgeAccOk = false;    // the glow starts from the edges as they are when it's next needed
+    int reach[4] = { -v.x, v.x + v.w - PK_WIDE_W, -v.y, v.y + v.h - PK_WIDE_H };
+
+    for (int j = 0; j < v.h; j++) {
+        int Y = v.y + j;
+        uint32_t* row = out + j * v.w;
+        int ry = Y - rawView.y;
+        bool rawRow = ry >= 0 && ry < rawView.h;
+        for (int i = 0; i < v.w; i++) {
+            int X = v.x + i;
+            if (onFrame(X, Y)) {
+                // The frame itself: copied a row segment at a time - or, under a BG0 picture, dimmed but for BG0's own
+                // pixels (the map showing around and through the picture).
+                int n = (PK_WIDE_W - X) < (v.w - i) ? PK_WIDE_W - X : v.w - i;
+                if (holeLeft) {
+                    // The host's (pk_wide_hole).
+                } else if (!overlayDim) {
+                    memcpy(row + i, frame + Y * PK_WIDE_W + X, (size_t) n * sizeof(uint32_t));
+                } else {
+                    for (int k = 0; k < n; k++) {
+                        uint32_t p = frame[Y * PK_WIDE_W + X + k];
+                        row[i + k] = fromBg(p, 0) ? p : dimmed(p, overlayDim);
+                    }
+                }
+                i += n - 1;
+                continue;
+            }
+            // A run of pixels outside the frame (a whole row above/below it, or the left run before it, or the right run).
+            int n = (Y < 0 || Y >= PK_WIDE_H || X >= PK_WIDE_W) ? v.w - i : (-X < v.w - i ? -X : v.w - i);
+            // Where the last drawn window is settled (no glow mixed in) and nothing dims it, a run inside `raw` is its row
+            // copied, the holes patched after: the same pixels the per-pixel path below gives, without its branches.
+            int fa = -1, fb = -1;
+            if (mix >= 256 && !overlayDim && rawRow) {
+                fa = rawView.x - X < 0 ? 0 : rawView.x - X;
+                fb = rawView.x + rawView.w - X > n ? n : rawView.x + rawView.w - X;
+                if (fa >= fb) fa = fb = -1;
+            }
+            for (int k = 0; k < n;) {
+                if (k == fa) {
+                    int rx0 = X + k - rawView.x, cnt = fb - fa;
+                    memcpy(row + i + k, &raw[ry][rx0], (size_t) cnt * sizeof(uint32_t));
+                    const uint8_t* hole = &rawHole[ry][rx0];
+                    for (int q = 0; q < cnt; q++) {
+                        if (hole[q]) {
+                            int XX = X + k + q;
+                            row[i + k + q] = frame[clampi(Y, 0, PK_WIDE_H - 1) * PK_WIDE_W + clampi(XX, 0, PK_WIDE_W - 1)];
+                        }
+                    }
+                    k = fb;
+                    continue;
+                }
+                int XX = X + k;
+                int rx = XX - rawView.x, m = mix;
+                uint32_t scene = 0;
+                if (rawRow && rx >= 0 && rx < rawView.w) {
+                    // A hole goes on with the frame's nearest edge pixel as the game shows it now (so it follows fades).
+                    scene = rawHole[ry][rx] ? frame[clampi(Y, 0, PK_WIDE_H - 1) * PK_WIDE_W + clampi(XX, 0, PK_WIDE_W - 1)]
+                                            : raw[ry][rx];
+                } else {
+                    m = 0;   // the window moved off what was last drawn: the glow
+                }
+                uint32_t o = m >= 256 ? scene : lerp(glowAt(frame, XX, Y, reach, alpha), scene, m);
+                row[i + k] = overlayDim ? dimmed(o, overlayDim) : o;
+                k++;
+            }
+            i += n - 1;
+        }
+    }
+    if (valid && (flyDx || flyDy)) flyLabel(f);
+    PW_MARK(pw5);
+    PW_ADD(3, pw4, pw5);
+    PW_REPORT();
+}
+
+#ifdef PK_WIDE_CACHE
+void pk_wide_later(int on, void (*join)(void)) {
+    laterOn = on != 0;
+    laterJoin = join;
+}
+
+static struct FullView laterFull;
+
+int pk_wide_due(void) { return later.due || laterFullDue; }
+
+void pk_wide_finish(void) {
+    if (laterFullDue) {
+        laterFullDue = false;
+        fullDraw(&laterFull);
+    }
+    if (!later.due) return;
+    later.due = false;
+    cacheDraw(later.s, later.frame, later.out, later.v, later.cx, later.cy, later.enabled, later.alpha, later.sign);
+    if (later.sign)
+        flySignMove(laterSign, later.s, later.cx, later.cy, later.href, later.vref, later.frame, later.out, later.v, later.dx,
+                    later.dy, later.alpha);
+}
+#endif
+
 static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, struct PkWideView v, uint32_t* centre) {
-    if (gbGame) return pk_wide_gb_view(core, frame, out, v, centre);
+    if (laterJoin) laterJoin();
+    if (gbGame) {
+        needFrame();
+        return pk_wide_gb_view(core, frame, out, v, centre);
+    }
     realFrame = frame;
     if (!out) {
         // pk_wide_skip: a frame nobody will see (fast-forward runs several per refresh). Only the RAM after it is
         // kept - what the next frame shows - so the frame that is drawn still has its snapshot from the frame before.
         if (!core || core->platform(core) != mPLATFORM_GBA || !configured) return 0;
+        flyViewAge = 0;
         G = (struct GBA*) core->board;
         useLive();
         hookScanlines(G);
         int cur = prev == 0 ? 1 : 0;
         take(&snaps[cur]);
-        if (lineIoFrames < 2) lineIoFrames++;
+        if (linesWanted && lineIoFrames < 2) lineIoFrames++;
         prev = cur;
         return mix;
     }
@@ -2683,6 +4397,7 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
     if (v.w < 1 || v.h < 1) return 0;
     uint32_t alpha = frame[0] & 0xFF000000;
     if (!core || core->platform(core) != mPLATFORM_GBA || !configured) {
+        needFrame();
         for (int j = 0; j < v.h; j++)
             for (int i = 0; i < v.w; i++) {
                 int X = v.x + i, Y = v.y + j;
@@ -2694,7 +4409,12 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
     G = (struct GBA*) core->board;
     useLive();
     hookScanlines(G);
+    // FREE FLIGHT's smooth camera (flyBegin): the window moved with the bird, the frame's own offset.
+    flyViewAge = 0;
+    v.x += flyDx;
+    v.y += flyDy;
 
+    PW_MARK(pw0);
     int cur = prev == 0 ? 1 : 0;
     take(&snaps[cur]);
 
@@ -2729,9 +4449,28 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
         }
         lastScore = best;
     }
+    PW_MARK(pw1);
+    PW_ADD(0, pw0, pw1);
     bool valid = best >= MIN_SCORE;
+    if (!valid && flyOn && snaps[cur].ok && fieldDisplay()) {
+        // FREE FLIGHT crossing into a map: pk_flight.c's flMend has the grid right, the screen catches up two or three
+        // frames later. The camera as the RAM has it (no menu can open with the controls locked): the margins go on
+        // with the map and its people instead of freezing (they stood still for those frames and then jumped).
+        const struct Snap* s = &snaps[cur];
+        bestH = io(0x14) & 0x1FF;
+        bestV = io(0x16) & 0x1FF;
+        bestCx = s->posX * 16 + signed8(bestH - s->xTile * 8);
+        bestCy = s->posY * 16 + signed8(bestV - s->yTile * 8);
+        bestSnap = cur;
+        valid = true;
+    }
+    if (!valid) needFrame();
     bool battle = !valid && inBattleScreen();
-    bool menu = !valid && !battle && menuScreen();
+    // FREE FLIGHT: no menu can open (the controls are locked), so a frame that doesn't match is a map crossing settling
+    // (pk_flight.c's flMend draws the view again; the screen catches up two or three frames later): the camera holds and
+    // the last window stays, rather than the menu's bars and a zoom pulling in.
+    bool flyHold = flyOn && !valid && !battle;
+    bool menu = !valid && !battle && !flyHold && menuScreen();
     // A menu screen opened from a battle (POKéMON, BAG: gMain.inBattle stays set) is part of the battle for the
     // camera: a battle always pulls in to 1x, and its sub-screens used to read as SCENE_MENU, which AUTO ZOOM IN
     // OFF leaves zoomed out - the party / bag screen zoomed out and the battle zoomed back in after it.
@@ -2750,7 +4489,7 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
     bool fade = !valid && !battle && fadedFrame(frame);   // (a black frame can pass as a menu screen: still a fade)
     bool replay = questLogPlaying();
     lastClose = lastClose || replay;
-    lastScene = replay ? PK_WIDE_SCENE_OFF : fade ? PK_WIDE_SCENE_FADE : menu && !inBattle ? PK_WIDE_SCENE_MENU : !valid ? PK_WIDE_SCENE_OFF
+    lastScene = replay ? PK_WIDE_SCENE_OFF : fade || flyHold ? PK_WIDE_SCENE_FADE : menu && !inBattle ? PK_WIDE_SCENE_MENU : !valid ? PK_WIDE_SCENE_OFF
               : transition ? PK_WIDE_SCENE_BATTLE_START : overlay ? PK_WIDE_SCENE_OVERLAY
               : lastClose ? PK_WIDE_SCENE_TEXT : PK_WIDE_SCENE_FIELD;
     int dimTarget = overlay ? overlayStrength() : 0;
@@ -2759,6 +4498,7 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
 
     // Sprites: the frame shows the snapshot before it; if its list isn't what the OAM has, the
     // RAM was caught mid-update (a lag frame repeats the last picture) - keep the last good list.
+    PW_MARK(pw2);
     if (valid && prev >= 0 && snaps[prev].ok) {
         int other = shown ^ 1;
         npieces[other] = buildPieces(&snaps[prev], pieces[other]);
@@ -2766,67 +4506,56 @@ static int viewInner(struct mCore* core, const uint32_t* frame, uint32_t* out, s
         else lastTorn = 1;
     }
 
-    if (valid || battle || menu) {
-        if (valid) {
-            const struct Snap* s = &snaps[bestSnap];
-            drawRegion(s, bestCx, bestCy, bestH, bestV, v.x, v.y, v.x + v.w, v.y + v.h, true, &raw[0][0], BUF_W, alpha);
-        } else if (battle) {
-            drawBattleRegion(v.x, v.y, v.x + v.w, v.y + v.h, true, &raw[0][0], BUF_W, alpha);
-        } else {
-            drawMenuRegion(v.x, v.y, v.x + v.w, v.y + v.h, true, &raw[0][0], BUF_W, alpha, frame);
-        }
-        for (int j = 0; j < v.h; j++) memcpy(rawHole[j], holeBuf[j], (size_t) v.w);
-        rawView = v;
-        if (centre) {
-            if (valid) drawRegion(&snaps[bestSnap], bestCx, bestCy, bestH, bestV, 0, 0, PK_WIDE_W, PK_WIDE_H, false, centre, PK_WIDE_W, alpha);
-            else if (battle) drawBattleRegion(0, 0, PK_WIDE_W, PK_WIDE_H, false, centre, PK_WIDE_W, alpha);   // holes show the backdrop, as the PPU does
-            else drawMenuRegion(0, 0, PK_WIDE_W, PK_WIDE_H, false, centre, PK_WIDE_W, alpha, NULL);
-        }
-        mix = mix + MIX_STEP > 256 ? 256 : mix + MIX_STEP;
-    } else {
-        mix = mix - MIX_STEP < 0 ? 0 : mix - MIX_STEP;   // the last scene, frozen, dissolves into the glow
+#ifdef PK_WIDE_CACHE
+    holeLeft = false;
+    int cacheBgs = 0;
+    if (cacheMode && valid && !centre && !overlay && !overlayDim && !transition && !tintShown && mix >= 256 && rawView.w &&
+        cacheReady(io(0x14) & 0x1FF, io(0x16) & 0x1FF, bestH, bestV, &cacheBgs)) {
+        if (lineHookless) tilesCompared();
+        tileSide ^= 1;
+        // A flight's camera offset moves the area sign with it: kept still as the full draw does (flyLabel), its pixels
+        // read now, while the frame's line registers are this frame's.
+        bool sign = (flyDx || flyDy) && flySignMask(laterSign);
+        later = (struct Later) { &snaps[bestSnap], frame, out, v, bestCx, bestCy, cacheBgs, alpha, true, sign, bestH, bestV, flyDx, flyDy };
+        if (!laterOn) pk_wide_finish();
+        holeLeft = holeWanted && !sign;
+        cachedLast = true;
+        cachedView = v;
+        cachedOut = out;
+        cacheHits++;
+        edgeAccOk = false;
+        if (linesWanted && lineIoFrames < 2) lineIoFrames++;
+        prev = cur;
+        return mix;
     }
-    if (!rawView.w) mix = 0;   // nothing drawn yet
-    if (mix < 256) ambientPrepare(frame);
-    else edgeAccOk = false;    // the glow starts from the edges as they are when it's next needed
-    int reach[4] = { -v.x, v.x + v.w - PK_WIDE_W, -v.y, v.y + v.h - PK_WIDE_H };
-
-    for (int j = 0; j < v.h; j++) {
-        int Y = v.y + j;
-        uint32_t* row = out + j * v.w;
-        int ry = Y - rawView.y;
-        bool rawRow = ry >= 0 && ry < rawView.h;
-        for (int i = 0; i < v.w; i++) {
-            int X = v.x + i;
-            if (onFrame(X, Y)) {
-                // The frame itself: copied a row segment at a time - or, under a BG0 picture, dimmed but for BG0's own
-                // pixels (the map showing around and through the picture).
-                int n = (PK_WIDE_W - X) < (v.w - i) ? PK_WIDE_W - X : v.w - i;
-                if (!overlayDim) {
-                    memcpy(row + i, frame + Y * PK_WIDE_W + X, (size_t) n * sizeof(uint32_t));
-                } else {
-                    for (int k = 0; k < n; k++) {
-                        uint32_t p = frame[Y * PK_WIDE_W + X + k];
-                        row[i + k] = fromBg(p, 0) ? p : dimmed(p, overlayDim);
-                    }
-                }
-                i += n - 1;
-                continue;
-            }
-            int rx = X - rawView.x, m = mix;
-            uint32_t scene = 0;
-            if (rawRow && rx >= 0 && rx < rawView.w) {
-                // A hole goes on with the frame's nearest edge pixel as the game shows it now (so it follows fades).
-                scene = rawHole[ry][rx] ? frame[clampi(Y, 0, PK_WIDE_H - 1) * PK_WIDE_W + clampi(X, 0, PK_WIDE_W - 1)]
-                                        : raw[ry][rx];
-            } else {
-                m = 0;   // the window moved off what was last drawn: the glow
-            }
-            uint32_t o = m >= 256 ? scene : lerp(glowAt(frame, X, Y, reach, alpha), scene, m);
-            row[i] = overlayDim ? dimmed(o, overlayDim) : o;
+    needFrame();
+    if (cachedLast) {
+        // The rebuild takes over: its last scene is what the cache last showed.
+        cachedLast = false;
+        rawView = cachedView;
+        for (int j = 0; j < cachedView.h; j++) {
+            memcpy(raw[j], cachedOut + j * cachedView.w, (size_t) cachedView.w * sizeof(uint32_t));
+            memset(rawHole[j], 0, (size_t) cachedView.w);
         }
     }
-    if (lineIoFrames < 2) lineIoFrames++;
+#endif
+    PW_MARK(pw3);
+    PW_ADD(1, pw2, pw3);
+    struct FullView full = { frame, out, centre, v, valid, battle, menu, overlay, bestSnap, bestCx, bestCy, bestH, bestV, alpha, flyHold };
+#ifdef PK_WIDE_CACHE
+    // Not while FREE FLIGHT's camera is offset: flyLabel puts the area sign back where it would be with no offset, over
+    // the frame's own (moved) one - the host's copy of the frame would bring the moved one back (a doubled sign).
+    holeLeft = holeWanted && !overlayDim && !centre && !flyDx && !flyDy;
+    if (laterOn && !centre) {
+        laterFull = full;
+        laterFullDue = true;
+        if (linesWanted && lineIoFrames < 2) lineIoFrames++;
+        prev = cur;
+        return mix;
+    }
+#endif
+    fullDraw(&full);
+    if (linesWanted && lineIoFrames < 2) lineIoFrames++;
     prev = cur;
     return mix;
 }

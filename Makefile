@@ -18,12 +18,14 @@ export MON_ICONS
 .DEFAULT_GOAL := help
 
 .PHONY: help docs-shots docs-check submodules apk install run test clean shots preview menu-shots capture-image \
-        check stress test-roms version bump release-apk symbols release release-local
+        check gamedata stress test-roms test-quick version bump release-apk symbols release release-local \
+        rom-support rom-identify rom-checklist
 
 # versionName / versionCode, read from app/build.gradle.kts.
 VERSION      := $(shell sed -n 's/^ *versionName = "\(.*\)"/\1/p' app/build.gradle.kts)
 VERSION_CODE := $(shell sed -n 's/^ *versionCode = \([0-9]*\)/\1/p' app/build.gradle.kts)
 RELEASE_APK  := dist/PokeDaisy-$(VERSION).apk
+ROM_AGENT_VENV := $(HOME)/.cache/pokedaisy-rom-agent/venv
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*## "} \
@@ -45,7 +47,14 @@ install: ## Build + install on a connected Android device (adb)
 run: install ## Build + install + launch the library screen on the connected device
 	adb shell am start -n $(PKG)/.LibraryActivity
 
-test: ## JVM unit tests (fixture decode tests, UI logic)
+gamedata: ## Regenerate the per-game code from gamedata/ (NativeConfigsGen.kt, the DS ports' tables; see gamedata/README.md)
+	python3 scripts/gen_gamedata.py
+	python3 scripts/gen_nds_ports.py
+
+test-quick: ## Everyday unit tests: no Paparazzi renders or BestEffortTest, forks in parallel (T='*FooTest' to pick)
+	./gradlew :app:testDebugUnitTest -Pquick $(if $(T),--tests '$(T)')
+
+test: ## All JVM unit tests, Paparazzi renders included (CLAUDE.md: agents ask first)
 	./gradlew :app:testDebugUnitTest
 
 clean: ## gradle clean
@@ -53,8 +62,12 @@ clean: ## gradle clean
 
 ##@ Checks (what CI runs)
 
-check: ## Everything a PR must pass: unit tests, translations, ui-preview stress + docs search, docs, debug build
+check: ## Everything a PR must pass: unit tests, translations, game data, ui-preview stress + docs search, docs, debug build
 	python3 scripts/check_translations.py
+	python3 scripts/gen_gamedata.py --check
+	python3 scripts/gen_nds_ports.py --check
+	python3 scripts/check_melonds_patch.py
+	$(MAKE) -C 3ds test-configs-gen
 	./gradlew :app:testDebugUnitTest :app:assembleDebug
 	./gradlew -p ui-preview stress
 	./gradlew -p ui-preview docsSearchCheck
@@ -64,6 +77,7 @@ check: ## Everything a PR must pass: unit tests, translations, ui-preview stress
 docs-shots: ## Re-render the manual's screenshots (docs/manual/shots) with the invented save
 	cd website && npm run docs-art && npm run build
 	./gradlew -p ui-preview docsShots
+	$(MAKE) -C 3ds docs-shots
 
 docs-check: ## The manual parses, links resolve, no dashes, every setting documented, search cases pass
 	cd website && node --test test/docs.test.js test/docsearch.test.js && npm run build
@@ -87,10 +101,10 @@ bump: ## Set versionName to V=<x.y.z> and versionCode + 1
 	rm -f app/build.gradle.kts.bak
 	@$(MAKE) --no-print-directory version
 
-release-apk: ## Signed release APK -> dist/PokeDaisy-<version>.apk (needs keystore.properties)
+release-apk: ## Signed release APK (arm64 + 32-bit ARM) -> dist/PokeDaisy-<version>.apk (needs keystore.properties)
 	@test -f keystore.properties || { echo "keystore.properties is missing: release builds would be unsigned"; exit 1; }
 	@test -f app/google-services.json || echo "!! no app/google-services.json: this build can't send crash reports"
-	./gradlew :app:assembleRelease
+	./gradlew :app:assembleRelease -Ppokedaisy.armv7=true
 	mkdir -p dist
 	cp app/build/outputs/apk/release/app-release.apk $(RELEASE_APK)
 	@echo ">> $(RELEASE_APK)"
@@ -107,13 +121,14 @@ release: ## Tag v<version> on an up-to-date main and push it: the Release workfl
 	@! git rev-parse -q --verify "refs/tags/v$(VERSION)" >/dev/null || { echo "v$(VERSION) is already tagged: make bump V=... first"; exit 1; }
 	git tag -a "v$(VERSION)" -m "PokeDaisy $(VERSION)"
 	git push origin "v$(VERSION)"
-	@echo ">> pushed v$(VERSION): follow it in the repo's Actions tab (Release workflow)"
+	@echo ">> pushed v$(VERSION): follow it in the repo's Actions tab (Release workflow); it ends with a draft release to publish"
 
-release-local: release-apk symbols ## Without CI: build, upload symbols, tag and publish with the gh CLI
+release-local: release-apk symbols ## Without CI: build, upload symbols, tag and put up a draft release with the gh CLI
 	@command -v gh >/dev/null || { echo "needs the GitHub CLI (gh)"; exit 1; }
 	git tag -a "v$(VERSION)" -m "PokeDaisy $(VERSION)"
 	git push origin "v$(VERSION)"
-	gh release create "v$(VERSION)" $(RELEASE_APK) --title "PokeDaisy $(VERSION)" --generate-notes
+	gh release create "v$(VERSION)" $(RELEASE_APK) --draft --title "PokeDaisy $(VERSION)" --generate-notes
+	@echo ">> v$(VERSION) is a draft: publish it with gh release edit v$(VERSION) --draft=false (cancel the Release run the tag started)"
 
 ##@ Looking at the UI
 
@@ -130,3 +145,18 @@ capture-image: ## Build the Docker image the capture scripts use
 
 menu-shots: ## In-game party/pokedex/items screenshots of every ROM in host_roms.conf (KEYS="a b" to pick) -> native-capture/menu-shots/
 	scripts/screenshot_menus.sh $(KEYS)
+
+rom-identify: ## What ROM=<file> is: its engine, closest supported game, saves and which add-rom playbook to follow
+	@test -n "$(ROM)" || { echo "usage: make rom-identify ROM=<rom> [ARGS=...]"; exit 2; }
+	python3 scripts/rom_identify.py "$(ROM)" $(ARGS)
+
+rom-checklist: ## Every place a newly supported ROM=<file> has to reach (detection, title, site, books, fixtures, guard)
+	@test -n "$(ROM)" || { echo "usage: make rom-checklist ROM=<rom> [ARGS=...]"; exit 2; }
+	python3 scripts/rom_checklist.py "$(ROM)" $(ARGS)
+
+rom-support: ## A Claude agent adds support for ROM=<file> [SAVE=<file>] and / or LIST=<file of games> [ARGS=...], one PR to dev (scripts/rom_agent/)
+	@test -n "$(ROM)$(LIST)" || { echo "usage: make rom-support ROM=<rom> [SAVE=<save>] | LIST=<file> [ARGS=...]"; exit 2; }
+	@test -x "$(ROM_AGENT_VENV)/bin/python" || python3 -m venv "$(ROM_AGENT_VENV)"
+	@"$(ROM_AGENT_VENV)/bin/pip" install -q --disable-pip-version-check -r scripts/rom_agent/requirements.txt
+	"$(ROM_AGENT_VENV)/bin/python" scripts/rom_agent/add_rom_support.py $(if $(ROM),"$(ROM)") $(if $(SAVE),--save "$(SAVE)") \
+	    $(if $(LIST),--list "$(LIST)") $(ARGS)

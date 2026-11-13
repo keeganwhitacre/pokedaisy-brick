@@ -1,6 +1,10 @@
 package com.pokedaisy.app.companion.ui
 
+import com.pokedaisy.app.companion.SkinSystem
+
+import com.pokedaisy.app.companion.DsCore
 import com.pokedaisy.app.companion.NewFeatures
+import com.pokedaisy.app.companion.zoomLabel
 
 import com.pokedaisy.app.companion.data.LookChar
 import com.pokedaisy.app.companion.ui.theme.DarkMode
@@ -21,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +42,9 @@ import com.pokedaisy.app.companion.data.WildEncounters
 import com.pokedaisy.app.companion.COMPANION_TABS
 import com.pokedaisy.app.companion.CompanionSettings
 import com.pokedaisy.app.companion.KeyCapture
+import com.pokedaisy.app.companion.BattleStyle
+import com.pokedaisy.app.companion.FlyStyle
+import com.pokedaisy.app.companion.FlightAreaMode
 import com.pokedaisy.app.companion.FfMode
 import com.pokedaisy.app.companion.GameAspect
 import com.pokedaisy.app.companion.hasGrid
@@ -51,7 +59,7 @@ internal val STATUS_BAR_PLACES = listOf(tk("OFF"), tk("GAME"), tk("COMPANION"))
 
 internal fun statusBarLabel(on: Boolean, onCompanion: Boolean) = STATUS_BAR_PLACES[if (!on) 0 else if (onCompanion) 2 else 1]
 
-internal enum class Page(val title: String) { HOME(tk("SETTINGS")), TABS(tk("TAB BAR")), BUTTONS(tk("GAME BUTTONS")), HOTKEYS(tk("HOTKEYS")), SHADERS(tk("SHADERS")), FIELD_HUD(tk("HUD")), QUICK_MENU(tk("QUICK MENU")), TOUCH(tk("TOUCH CONTROLS")), SPEED(tk("SPEED OPTIONS")), DISPLAY(tk("DISPLAY OPTIONS")), CHEATS(tk("CHEATS")), TWEAKS(tk("TWEAKS")), HELP(tk("HELP")) }
+internal enum class Page(val title: String) { HOME(tk("SETTINGS")), TABS(tk("TAB BAR")), BUTTONS(tk("GAME BUTTONS")), HOTKEYS(tk("HOTKEYS")), SHADERS(tk("SHADERS")), FIELD_HUD(tk("HUD")), QUICK_MENU(tk("QUICK MENU")), TOUCH(tk("TOUCH CONTROLS")), SPEED(tk("SPEED OPTIONS")), DISPLAY(tk("DISPLAY OPTIONS")), CHEATS(tk("CHEATS")), TWEAKS(tk("TWEAKS")), COOP_PARTNERS(tk("PARTNERS")), HELP(tk("HELP")) }
 
 /** Where BACK from a page goes: SHADERS opens from DISPLAY OPTIONS, the rest from HOME. */
 internal val Page.parent: Page get() = if (this == Page.SHADERS) Page.DISPLAY else Page.HOME
@@ -93,7 +101,8 @@ fun CompanionSettingsScreen(
     // HOME starts with a group title, so its first row is index 1. HOME's cursor and
     // scroll outlive its sub-pages: coming back lands on the row that opened one.
     var homeCursor by ui::homeCursor
-    var pageCursor by remember(page) { mutableStateOf(0) }
+    // GAME BUTTONS opens on a group title (ALL GAMES): its cursor starts on the row under it, like HOME's.
+    var pageCursor by remember(page) { mutableStateOf(if (page == Page.BUTTONS) 1 else 0) }
     val cursor = if (page == Page.HOME) homeCursor else pageCursor
     fun moveCursor(i: Int) { if (page == Page.HOME) homeCursor = i else pageCursor = i }
     val homeScroll = ui.homeScroll
@@ -104,6 +113,9 @@ fun CompanionSettingsScreen(
     DisposableEffect(page, capture) { onDispose { capture?.cancel() } }
     var confirm by remember { mutableStateOf<Confirm?>(null) }
     var selector by remember { mutableStateOf<Selector?>(null) }
+    // TOUCH CONTROLS > SKINS: the imported skins (read on the way in) and their pick-list.
+    val touchSkinUi = remember { TouchSkinUi() }
+    val touchSkins = remember(settings, page) { if (page == Page.TOUCH) settings?.touchSkins.orEmpty() else emptyList() }
 
     // The games' own spelling: "POKéMON", not "POKÉMON".
     val gameName = settings?.gameName?.uppercase()?.replace('É', 'é') ?: ""
@@ -134,6 +146,10 @@ fun CompanionSettingsScreen(
                 }
                 Spacer(Modifier.height(m.u * 4))
             }
+            // CO-OP's LINK follows the link: re-read once a second while HOME shows (the retry countdown ticks too).
+            if (settings != null && settings.coopEnabled && settings.coopLiveRefresh && page == Page.HOME) {
+                LaunchedEffect(settings) { while (true) { kotlinx.coroutines.delay(1000); tick++ } }
+            }
             // EDIT LAYOUT saves over the game, outside this page: its revision redraws TOUCH CONTROLS.
             val touchRevision = settings?.touchRevision ?: 0
             val rows = remember(settings, page, tick, availableTabs, playsAs, capturing, capturedKeys, touchRevision) {
@@ -141,12 +157,17 @@ fun CompanionSettingsScreen(
                 when (page) {
                     Page.HOME -> playsAs?.let { game ->
                         listOf(groupTitle(tk("GAME")), SettingRow(tk("PLAYS AS"), game, subtitle = "Which game this ROM is read as", opensPage = true) { onPlaysAs() })
-                    }.orEmpty() + homeRows(settings, barCount(settings, availableTabs), { tick++ }, { page = it }, { selector = it })
+                    }.orEmpty() + homeRows(settings, barCount(settings, availableTabs), { tick++ }, { page = it }, { selector = it },
+                        { c -> confirm = Confirm(c.title, c.message, c.confirmLabel, c.onConfirm).also { it.cancelLabel = c.cancelLabel; it.onCancel = c.onCancel } })
+                        .let { if (settings.gameBlocked) withoutGameRows(it) else it }
                     Page.TABS -> COMPANION_TABS.map { id ->
                         val shown = id in settings.companionTabs
                         // A tab this game doesn't have (DEX, GUIDE) keeps its setting for the games that do.
                         if (id !in availableTabs) return@map SettingRow(companionTabLabel(id), tk("N/A")) {}
-                        SettingRow(companionTabLabel(id), if (shown) tk("SHOWN") else tk("HIDDEN")) {
+                        SettingRow(
+                            companionTabLabel(id), if (shown) tk("SHOWN") else tk("HIDDEN"),
+                            labelBadge = if (id == "BOXES") NewFeatures.badge(NewFeatures.BOXES_TAB) else null,
+                        ) {
                             val now = settings.companionTabs
                             when {
                                 shown -> setTabs(settings, now - id, onTabsChanged)
@@ -160,15 +181,21 @@ fun CompanionSettingsScreen(
                             tick++
                         }
                     } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
-                    Page.BUTTONS -> GbaControls.Btn.entries.map { btn ->
-                        val title = btn.title
-                        SettingRow(title, bindingValue(capture, title, settings.gbaControlBindings()[btn]), subtitle = btn.subtitle, labelBadge = btn.badge) {
-                            capture?.toggle(title) {
-                                KeyCapture.Request(
-                                    title, chord = false,
-                                    onDone = { keys -> settings.setGbaControlBinding(btn, KeyCapture.keyName(keys.first())); tick++ },
-                                    onClear = if (btn.canClear) ({ settings.clearGbaControlBinding(btn); tick++ }) else null,
-                                )
+                    // Every game's buttons, then the game running's own group (TO COMPANION only with two screens).
+                    Page.BUTTONS -> GbaControls.Group.entries.filter { it == GbaControls.Group.ALL || settings.buttonGroup.let { g -> g == null || g == it } }.flatMap { group ->
+                        val btns = GbaControls.Btn.entries.filter {
+                            it.group == group && (it != GbaControls.Btn.TO_COMPANION || settings.usesSecondScreen || settings.buttonGroup == null)
+                        }
+                        listOf(groupTitle(group.title)) + btns.map { btn ->
+                            val title = btn.title
+                            SettingRow(title, bindingValue(capture, title, settings.gbaControlBindings()[btn]), subtitle = btn.subtitle, labelBadge = btn.badge) {
+                                capture?.toggle(title) {
+                                    KeyCapture.Request(
+                                        title, chord = false,
+                                        onDone = { keys -> settings.setGbaControlBinding(btn, KeyCapture.keyName(keys.first())); tick++ },
+                                        onClear = if (btn.canClear) ({ settings.clearGbaControlBinding(btn); tick++ }) else null,
+                                    )
+                                }
                             }
                         }
                     } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
@@ -219,6 +246,9 @@ fun CompanionSettingsScreen(
                         onEdit = settings::editTouchLayout,
                         underGame = settings.uprightUnderGame, setUnderGame = { settings.setPortraitUnderGame(it); tick++ },
                         expand = settings.gameAspect == GameAspect.WIDE && settings.wideSupported, touchShown = settings.touchControlsShown,
+                        skins = touchSkins, skinUi = touchSkinUi,
+                        skinSystem = settings.touchStage?.let { if (it.ds) SkinSystem.DS else if (it.gameBoy) SkinSystem.GB else SkinSystem.GBA } ?: SkinSystem.GBA,
+                        feel = settings::feelVibration,
                     ) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.SPEED -> speedRows(settings, { tick++ }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.DISPLAY -> displayRows(settings, { tick++ }, { page = it }, { selector = it }) + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
@@ -232,6 +262,11 @@ fun CompanionSettingsScreen(
                             CompanionTweaks[t] = !CompanionTweaks.stored(t)
                             settings.setTweak(t.key, CompanionTweaks.stored(t))
                             tick++
+                        }
+                    } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
+                    Page.COOP_PARTNERS -> coopPartnerRows(settings.coopPairs) { p ->
+                        confirm = Confirm(tk("UNPAIR"), tr("Unpair {0}? You'll need a new invite to play together again.", p.partner.name), tk("UNPAIR")) {
+                            settings.coopUnpair(p.ownSave); tick++
                         }
                     } + SettingRow(tk("CANCEL"), null) { page = Page.HOME }
                     Page.HELP -> emptyList()
@@ -257,12 +292,16 @@ fun CompanionSettingsScreen(
                     TouchControlsPage(
                         stage, style, shot, m, Modifier.fillMaxWidth().weight(1f), underGame = settings.uprightUnderGame == true,
                         expand = settings.gameAspect == GameAspect.WIDE && settings.wideSupported, touchShown = settings.touchControlsShown,
+                        skins = touchSkins, skinUi = touchSkinUi, setStyle = { settings.setTouchStyle(it); tick++ },
                     ) { mod ->
                         OptionListWindow(m, mod) {
                             GroupedRows(rows, m, cursor, onClick = { i -> moveCursor(i); rows[i].onClick() }, onFocused = ::moveCursor)
                         }
                     }
-                } else OptionListWindow(m, Modifier.fillMaxWidth().weight(1f)) {
+                } else DenseText {
+                    // The lists a font pixel smaller where there's room (the Thor): more rows on screen. The title keeps its size.
+                    val m = rememberGbaTextMetrics()
+                    RailedWindow(m, Modifier.fillMaxWidth().weight(1f), rail = page == Page.HOME) {
                     // Rows share out the window's height (big touch targets) down
                     // to a floor, past which the list scrolls instead.
                     // SHADERS too: OptionRows shares the window out, so its 4 rows came out taller than SETTINGS'.
@@ -326,6 +365,7 @@ fun CompanionSettingsScreen(
                         )
                     }
                 }
+                }
             }
         }
 
@@ -337,18 +377,32 @@ fun CompanionSettingsScreen(
                 label = { settings?.playerLookLabel(it) ?: it },
             )
         }
-        selector?.takeIf { !it.tiles }?.let { sel ->
+        selector?.takeIf { it.dsLayouts }?.let { sel ->
+            DsLayoutPicker(
+                com.pokedaisy.app.companion.DsLayout.entries.firstOrNull { it.label == sel.current } ?: com.pokedaisy.app.companion.DsLayout.ONE_SCREEN, m,
+                onPick = { sel.onPick(it.label); selector = null; tick++ },
+                onDismiss = { selector = null },
+            )
+        }
+        selector?.slider?.let { read ->
+            // Read after every change (tick), so the pop-up shows the value it just moved to.
+            val (value, slider) = tick.let { read() }
+            OptionSliderPopup(selector!!.title, value, slider, m, onDismiss = { selector = null })
+        }
+        selector?.takeIf { !it.tiles && !it.dsLayouts && it.slider == null }?.let { sel ->
             OptionSelector(
                 sel.title, sel.options, sel.current, { it }, m,
                 onPick = { sel.onPick(it); selector = null; tick++ },
                 onDismiss = { selector = null },
-                badge = sel.badge,
+                badge = sel.badge, note = sel.note,
             )
         }
         confirm?.let { c ->
             OptionConfirm(
                 c.title, c.message, c.confirmLabel, m,
                 onConfirm = { confirm = null; c.action() }, onDismiss = { confirm = null },
+                onCancel = { confirm = null; c.onCancel() },
+                cancelLabel = c.cancelLabel ?: tk("CANCEL"),
             )
         }
     }
@@ -394,10 +448,36 @@ private class Selector(
     val badge: (String) -> String? = { null },
     /** PLAYER LOOK's tiles ([PlayerLookPicker]): [options] are OFF then the heroes' names. */
     val tiles: Boolean = false,
+    /** A few words above the options ([OptionSelector]'s note), or null. */
+    val note: String? = null,
+    /** DS LAYOUT's pick-list with its miniatures ([DsLayoutPicker]): [options] are the layouts' labels. */
+    val dsLayouts: Boolean = false,
+    /** A slider setting's pop-up ([OptionSliderPopup]) instead of a list: its value and slider, read fresh on each change. */
+    val slider: (() -> Pair<String, SettingSlider>)? = null,
     val onPick: (String) -> Unit,
 )
 
-private class Confirm(val title: String, val message: String, val confirmLabel: String, val action: () -> Unit)
+private class Confirm(val title: String, val message: String, val confirmLabel: String, val action: () -> Unit) {
+    /** YES / NO style confirms name their buttons; [onCancel] runs on NO only (BACK just closes it). */
+    var cancelLabel: String? = null
+    var onCancel: () -> Unit = {}
+}
+
+/** The groups (by title) a blocked game ([CompanionSettings.gameBlocked]) leaves out whole: none of them works there. */
+private val BLOCKED_GROUPS = setOf(tk("MAKEOVER"), tk("GAMEPLAY"), tk("COMPANION"), tk("CO-OP"))
+
+/** And the single rows it leaves out: EXPAND's, the HUD's, the battle buttons and the quick menu. */
+private val BLOCKED_ROWS = setOf(tk("ZOOM"), tk("AUTO ZOOM IN"), tk("LOOK AROUND"), tk("HUD"), tk("BATTLE BUTTONS"), tk("QUICK MENU"))
+
+/** HOME for a game its makers asked PokéDaisy not to read: the emulator's settings only (speed, sound, screen, controls,
+ * the app), none of the game's own features. */
+private fun withoutGameRows(rows: List<SettingRow>): List<SettingRow> {
+    var skipping = false
+    return rows.filter { r ->
+        if (r.header) skipping = r.label in BLOCKED_GROUPS
+        !skipping && r.label !in BLOCKED_ROWS
+    }
+}
 
 private fun homeRows(
     s: CompanionSettings,
@@ -405,13 +485,14 @@ private fun homeRows(
     changed: () -> Unit,
     navigate: (Page) -> Unit,
     select: (Selector) -> Unit,
+    askLock: (CoopLockAsk) -> Unit = {},
 ): List<SettingRow> {
     fun onOff(on: Boolean) = if (on) tk("ON") else tk("OFF")
     val rateLabels = FF_RATES.map(::rateLabel)
     // MAKEOVER: the game's look from other games (the user's call: its own group, first and standing out, only in a
     // game it works in).
     val looks = s.playerLookSupported
-    val makeover = if (!looks && !s.dayNightSupported && !s.followerSupported) emptyList() else listOfNotNull(
+    val makeover = if (!looks && !s.dayNightSupported && !s.followerSupported && !s.flyStyleSupported) emptyList() else listOfNotNull(
         featuredGroupTitle(tk("MAKEOVER"), if (looks) "Other games' looks in this one" else "A fresh look for this game"),
         // Another game's hero for the player (PlayerLook.kt: their sprites from the player's own ROM of that game,
         // patched into this one in memory). The heroes' names are the games' own, so they aren't translated.
@@ -456,6 +537,24 @@ private fun homeRows(
                 subtitle = if (s.followerReady) null else "Needs a game with following Pokémon too",
             ) { if (s.followerReady) { s.setFollower(!s.follower); changed() } }
         } else null,
+        // What FREE FLIGHT and the scenic FLY fly on (FlightVehicle: our own pixel art, the player in its seat).
+        if (s.flyStyleSupported) {
+            SettingRow(tk("FLY ON"), s.flightVehicle.label, labelBadge = NewFeatures.badge(NewFeatures.FLY_ON)) {
+                val all = com.pokedaisy.app.companion.data.FlightVehicle.entries
+                select(Selector(tk("FLY ON"), all.map { it.label }, s.flightVehicle.label) { l ->
+                    all.firstOrNull { it.label == l }?.let(s::setFlightVehicle)
+                })
+            }
+        } else null,
+        // What the player rides in place of the bike (RideOn.kt: our own pixel art in the hero's bike sheets).
+        if (looks) {
+            SettingRow(tk("RIDE ON"), s.rideVehicle.label, labelBadge = NewFeatures.badge(NewFeatures.RIDE_ON)) {
+                val all = com.pokedaisy.app.companion.data.RideVehicle.entries
+                select(Selector(tk("RIDE ON"), all.map { it.label }, s.rideVehicle.label) { l ->
+                    all.firstOrNull { it.label == l }?.let(s::setRideVehicle)
+                })
+            }
+        } else null,
         // The overworld by the device's clock (DayNight.kt): every GBA game but those with their own.
         if (s.dayNightSupported) {
             SettingRow(tk("DAY AND NIGHT"), onOff(s.dayNight), labelBadge = NewFeatures.badge(NewFeatures.DAY_NIGHT)) {
@@ -467,7 +566,7 @@ private fun homeRows(
         groupTitle(tk("FF / SPEED")),
         // On / off - the group's title already says fast-forward.
         SettingRow("FF", onOff(s.ffToggled)) { s.setFfToggled(!s.ffToggled); changed() },
-        SettingRow(tk("FF SPEED"), rateLabel(s.ffMaxSpeed), subtitle = "How fast FF runs") {
+        SettingRow(tk("FF SPEED"), rateLabel(s.ffMaxSpeed)) {
             select(Selector(tk("FF SPEED"), rateLabels, rateLabel(s.ffMaxSpeed)) { s.setFfMaxSpeed(FF_RATES[rateLabels.indexOf(it)]) })
         },
         // The game's own pace, kept per game: slow-motion that stays (0.5x, 0.25x) up to 4x. FF, when on, wins.
@@ -482,11 +581,55 @@ private fun homeRows(
         } else null,
         // SCENE SPEEDS, FF MODE and FF MUSIC: set once and rarely touched, on their own page.
         SettingRow(tk("SPEED OPTIONS"), null, subtitle = "Scene speeds, FF mode and FF music", opensPage = true) { navigate(Page.SPEED) },
+        groupTitle(tk("SOUND")),
+        // The game's loudness under the device's own volume (100% = the device's); MUTE GAME keeps it for after.
+        SettingRow(tk("GAME VOLUME"), gameVolumeLabel(s.gameVolume),
+            labelBadge = NewFeatures.badge(NewFeatures.GAME_VOLUME),
+            slider = gameVolumeSlider(s.gameVolume) { s.setGameVolume(it); changed() }) {
+            // A tap opens it in a pop-up with a bigger bar (the user's call).
+            select(Selector(tk("GAME VOLUME"), emptyList(), "", slider = {
+                gameVolumeLabel(s.gameVolume) to gameVolumeSlider(s.gameVolume) { s.setGameVolume(it); changed() }
+            }) {})
+        },
+        SettingRow(tk("MUTE GAME"), onOff(s.gameMuted),
+            labelBadge = NewFeatures.badge(NewFeatures.GAME_VOLUME)) { s.setGameMuted(!s.gameMuted); changed() },
+        // Equalizer apps and the like on the game's sound (AudioEffects): the game's tracks take it at their next start.
+        SettingRow(tk("AUDIO EFFECTS"), onOff(s.audioEffects),
+            labelBadge = NewFeatures.badge(NewFeatures.AUDIO_EFFECTS),
+            subtitle = "For equalizer apps, on the next start") { s.setAudioEffects(!s.audioEffects); changed() },
         groupTitle(tk("GAMEPLAY")),
         // The game's own switch for random encounters (WildEncounters.kt): ON (the game's rate) or OFF.
         SettingRow(tk("WILD ENCOUNTERS"), if (s.wildEncountersSupported) wildEncountersLabel(s.wildEncounters) else tk("N/A"),
             enabled = s.wildEncountersSupported) {
             if (s.wildEncountersSupported) { s.setWildEncounters(if (s.wildEncounters == 0) 100 else 0); changed() }
+        },
+        // A text box's words appear at once, nothing else sped up (InstantText.kt: the game's text routine patched).
+        SettingRow(
+            tk("INSTANT TEXT"), if (s.instantTextSupported) onOff(s.instantText) else tk("N/A"),
+            enabled = s.instantTextSupported, labelBadge = NewFeatures.badge(NewFeatures.INSTANT_TEXT),
+        ) {
+            if (s.instantTextSupported) { s.setInstantText(!s.instantText); changed() }
+        },
+        // The companion's FLY: the game's own (CLASSIC) or flown over the field to the town (SCENIC, Flight.kt). Two values: a tap flips it.
+        SettingRow(
+            tk("FLY STYLE"), if (s.flyStyleSupported) s.flyStyle.label else tk("N/A"),
+            enabled = s.flyStyleSupported, labelBadge = NewFeatures.badge(NewFeatures.SCENIC_FLY),
+            subtitle = "SCENIC flies you there over the map",
+        ) {
+            if (s.flyStyleSupported) {
+                s.setFlyStyle(if (s.flyStyle == FlyStyle.SCENIC) FlyStyle.CLASSIC else FlyStyle.SCENIC)
+                changed()
+            }
+        },
+        // Where FREE FLIGHT and the scenic FLY may go: the maps seen (FlightArea.kt) or anywhere. Two values: a tap flips it.
+        SettingRow(
+            tk("FLIGHT AREA"), if (s.flyStyleSupported) s.flightArea.label else tk("N/A"),
+            enabled = s.flyStyleSupported, labelBadge = NewFeatures.badge(NewFeatures.FLIGHT_AREA),
+        ) {
+            if (s.flyStyleSupported) {
+                s.setFlightArea(if (s.flightArea == FlightAreaMode.SEEN) FlightAreaMode.ANYWHERE else FlightAreaMode.SEEN)
+                changed()
+            }
         },
         // A TM stays in the bag after it teaches a move, as an HM does (ReusableTms.kt: the ROM's own check patched).
         // A game whose own TMs never run out (ReusableTms.BUILT_IN) shows ON, greyed, and says so.
@@ -499,8 +642,45 @@ private fun homeRows(
         ) {
             if (s.reusableTmsSupported) { s.setReusableTms(!s.reusableTms); changed() }
         },
+        // A Pokémon that evolves by trading evolves from its summary, through the game's own evolution (TradeEvolution.kt).
+        SettingRow(
+            tk("TRADE EVOS"), if (s.tradeEvolutionsSupported) onOff(s.tradeEvolutions) else tk("N/A"),
+            enabled = s.tradeEvolutionsSupported, labelBadge = NewFeatures.badge(NewFeatures.TRADE_EVOLUTIONS),
+            subtitle = "Evolve without a trade",
+        ) {
+            if (s.tradeEvolutionsSupported) { s.setTradeEvolutions(!s.tradeEvolutions); changed() }
+        },
+        // A new wild foe made shiny at these odds before its battle draws it (ShinyOdds.kt; the versions it knows by hash).
+        SettingRow(
+            tk("SHINY ODDS"), if (s.shinyOddsSupported) shinyOddsLabel(s.shinyOdds) else tk("N/A"),
+            enabled = s.shinyOddsSupported, labelBadge = NewFeatures.badge(NewFeatures.SHINY_ODDS),
+        ) {
+            if (s.shinyOddsSupported) {
+                val odds = s.shinyOddsChoices
+                val labels = odds.map(::shinyOddsLabel)
+                select(
+                    Selector(tk("SHINY ODDS"), labels, shinyOddsLabel(s.shinyOdds), note = SHINY_ODDS_NOTE) { l ->
+                        s.setShinyOdds(odds[labels.indexOf(l)])
+                    },
+                )
+            }
+        },
+        // The NUZLOCKE tab and its tracker for this game (Nuzlocke.kt): first encounter per area, fainted = out of the run.
+        SettingRow(
+            tk("NUZLOCKE"), if (s.nuzlockeSupported) onOff(s.nuzlocke) else tk("N/A"), enabled = s.nuzlockeSupported,
+            labelBadge = NewFeatures.badge(NewFeatures.NUZLOCKE),
+            subtitle = tk("Track a run: one catch per area, a faint is final"),
+        ) {
+            if (s.nuzlockeSupported) { s.setNuzlocke(!s.nuzlocke); changed() }
+        },
         // B held for the player while walking on the field; holding it walks. Never on a bike or in a menu.
-        SettingRow(tk("AUTO-RUN"), if (s.fieldReadable) onOff(s.autoRun) else tk("N/A"), enabled = s.fieldReadable) { if (s.fieldReadable) { s.setAutoRun(!s.autoRun); changed() } },
+        // A game that runs by itself (GAMES_WITH_OWN_AUTO_RUN) shows ON, greyed, and says so: flipping B there would walk.
+        SettingRow(
+            tk("AUTO-RUN"),
+            when { s.autoRunBuiltIn -> tk("ON"); s.fieldReadable -> onOff(s.autoRun); else -> tk("N/A") },
+            enabled = s.fieldReadable && !s.autoRunBuiltIn,
+            subtitle = if (s.autoRunBuiltIn) "This game has its own auto-run" else null,
+        ) { if (s.fieldReadable) { s.setAutoRun(!s.autoRun); changed() } },
         // Every map lets the player run (buildings too); FireRed / Emerald engines.
         SettingRow(tk("RUN INDOORS"), if (s.runIndoorsSupported) onOff(s.runIndoors) else tk("N/A"), enabled = s.runIndoorsSupported) { if (s.runIndoorsSupported) { s.setRunIndoors(!s.runIndoors); changed() } },
         // This game's cheats on / off (the codes are typed or imported in the top screen's Settings).
@@ -508,18 +688,89 @@ private fun homeRows(
         groupTitle(tk("SCREEN")),
         // The game at the GBA's 3:2, stretched to fill the top screen, or WIDE (the overworld drawn past
         // its edges); WIDE is tagged BETA, or NOT YET on a game it doesn't know (which shows it as ORIGINAL).
-        SettingRow(tk("ASPECT"), aspectLabel(s.gameAspect), wideBadge(s, s.gameAspect), subtitle = "Original shape, stretched, or more of the map") {
-            val aspects = GameAspect.entries
-            select(
-                Selector(
-                    tk("ASPECT"), aspects.map { it.label }, s.gameAspect.label,
-                    badge = { l -> wideBadge(s, aspects.first { it.label == l }) },
-                ) { l -> s.setGameAspect(aspects.first { it.label == l }) },
-            )
+        // A blocked game has no EXPAND: ORIGINAL or STRETCH, a saved EXPAND reading as ORIGINAL (what it plays as).
+        run {
+            val aspect = if (s.gameBlocked && s.gameAspect == GameAspect.WIDE) GameAspect.ORIGINAL else s.gameAspect
+            SettingRow(tk("ASPECT"), aspectLabel(aspect), if (s.gameBlocked) null else wideBadge(s, aspect), subtitle = "Original shape, stretched, or more of the map") {
+                val aspects = GameAspect.entries.filter { !s.gameBlocked || it != GameAspect.WIDE }
+                select(
+                    Selector(
+                        tk("ASPECT"), aspects.map { it.label }, aspect.label,
+                        badge = { l -> wideBadge(s, aspects.first { it.label == l }) },
+                    ) { l -> s.setGameAspect(aspects.first { it.label == l }) },
+                )
+            }
+        },
+        // EXPAND only: the zoom step from a list, for a device with no right stick (R3 is the ZOOM hotkey).
+        s.zoomSteps.takeIf { s.gameAspect == GameAspect.WIDE && it.size > 1 }?.let { steps ->
+            val labels = steps.map(::zoomLabel)
+            val now = labels.getOrElse(s.zoomLevel) { labels[0] }
+            SettingRow(
+                tk("ZOOM"), now, subtitle = "How much of the map you see",
+                labelBadge = NewFeatures.badge(NewFeatures.ZOOM_SETTING),
+            ) { select(Selector(tk("ZOOM"), labels, now) { l -> s.setZoomLevel(labels.indexOf(l)); changed() }) }
         },
         // EXPAND only: whether a conversation, sign, menu or picture over the field pulls the zoom in (battles always do).
-        SettingRow(tk("AUTO ZOOM IN"), onOff(s.expandZoomOnText), subtitle = "1x on dialogue, signs, menus") { s.setExpandZoomOnText(!s.expandZoomOnText); changed() }
+        SettingRow(tk("AUTO ZOOM IN"), onOff(s.expandZoomOnText)) { s.setExpandZoomOnText(!s.expandZoomOnText); changed() }
             .takeIf { s.gameAspect == GameAspect.WIDE },
+        // EXPAND only: the right stick moves the view.
+        SettingRow(
+            tk("LOOK AROUND"), onOff(s.lookAround), subtitle = "The right stick moves the view",
+            labelBadge = NewFeatures.badge(NewFeatures.LOOK_AROUND),
+        ) { s.setLookAround(!s.lookAround); changed() }
+            .takeIf { s.gameAspect == GameAspect.WIDE },
+        // A DS game: which emulator runs it (melonDS, or DSperate for weak devices); taken at the game's next start.
+        s.dsCore?.let { core ->
+            val now = core.valueLabel()
+            val pending = (core.runs() == com.pokedaisy.app.MgbaCore.NDS_CORE_DSPERATE) == s.dsMelonDs
+            SettingRow(
+                tk("DS CORE"), now, labelBadge = NewFeatures.badge(NewFeatures.DS_CORE),
+                subtitle = if (pending) "Takes effect when the game restarts" else "DSPERATE runs on weaker devices",
+            ) {
+                select(Selector(tk("DS CORE"), DsCore.entries.map { it.label }, core.label) { l ->
+                    s.setDsCore(DsCore.entries.first { it.label == l }); changed()
+                })
+            }
+        },
+        // A DS game: its 3D at 2x to 8x the DS's own on the GPU, or ORIGINAL (the CPU's, pixel for pixel). melonDS only.
+        s.dsResolution?.let { scale ->
+            val can = s.dsGpuAvailable && s.dsMelonDs
+            SettingRow(
+                tk("DS RESOLUTION"), if (can) dsResolutionLabel(scale) else tk("N/A"), enabled = can,
+                labelBadge = NewFeatures.badge(NewFeatures.DS_RESOLUTION),
+                subtitle = if (!s.dsMelonDs) "Unavailable on DSPERATE" else null,
+            ) {
+                if (!can) return@SettingRow
+                val labels = dsResolutionLabels()
+                select(Selector(tk("DS RESOLUTION"), labels, dsResolutionLabel(scale)) { l -> s.setDsResolution(labels.indexOf(l) + 1); changed() })
+            }
+        },
+        // A DS game: its CPU at twice the DS's clock, so the game's own slow frames go (HeartGold walking). melonDS only.
+        s.dsCpuBoost?.let { on ->
+            SettingRow(
+                tk("DS CPU BOOST"), if (s.dsMelonDs) onOff(on) else tk("N/A"), enabled = s.dsMelonDs,
+                labelBadge = NewFeatures.badge(NewFeatures.DS_CPU_BOOST),
+                subtitle = if (s.dsMelonDs) "Fewer slowdowns in DS games" else "Unavailable on DSPERATE",
+            ) { if (s.dsMelonDs) { s.setDsCpuBoost(!on); changed() } }
+        },
+        // A DS game on two screens: its touch screen at its 4:3 with the COMPANION bar, or stretched over the second display.
+        s.dsTouchFill?.let { on ->
+            SettingRow(
+                tk("DS TOUCH SCREEN"), if (on) tk("STRETCH") else tk("ORIGINAL"), labelBadge = NewFeatures.badge(NewFeatures.DS_TOUCH_FILL),
+                subtitle = "The touch screen on your second screen",
+            ) { s.setDsTouchFill(!on); changed() }
+        },
+        // A DS game on one screen held sideways: where its two screens go (DsLayout), picked from miniatures.
+        s.dsLayout?.let { layout ->
+            SettingRow(
+                tk("DS LAYOUT"), layout.label, labelBadge = NewFeatures.badge(NewFeatures.DS_LAYOUT),
+                subtitle = "Where a DS game's two screens go",
+            ) {
+                select(Selector(tk("DS LAYOUT"), com.pokedaisy.app.companion.DsLayout.entries.map { it.label }, layout.label, dsLayouts = true) { l ->
+                    s.setDsLayout(com.pokedaisy.app.companion.DsLayout.entries.first { it.label == l })
+                })
+            }
+        },
         // The party, a minimap, the balls and BAG / WILD over the game on the field: its own page (layout, look, size, parts).
         SettingRow(tk("HUD"), onOff(s.fieldHud), labelBadge = NewFeatures.badge(NewFeatures.HUD), opensPage = true, subtitle = "Party, minimap and bag over the game") { navigate(Page.FIELD_HUD) },
         // One screen: FIGHT, POKéMON and RUN in the room beside a battle (BattleButtons).
@@ -536,6 +787,13 @@ private fun homeRows(
                 labelBadge = NewFeatures.badge(NewFeatures.COMPANION_WINDOW), subtitle = "A window over the game, or a side panel",
             ) { s.setCompanionWindow(!window); changed() }
         },
+        // A foldable half open: the game on one side of the hinge, the companion on the other.
+        s.foldLayout?.let { fold ->
+            SettingRow(
+                tk("FOLD LAYOUT"), onOff(fold), labelBadge = NewFeatures.badge(NewFeatures.FOLD_LAYOUT),
+                subtitle = "Half open: the game on one side of the fold",
+            ) { s.setFoldLayout(!fold); changed() }
+        },
         // The white tab at the screen's right edge that opens it (BACK and the HUD's COMPANION still do).
         s.companionTab?.let { tab ->
             SettingRow(
@@ -551,34 +809,89 @@ private fun homeRows(
             tk("SINGLE SCREEN"), onOff(s.singleScreen), subtitle = "Second screen free; companion over the game",
             labelBadge = NewFeatures.badge(NewFeatures.SINGLE_SCREEN),
         ) { s.setSingleScreen(!s.singleScreen); changed() }.takeIf { s.hasSecondScreen },
+        // The app's and the companion's colours (the limited-time themes only in their dates): both screens at once.
+        com.pokedaisy.app.companion.ui.theme.availableThemes().let { themes ->
+            val now = com.pokedaisy.app.companion.ui.theme.AppColors.theme
+            SettingRow(
+                tk("THEME"), now.label, labelBadge = NewFeatures.badge(NewFeatures.THEMES),
+            ) {
+                select(Selector(
+                    tk("THEME"), themes.map { it.label }, now.label,
+                    badge = { l -> tk("LIMITED").takeIf { themes.firstOrNull { it.label == l }?.season != null } },
+                ) { l -> themes.firstOrNull { it.label == l }?.let { s.setAppTheme(it.id); com.pokedaisy.app.companion.ui.theme.AppColors.applyTheme(it) } })
+            }
+        },
         // OFF / ON / AUTO (the device's), cycled on a tap so each look shows at once: both screens switch together.
         SettingRow(tk("DARK MODE"), DarkMode.setting.label) {
             val pick = DarkMode.setting.next()
             DarkMode.setting = pick
             s.setDarkMode(pick.ordinal)
+            changed()
         },
         // The game's frames per second and the app's CPU share, in the game's corner.
         SettingRow(tk("FPS / CPU"), onOff(s.showPerformance), subtitle = "Speed and CPU use in the game's corner") { s.setShowPerformance(!s.showPerformance); changed() },
         groupTitle(tk("COMPANION")),
         // Move effectiveness and the foe's weak-to/resists during battle.
-        SettingRow(tk("BATTLE HINTS"), onOff(s.showHints), subtitle = "Move ratings and the best pick in battle") { s.setShowHints(!s.showHints); changed() },
+        // Off: the battle buttons alone - no INFO, SUGGESTIONS or move ratings. The rows about them go with it.
+        SettingRow(
+            tk("BATTLE INFO"), onOff(s.battleInfo), subtitle = "INFO, SUGGESTIONS and move ratings",
+            labelBadge = NewFeatures.badge(NewFeatures.BATTLE_INFO),
+        ) { s.setBattleInfo(!s.battleInfo); changed() },
+        SettingRow(tk("BATTLE HINTS"), onOff(s.showHints), subtitle = "Move ratings and the best pick in battle") { s.setShowHints(!s.showHints); changed() }
+            .takeIf { s.battleInfo },
         // The battle controls' action menu shows the moves: one tap picks FIGHT and the move.
+        // What the BATTLE tab shows first: the battle buttons, or INFO (its own buttons lead back).
+        // BUTTONS / INFO / SUGGESTIONS: a pick-list (three values never cycle on a tap).
+        run {
+            val view = when { s.battleSuggestionsFirst -> tk("SUGGESTIONS"); s.battleInfoFirst -> tk("INFO"); else -> tk("BUTTONS") }
+            SettingRow(
+                tk("BATTLE VIEW"), view, subtitle = "What the BATTLE tab opens on",
+                labelBadge = NewFeatures.badge(NewFeatures.BATTLE_VIEW),
+            ) {
+                select(Selector(tk("BATTLE VIEW"), listOf(tk("BUTTONS"), tk("INFO"), tk("SUGGESTIONS")), view) { l ->
+                    s.setBattleInfoFirst(l == tk("INFO"))
+                    s.setBattleSuggestionsFirst(l == tk("SUGGESTIONS"))
+                    changed()
+                })
+            }.takeIf { s.battleInfo }
+        },
         SettingRow(tk("ONE-TAP MOVES"), onOff(s.oneTapMoves), subtitle = "Your moves right on the battle menu") { s.setOneTapMoves(!s.oneTapMoves); changed() },
+        // The battle buttons' look: GEN 4 (coloured buttons) or GEN 5 (dark plates round a red and white ball).
+        SettingRow(
+            tk("BATTLE STYLE"), s.battleStyle.label, subtitle = "The battle buttons' look",
+            labelBadge = NewFeatures.badge(NewFeatures.BATTLE_STYLE),
+        ) {
+            val styles = BattleStyle.entries
+            select(Selector(tk("BATTLE STYLE"), styles.map { it.label }, s.battleStyle.label) { l -> s.setBattleStyle(styles.first { it.label == l }) })
+        },
         // A STATS page in battle INFO with the foe's IVs / EVs / nature.
-        SettingRow(tk("FOE IVS"), onOff(s.showFoeIvs), subtitle = "The foe's hidden stats in battle") { s.setShowFoeIvs(!s.showFoeIvs); changed() },
-        SettingRow(tk("TAB BAR"), tr("{0} TABS", barTabs), labelBadge = NewFeatures.badge(NewFeatures.MORE_TAB), opensPage = true, subtitle = "Which tabs sit next to the gear") { navigate(Page.TABS) },
+        SettingRow(tk("FOE IVS"), onOff(s.showFoeIvs), subtitle = "The foe's hidden stats in battle") { s.setShowFoeIvs(!s.showFoeIvs); changed() }
+            .takeIf { s.battleInfo },
+        SettingRow(
+            tk("BATTLE FOCUS"), onOff(s.battleFocus), subtitle = "Battle info on one page, no scrolling",
+            labelBadge = NewFeatures.badge(NewFeatures.BATTLE_FOCUS),
+        ) { s.setBattleFocus(!s.battleFocus); changed() },
+        SettingRow(tk("TAB BAR"), tr("{0} TABS", barTabs), labelBadge = NewFeatures.badge(NewFeatures.MORE_TAB) ?: NewFeatures.badge(NewFeatures.BOXES_TAB), opensPage = true, subtitle = "Which tabs sit next to the gear") { navigate(Page.TABS) },
         // The game's menu click on every companion button.
         SettingRow(tk("CLICK SOUND"), onOff(s.clickSound)) { s.setClickSound(!s.clickSound); changed() },
+        // RetroAchievements' challenge badges and leaderboard values in the corner (GitHub discussion #620).
+        SettingRow(
+            tk("CHALLENGE ICONS"), onOff(s.raIcons), subtitle = "RetroAchievements' icons in the corner",
+            labelBadge = NewFeatures.badge(NewFeatures.RA_ICONS),
+        ) { s.setRaIcons(!s.raIcons); changed() },
         // Small on / off preferences: the icons' bounce, the map cursor's blink, tab slides, the battle jump.
         SettingRow(tk("TWEAKS"), null, opensPage = true, subtitle = "Small animations and the battle jump") { navigate(Page.TWEAKS) },
+    ) + coopRows(s, changed, navigate, pick = { title, choices, current, onPick -> select(Selector(title, choices, current) { onPick(it); changed() }) }, askLock = askLock) + listOfNotNull(
         groupTitle(tk("CONTROLS")),
         SettingRow(tk("GAME BUTTONS"), null, subtitle = "Key bindings: which button presses A, B, START...", opensPage = true) { navigate(Page.BUTTONS) },
         SettingRow(tk("HOTKEYS"), onOff(s.hotkeysEnabled), opensPage = true, subtitle = "Button combos for states, FF and more") { navigate(Page.HOTKEYS) },
         // PC, FLY, a Repel, the bike, a rod, states, FF... on a held button (L3 by default): its own page.
         SettingRow(tk("QUICK MENU"), null, subtitle = "Actions on a held button", labelBadge = quickMenuBadge(), opensPage = true) { navigate(Page.QUICK_MENU) },
         // The on-screen buttons: when they show, layouts, size, extras, EDIT LAYOUT - its own page, with a preview.
-        SettingRow(tk("TOUCH CONTROLS"), s.touchStyle.show.label, labelBadge = touchControlsBadge(), opensPage = true, subtitle = "The on-screen buttons: layout, size, extras") { navigate(Page.TOUCH) },
+        SettingRow(tk("TOUCH CONTROLS"), s.touchStyle.show.label, labelBadge = touchControlsBadge(), opensPage = true, subtitle = "The on-screen buttons: layout, look, skins") { navigate(Page.TOUCH) },
         groupTitle(tk("APP")),
+        // A card now and then about a feature the player hasn't found (FeatureTips).
+        tipsRow(s.tips) { s.setTips(it); changed() },
         // AUTO: the ROM's own language. Applies at once, both screens.
         SettingRow("LANGUAGE", L10n.settingLabel(s.appLanguage)) {
             val opts = L10n.options
@@ -586,9 +899,74 @@ private fun homeRows(
                 s.setAppLanguage(opts.first { it.second == l }.first)
             })
         },
+        // PokeDaisy's Discord server, opened in the browser (or the Discord app) on the main screen.
+        SettingRow(
+            "DISCORD", null,
+            labelBadge = NewFeatures.badge(NewFeatures.DISCORD), labelIcon = { DiscordMark() },
+        ) { s.openDiscord() },
         // The manual: every tab and setting explained (served by the website, kept for offline reading).
-        SettingRow(tk("HELP"), null, subtitle = "The manual: how every screen and setting works", opensPage = true) { navigate(Page.HELP) },
+        SettingRow(tk("HELP"), null, opensPage = true) { navigate(Page.HELP) },
     )
+}
+
+/** The CO-OP group: LINK (companion only, the state and why), PAIR (top screen), PARTNERS, RELAY (top screen) and RELAY ONLY. */
+internal fun coopRows(
+    s: CompanionSettings, changed: () -> Unit, navigate: (Page) -> Unit,
+    pick: (title: String, choices: List<String>, current: String, onPick: (String) -> Unit) -> Unit,
+    /** Shows PLAY TOGETHER ONLY's confirm (the screen draws it); the row is hidden while the settings carry no lock state. */
+    askLock: (CoopLockAsk) -> Unit = {},
+): List<SettingRow> {
+    if (!s.coopEnabled) return emptyList()
+    val state = s.coopState
+    val pairs = s.coopPairs
+    val partnerName = when (state) {
+        is com.pokedaisy.app.companion.coop.CoopState.Off -> null
+        is com.pokedaisy.app.companion.coop.CoopState.Connecting -> state.partner.name
+        is com.pokedaisy.app.companion.coop.CoopState.Connected -> state.partner.name
+        is com.pokedaisy.app.companion.coop.CoopState.Disconnected -> state.partner.name
+    }
+    val why = when (state) {
+        is com.pokedaisy.app.companion.coop.CoopState.Off -> when (state.reason) {
+            com.pokedaisy.app.companion.coop.CoopOffReason.NOT_PAIRED -> "Pair it on the top screen: CO-OP"
+            com.pokedaisy.app.companion.coop.CoopOffReason.CHEATS_ON -> "Turn cheats off to play together"
+            com.pokedaisy.app.companion.coop.CoopOffReason.NOT_EMERALD -> "Co-op needs English Pokémon Emerald."
+            else -> null
+        }
+        is com.pokedaisy.app.companion.coop.CoopState.Disconnected -> when (state.reason) {
+            com.pokedaisy.app.companion.coop.CoopDropReason.CLOSED, com.pokedaisy.app.companion.coop.CoopDropReason.NETWORK -> {
+                val secs = ((state.retryAtMs - System.currentTimeMillis() + 999) / 1000).coerceAtLeast(0)
+                tr("{0}: trying again in {1} s", state.partner.name, secs.toString())
+            }
+            else -> partnerName
+        }
+        else -> partnerName
+    }
+    return listOf(
+        groupTitle(tk("CO-OP")),
+        SettingRow(tk("LINK"), coopLinkLabel(state), subtitle = why) {},
+        SettingRow(tk("PAIR"), null, enabled = false, labelBadge = NewFeatures.badge(NewFeatures.COOP), subtitle = "On the top screen: Settings > CO-OP") {},
+        SettingRow(tk("PARTNERS"), if (pairs.isEmpty()) tk("NONE") else pairs.size.toString(), opensPage = true) { navigate(Page.COOP_PARTNERS) },
+        nearbyRangeRow(s.coopNearbyRange, pick) { s.coopNearbyRange = it },
+        SettingRow(tk("RELAY"), s.coopRelayValue, enabled = false, subtitle = "Change it in Settings on the top screen") {},
+        SettingRow(tk("RELAY ONLY"), if (s.coopRelayOnly) tk("ON") else tk("OFF")) { s.setCoopRelayOnly(!s.coopRelayOnly); changed() },
+    ) + listOfNotNull(
+        coopLockRow(s.coopLock, s.coopLockActions, partnerName ?: "", askLock),
+    )
+}
+
+/** NEARBY RANGE (both screens): how far away a partner's battle can be joined from, in steps. */
+internal val COOP_NEARBY_RANGES = listOf(2, 4, 8, 16, 32)
+
+internal fun nearbyRangeRow(
+    current: Int,
+    pick: (title: String, choices: List<String>, current: String, onPick: (String) -> Unit) -> Unit,
+    set: (Int) -> Unit,
+): SettingRow {
+    val labels = COOP_NEARBY_RANGES.map { tr("{0} STEPS", it) }
+    val now = tr("{0} STEPS", if (current in COOP_NEARBY_RANGES) current else 8)
+    return SettingRow(tk("NEARBY RANGE"), now, labelBadge = NewFeatures.badge(NewFeatures.COOP), subtitle = "How close you must be to join") {
+        pick(tk("NEARBY RANGE"), labels, now) { l -> set(COOP_NEARBY_RANGES[labels.indexOf(l)]) }
+    }
 }
 
 /** CHEATS' value on the options: OFF, or how many of this game's cheats are on. */
@@ -731,4 +1109,18 @@ private fun KeyCapture.toggle(title: String, request: () -> KeyCapture.Request) 
 }
 
 /** WILD ENCOUNTERS' value: ON (the game's own rate) or OFF. */
+/** GAME VOLUME's value (both screens): "100%" .. "0%". */
+internal fun gameVolumeLabel(percent: Int) = "$percent%"
+
+/** GAME VOLUME's slider (both screens): 0 - 100% in [com.pokedaisy.app.GameVolume.STEP]s, [set] on every move. */
+internal fun gameVolumeSlider(percent: Int, set: (Int) -> Unit) =
+    SettingSlider(percent, 0..100, com.pokedaisy.app.GameVolume.STEP, set)
+
 internal fun wildEncountersLabel(percent: Int) = if (percent == 0) tk("OFF") else tk("ON")
+
+/** SHINY ODDS' value: NORMAL (the game's own 1 in 8192), else "1 IN n". */
+private fun shinyOddsLabel(odds: Int): String =
+    if (odds >= com.pokedaisy.app.companion.data.ShinyOdds.NORMAL) tk("NORMAL") else tr("1 IN {0}", odds)
+
+/** SHINY ODDS' pick-list disclaimer: what a save checker may say, and the achievements' pause. */
+private const val SHINY_ODDS_NOTE = "Save checkers may flag these shinies. Achievements pause."

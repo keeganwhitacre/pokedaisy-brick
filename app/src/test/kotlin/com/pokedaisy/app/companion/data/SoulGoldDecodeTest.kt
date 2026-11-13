@@ -194,6 +194,59 @@ class SoulGoldDecodeTest {
     }
 
     @Test
+    fun `v1_2_1 - the v1_2 save at its moved EWRAM addresses`() {
+        activeGame = GameKind.SOULGOLD
+        for (fixture in listOf("soulgold_v121", "soulgold_v121b")) {
+            val t = decodeNative(fixture, NATIVE_SOULGOLD_V1_2_1)
+            val mon = t.party.single()
+            assertEquals(155 to 6, mon.species to mon.level)
+            assertEquals(21 to 21, mon.hp to mon.maxHp)
+            assertEquals(listOf("Tackle", "Leer"), mon.moves.filter { it != 0 }.map { lookupMove(it).name })
+            assertEquals(listOf(35, 30, 0, 0), mon.pp.toList()) // its 7-bit PP fields: read byte by byte, LEER had 15
+            assertEquals("Cherrygrove City", lookupLocation(t.regionMapSectionId).mapSecName)
+            assertEquals(3080L, t.money)
+            assertEquals("Potion", itemName(t.items.single().itemId))
+        }
+    }
+
+    @Test
+    fun `v1_2_1 - bit-packed moves and PP, as the game's SetMonData writes them`() {
+        // A player's Feraligatr (Discord, 2026-11-07): FISHIOUS REND read as SLAM, PP 7 / 69 / 49 for 15 / 20 / 10. These
+        // are the attacks SetMonData wrote headless on v1.2.1 for moves 242 / 423 / 349 / 701 and PP 15 / 15 / 20 / 10
+        // (v1.1.4 and v1.2 wrote `f2 00 a7 01 5d 01 bd 02 0f 0f 14 0a`, the plain u16s and bytes).
+        activeGame = GameKind.SOULGOLD
+        val raw = ByteArray(96)
+        raw[0x20] = 160.toByte() // FERALIGATR
+        val attacks = intArrayOf(0xf2, 0x00, 0xa7, 0x01, 0x5d, 0xe9, 0x15, 0x00, 0x8f, 0x07, 0x45, 0x31)
+        attacks.forEachIndexed { i, b -> raw[0x2C + i] = b.toByte() }
+        raw[0x50] = 100
+        val mon = decodePartyMon(raw, 0, SOULGOLD_V1_2_1_PARTY_MON)!!
+        assertEquals(listOf(242, 423, 349, 701), mon.moves.toList())
+        assertEquals("Fishious Rend", lookupMove(701).name)
+        assertEquals(listOf(15, 15, 20, 10), mon.pp.toList())
+        // v1.2's layout on the same bytes is what the player saw.
+        val old = decodePartyMon(raw, 0, SOULGOLD_PARTY_MON)!!
+        assertEquals(21, old.moves[3])
+        assertEquals(NATIVE_SOULGOLD_V1_2_1.partyMonLayout, SOULGOLD_V1_2_1_PARTY_MON)
+    }
+
+    @Test
+    fun `v1_2_1 battle - at the action menu`() {
+        activeGame = GameKind.SOULGOLD
+        val ram = FixtureMemoryReader.load("soulgold_v121_battle")
+        val cfg = NATIVE_SOULGOLD_V1_2_1
+        val t = readNativeTelemetry(ram, cfg)
+        assertTrue(t.inBattle)
+        val me = t.battleMons[BATTLE_POS_PLAYER_LEFT]
+        assertEquals(155 to 6, me.species to me.level)
+        val foe = t.battleMons[BATTLE_POS_OPPONENT_LEFT]
+        assertEquals(25 to 5, foe.species to foe.level)
+        assertEquals(0 to BATTLE_INPUT_ACTION_SELECT, readNativeBattleInputFast(ram, cfg))
+        val foeMon = decodePartyMon(ram.readCoreMemory(cfg.enemyParty, 96), 0, SOULGOLD_PARTY_MON)!!
+        assertEquals(25 to 5, (foeMon.species and 0x7FF) to foeMon.level)
+    }
+
+    @Test
     fun `v1_2 TM75 teaches Agility`() {
         activeGame = GameKind.SOULGOLD
         try {

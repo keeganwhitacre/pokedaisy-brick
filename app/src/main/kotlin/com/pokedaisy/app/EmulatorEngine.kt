@@ -3,7 +3,6 @@ package com.pokedaisy.app
 import com.pokedaisy.app.companion.data.SnapshotCache
 import com.pokedaisy.app.companion.i18n.tr
 import android.graphics.Bitmap
-import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.util.Log
@@ -68,6 +67,11 @@ class EmulatorEngine(
     /** Cap for hold/toggle fast-forward. 0 = unlimited. (Phase 4: make configurable.) */
     @Volatile var ffMaxSpeed = 2f
 
+    /** Debug builds: an `audio_tap` file put in here records the next [AudioTap.SECONDS] s of what the track is given
+     * (`audio-tap.pcm`, 48 kHz stereo s16le) and, per frame, what the core made, what the track took and the rate
+     * (`audio-tap.txt`): the audio as the device gets it, to set beside a headless `wav` of the same game. */
+    @Volatile var audioTapDir: File? = null
+
     /** REWIND (Settings): states kept for the rewind hotkey, 0 = off. Picked up on the emu thread. */
     @Volatile var rewindEntries = 0
 
@@ -103,8 +107,32 @@ class EmulatorEngine(
     @Volatile var riding = false
         private set
 
+    /** FREE FLIGHT's state after the last frame (pk_flight.c: [MgbaCore.FLIGHT_IDLE] ... [MgbaCore.FLIGHT_DISMOUNT]): the
+     * QUICK MENU's TAKE OFF / LAND, the HUD. GBA games only; IDLE elsewhere. */
+    @Volatile var flightState = MgbaCore.FLIGHT_IDLE
+        private set
+
+    /** The flight is the scenic FLY's (a route to a town): EXPAND zoomed out and the game at [SCENIC_SPEED] while it's in
+     * the air. Cleared once it's down. */
+    @Volatile var scenicFlight = false
+
+    /** In the air on the scenic FLY. */
+    private val scenicAirborne: Boolean
+        get() = scenicFlight && flightState != MgbaCore.FLIGHT_IDLE && flightState != MgbaCore.FLIGHT_DISMOUNT
+
     /** AUTO-RUN: B held for the player while walking on the field (holding B walks); never on a bike or in a menu. */
     @Volatile var autoRun = false
+    /** The running game runs by itself ([com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN]): flipping B there walks. */
+    private val ownAutoRun get() = com.pokedaisy.app.companion.data.activeGame in com.pokedaisy.app.companion.data.GAMES_WITH_OWN_AUTO_RUN
+
+    /** With AUTO-RUN off: frames the player walked on the field where it would have run for them, and of those the ones
+     *  B was held (AUTO-RUN's tip: someone who runs everywhere). Emu thread writes, the UI reads and resets. */
+    @Volatile var walkFrames = 0L
+    @Volatile var runFrames = 0L
+
+    /** The game's own region map (a Town Map, the Fly map) is up: [RegionMapWatch], GBA only. */
+    @Volatile var regionMapOpen = false
+        private set
 
     /** RUN INDOORS: the current map lets the player run (gMapHeader.allowRunning; FireRed / Emerald engines). */
     @Volatile var runIndoors = false
@@ -113,6 +141,10 @@ class EmulatorEngine(
      * encounters left (100 = the game's own rate, 0 = none). */
     @Volatile var wildFlag = 0L
     @Volatile var wildEncounters = 100
+
+    /** DS RESOLUTION ([Prefs.dsResolution]): a DS game's 3D scale, handed to the core before the next frame. */
+    @Volatile var ndsScale = 1
+    private var ndsScaleSet = -1
 
     /** REUSABLE TMS: the ROM's spots that use a TM up ([com.pokedaisy.app.companion.data.ReusableTms]; empty = none
      * known) and whether they're patched; both go in on the next frame boundary ([setReusableTms]). */
@@ -124,6 +156,31 @@ class EmulatorEngine(
         tmSites = sites
         reusableTms = on
         tmPatchDirty = true
+    }
+
+    /** INSTANT TEXT: the ROM's patch ([com.pokedaisy.app.companion.data.InstantText]; null = none known) and whether it's
+     * in; with REUSABLE TMS's on the next frame boundary. */
+    @Volatile private var textPatch: com.pokedaisy.app.companion.data.InstantText.Patch? = null
+    @Volatile private var instantText = false
+
+    fun setInstantText(patch: com.pokedaisy.app.companion.data.InstantText.Patch?, on: Boolean) {
+        textPatch = patch
+        instantText = on
+        tmPatchDirty = true
+    }
+
+    /** SHINY ODDS ([com.pokedaisy.app.companion.data.ShinyOdds]): the game's foe party watched every frame, a new wild foe
+     * made shiny at 1 in [shinyOdds] ([com.pokedaisy.app.companion.data.ShinyOdds.NORMAL] = the game's own odds, nothing
+     * done); null = a game it doesn't know. */
+    @Volatile private var shinyRoller: com.pokedaisy.app.companion.data.ShinyOdds.Roller? = null
+    @Volatile var shinyOdds = com.pokedaisy.app.companion.data.ShinyOdds.NORMAL
+
+    @Volatile private var shinyTarget: com.pokedaisy.app.companion.data.ShinyOdds.Target? = null
+
+    fun setShinyTarget(target: com.pokedaisy.app.companion.data.ShinyOdds.Target?) {
+        if (target == shinyTarget) return
+        shinyTarget = target
+        shinyRoller = target?.let { com.pokedaisy.app.companion.data.ShinyOdds.Roller(it) }
     }
 
     /** PLAYER LOOK ([com.pokedaisy.app.companion.data.PlayerLook]): the patch to wear - its blocks into the ROM, then its
@@ -201,7 +258,7 @@ class EmulatorEngine(
     /** Fired (emu thread) only when the FF music that should be playing
      * actually changes — a cached clip (its loop, intro and when the song
      * started), or null to stop (nothing cached yet for this state, or FF
-     * isn't active). Wrap MediaPlayer work in the callback yourself (see FfMusicPlayer). */
+     * isn't active). Post the player's work to the UI thread yourself (see FfMusicPlayer). */
     var onFfMusicChanged: ((clip: FfMusicPlayer.Clip?) -> Unit)? = null
 
     /** Fired (emu thread) in STEADY when the game starts a song with no clip
@@ -227,23 +284,32 @@ class EmulatorEngine(
      * same touch-overlay bitmask the on-screen D-pad uses. */
     private val battleInput = BattleInputController(input, writer = { a, b -> MgbaCore.pkWriteBytes(a, b) })
 
+    /** A DS game's battle picks: the game's own touch-screen buttons pressed with the stylus ([NdsBattleTaps]). */
+    private val ndsTaps = NdsBattleTaps()
+
+    /** The DS game's header code: where its battle panels have their buttons ([NdsBattleTaps.layoutFor]). */
+    var ndsGameCode: String = ""
+        set(v) { field = v; ndsTaps.layout = NdsBattleTaps.layoutFor(v) }
+
     /** True while a queued battle-menu button sequence hasn't fully drained —
      * the touch battle UI should disable further taps while this is true. */
-    val battleInputBusy: Boolean get() = battleInput.isBusy
+    val battleInputBusy: Boolean get() = if (nds) ndsTaps.busy else battleInput.isBusy
+    /** The game's cursor in the open battle menu ([BattleInputController.menuCursor]). */
+    val battleMenuCursor: Int get() = if (nds) -1 else battleInput.menuCursor
 
     /** Keep showing the last frame: an automated switch is in the game's party menu (see [BattleInputController.holdFrame]). */
-    val holdFrame: Boolean get() = battleInput.holdFrame
+    val holdFrame: Boolean get() = battleInput.holdFrame || dsHeld
 
     /** actionIndex: 0=FIGHT, 1=BAG, 2=POKEMON, 3=RUN. Call from the UI thread. */
-    fun battleSelectAction(actionIndex: Int) = battleInput.selectAction(actionIndex)
+    fun battleSelectAction(actionIndex: Int) = if (nds) ndsTaps.selectAction(actionIndex) else battleInput.selectAction(actionIndex)
 
     /** moveIndex 0-3. Call from the UI thread; opens FIGHT first if needed. */
-    fun battleSelectMove(moveIndex: Int) = battleInput.selectMove(moveIndex)
+    fun battleSelectMove(moveIndex: Int) = if (nds) ndsTaps.selectMove(moveIndex) else battleInput.selectMove(moveIndex)
 
     /** Backs out of move-select to action-select (a single B press). */
-    fun battleBack() = battleInput.back()
+    fun battleBack() = if (nds) ndsTaps.back() else battleInput.back()
 
-    fun battleCancelInput() = battleInput.cancel()
+    fun battleCancelInput() { battleInput.cancel(); ndsTaps.cancel() }
 
     /** Where [battleSwitchTo] finds the party menu; null = not supported for this game. */
     var battleSwitchAddrs: BattleInputController.SwitchAddrs?
@@ -254,6 +320,16 @@ class EmulatorEngine(
     var battleCursorAddrs: BattleInputController.CursorAddrs?
         get() = battleInput.cursorAddrs
         set(v) { battleInput.cursorAddrs = v }
+
+    /** A fresh read of the battle input state, for RUN's follow-up (see [BattleInputController.stateNow]). */
+    var battleStateNow: (() -> Int?)?
+        get() = battleInput.stateNow
+        set(v) { battleInput.stateNow = v }
+
+    /** The foe in battle is shiny: RUN leaves the game's "are you sure?" to the player ([BattleInputController.runAsksFirst]). */
+    var battleRunAsksFirst: Boolean
+        get() = battleInput.runAsksFirst
+        set(v) { battleInput.runAsksFirst = v }
 
     /** Switch to the party mon with this personality. Call from the UI thread. */
     fun battleSwitchTo(personality: Long) = battleInput.switchTo(personality)
@@ -268,7 +344,10 @@ class EmulatorEngine(
 
     /** Feed the latest (battleActiveBattler, battleInputState) from the fast
      * poll above. */
-    fun setBattleMenuState(activeBattler: Int, state: Int, cursor: Int = -1) = battleInput.onState(activeBattler, state, cursor)
+    fun setBattleMenuState(activeBattler: Int, state: Int, cursor: Int = -1) {
+        ndsTaps.onState(state)
+        battleInput.onState(activeBattler, state, cursor)
+    }
 
     /** A Gen 1 game's battle menus (steered from their read cursor - see [BattleInputController.gen1]). */
     var battleGen1Menus: Boolean
@@ -317,7 +396,7 @@ class EmulatorEngine(
     fun softReset() { softResetFrames = SOFT_RESET_FRAMES }
 
     fun setRewindHeld(on: Boolean) {
-        rewindHeld = on
+        rewindHeld = on && rewindAllowed(CoopGuards.statesBlocked)
     }
 
     fun setSlowmoHeld(on: Boolean) {
@@ -365,6 +444,66 @@ class EmulatorEngine(
      * back (a conversation's lines don't make the HUD blink), goes at once. Set on the emu thread.
      */
     val onField = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /**
+     * DS LAYOUT: a DS game wants its touch screen ([MgbaCore.FIELD_TOUCH], or [MgbaCore.FIELD_TOUCH_BATTLE_MENU] while
+     * [dsBattleMenuFloats]); a screen the game fades in ([MgbaCore.FIELD_TOUCH_FADES]) once it has. On after
+     * [TOUCH_ON_FRAMES], off after [TOUCH_OFF_FRAMES]; while both screens are black ([dsDark]: the fade from the X menu
+     * into a menu screen and back) it holds, and the first frame after decides at once. Set on the emu thread.
+     */
+    val dsTouchWanted = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /** A DS game's menu screen is up (the party, the bag, the Pokédex, the Pokégear...: [MgbaCore.FIELD_MENU], not a battle):
+     * DS LAYOUT shows both screens side by side then, both full of what the screen has to say. Same timing as [dsTouchWanted]. */
+    val dsMenuScreen = kotlinx.coroutines.flow.MutableStateFlow(false)
+    private var menuFrames = 0
+
+    /** A DS game's menu screen of any kind is up ([dsMenuScreen]'s, or one whose page is all on the touch screen, which
+     * floats in alone): the overworld it was opened from goes behind it. Same timing. */
+    val dsMenuApp = kotlinx.coroutines.flow.MutableStateFlow(false)
+    private var appFrames = 0
+
+    /** A DS game's scene is one EXPAND widens (the overworld - its menus and boxes over it - or a battle): elsewhere (the
+     * title, a menu screen) DS LAYOUT keeps the game at its 4:3 with the backdrop beside it, never black bars. Same timing. */
+    val dsWideScene = kotlinx.coroutines.flow.MutableStateFlow(true)
+    private var wideFrames = 0
+
+    /** Both of a DS game's screens are black (between two scenes; or a side-by-side menu screen's top one): DS LAYOUT
+     * covers a menu's way in and out with the overworld's picture and its loader. (The DS flows above hold while both
+     * are.) Set on the emu thread. */
+    val dsDark = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /** A DS game's touch screen is one colour (a fade, an evolution): the floating window hides meanwhile. Emu thread. */
+    val dsTouchBlank = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /** One screen's DS LAYOUT is up (the activity's): a menu's way in and out goes by under [dsHold]. */
+    @Volatile var dsQuickLoads = false
+
+    /** DS LAYOUT's transition hold ([DsTransitionHold]): from a menu transition's first faded frame until the next screen
+     * is lit, both screens keep the picture before it (the touch screen's [NdsBottomFrame.held], the top's [holdFrame])
+     * and the game runs flat out, muted (at FF's speed with its music while FF is on), the player's keys and taps held
+     * back. Emu thread. */
+    private val dsHold = DsTransitionHold()
+    @Volatile private var dsHeld = false
+
+    /** [dsHold]'s, for the UI (the window's frozen picture, its shade and dots). Set on the emu thread. */
+    val dsHolding = kotlinx.coroutines.flow.MutableStateFlow(false)
+    private var darkBefore = false
+    private var fadeSeen = false
+    private var fadeFrames = 0
+    private var litFrames = 0
+
+    /** DS CPU BOOST ([Prefs.dsCpuBoost]): the emulated ARM9 at twice the DS's clock, set between frames. */
+    @Volatile var ndsCpuBoost = true
+    /** DS CORE ([com.pokedaisy.app.companion.DsCore]): the core the next DS game starts on (MgbaCore.NDS_CORE_*). */
+    @Volatile var ndsCore = MgbaCore.NDS_CORE_MELONDS
+
+    /** DS LAYOUT floats the X menu (one screen): it comes back after a menu screen left by touch ([MgbaCore.pkNdsKeepStartMenu]). */
+    @Volatile var dsKeepStartMenu = false
+
+    /** The battle's command / move panel floats in too: BATTLE BUTTONS can't stand in for it (off, a double battle). */
+    @Volatile var dsBattleMenuFloats = false
+    private var touchFrames = 0
     private var fieldFrames = 0
 
     /**
@@ -406,6 +545,27 @@ class EmulatorEngine(
      * is on) and when AUTO-RUN becomes ready or blocked, and why - so SCENE SPEEDS, TEXT SPEED and AUTO-RUN's bike /
      * script / battle checks can be read off `adb logcat -s pokedaisy` after a test on a device.
      */
+    /** RIDE ON's vehicle as the look patch now in brings it (emu thread; null = none), sent to the core when it changed. */
+    private var rideApplied: com.pokedaisy.app.companion.data.RideOn.Sprite? = null
+    private var rideSent: com.pokedaisy.app.companion.data.RideOn.Sprite? = null
+    private var rideShown = false
+    private var rideFrames = 0
+
+    /** RIDE ON, once a frame (emu thread): the vehicle's sprite to the core when it changed, and shown or not (the core
+     * draws it only while the player is on a bike, behind them). */
+    private fun stepRide(field: Boolean) {
+        val r = rideApplied
+        if (r !== rideSent) {
+            MgbaCore.pkRideSet(r?.frames, r?.pal, r?.width ?: 32)
+            rideSent = r
+        }
+        val show = field && r != null
+        if (show != rideShown || (show && ++rideFrames % 60 == 0)) {
+            MgbaCore.pkRideShow(show)
+            rideShown = show
+        }
+    }
+
     /** FOLLOWER, once a frame (emu thread): its sprite to the core when it changed, and shown or not. */
     private fun stepFollower(field: Boolean) {
         val mon = follower
@@ -421,6 +581,17 @@ class EmulatorEngine(
         }
     }
     private var followerFrames = 0
+
+    /** Co-op presence ([CoopPresence]): called once per game frame beside FOLLOWER; null = none (not retail Emerald). */
+    @Volatile var coopPresence: CoopPresence? = null
+    /** The co-op lock (PLAY TOGETHER ONLY): stepped every loop turn, also while a hold runs no frame. */
+    @Volatile var coopLock: CoopLock? = null
+
+    /**
+     * Co-op joined battles ([CoopBattles]): asked every tick (also while [CoopGuards.held], when no frame runs) for the keys of
+     * the next frame - null = no frame this tick - and told after each one. Null = no co-op battles (not retail Emerald, no link).
+     */
+    @Volatile var coopBattles: CoopFrameHook? = null
 
     /** DAY AND NIGHT, once a frame (emu thread): [tintNow] a step toward [dayNightTint] on the field, toward none off it. */
     private fun stepTint(field: Boolean) {
@@ -452,6 +623,7 @@ class EmulatorEngine(
             s and MgbaCore.FIELD_BATTLE != 0 -> "battle"
             s and MgbaCore.FIELD_BIKE != 0 -> "bike"
             s and MgbaCore.FIELD_LOCKED != 0 -> "script / text / START menu"
+            s and MgbaCore.FIELD_WINDOW != 0 -> "a window on the field (a START menu that doesn't lock)"
             !FfMenuWatch.onField -> "not the field (a menu screen, or the field not learned yet)"
             else -> null
         }
@@ -492,10 +664,37 @@ class EmulatorEngine(
         // there, so it runs flat out (muted) and the battle comes back in a fraction of a second.
         if (battleInput.holdFrame) return Float.POSITIVE_INFINITY
         val s = requestedSpeed()
+        // The scenic FLY: the trip runs faster (it's a show, nothing to steer), FF's own speed when that's faster still.
+        if (scenicAirborne) return maxOf(s, SCENIC_SPEED)
+        // A DS game going to its next screen behind the held pictures (dsHold): the same, nothing to see or hear - unless
+        // FF is on, whose music plays through it (muting it cut the FF music and skipped it ahead): FF's speed then, never
+        // SMART's 1x (nothing to steer behind a held picture).
+        if (dsHeld) return if (s > 1f) s else Float.POSITIVE_INFINITY
         // SMART: menus and the region map's cursor can't be steered sped up -
         // 1x while one is up, and FF (still on) picks up again when it closes.
         // A battle runs fast but where it waits for the player (its menus, bag and party).
         return if (ffMode == FfMode.SMART && s > 1f && smartSlows(battleInput.gameState, menuOpen, mapOpen, battleWaiting)) 1f else s
+    }
+
+    /** No hold carried past a core (a held touch screen would stay frozen in the next game). */
+    private fun endDsHold() {
+        dsHold.release()
+        dsHeld = false
+        NdsBottomFrame.held = false
+        dsHolding.value = false
+    }
+
+    /** One frame of [dsHold], right after it ran. Emu thread. */
+    private fun stepDsHold() {
+        val held = dsHold.step(
+            MgbaCore.pkNdsFade(), fieldState, dsTouchWanted.value || dsMenuScreen.value || dsMenuApp.value, dsQuickLoads,
+        )
+        if (held == dsHeld) return
+        val ran = dsHold.frames
+        dsHeld = held
+        NdsBottomFrame.held = held
+        dsHolding.value = held
+        if (BuildConfig.DEBUG) Log.i("pokedaisy", if (held) "DS hold: on" else "DS hold: off after $ran frames")
     }
 
     private fun speedTag(s: Float): String = if (s.isInfinite()) "ff" else "${s}x"
@@ -630,9 +829,12 @@ class EmulatorEngine(
      * with no scene (no EXPAND row: the European Yellows, Red / Blue) leaves it to [gbField]'s own RAM checks. */
     private val gbOnField get() = wideScene == WideCamera.SCENE_FIELD || wideScene == -1
 
-    fun requestSaveState(slot: Int) { pendingSave = slot.coerceIn(SaveStates.SLOT_MIN, SaveStates.SLOT_MAX) }
+    fun requestSaveState(slot: Int) { if (CoopGuards.battleActive()) return; pendingSave = slot.coerceIn(SaveStates.SLOT_MIN, SaveStates.SLOT_MAX) }
+    /** False while co-op blocks LOAD STATE (slot loads and UNDO LOAD; the launch's resume is never blocked). */
+    fun loadAllowed(): Boolean = !CoopGuards.statesBlocked
+
     fun requestLoadState(slot: Int) { pendingLoad = slot.coerceIn(SaveStates.SLOT_MIN, SaveStates.SLOT_MAX) }
-    fun requestUndoSave() { pendingUndoSave = true }
+    fun requestUndoSave() { if (!CoopGuards.battleActive()) pendingUndoSave = true }   // no state of a co-op battle is ever written
     fun requestUndoLoad() { pendingUndoLoad = true }
 
     fun cycleSlot(delta: Int) {
@@ -646,6 +848,12 @@ class EmulatorEngine(
     @Volatile private var lastVsyncNanos = 0L
     /** The game screen's refresh period, averaged over recent ticks; 0 = not known yet. */
     @Volatile private var vsyncPeriodNanos = 0.0
+    /** The same over every tick since the screen's rate last changed, for the audio's rate: the ticks come when the GL
+     * thread wakes, a millisecond or more either side of the refresh, and [vsyncPeriodNanos] carried that into the
+     * resampling - the rate swung 47,390 - 48,660 Hz frame to frame on the Thor (SoulGold), a pitch wobble on held
+     * notes (#80's "tonal shifts"). Total time over refreshes cancels it out; 0 = not enough ticks yet. */
+    @Volatile private var audioPeriodNanos = 0.0
+    private val refreshAverage = RefreshAverage()
 
     /** Game frames run since the core started - SETTINGS > FPS / CPU counts them per second. */
     @Volatile var framesRun = 0L
@@ -661,12 +869,26 @@ class EmulatorEngine(
     /** The game screen's refresh as measured (Hz, 0 = unknown) and refreshes per frame (0 = timer pacing). */
     val refreshHz: Float get() = vsyncPeriodNanos.let { if (it > 0.0) (1e9 / it).toFloat() else 0f }
     val refreshesPerFrame: Int get() = pacedPerFrame
+    /** Why 1x is on the timer: [TIMER_NONE], [TIMER_AUDIO] (underruns kept coming under vsync pacing) or [TIMER_SCREEN]
+     * (the screen's ticks don't follow its refresh, [VsyncCheck]), for FPS / CPU's panel. */
+    val timerFallback: Int get() = when {
+        vsyncUnreliable != null -> TIMER_SCREEN
+        audioFallback -> TIMER_AUDIO
+        else -> TIMER_NONE
+    }
+    /** The audio fallback is on (the loop's own flag, for [timerFallback]). */
+    @Volatile private var audioFallback = false
     /** The speed the core runs at now (1 = real time, Infinity = uncapped FF). */
     @Volatile var currentSpeed = 1f
         private set
     /** The audio device ran dry this many times since the game started (each one a crackle). */
     @Volatile var audioUnderruns = 0
         private set
+
+    /** The GL thread's refreshes with no new frame and frames never drawn so far (EmulatorView), for the fps log line. */
+    @Volatile var drawStatsSource: (() -> Pair<Long, Long>)? = null
+    private var fpsRepeats = 0L
+    private var fpsUnshown = 0L
 
     /** The GL thread's late draws so far (EmulatorView.lateFrames), for the fps log line; null = unknown. */
     @Volatile var lateFramesSource: (() -> Long)? = null
@@ -677,6 +899,13 @@ class EmulatorEngine(
     /** This game's frames miss the GL thread's wait too often: drawn a refresh later, never waited for (as a DS
      * game's). Latched until the core stops - flipping back and forth would skip / repeat a frame each time. */
     @Volatile private var slowFrames = false
+    /** A DS game at 1x that can't keep up skips some frames' drawing (DsFrameSkip); emu thread only. */
+    private val dsSkip = DsFrameSkip()
+    private var dsSkipDrawn = true    // this frame's plan: drawn
+    private var dsSkipTimed = false   // this frame's core time goes to dsSkip
+
+    /** The game screen's fastest display mode (Hz, 0 = unknown), for [VsyncCheck]: asked on the GL thread once a second. */
+    @Volatile var displayMaxHz: () -> Float = { 0f }
 
     /** GL thread: the game's screen just refreshed (EmulatorView.onVsync). Returns how long the draw may
      * wait for the frame this refresh starts (~60% of a refresh), or 0 when none is due. */
@@ -684,10 +913,21 @@ class EmulatorEngine(
         val now = System.nanoTime()
         val d = now - lastVsyncNanos
         lastVsyncNanos = now
+        val unreliable = vsyncCheck.tick(now, displayMaxHz)
+        if (unreliable != (vsyncUnreliable != null)) {
+            if (unreliable) {
+                vsyncUnreliable = vsyncCheck.reason ?: "unreliable"
+                Log.w("pokedaisy", "pacing: the screen's ticks don't follow its refresh (${vsyncUnreliable}); the timer paces until they do")
+            } else {
+                vsyncUnreliable = null
+                Log.i("pokedaisy", "pacing: the screen's ticks follow its refresh again; vsync paces (next time ${vsyncCheck.recoverWindows} s to come back)")
+            }
+        }
         // A gap (the view paused, a dropped refresh) isn't a period.
         if (d in 4_000_000L..34_000_000L) {
             val p = vsyncPeriodNanos
             vsyncPeriodNanos = if (p == 0.0) d.toDouble() else p + (d - p) * 0.05
+            audioPeriodNanos = refreshAverage.tick(d, vsyncPeriodNanos)
         }
         // At 1x two frames' worth of refreshes banked: one was too few - refreshes arriving unevenly (two close
         // together, then a gap) were dropped, each a game frame never run and its audio missing (GitHub #80).
@@ -696,6 +936,7 @@ class EmulatorEngine(
         val n = pacedPerFrame
         if (vsyncTicks.availablePermits() < (if (n == 0) 1 else 2 * n)) vsyncTicks.release()
         if (n == 0) return 0L
+        if (CoopGuards.held) return 0L   // a hold runs no frame: nothing to wait for, no late draws to count
         // A DS frame takes 4-20 ms on the RP6 / Thor: waited for within ~60% of a refresh, every one past ~10 ms
         // missed it and the last picture showed twice (GitHub #215: 45 of 120 frames late in HeartGold). It's drawn
         // a refresh later instead, never waited for: a frame of latency, and a whole refresh to finish in.
@@ -708,7 +949,7 @@ class EmulatorEngine(
     /** Refreshes per game frame while the display paces 1x, or 0 for timer pacing. */
     private fun vsyncsPerFrame(): Int {
         val p = vsyncPeriodNanos
-        if (p == 0.0 || System.nanoTime() - lastVsyncNanos > 100_000_000L) return 0
+        if (p == 0.0 || System.nanoTime() - lastVsyncNanos > 100_000_000L || vsyncUnreliable != null) return 0
         val hz = 1e9 / p
         val n = (hz / GBA_FPS).roundToInt()
         // Within 1.5% of the GBA's own rate (60 / 120 Hz: +0.46%); a 90 Hz screen would judder either way.
@@ -723,6 +964,15 @@ class EmulatorEngine(
     private fun loop(rom: File, save: File, resume: File?) {
         emuJobs.clear()   // the last game's
         SaveBackups.snapshot(save)
+        // RetroArch's compressed .srm, unpacked first: mGBA would take it as the flash itself and the game start anew.
+        RzipSave.unpackForPlay(save)?.let { why ->
+            loadError = why
+            running = false
+            if (resume != null) onResumeResult?.invoke(false)
+            return
+        }
+        ndsScaleSet = -1
+        MgbaCore.pkNdsSetCore(ndsCore)
         if (!MgbaCore.pkInit(rom.absolutePath, save.absolutePath)) {
             loadError = "mGBA could not load ${rom.name}"
             running = false
@@ -732,6 +982,12 @@ class EmulatorEngine(
         vw = MgbaCore.pkVideoWidth()
         vh = MgbaCore.pkVideoHeight()
         videoBuf = MgbaCore.pkVideoBuffer()
+        // The core starts with no follower and no tint (pk_wide_extras_reset): so do what this engine last sent.
+        followerSent = null
+        followerShown = false
+        tintNow.fill(256f)
+        tintSent.fill(256)
+        endDsHold()
         onCoreReady?.invoke(vw, vh)
 
         // A state carries the save as it was when it was made, and loading it writes
@@ -739,8 +995,18 @@ class EmulatorEngine(
         // save: if it was changed since (another emulator, a save copied in, the saves
         // folder moved), the file wins and the game boots from it.
         var resumed: File? = null
+        val dsCore = MgbaCore.pkNdsCore()
         if (resume != null && resume.isFile && resume.length() > 0) {
-            if (MgbaCore.pkStateMatchesSave(resume.absolutePath) == 0) {
+            val matches = MgbaCore.pkStateMatchesSave(resume.absolutePath)
+            if (matches == MgbaCore.STATE_OTHER_CORE) {
+                // A DS game left on the other DS core (DS CORE changed since): its state can't load here. Kept for that
+                // core (SaveStates.parkedResume: the next start on it resumes it), and the game starts from its save file.
+                Log.w("pokedaisy", "resume skipped: the state is the other DS core's")
+                val other = if (dsCore == MgbaCore.NDS_CORE_DSPERATE) MgbaCore.NDS_CORE_MELONDS else MgbaCore.NDS_CORE_DSPERATE
+                resume.renameTo(SaveStates.parkedResume(resume, other))
+                SnapshotCache.fileFor(resume).delete()
+                startNotice = tr("This game was left on the other DS core, so it started from the save file")
+            } else if (matches == 0) {
                 Log.w("pokedaisy", "resume skipped: ${save.name} changed since the state was made")
                 resume.renameTo(File(resume.parentFile, "resume.replaced"))
                 SnapshotCache.fileFor(resume).delete()
@@ -771,7 +1037,13 @@ class EmulatorEngine(
             .onFailure { Log.e("pokedaisy", "audio track failed", it) }
             .getOrNull()
 
+        // SOUND > GAME VOLUME / MUTE GAME (GameVolume): the track's own gain, under the device's volume. Set here and
+        // whenever it changes below; the writes (and so 1x's pacing) go on as before.
+        var trackGain = GameVolume.gain
+        runCatching { track?.setVolume(trackGain) }
+
         val scratch = ShortArray(4096)
+        val tap = AudioTap()
         val frameNanos = 1_000_000_000L / 60L
         var next = System.nanoTime()
         var fpsFrames = 0
@@ -786,6 +1058,7 @@ class EmulatorEngine(
         var fpsPlayedAt = -1L
         var fpsSampleWork = 0L
         var fpsMaxSample = 0L
+        var wasHeld = false
         var fpsLate = -1L
         var slowWindows = 0
         slowFrames = false
@@ -810,6 +1083,9 @@ class EmulatorEngine(
         var dsMusicOk = true
         var dsMusicBgm = -1
         var dsMusicWait = -1   // game frames since a copy became due (-1: none due)
+        var dsMusicState = -1  // pkNdsBgmState when the copy was taken (-1: taken unsettled, after the longest wait)
+        var dsStateSeen = -1   // pkNdsBgmState last frame, and the frames it has held
+        var dsStateFrames = 0
         val dsMusicOut = ShortArray(4096)
         var dsMusicFrames = 0   // audio frames the copy wrote since the last fps log line
         var dsMusicPos = 0      // the copy's last frame of audio not written yet: dsMusicOut[pos, pos + left)
@@ -822,11 +1098,18 @@ class EmulatorEngine(
         var decimN = 0
         var measuredSpeed = 4f // uncapped FF's real rate, from the fps log below
         // Vsync pacing (see the class comment): the device buffer's size, and what's been
-        // written to it since the last resync - minus its play head, what's still queued.
+        // written to it since it started or was flushed (every write counts) - minus its play head, what's still queued.
         val bufferFrames = track?.bufferSizeInFrames ?: 0
         var framesWritten = 0L
         var underruns = track?.underrunCount ?: 0
         var vsyncMode = false
+        // The track's buffer is used to half until vsync pacing takes 1x (and in FF): the first frames of every launch
+        // run on blocking writes (no refresh reported yet), which filled it to the top, and pacing then took ~30 s to
+        // wear a full buffer down to its half-full target, holding every frame and the music 0.5% flat meanwhile.
+        var trackHalf = false
+        // The same after a flush (FF with a STEADY clip, sleep): a stopped track only plays again once its buffer is as
+        // full as its start threshold - all of it - so until its head moves again it's held to half too.
+        var trackStarted = false
         // Audio queued after this frame's write (vsync pacing only): picks how the next frame is paced. Null on a
         // frame that wrote none (the game's audio paused for a STEADY clip, say): it paces on the tick alone - a
         // stale "low" once ran SMART's 1x menus at up to 3x while the clip played.
@@ -834,13 +1117,23 @@ class EmulatorEngine(
         var lastQueued = -1
         var catchUpRun = 0
         // Underruns while vsync paces, counted once it has settled; too many and this run goes back to the timer.
-        val trouble = AudioTroubleWatch()
+        var trouble = AudioTroubleWatch()
         var vsyncFallback = false
+        audioFallback = false
+        // The audio fallback isn't for the whole run (1.5.0's was: one bad stretch left a game choppy until it was
+        // closed): vsync pacing is tried again after [AUDIO_RETRY_NANOS], twice as long after each time it gives up.
+        var audioRetryAt = 0L
+        var audioRetryNanos = AUDIO_RETRY_NANOS
         var vsyncSettledAt = 0L
         // For the fps log line: audio a full buffer cut off, frames run at once / held back.
         var fpsDropped = 0
         var fpsCatchUps = 0
         var fpsHolds = 0
+        // ... and the timer's blocking writes: how many, their total and longest wait (a device whose audio takes
+        // writes in big chunks holds the loop for several frames, then it runs them back to back: GitHub #350).
+        var fpsBlocks = 0
+        var fpsBlockSum = 0L
+        var fpsBlockMax = 0L
         // Fast-forward at a whole number of game frames per refresh (2x / 3x / 4x on 60 Hz): the group of frames
         // for this refresh, run back to back on its tick, the last one drawn. Timer-paced frames with EXPAND's
         // window drawn every 12 ms gave the 60 Hz screen steps of 3, 3, 5 game frames: a judder RetroArch hasn't.
@@ -857,8 +1150,33 @@ class EmulatorEngine(
         try {
             while (running) {
                 val frameStart = System.nanoTime()
+                if (rewindHeld && !rewindAllowed(CoopGuards.statesBlocked)) rewindHeld = false
+                if (loopAction(CoopGuards.held, !running, pendingSave >= 0) != LoopAction.RUN) {
+                    wasHeld = true
+                    // Co-op holds the game: no frame, the last picture stays; saves, suspend, sleep and stop still served.
+                    gameAudioPaused = true
+                    if (!paused) { paused = true; runCatching { track?.pause(); track?.flush() }; framesWritten = 0L }
+                    coopBattles?.beforeFrame(input.mask)   // CO-OP BATTLES: its timers and link waits tick while no frame runs
+                    coopLock?.onFrame()
+                    servicePending(runFieldJobs = false)
+                    if (sleeping) synchronized(sleepLock) {
+                        while (sleeping && running && pendingSuspend == null) sleepLock.wait(SLEEP_POLL_MS)
+                        sleeping = false
+                    } else Thread.sleep(16)
+                    next = System.nanoTime()
+                    continue
+                }
+                if (wasHeld) {
+                    // The hold's refreshes were never waited for: the first window after it counts no late draws.
+                    wasHeld = false
+                    fpsLate = -1L; slowWindows = 0; ticksSinceFrame = 0
+                    vsyncSettledAt = System.nanoTime() + VSYNC_SETTLE_NANOS
+                    vsyncTicks.drainPermits()
+                }
                 battleInput.tick()
-                val rewindWanted = rewindEntries
+                if (nds) ndsTaps.tick()
+                // No ring while a co-op battle runs: it would fill with the other game's frames.
+                val rewindWanted = if (CoopGuards.statesBlocked) 0 else rewindEntries
                 if (rewindWanted != rewindApplied) {
                     MgbaCore.pkSetRewind(rewindWanted)
                     rewindApplied = rewindWanted
@@ -884,6 +1202,8 @@ class EmulatorEngine(
                         if (draw) lastWideDraw = now
                         MgbaCore.pkWideSetDraw(draw)
                         camera.walking = input.mask and DIRECTIONS != 0
+                        camera.flightZoom = scenicAirborne
+                        camera.flying = flightState != MgbaCore.FLIGHT_IDLE
                         wideScene = MgbaCore.pkWideScene()
                         val win = camera.frame(wideScene)
                         if (win != null) MgbaCore.pkWideSetView(win.x, win.y, win.w, win.h)
@@ -899,24 +1219,77 @@ class EmulatorEngine(
                 MgbaCore.pkSetRewinding(rewinding)
                 // TURBO A / B: pressed 2 frames, released 2, in game frames - so FF mashes faster too.
                 val reset = if (softResetFrames > 0) { softResetFrames--; SOFT_RESET_KEYS } else 0
-                var keys = input.mask or reset or (if ((frame++ / 2) % 2 == 0L) input.turboMask else 0)
+                var keys = input.mask or reset or input.tapMask() or (if ((frame++ / 2) % 2 == 0L) input.turboMask else 0)
                 // AUTO-RUN: B flipped while walking on the player's own field (holding it walks) - never in a script, a
                 // battle, a menu screen (B leaves it) or on a bike (the Acro Bike's wheelie is B). Nor with A held: the
                 // expansion's DexNav creeps on A (Seaglass & co.), but checks B's run first, so a held B scared the
                 // Pokémon off. A while walking does nothing in the other games.
-                if (autoRun && (gba || nds) && keys and DIRECTIONS != 0 && keys and MgbaCore.Key.A == 0 &&
+                if (autoRun && !ownAutoRun && (gba || nds) && keys and DIRECTIONS != 0 && keys and MgbaCore.Key.A == 0 &&
                     fieldState and AUTO_RUN_BLOCKERS == MgbaCore.FIELD_KNOWN && fieldScreen
                 ) keys = keys xor MgbaCore.Key.B
+                else if (!autoRun && !ownAutoRun && (gba || nds) && keys and DIRECTIONS != 0 &&
+                    fieldState and AUTO_RUN_BLOCKERS == MgbaCore.FIELD_KNOWN && fieldScreen
+                ) {
+                    walkFrames++
+                    if (keys and MgbaCore.Key.B != 0) runFrames++
+                }
+                // CO-OP BATTLES (hook null = nothing changes): the hook gives this frame's keys (always the player's own: a joined
+                // battle is the game's own link battle); null = the game is held (a joined battle waiting at its start, a stop in flight).
+                val coop = coopBattles
+                if (coop != null) {
+                    val coopKeys = coop.beforeFrame(keys)
+                    if (coopKeys == null) {
+                        // No frame this tick: nothing runs, no new audio.
+                        wasHeld = true
+                        gameAudioPaused = true
+                        if (!paused) { paused = true; runCatching { track?.pause(); track?.flush() }; framesWritten = 0L }
+                        servicePending(runFieldJobs = false)
+                        if (sleeping) synchronized(sleepLock) {
+                            while (sleeping && running && pendingSuspend == null) sleepLock.wait(SLEEP_POLL_MS)
+                            sleeping = false
+                        } else Thread.sleep(2)
+                        next = System.nanoTime()
+                        continue
+                    }
+                    keys = coopKeys
+                }
+                // Behind DS LAYOUT's held pictures the player can't see what a key would do.
+                if (dsHeld) keys = 0
                 MgbaCore.pkSetKeys(keys)
                 if (nds) {
+                    if (ndsScale != ndsScaleSet) {
+                        MgbaCore.pkNdsSetScale(ndsScale)
+                        ndsScaleSet = ndsScale
+                    }
                     // Fast-forward on the refresh shows the last frame of each group: the others skip their drawing, and
                     // EXPAND's slices (drawn after a frame, for the next) only come before a shown one - drawing them for
                     // every frame was two thirds of a DS frame's cost, and at 3x the group outran the refresh (stutter).
                     val ff = ffPerTick > 0
-                    MgbaCore.pkNdsSetDraw(!ff || ffGroup <= 1, !ff || (if (ffGroup > 1) ffGroup <= 2 else ffFit.size <= 1))
+                    dsSkipDrawn = true
+                    if (dsHeld) {
+                        // Held: nothing is seen, so most frames skip their drawing (the hold still reads every
+                        // DsTransitionHold.DRAW_EVERY-th, to see the next screen lit).
+                        val n = dsHold.frames + 1
+                        dsSkip.reset()
+                        MgbaCore.pkNdsSetDraw(n % DsTransitionHold.DRAW_EVERY == 0, (n + 1) % DsTransitionHold.DRAW_EVERY == 0)
+                    } else if (!ff && effectiveSpeed() == 1f) {
+                        // 1x on a device that can't finish its frames in time: some skip their drawing (DsFrameSkip).
+                        val (draw, drawNext) = dsSkip.plan()
+                        dsSkipDrawn = draw
+                        dsSkipTimed = true
+                        MgbaCore.pkNdsSetDraw(draw, drawNext)
+                    } else {
+                        dsSkip.reset()
+                        MgbaCore.pkNdsSetDraw(!ff || ffGroup <= 1, !ff || (if (ffGroup > 1) ffGroup <= 2 else ffFit.size <= 1))
+                    }
                 }
+                val coreStart = System.nanoTime()
                 MgbaCore.pkRunFrame()
+                val coreEnd = System.nanoTime()
+                // Before the frame is shown: the frame a menu transition starts fading on is never seen.
+                if (nds) stepDsHold()
                 onFrame?.invoke()
+                coop?.afterFrame()
                 framesRun++
                 ticksSinceFrame = 0
                 // Achievements never take the game down with them (a pending JNI
@@ -926,6 +1299,18 @@ class EmulatorEngine(
                 } catch (t: Exception) {
                     if (!raFrameFailed) Log.e("pokedaisy", "achievements frame failed", t)
                     raFrameFailed = true
+                }
+                // FREE FLIGHT's state after this frame (pk_flight.c ticks inside pkRunFrame): TAKE OFF / LAND, the scenic FLY.
+                if (gba) {
+                    flightState = MgbaCore.pkFlightState()
+                    if (scenicFlight && flightState == MgbaCore.FLIGHT_IDLE) scenicFlight = false
+                }
+                // DsFrameSkip learns from the core's own time (drawn or not), after the frame is out.
+                if (dsSkipTimed) {
+                    val before = dsSkip.skip
+                    dsSkip.frameDone(coreEnd - coreStart, dsSkipDrawn)
+                    dsSkipTimed = false
+                    if (dsSkip.skip != before) Log.i("pokedaisy", "DS frame skip: $before -> ${dsSkip.skip} (${dsSkip.describe()})")
                 }
 
                 servicePending()
@@ -940,6 +1325,7 @@ class EmulatorEngine(
                     // As after the audio pausing below: flush() put the play head back at 0. And the frames due while
                     // it slept are not owed.
                     framesWritten = 0L
+                    trackStarted = false
                     vsyncSettledAt = System.nanoTime() + VSYNC_SETTLE_NANOS
                     vsyncTicks.drainPermits()
                     next = System.nanoTime()
@@ -972,10 +1358,62 @@ class EmulatorEngine(
 
                 // GBA memory watchers; a Game Boy game has none of these screens / engines to read.
                 mapOpen = gba && RegionMapWatch.isOpen(InProcessReader)
+                regionMapOpen = mapOpen
                 // A shop's screens count as the field: its clerk talks inside them (GitHub #41).
                 menuOpen = gba && FfMenuWatch.tick(InProcessReader) && !ShopWatch.isOpen(InProcessReader) ||
                     nds && fieldState and MgbaCore.FIELD_MENU != 0   // a DS menu screen: the field's child process
                 battleWaiting = nds && fieldState and MgbaCore.FIELD_BATTLE_INPUT != 0
+                if (nds) {
+                    // Both screens black (between two scenes): every choice below holds - what comes after the black
+                    // decides, at once, on its first frame (no gap to bridge then, so no off delay either).
+                    val dark = fieldState and MgbaCore.FIELD_DARK_TOP != 0 && fieldState and MgbaCore.FIELD_DARK_BOTTOM != 0
+                    val bottomDark = fieldState and MgbaCore.FIELD_DARK_BOTTOM != 0
+                    // (Covered too: a side-by-side menu screen's top half already black, its touch half still up.)
+                    val covered = dark || dsMenuScreen.value && fieldState and MgbaCore.FIELD_DARK_TOP != 0
+                    if (dsDark.value != covered) dsDark.value = covered
+                    if (dsTouchBlank.value != bottomDark) dsTouchBlank.value = bottomDark
+                    val afterDark = darkBefore && !dark
+                    darkBefore = dark
+                    if (!dark) {
+                        var want = fieldState and MgbaCore.FIELD_TOUCH != 0 ||
+                            dsBattleMenuFloats && fieldState and MgbaCore.FIELD_TOUCH_BATTLE_MENU != 0
+                        // A screen the game fades in (a battle's bag / party): not over the old one fading out - once
+                        // the touch screen has been black and then lit for a while (or the game took too long about it).
+                        // It ends at its first black: leaving it, the battle redraws its own touch screen (a Poké Ball for
+                        // a few frames) while still at the bag's step.
+                        val fades = fieldState and MgbaCore.FIELD_TOUCH_FADES != 0
+                        if (fades && dsTouchWanted.value && bottomDark) {
+                            dsTouchWanted.value = false
+                            touchFrames = 0
+                            fadeSeen = true; fadeFrames = 0; litFrames = 0
+                        }
+                        if (want && !dsTouchWanted.value && fades) {
+                            if (bottomDark) { fadeSeen = true; litFrames = 0 } else litFrames++
+                            fadeFrames++
+                            if (!(fadeSeen && litFrames >= FADE_LIT_FRAMES) && fadeFrames < FADE_WAIT_FRAMES) want = false
+                        } else if (!want) { fadeSeen = false; fadeFrames = 0; litFrames = 0 }
+                        // (A page all on one screen isn't one for both: the touch screen's floats in, the top screen's stays alone.)
+                        val menu = fieldState and MgbaCore.FIELD_MENU != 0 &&
+                            fieldState and (MgbaCore.FIELD_BATTLE or MgbaCore.FIELD_TOUCH_ONLY or MgbaCore.FIELD_TOP_ONLY) == 0
+                        val app = fieldState and MgbaCore.FIELD_MENU != 0 && fieldState and MgbaCore.FIELD_BATTLE == 0
+                        val wide = fieldState and (MgbaCore.FIELD_SCREEN or MgbaCore.FIELD_BATTLE) != 0
+                        fun settle(flow: kotlinx.coroutines.flow.MutableStateFlow<Boolean>, v: Boolean, frames: Int): Int {
+                            if (v == flow.value) return 0
+                            val n = frames + 1
+                            if (afterDark || n >= (if (v) TOUCH_ON_FRAMES else TOUCH_OFF_FRAMES)) { flow.value = v; return 0 }
+                            return n
+                        }
+                        touchFrames = settle(dsTouchWanted, want, touchFrames)
+                        if (dsTouchWanted.value) { fadeSeen = false; fadeFrames = 0; litFrames = 0 }
+                        menuFrames = settle(dsMenuScreen, menu, menuFrames)
+                        appFrames = settle(dsMenuApp, app, appFrames)
+                        wideFrames = settle(dsWideScene, wide, wideFrames)
+                    }
+                } else {
+                    if (dsTouchWanted.value) dsTouchWanted.value = false
+                    if (dsMenuScreen.value) dsMenuScreen.value = false
+                    if (dsMenuApp.value) dsMenuApp.value = false
+                }
                 if (wideApplied == WideScreen.OFF || (wideCamera == null && !probeOnly)) wideScene = -1
                 // A fade between two maps keeps whatever the HUD was doing.
                 if (wideScene != WideCamera.SCENE_FADE) {
@@ -1009,10 +1447,21 @@ class EmulatorEngine(
                 } ?: run { gbWildHeld = null }
                 // A DS game holds its own switch in its field read (pk_nds_field.cpp: the map's rates at 0).
                 val wildKeep = if (wildFlag != 0L || nds) wildEncounters else 100
+                if (nds) {
+                    MgbaCore.pkNdsKeepStartMenu(dsKeepStartMenu)
+                    MgbaCore.pkNdsCpuBoost(ndsCpuBoost)
+                }
                 fieldState = when {
                     nds -> MgbaCore.pkFieldState(false, wildKeep)
                     gba && fieldGame != WideScreen.OFF -> MgbaCore.pkFieldState(runIndoors, wildKeep)
                     else -> 0
+                }
+                // SHINY ODDS: a new wild foe, between the frame it's made and the battle drawing it.
+                if (gba && shinyOdds < com.pokedaisy.app.companion.data.ShinyOdds.NORMAL) shinyRoller?.let { r ->
+                    runCatching {
+                        val n = r.tick(shinyOdds, InProcessReader::readCoreMemory, MgbaCore::pkWriteBytes)
+                        if (n > 0) Log.i("pokedaisy", "shiny odds: foe made shiny (1 in $shinyOdds)")
+                    }.onFailure { Log.w("pokedaisy", "shiny odds failed", it) }
                 }
                 if (fieldState and MgbaCore.FIELD_AVATAR != 0) fieldMovesKnown = true
                 val bike = MgbaCore.FIELD_AVATAR or MgbaCore.FIELD_BIKE
@@ -1044,8 +1493,13 @@ class EmulatorEngine(
                         lookRefreshTries = 0
                     }
                 }
+                if (gba) stepRide(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
+                    battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE)
                 if (gba) stepFollower(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
                     battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE && fieldState and MgbaCore.FIELD_SURF == 0)
+                if (gba) coopLock?.onFrame()
+                if (gba) coopPresence?.onFrame(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
+                    battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE)
                 if (gba) stepTint(fieldScreen && !mapOpen && !FfMenuWatch.battling &&
                     battleInput.gameState == com.pokedaisy.app.companion.data.BATTLE_INPUT_NONE)
                 logField(effectiveSpeed())
@@ -1066,6 +1520,7 @@ class EmulatorEngine(
                 if (mode != FfMusicMode.STEADY) requestedKey = null
                 else if (ffMusicKey != null && ffMusicKey != requestedKey) {
                     requestedKey = ffMusicKey
+                    ffMusicCache.notePlayed(ffMusicKey)   // the songs played longest ago go first when the cache is full
                     if (!ffMusicCache.complete(ffMusicKey)) runCatching { onFfMusicWanted?.invoke(ffMusicKey) }
                 }
                 // The clip follows the FF the player asked for, not SMART's 1x stretches: it
@@ -1089,19 +1544,35 @@ class EmulatorEngine(
                 val dsBgm = if (nds && dsMusicOk && mode == FfMusicMode.STEADY && ffWanted) MgbaCore.pkNdsBgm() else -1
                 if (dsBgm >= 0) {
                     // A copy is due when FF comes on and for each new song: taken once the sound driver has the song
-                    // (a few frames on) and no volume fade runs (a song coming back after a battle fades in - a copy
-                    // taken then stayed nearly silent), or after DS_MUSIC_MAX_WAIT_FRAMES whatever.
+                    // (a few frames on) and it's settled (pkNdsBgmState: no volume fade runs, and its player isn't
+                    // paused - a song coming back after a battle is, at 0, for a few frames before it fades in: a copy
+                    // taken then stayed silent), or after DS_MUSIC_MAX_WAIT_FRAMES whatever. Settled for a few frames:
+                    // the ARM9 marks a song started a frame or so before its command reaches the ARM7, and a copy
+                    // taken in between never starts it (Black 2, leaving a Pokemon Center: silent).
+                    val bgmState = MgbaCore.pkNdsBgmState()
+                    if (bgmState != dsStateSeen) {
+                        dsStateSeen = bgmState
+                        dsStateFrames = 0
+                    } else dsStateFrames++
+                    val settled = bgmState >= 0 && dsStateFrames >= DS_MUSIC_SETTLE_FRAMES
                     if (!dsMusicOn && dsMusicWait < 0) dsMusicWait = DS_MUSIC_SETTLE_FRAMES
                     else if (dsMusicOn && dsBgm != dsMusicBgm) {
                         // 0: the game fading its song out before the next (its fades run on the ARM9, stopped in the
                         // copy).
                         if (dsBgm == 0) MgbaCore.pkNdsMusicFade(DS_MUSIC_FADE_FRAMES) else dsMusicWait = 0
+                    } else if (dsMusicOn && dsMusicWait < 0 && settled && bgmState != dsMusicState) {
+                        // Same song, but the game paused, faded or resumed it since the copy (which can't follow): faded
+                        // out with it when it's gone silent (before the next song, usually), else copied again as it is.
+                        if ((bgmState and 0xFFFF) == 0) MgbaCore.pkNdsMusicFade(DS_MUSIC_FADE_FRAMES)
+                        else dsMusicWait = DS_MUSIC_SETTLE_FRAMES
+                        dsMusicState = bgmState
                     }
                     dsMusicBgm = dsBgm
                     if (dsMusicWait >= 0 && ++dsMusicWait > DS_MUSIC_SETTLE_FRAMES &&
-                        (!MgbaCore.pkNdsBgmFading() || dsMusicWait > DS_MUSIC_MAX_WAIT_FRAMES)
+                        (settled || dsMusicWait > DS_MUSIC_MAX_WAIT_FRAMES)
                     ) {
                         dsMusicWait = -1
+                        dsMusicState = bgmState
                         dsMusicLeft = 0
                         dsMusicOn = MgbaCore.pkNdsMusicStart()
                         if (dsMusicOn) Log.i("pokedaisy", "FF music: DS copy playing song %d".format(dsBgm))
@@ -1121,9 +1592,19 @@ class EmulatorEngine(
                 // only as SPED-UP (which STEADY falls back to only for a song or ROM it can't
                 // render). Slow-mo stays muted.
                 val spedUp = speed > 1f && clip == null && mode != FfMusicMode.OFF && !awaitingClip && !dsMusicOn
-                val wantPaused = rewinding || battleInput.holdFrame ||
+                val wantPaused = rewinding || battleInput.holdFrame || dsHeld && !ffWanted ||
                     !((speed == 1f && clip == null) || spedUp || dsMusicOn)
                 // Refreshes per frame when the display paces 1x; 0 = the timer and blocking audio.
+                // A screen whose ticks don't follow its refresh (VsyncCheck, GitHub #350): the timer and blocking writes,
+                // like the audio's own fallback - vsync pacing on its made-up rate flipped on and off, 25-60 fps at 1x.
+                // Not latched: vsyncsPerFrame() is 0 while the check finds them unreliable, and vsync paces again once
+                // it doesn't. The audio fallback tries vsync pacing again once its wait is over.
+                if (vsyncFallback && System.nanoTime() >= audioRetryAt) {
+                    vsyncFallback = false
+                    audioFallback = false
+                    trouble = AudioTroubleWatch()
+                    Log.i("pokedaisy", "audio: trying vsync pacing again")
+                }
                 val perFrame = if (speed == 1f && track != null && bufferFrames > 0 && !vsyncFallback) vsyncsPerFrame() else 0
                 pacedPerFrame = perFrame
                 val ffPer = ffFramesPerRefresh(speed, vsyncsPerFrame())
@@ -1131,6 +1612,10 @@ class EmulatorEngine(
                     ffPerTick = ffPer
                     ffFit.reset(ffPer)
                     ffGroup = 1   // this frame ends a group: drawn, then the next refresh's tick
+                    // Timed from the next tick: kept from FF's last run, the first group "took" all the time FF was
+                    // off (seconds, minutes), the fit dropped to a frame a refresh - 1x - and FF only came back
+                    // seconds later, longer the longer it had been off; a refresh gap mid-FF did the same.
+                    ffGroupStart = 0L
                     if (ffPer > 0) vsyncTicks.drainPermits()
                 }
                 if ((perFrame > 0) != vsyncMode) {
@@ -1139,11 +1624,25 @@ class EmulatorEngine(
                         vsyncTicks.drainPermits()   // start on the next refresh, not a banked one
                         vsyncSettledAt = System.nanoTime() + VSYNC_SETTLE_NANOS
                         catchUpRun = 0
-                        // Blocking writes left the buffer about full.
-                        framesWritten = (track!!.playbackHeadPosition.toLong() and 0xFFFFFFFFL) + bufferFrames
+                        // framesWritten already counts every write since the track started or was flushed. It was set to
+                        // "about full" here, but a new track (every launch and resume) starts empty and FF's writes never
+                        // block: the guess ran up to twice the buffer (queued=14886 of 7688 on the Thor), held every frame
+                        // and pinned the rate control at its lowest - the music 0.5% flat - for 15 - 30 s.
                     } else {
                         MgbaCore.pkSetAudioRate(sampleRate.toDouble())
                     }
+                }
+                // The timer fallback keeps the whole buffer: it's there for devices that ran dry. So does a DS game's
+                // STEADY copy, which fills it to the top on purpose (a track starts once its buffer is full).
+                if (!trackStarted && !paused && track != null) trackStarted = track.playbackHeadPosition != 0
+                val half = (!vsyncMode || !trackStarted) && !vsyncFallback && vsyncUnreliable == null && !dsMusicOn
+                if (half != trackHalf && track != null) {
+                    trackHalf = half
+                    runCatching { track.bufferSizeInFrames = if (half) bufferFrames / 2 else bufferFrames }
+                }
+                if (GameVolume.gain != trackGain && track != null) {
+                    trackGain = GameVolume.gain
+                    runCatching { track.setVolume(trackGain) }
                 }
                 gameAudioPaused = wantPaused
                 if (wantPaused != paused) {
@@ -1152,12 +1651,14 @@ class EmulatorEngine(
                     else runCatching { track?.play() }
                     // flush() empties the buffer and puts the play head back at 0.
                     framesWritten = 0L
+                    trackStarted = false
                     vsyncSettledAt = System.nanoTime() + VSYNC_SETTLE_NANOS
                 }
 
                 queuedAfter = null
                 val n = MgbaCore.pkReadAudio(scratch)
                 fpsAudioMade += n / 2
+                if (BuildConfig.DEBUG && fpsFrames and 63 == 0) tap.arm(audioTapDir)
                 if (BuildConfig.DEBUG && nds) for (i in 0 until n) gamePeak = maxOf(gamePeak, kotlin.math.abs(scratch[i].toInt()))
                 // In FF, the game's sounds for the companion's automated battle presses stay silent but the last.
                 if (n > 0 && speed > 1f && battleInput.muteGame) java.util.Arrays.fill(scratch, 0, n, 0.toShort())
@@ -1170,6 +1671,10 @@ class EmulatorEngine(
                     var queued = framesWritten.toInt() - played
                     if (queued < 0) queued = 0
                     framesWritten = played.toLong() + queued
+                    // Seen here, so 1x's guard below doesn't take an underrun from FF (a copy starting) for one of its
+                    // own: it read it as "ran dry" and zeroed the estimate over a full buffer (Black on the Thor: 1x ran
+                    // ~2.2x after FF, every frame a catch-up, half its audio cut off).
+                    underruns = track.underrunCount
                     // A copy frame runs only once the last one's audio is all written (what didn't fit waits in
                     // dsMusicOut): run per game frame instead, the copy ran at the game's speed and its music skipped.
                     var runs = 0
@@ -1182,6 +1687,7 @@ class EmulatorEngine(
                         }
                         val w = track.write(dsMusicOut, dsMusicPos, dsMusicLeft, AudioTrack.WRITE_NON_BLOCKING)
                         if (w <= 0) break
+                        tap.frame(dsMusicOut, dsMusicLeft, w, sampleRate.toDouble(), queued, 's', dsMusicPos)
                         if (BuildConfig.DEBUG) for (i in dsMusicPos until dsMusicPos + w) dsMusicPeak = maxOf(dsMusicPeak, kotlin.math.abs(dsMusicOut[i].toInt()))
                         dsMusicPos += w
                         dsMusicLeft -= w
@@ -1200,9 +1706,12 @@ class EmulatorEngine(
                             trouble.record(System.nanoTime())
                         ) {
                             // The device keeps running dry with this screen's pacing: the timer and blocking
-                            // writes for the rest of this run, as before vsync pacing (1.1.x).
+                            // writes for a while, as before vsync pacing (1.1.x), then vsync pacing again.
                             vsyncFallback = true
-                            Log.w("pokedaisy", "audio: underruns keep coming under vsync pacing; timer pacing for this run")
+                            audioFallback = true
+                            audioRetryAt = System.nanoTime() + audioRetryNanos
+                            Log.w("pokedaisy", "audio: underruns keep coming under vsync pacing; timer pacing for %d s".format(audioRetryNanos / 1_000_000_000L))
+                            audioRetryNanos = (audioRetryNanos * 2).coerceAtMost(AUDIO_RETRY_MAX_NANOS)
                         }
                         underruns = nowUnderruns
                         // No silence written in: it was the stutter (30-40 ms of it each time the buffer ran low). A
@@ -1211,19 +1720,33 @@ class EmulatorEngine(
                         // Samples per emulated second so that a frame's worth lasts one frame of the
                         // display's, nudged towards a half-full buffer (dynamic rate control).
                         val fill = queued.toDouble() / bufferFrames
-                        val frameHz = 1e9 / (vsyncPeriodNanos * perFrame)
+                        val frameHz = 1e9 / ((audioPeriodNanos.takeIf { it > 0.0 } ?: vsyncPeriodNanos) * perFrame)
                         val drc = 1.0 + DRC_MAX * (1.0 - 2.0 * fill).coerceIn(-1.0, 1.0)
                         // The core's own frame rate: a DS makes 59.83 frames a second, not the GBA's 59.73 (0.17% that DRC
                         // otherwise spent a third of its range on, GitHub #215).
-                        MgbaCore.pkSetAudioRate(sampleRate * (if (nds) NDS_FPS else GBA_FPS) / frameHz * drc)
+                        val rate = sampleRate * (if (nds) NDS_FPS else GBA_FPS) / frameHz * drc
+                        MgbaCore.pkSetAudioRate(rate)
                         val w = track.write(scratch, 0, n, AudioTrack.WRITE_NON_BLOCKING)
+                        tap.frame(scratch, n, w, rate, queued, 'v')
                         if (w > 0) fpsAudioTaken += w / 2
                         if (w > 0) framesWritten += w / 2
-                        if (w in 0 until n) fpsDropped += (n - w) / 2   // a full buffer cut it short
-                        queuedAfter = queued + maxOf(w, 0) / 2
+                        if (w in 0 until n) {
+                            fpsDropped += (n - w) / 2   // a full buffer cut it short
+                            // ... so it's full, whatever the estimate says: one that had gone low stays low
+                            // otherwise (the play head and the writes keep step), every frame a catch-up.
+                            framesWritten = played.toLong() + track.bufferSizeInFrames
+                        }
+                        queuedAfter = (framesWritten - played).toInt()
                         lastQueued = queuedAfter
                     } else if (speed == 1f) {
-                        track.write(scratch, 0, n)   // blocking → real-time pacing at 1x
+                        val blockStart = System.nanoTime()
+                        val w = track.write(scratch, 0, n)   // blocking → real-time pacing at 1x
+                        val blocked = System.nanoTime() - blockStart
+                        fpsBlocks++
+                        fpsBlockSum += blocked
+                        if (blocked > fpsBlockMax) fpsBlockMax = blocked
+                        if (w > 0) framesWritten += w / 2
+                        tap.frame(scratch, n, w, sampleRate.toDouble(), -1, 'b')
                     } else {
                         // The speed the game really runs at: a refresh-paced group the device can't fit runs fewer frames.
                         val factor = if (speed.isInfinite()) measuredSpeed else if (ffPerTick > 0) ffFit.size * speed / ffPerTick else speed
@@ -1239,7 +1762,11 @@ class EmulatorEngine(
                             }
                         }
                         // Never block: FF mustn't be paced by the audio device.
-                        if (m > 0) track.write(spedUpOut, 0, m, AudioTrack.WRITE_NON_BLOCKING)
+                        if (m > 0) {
+                            val w = track.write(spedUpOut, 0, m, AudioTrack.WRITE_NON_BLOCKING)
+                            if (w > 0) framesWritten += w / 2
+                        }
+                        underruns = track.underrunCount   // FF's own, not 1x's (as the DS copy's above)
                     }
                 }
 
@@ -1266,13 +1793,23 @@ class EmulatorEngine(
                         fpsCatchUps, fpsHolds, fpsDropped, lastQueued, bufferFrames,
                         fpsAudioMade, fpsAudioTaken,
                         (track?.playbackHeadPosition?.toLong()?.and(0xFFFFFFFFL) ?: 0L).let { p -> if (fpsPlayedAt < 0) -1 else p - fpsPlayedAt },
-                        if (vsyncFallback) " fallback" else "") +
-                        if (nds) " dsMusic=%s/%d written=%d peak=%d gamePeak=%d track=%d".format(dsMusicOn, dsMusicBgm, dsMusicFrames, dsMusicPeak, gamePeak, track?.playState ?: -1) else "")
+                        if (vsyncUnreliable != null) " fallback (ticks don't follow the refresh)" else if (vsyncFallback) " fallback (audio)" else "") +
+                        " ticks=%.0f/s".format(vsyncCheck.lastRate) +
+                        (if (fpsBlocks > 0) " block=%.1f/%.1fms".format(fpsBlockSum / fpsBlocks / 1e6, fpsBlockMax / 1e6) else "") +
+                        (drawStatsSource?.invoke()?.let { (r, u) ->
+                            val line = " repeats=%d unshown=%d".format(r - fpsRepeats, u - fpsUnshown)
+                            fpsRepeats = r; fpsUnshown = u
+                            line
+                        } ?: "") +
+                        if (nds) " dsMusic=%s/%d written=%d peak=%d gamePeak=%d track=%d skip=%d".format(dsMusicOn, dsMusicBgm, dsMusicFrames, dsMusicPeak, gamePeak, track?.playState ?: -1, dsSkip.skip) else "")
                     dsMusicPeak = 0
                     gamePeak = 0
                     dsMusicFrames = 0
                     fpsCatchUps = 0
                     fpsHolds = 0
+                    fpsBlocks = 0
+                    fpsBlockSum = 0L
+                    fpsBlockMax = 0L
                     fpsDropped = 0
                     // [slowFrames]: 3+ late draws in two windows of 1x frames (a single one can be the device's hiccup).
                     if (!slowFrames && pacedPerFrame > 0 && speed == 1f && fpsLate >= 0 && late - fpsLate >= SLOW_LATE_FRAMES &&
@@ -1367,12 +1904,14 @@ class EmulatorEngine(
             pendingSuspend = null
             runCatching { track?.stop() }
             runCatching { track?.release() }
+            tap.close()
             // The STEADY clip is only told when it changes, and the next loop starts with none: silence it here, or a
             // RESTART GAME (or another ROM) kept the old song playing over the new one.
             runCatching { onFfMusicChanged?.invoke(null) }
             if (nds) runCatching { MgbaCore.pkNdsMusicStop() }
             runCatching { RetroAchievements.onCoreStopping() }
             // The GL thread lets go of the frame buffer before pkDeinit frees it.
+            endDsHold()
             runCatching { onCoreStopping?.invoke() }.onFailure { Log.e("pokedaisy", "core stopping hook failed", it) }
             videoBuf = null
             runCatching { finishSave() }
@@ -1392,31 +1931,47 @@ class EmulatorEngine(
     /** Loads [cheatText] into the core (emu thread). Achievements pause while any is in. */
     private fun applyCheats() {
         cheatsDirty = false
-        val text = if (gba) cheatText else ""
-        val n = MgbaCore.pkCheatsApply(text)
+        // A DS game: Action Replay DS codes, into melonDS's own engine (cheats.DsCheats).
+        val text = if (gba || nds) cheatText else ""
+        val n = if (nds) {
+            val w = com.pokedaisy.app.cheats.DsCheats.fromText(text)
+            MgbaCore.pkNdsCheats(w.words, w.lengths)
+        } else MgbaCore.pkCheatsApply(text)
         if (n < 0) Log.w("pokedaisy", "cheats didn't load")
         else if (text.isNotEmpty()) Log.i("pokedaisy", "cheats loaded: $n")
         runCatching { RetroAchievements.setCheatsActive(n > 0) }
     }
 
-    /** REUSABLE TMS onto the ROM (emu thread): the sites patched, or the file's bytes back. */
+    /** REUSABLE TMS and INSTANT TEXT onto the ROM (emu thread): what's on patched, the rest the file's bytes. */
     private fun applyTmPatch() {
         tmPatchDirty = false
         MgbaCore.pkRomUnpatch()
+        if (!gba) return
+        val text = textPatch.takeIf { instantText }
+        // All or none, each: a ROM that only matched in part would still use TMs up on the other paths, and half a text
+        // routine can't run. pkRomUnpatch takes everything, so text that fails puts the TMs' back.
         val sites = tmSites
-        if (!gba || !reusableTms || sites.isEmpty()) return
-        val all = sites.all {
+        val tms = reusableTms && sites.isNotEmpty() && sites.all {
             MgbaCore.pkRomPatch(it.at, it.expect, it.branch, com.pokedaisy.app.companion.data.ReusableTms.ALWAYS_SKIP)
         }
-        // All or none: a ROM that only matched in part would still use TMs up on the other paths.
-        if (!all) MgbaCore.pkRomUnpatch()
-        Log.i("pokedaisy", "reusable TMs: ${if (all) "${sites.size} site(s) patched" else "code didn't match"}")
+        if (reusableTms && sites.isNotEmpty()) {
+            if (!tms) MgbaCore.pkRomUnpatch()
+            Log.i("pokedaisy", "reusable TMs: ${if (tms) "${sites.size} site(s) patched" else "code didn't match"}")
+        }
+        if (text != null && !text.writes.all { MgbaCore.pkRomPatch(it.addr, it.expect, it.addr, it.value) }) {
+            MgbaCore.pkRomUnpatch()
+            if (tms) sites.forEach {
+                MgbaCore.pkRomPatch(it.at, it.expect, it.branch, com.pokedaisy.app.companion.data.ReusableTms.ALWAYS_SKIP)
+            }
+            Log.i("pokedaisy", "instant text: code didn't match")
+        } else if (text != null) Log.i("pokedaisy", "instant text: ${text.writes.size} piece(s) patched")
     }
 
     /** PLAYER LOOK onto the ROM (emu thread): the last look's blocks out, this one's in (all or none), then the palettes. */
     private fun applyLook() {
         lookDirty = false
         MgbaCore.pkRomUnblock()
+        rideApplied = null
         val patch = lookPatch
         // The player's sprite still holds the last look's record (a Pokémon's 32x32 shape, a frame table in the tail):
         // set up from the ROM as it is now, whatever comes next.
@@ -1433,6 +1988,7 @@ class EmulatorEngine(
             )
             Log.i("pokedaisy", "player look: ${if (n < 0) "the ROM didn't match, left as it is" else "$n block(s) in"}")
             if (n < 0) return
+            rideApplied = patch.ride   // only with the rider's frames in: else a vehicle under the game's own bike
         }
         settleLook()
     }
@@ -1450,13 +2006,15 @@ class EmulatorEngine(
         if (n > 0) Log.i("pokedaisy", "player look: $n palette(s) swapped")
     }
 
-    private fun servicePending() {
+    private fun servicePending(runFieldJobs: Boolean = true) {
         repeat(emuJobs.size) { emuJobs.poll()?.let { job -> runCatching(job).onFailure { Log.e("pokedaisy", "emu job failed", it) } } }
         if (cheatsDirty) applyCheats()
-        if (tmPatchDirty) applyTmPatch()
-        if (lookDirty) applyLook()
+        // Never during a co-op battle: both reach pkRomUnpatch / pkRomUnblock, which uninstall co-op (they stay dirty until it ends).
+        if (tmPatchDirty && !CoopGuards.battleActive()) { applyTmPatch(); coopLock?.requestReinstall() }
+        if (lookDirty && !CoopGuards.battleActive()) { applyLook(); coopLock?.requestReinstall() }
         // The jobs queued by now (one a job queues runs on a later frame); a delayed one waits its frames.
-        repeat(fieldItemJobs.size) {
+        // Not while co-op holds the game: they call game code (PC, USE, FLY) with no frames advancing; they stay queued.
+        if (runFieldJobs) repeat(fieldItemJobs.size) {
             val job = fieldItemJobs.poll() ?: return@repeat
             if (job.delayFrames > 0) {
                 job.delayFrames--
@@ -1513,7 +2071,9 @@ class EmulatorEngine(
         val load = pendingLoad
         if (load >= 0) {
             pendingLoad = -1
-            if (states.exists(load)) {
+            if (refuseLoad(CoopGuards.statesBlocked, isResume = false)) {
+                onStateResult?.invoke(Hotkeys.Action.LOAD_STATE, load, false)
+            } else if (states.exists(load)) {
                 // Snapshot the live state so the load can be undone.
                 runCatching { saveState(states.undoLoadFile) }
                 val ok = loadState(states.stateFile(load))
@@ -1541,7 +2101,8 @@ class EmulatorEngine(
         }
         if (pendingUndoLoad) {
             pendingUndoLoad = false
-            val ok = states.undoLoadFile.let { it.isFile && it.length() > 0 } &&
+            val ok = !refuseLoad(CoopGuards.statesBlocked, isResume = false) &&
+                states.undoLoadFile.let { it.isFile && it.length() > 0 } &&
                 loadState(states.undoLoadFile)
             onStateResult?.invoke(Hotkeys.Action.UNDO_LOAD, currentSlot, ok)
         }
@@ -1606,12 +2167,7 @@ class EmulatorEngine(
             AudioFormat.ENCODING_PCM_16BIT,
         ).coerceAtLeast(4096)
         return AudioTrack.Builder()
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_GAME)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build(),
-            )
+            .setAudioAttributes(AudioEffectsTrack.attributes())
             .setAudioFormat(
                 AudioFormat.Builder()
                     .setSampleRate(sampleRate)
@@ -1622,19 +2178,21 @@ class EmulatorEngine(
             // Room for the vsync pacing's rate control to keep it half full: at least ~85 ms.
             .setBufferSizeInBytes(maxOf(minBuf * 2, 4096 * 4))
             .setTransferMode(AudioTrack.MODE_STREAM)
-            .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+            .let(AudioEffectsTrack::mode)
             .build()
             .also { t ->
                 // A low-latency track can start with less of its buffer in use than was asked for: vsync pacing
                 // keeps it about half full, so give it all of it (and say what it got, for a logcat read: #80).
                 val asked = t.bufferSizeInFrames
                 runCatching { t.setBufferSizeInFrames(t.bufferCapacityInFrames) }
+                // Start (and start again after a flush) at the half-full level vsync pacing keeps, not all of it.
+                if (android.os.Build.VERSION.SDK_INT >= 31) runCatching { t.startThresholdInFrames = t.bufferSizeInFrames / 2 }
                 Log.i("pokedaisy", "audio: %d Hz, buffer %d frames (was %d, capacity %d)".format(
                     sampleRate, t.bufferSizeInFrames, asked, t.bufferCapacityInFrames))
             }
     }
 
-    private companion object {
+    internal companion object {
         /** DAY AND NIGHT's ease: per frame, of 256 (a full night's dimming in about half a second). */
         const val TINT_STEP = 4f
 
@@ -1649,6 +2207,17 @@ class EmulatorEngine(
          * (pk_call refuses them), so the job reports its own failure rather than calling into the game mid-code. */
         const val CALL_WAIT_FRAMES = 120
 
+        /** [dsTouchWanted]: frames the game wants its touch screen before it floats in, and frames without before it goes. */
+        const val TOUCH_ON_FRAMES = 2
+        const val TOUCH_OFF_FRAMES = 6
+
+        /** [MgbaCore.FIELD_TOUCH_FADES]: frames to wait for the new touch screen's fade before floating it in anyway. */
+        const val FADE_WAIT_FRAMES = 90
+
+        /** ...and frames it must stay lit first: the battle's own redraw between the bag and its commands lasts 5. */
+        const val FADE_LIT_FRAMES = 12
+
+
         /** FIELD HUD: frames of plain field before [onField] comes on (~1/3 s at 1x). */
         const val FIELD_SETTLE_FRAMES = 20
 
@@ -1662,6 +2231,20 @@ class EmulatorEngine(
         /** Late draws in a 120-frame window, in this many windows, that make a game's frames [slowFrames]. */
         private const val SLOW_LATE_FRAMES = 3
         private const val SLOW_WINDOWS = 2
+        /** [VsyncCheck]'s finding while it holds: kept across games (the device doesn't change), so a game started again
+         * doesn't spend its first seconds on vsync pacing's made-up rate; cleared once the ticks follow the refresh
+         * again for a while. Null = they follow it. */
+        @Volatile private var vsyncUnreliable: String? = null
+        /** GL thread: whether its ticks follow the refresh at all (GitHub #350: the RG DS swaps without waiting for it).
+         * One per process, like [vsyncUnreliable]. */
+        private val vsyncCheck = VsyncCheck()
+        /** [timerFallback]'s values. */
+        const val TIMER_NONE = 0
+        const val TIMER_AUDIO = 1
+        const val TIMER_SCREEN = 2
+        /** The audio fallback's first wait before vsync pacing is tried again, and its longest (it doubles). */
+        const val AUDIO_RETRY_NANOS = 60_000_000_000L
+        const val AUDIO_RETRY_MAX_NANOS = 960_000_000_000L
         /** Dynamic rate control's most the audio is stretched or squeezed (RetroArch's default). */
         const val DRC_MAX = 0.005
         /** Vsync pacing: frames run at once in a row at most, when the audio buffer runs low ([vsyncPace]). */
@@ -1679,6 +2262,8 @@ class EmulatorEngine(
         const val CYCLE_STEPS = 5
         /** At fast-forward, a WIDE window is drawn at most this often (~80 a second: every refresh of a 60 Hz screen). */
         const val WIDE_DRAW_NANOS = 12_000_000L
+        /** The scenic FLY's pace in the air: the trip a Kanto crossing takes about 5 s at. */
+        const val SCENIC_SPEED = 2f
         /** A DS game's STEADY copy: game frames after a new song id before copying the game again (the ARM9 hands the
          * sound driver its start command at the end of its frame), and at most this long while a volume fade runs (5 s
          * of game time); copy frames for a song fading out (~0.5 s); and at most this many copy frames run per game
@@ -1687,8 +2272,11 @@ class EmulatorEngine(
         const val DS_MUSIC_MAX_WAIT_FRAMES = 300
         const val DS_MUSIC_FADE_FRAMES = 30
         const val DS_MUSIC_MAX_FRAMES = 4
-        /** pkFieldState's bits that keep AUTO-RUN off: a script holding the field, a battle, a bike (known must be set). */
-        const val AUTO_RUN_BLOCKERS = MgbaCore.FIELD_KNOWN or MgbaCore.FIELD_LOCKED or MgbaCore.FIELD_BATTLE or MgbaCore.FIELD_BIKE
+        /** pkFieldState's bits that keep AUTO-RUN off: a script holding the field, a battle, a bike, a window up with the
+         *  controls free (a START menu that doesn't lock them: B closed it, GitHub #610) (known must be set). */
+        const val AUTO_RUN_BLOCKERS = MgbaCore.FIELD_KNOWN or MgbaCore.FIELD_LOCKED or MgbaCore.FIELD_BATTLE or MgbaCore.FIELD_BIKE or
+            MgbaCore.FIELD_SURF or   // under the sea B is what surfaces (TrySetupDiveEmergeScript): GitHub #338
+            MgbaCore.FIELD_WINDOW
         /** The D-pad's bits: one held = the player walking (the look-around glides back). */
         const val DIRECTIONS = MgbaCore.Key.UP or MgbaCore.Key.DOWN or MgbaCore.Key.LEFT or MgbaCore.Key.RIGHT
     }
@@ -1717,6 +2305,7 @@ internal fun ffFramesPerRefresh(speed: Float, refreshesPerFrame: Int): Int {
  * - under [ROOM] of a refresh for [wait] groups, a frame is tried; a try that ends up over [OVER] within [PROBE_GROUPS]
  *   groups goes back, and the next one waits twice as long ([MAX_WAIT_GROUPS] at most).
  * No cost per frame is modelled: a DS's skipped frames cost a fraction of its drawn one, and a group of 1 has none.
+ * A group over [STALL_PERIODS] refreshes is a stall and isn't counted.
  */
 internal class FfGroupFit {
     var size = 0
@@ -1740,6 +2329,9 @@ internal class FfGroupFit {
     /** A group of [size] frames took [groupNanos] against a refresh of [periodNanos]. */
     fun groupDone(groupNanos: Long, periodNanos: Long) {
         if (size <= 0 || periodNanos <= 0) return
+        // A stall, not the group's work (a map loading, a GC, the loop held up): left out, or as the first group it set
+        // the average outright and FF ran at 1x for seconds.
+        if (groupNanos > periodNanos * STALL_PERIODS) return
         avg = if (avg == 0.0) groupNanos.toDouble() else avg + (groupNanos - avg) * EMA
         val period = periodNanos.toDouble()
         if (avg > period * OVER) {
@@ -1776,6 +2368,8 @@ internal class FfGroupFit {
         const val ROOM = 0.85
         const val PROBE_GROUPS = 60
         const val MAX_WAIT_GROUPS = 1800
+        /** A group over this many refreshes is a stall ([groupDone]): 4 DS frames at their dearest (~20 ms) are ~5. */
+        const val STALL_PERIODS = 8
     }
 }
 
@@ -1795,6 +2389,39 @@ internal fun vsyncPace(queued: Int, bufferFrames: Int): VsyncPace = when {
     else -> VsyncPace.ON_TICK
 }
 
+/**
+ * A screen's refresh period as total time over refreshes ([EmulatorEngine]'s audioPeriodNanos): each tick's own
+ * lateness cancels out, so the longer it runs the steadier it gets. An interval of two or more refreshes (a skipped
+ * tick) counts as that many; a [fast] average more than [CHANGE] off this one for [CHANGED_TICKS] ticks in a row means
+ * the screen's rate changed (60 / 120 Hz), and it starts over (a skipped tick alone throws the quick one ~5% for a few).
+ */
+internal class RefreshAverage {
+    private var nanos = 0L
+    private var refreshes = 0L
+    private var offTicks = 0
+
+    /** One tick [interval] after the last ([fast]: the quick average including it); the period, or 0 while too few. */
+    fun tick(interval: Long, fast: Double): Double {
+        if (fast <= 0.0) return 0.0
+        offTicks = if (refreshes > 0 && kotlin.math.abs(fast * refreshes / nanos - 1.0) > CHANGE) offTicks + 1 else 0
+        if (offTicks >= CHANGED_TICKS) {
+            nanos = 0L
+            refreshes = 0L
+            offTicks = 0
+        }
+        val n = kotlin.math.round(interval / fast).toLong().coerceAtLeast(1L)
+        nanos += interval
+        refreshes += n
+        return if (refreshes >= MIN_REFRESHES) nanos.toDouble() / refreshes else 0.0
+    }
+
+    private companion object {
+        const val CHANGE = 0.03
+        const val CHANGED_TICKS = 30
+        const val MIN_REFRESHES = 120L
+    }
+}
+
 /** [max] underruns within [windowNanos] under vsync pacing: [record] says it's time to go back to the timer. */
 internal class AudioTroubleWatch(private val max: Int = 4, private val windowNanos: Long = 10_000_000_000L) {
     private val times = ArrayDeque<Long>()
@@ -1805,4 +2432,70 @@ internal class AudioTroubleWatch(private val max: Int = 4, private val windowNan
         while (now - times.first() > windowNanos) times.removeFirst()
         return times.size >= max
     }
+}
+
+/** Debug builds' recording of what the audio track is given ([EmulatorEngine.audioTapDir]): emu thread only. */
+private class AudioTap {
+    private var pcm: java.io.OutputStream? = null
+    private var log: java.io.PrintWriter? = null
+    private var left = 0L   // audio frames still to record
+    private val bytes = ByteArray(8192)
+
+    /** Starts a recording when [dir] holds the `audio_tap` marker (taken away, so one marker = one recording). */
+    fun arm(dir: File?) {
+        if (pcm != null || dir == null) return
+        val marker = File(dir, "audio_tap")
+        if (!marker.isFile || !marker.delete()) return
+        pcm = File(dir, "audio-tap.pcm").outputStream().buffered(1 shl 16)
+        log = File(dir, "audio-tap.txt").printWriter().also { it.println("made taken rate queued mode") }
+        left = SECONDS * 48_000L
+        Log.i("pokedaisy", "audio tap: recording $SECONDS s")
+    }
+
+    /** One frame's audio: [made] shorts from the core, the first [taken] of [data] (from [from]) given to the track.
+     * Modes: v vsync-paced 1x, b blocking 1x, s a DS game's STEADY copy. */
+    fun frame(data: ShortArray, made: Int, taken: Int, rate: Double, queued: Int, mode: Char, from: Int = 0) {
+        val out = pcm ?: return
+        log?.println("$made $taken ${"%.1f".format(rate)} $queued $mode")
+        val n = taken.coerceIn(0, minOf(data.size - from, bytes.size / 2))
+        for (i in 0 until n) {
+            bytes[i * 2] = data[from + i].toByte()
+            bytes[i * 2 + 1] = (data[from + i].toInt() shr 8).toByte()
+        }
+        out.write(bytes, 0, n * 2)
+        left -= n / 2
+        if (left <= 0) close()
+    }
+
+    fun close() {
+        val out = pcm ?: return
+        runCatching { out.close() }
+        runCatching { log?.close() }
+        pcm = null
+        log = null
+        Log.i("pokedaisy", "audio tap: done")
+    }
+
+    companion object {
+        const val SECONDS = 30
+    }
+}
+
+internal enum class LoopAction { STOP, SAVE_STATE, HOLD, RUN }
+
+/** No game frame while co-op holds the game. */
+internal fun EmulatorEngine.Companion.shouldRunFrame(held: Boolean): Boolean = !held
+
+/** A slot load / UNDO LOAD is refused while co-op blocks states; the launch's resume never is. */
+internal fun EmulatorEngine.Companion.refuseLoad(statesBlocked: Boolean, isResume: Boolean): Boolean = statesBlocked && !isResume
+
+internal fun EmulatorEngine.Companion.rewindAllowed(statesBlocked: Boolean): Boolean = !statesBlocked
+
+/** What a loop turn does: not held = RUN; held = no frame, but a stop or a pending save is still served (all three
+ * take the held branch, which serves them through servicePending). */
+internal fun EmulatorEngine.Companion.loopAction(held: Boolean, stopRequested: Boolean, saveRequested: Boolean): LoopAction = when {
+    !shouldRunFrame(held) && stopRequested -> LoopAction.STOP
+    !shouldRunFrame(held) && saveRequested -> LoopAction.SAVE_STATE
+    !shouldRunFrame(held) -> LoopAction.HOLD
+    else -> LoopAction.RUN
 }

@@ -31,6 +31,11 @@ object Gen2Art {
     const val CRYSTAL_PLAYER = "player_chris"
     const val CRYSTAL_PLAYER_F = "player_kris"
 
+    const val CRYSTAL_LEGACY_FONT = "gen2/crystal-legacy-font.ttf"
+    const val CRYSTAL_LEGACY_ICONS = "gen2/crystal_legacy/pokemon"
+    const val CRYSTAL_LEGACY_HOLD_ICONS = "gen2/crystal_legacy/hold_icons.png"
+    val CRYSTAL_LEGACY_TOWN_MAPS = arrayOf("crystal_legacy_johto", "crystal_legacy_kanto")
+
     const val GOLD_SILVER_FONT = "gen2/gold-silver-font.ttf"
     const val GOLD_SILVER_ICONS = "gen2/gold_silver/pokemon"
     const val GOLD_SILVER_HOLD_ICONS = "gen2/gold_silver/hold_icons.png"
@@ -110,11 +115,16 @@ object Gen2Art {
         // index (Crystal: day's red / blue from 8; Polished's PokegearOBPals: red, blue, green from 0).
         val playerLz: Boolean = false,
         val playerPalFrom: Int = 8,
+        // Crystal Legacy's own icons, one per species, uncompressed: [icons]' word is in the first bank below the third
+        // value (ICON_MAGIKARP) and the second from it, in [partyMenuObPals]' palette [iconPalNibbles] gives each species
+        // (MonMenuIconPals, a byte from species 1: normal high, shiny low).
+        val iconBankSplit: Triple<Int, Int, Int>? = null,
+        val iconPalNibbles: Pair<Int, Int>? = null,
     )
 
-    val CRYSTAL = Gen2ArtTables(
+    private fun crystalArt(sha1s: Set<String>, townMaps: List<Pair<Int, Int>>, townMapPalMap: Pair<Int, Int>) = Gen2ArtTables(
         name = "crystal",
-        sha1s = setOf(TelemetrySampler.CRYSTAL_SHA1, TelemetrySampler.CRYSTAL_REV1_SHA1, TelemetrySampler.CRYSTAL_AU_SHA1),
+        sha1s = sha1s,
         font = 0x3E to 0x4200,
         fontPath = CRYSTAL_FONT,
         icons = 0x23 to 0x6BBF,
@@ -125,13 +135,49 @@ object Gen2Art {
         iconsDir = CRYSTAL_ICONS,
         holdIconsPath = CRYSTAL_HOLD_ICONS,
         townMapGfx = 0x3E to 0x4BA0,
-        townMaps = listOf(0x24 to 0x5FFF, 0x24 to 0x6168),
-        townMapPalMap = 0x24 to 0x5F4B,
+        townMaps = townMaps,
+        townMapPalMap = townMapPalMap,
         pokegearPals = 0x02 to 0x7729,
         townMapPaths = CRYSTAL_TOWN_MAPS.map { "regionmap/$it.png" },
         playerSprites = listOf(0x30 to 0x4000, 0x31 to 0x7A40),
         objectPals = 0x02 to 0x7469,
         playerPaths = listOf("regionmap/$CRYSTAL_PLAYER.png", "regionmap/$CRYSTAL_PLAYER_F.png"),
+    )
+
+    val CRYSTAL = crystalArt(
+        setOf(TelemetrySampler.CRYSTAL_SHA1, TelemetrySampler.CRYSTAL_REV1_SHA1, TelemetrySampler.CRYSTAL_AU_SHA1),
+        townMaps = listOf(0x24 to 0x5FFF, 0x24 to 0x6168), townMapPalMap = 0x24 to 0x5F4B,
+    )
+
+    /** German Crystal (Kristall): English Crystal's art, its town maps 0x1F later. */
+    val CRYSTAL_DE = crystalArt(
+        setOf(TelemetrySampler.CRYSTAL_DE_SHA1),
+        townMaps = listOf(0x24 to 0x601E, 0x24 to 0x6187), townMapPalMap = 0x24 to 0x5F6A,
+    )
+
+    /** Crystal Legacy v1.3.1 (its pokecrystal.sym): its own font, party icons in eight palettes, redrawn POKéGEAR maps; Crystal's players. */
+    val CRYSTAL_LEGACY = Gen2ArtTables(
+        name = "crystal_legacy",
+        sha1s = setOf(TelemetrySampler.CRYSTAL_LEGACY_V1_3_1_SHA1),
+        font = 0x3E to 0x4000,
+        fontPath = CRYSTAL_LEGACY_FONT,
+        icons = 0x23 to 0x6E51,
+        monMenuIcons = 0x23 to 0x6C58,
+        eggIcon = 0xFC,
+        heldItemIcons = 0x23 to 0x6B7F,
+        partyMenuObPals = 0x02 to 0x7B26,
+        iconsDir = CRYSTAL_LEGACY_ICONS,
+        holdIconsPath = CRYSTAL_LEGACY_HOLD_ICONS,
+        townMapGfx = 0x3E to 0x4AB0,
+        townMaps = listOf(0x24 to 0x60D2, 0x24 to 0x63A4),
+        townMapPalMap = 0x24 to 0x601E,
+        pokegearPals = 0x02 to 0x7BCE,
+        townMapPaths = CRYSTAL_LEGACY_TOWN_MAPS.map { "regionmap/$it.png" },
+        playerSprites = listOf(0x30 to 0x4000, 0x31 to 0x7A40),
+        objectPals = 0x02 to 0x790E,
+        playerPaths = listOf("regionmap/$CRYSTAL_PLAYER.png", "regionmap/$CRYSTAL_PLAYER_F.png"),
+        iconBankSplit = Triple(0x75, 0x76, 0x81),
+        iconPalNibbles = 0x23 to 0x6D53,
     )
 
     /**
@@ -166,6 +212,23 @@ object Gen2Art {
         Gen2ArtTables(
             it.name, setOf(TelemetrySampler.SILVER_SHA1), it.font, it.fontPath, 0x23 to 0x6A56, 0x23 to 0x695B, it.eggIcon,
             0x23 to 0x68C1, it.partyMenuObPals, it.iconsDir, it.holdIconsPath, it.townMapGfx, it.townMaps, it.townMapPalMap,
+            it.pokegearPals, it.townMapPaths, it.playerSprites, it.objectPals, it.playerPaths,
+        )
+    }
+
+    /** German Gold / Silver: English's art, the party icons' tables 2 bytes later, the town maps 0x32 later. */
+    val GOLD_DE = GOLD.let {
+        Gen2ArtTables(
+            it.name, setOf(TelemetrySampler.GOLD_DE_SHA1), it.font, it.fontPath, 0x23 to 0x6A72, 0x23 to 0x6977, it.eggIcon,
+            0x23 to 0x68DD, it.partyMenuObPals, it.iconsDir, it.holdIconsPath, it.townMapGfx,
+            listOf(0x24 to 0x5F84, 0x24 to 0x60ED), 0x24 to 0x5EDE, it.pokegearPals, it.townMapPaths, it.playerSprites,
+            it.objectPals, it.playerPaths,
+        )
+    }
+    val SILVER_DE = GOLD_DE.let {
+        Gen2ArtTables(
+            it.name, setOf(TelemetrySampler.SILVER_DE_SHA1), it.font, it.fontPath, 0x23 to 0x6A58, 0x23 to 0x695D, it.eggIcon,
+            0x23 to 0x68C3, it.partyMenuObPals, it.iconsDir, it.holdIconsPath, it.townMapGfx, it.townMaps, it.townMapPalMap,
             it.pokegearPals, it.townMapPaths, it.playerSprites, it.objectPals, it.playerPaths,
         )
     }
@@ -290,7 +353,7 @@ object Gen2Art {
         )
     }
 
-    private val GAMES = listOf(CRYSTAL, GOLD, SILVER, CRYSTAL_CLEAR_V2_6_0, CRYSTAL_CLEAR_V2_5_11, PRISM) + POLISHED_CRYSTAL
+    private val GAMES = listOf(CRYSTAL, CRYSTAL_DE, GOLD, SILVER, GOLD_DE, SILVER_DE, CRYSTAL_CLEAR_V2_6_0, CRYSTAL_CLEAR_V2_5_11, PRISM, CRYSTAL_LEGACY) + POLISHED_CRYSTAL
 
     /** The game's text characters for its font tiles 0x80-0xFF (constants/charmap.asm) the companion prints. */
     private val CHARS: Map<Int, Char> = buildMap {
@@ -400,6 +463,18 @@ object Gen2Art {
                 tiles?.let { out[dex] = draw(it, 0, pal(dex)) }
             }
             return out
+        }
+        val split = t.iconBankSplit
+        if (split != null) {
+            // Crystal Legacy: by Dex number (EGG too), each in its species' palette.
+            val menu = off(t.monMenuIcons!!.first, t.monMenuIcons.second)
+            val pals = off(t.iconPalNibbles!!.first, t.iconPalNibbles.second)
+            fun iconOf(species: Int, id: Int): RomArt.Image {
+                val pal = palette(rom, t.partyMenuObPals, u8(rom, pals + species - 1) shr 4 and 7)
+                val bank = if (id < split.third) split.first else split.second
+                return draw(rom, off(bank, u16(rom, off(t.icons.first, t.icons.second) + 2 * id)), pal)
+            }
+            return (1..251).associateWith { dex -> iconOf(dex, u8(rom, menu + dex - 1)) } + (EGG to iconOf(EGG, t.eggIcon))
         }
         fun icon(id: Int): RomArt.Image = draw(rom, off(t.icons.first, u16(rom, off(t.icons.first, t.icons.second) + 2 * id)), menuPal)
         val menuIcons = off(t.monMenuIcons!!.first, t.monMenuIcons.second)

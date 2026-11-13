@@ -50,14 +50,20 @@ build/
 # Headless capture tool output: mgba_dump is compiled fresh inside the
 # pokedaisy-capture image each run (a Linux ELF, not portable).
 /native-capture/mgba_dump
+/native-capture/mgba_link
 /native-capture/menu-shots/
 
 __pycache__/
 .DS_Store
 .claude/settings.local.json
+.claude/worktrees/
 
 # make release-apk output
 /dist/
 # 3DS build output (3ds/README.md)
+3ds/ctr/build-dev/
 *.3dsx
 *.smdh
+
+# ROM lists for make rom-support LIST=... (scripts/rom_agent/): local paths, never committed
+roms-to-add*.txt

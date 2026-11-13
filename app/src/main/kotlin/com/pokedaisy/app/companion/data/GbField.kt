@@ -67,7 +67,11 @@ sealed class GbField {
                 else -> null
             }
             game == GameKind.RED || game == GameKind.BLUE -> GB_FIELD_RED_BLUE
+            game == GameKind.PURE_RED || game == GameKind.PURE_BLUE -> GB_FIELD_PURE_RGB
+            game == GameKind.YELLOW_LEGACY -> GB_FIELD_YELLOW_LEGACY
             game == GameKind.CRYSTAL && activeGen2 === GEN2_CRYSTAL -> Crystal
+            game == GameKind.CRYSTAL && activeGen2 === GEN2_CRYSTAL_DE -> CrystalDe
+            game == GameKind.CRYSTAL_LEGACY -> CrystalLegacy
             else -> null
         }
     }
@@ -104,9 +108,12 @@ sealed class GbField {
         private val curMap: Long,
         private val grassRate: Long,
         private val waterRate: Long,
-        /** WildDataPointers, in bank 3 with the data. */
+        /** WildDataPointers, in bank [wildBank] with the data. */
         private val wildDataPointers: Int,
         override val signatures: List<Pair<Long, String>>,
+        /** OpenPokemonCenterPC's bank (0x18; PureRGB's 0x33) and the wild data's (3; PureRGB's 0x2C). */
+        private val pcBank: Int = 0x18,
+        private val wildBank: Int = 0x03,
     ) : GbField() {
         private val flags7 = flags6 + 1
 
@@ -117,7 +124,7 @@ sealed class GbField {
 
         override fun openPc(g: GameCalls): ItemUseResult {
             if (!free(g)) return ItemUseResult.NOT_NOW
-            return if (g.gbCallAt(loopAfterWait, bankswitch, 0, PC_BANK, pcRoutine)) ItemUseResult.USED else ItemUseResult.NOT_NOW
+            return if (g.gbCallAt(loopAfterWait, bankswitch, 0, pcBank, pcRoutine)) ItemUseResult.USED else ItemUseResult.NOT_NOW
         }
 
         private fun flyer(g: GameCalls): Int {
@@ -177,10 +184,10 @@ sealed class GbField {
             if (u8(g, inBattle) != 0 || !free(g)) return false
             if (u8(g, grassRate) != 0 || u8(g, waterRate) != 0) return true
             val map = u8(g, curMap)
-            val p = g.rom(WILD_BANK * 0x4000L + (wildDataPointers - 0x4000) + 2 * map, 2) ?: return false
+            val p = g.rom(wildBank * 0x4000L + (wildDataPointers - 0x4000) + 2 * map, 2) ?: return false
             val ptr = (p[0].toInt() and 0xFF) or ((p[1].toInt() and 0xFF) shl 8)
             if (ptr !in 0x4000..0x7FFF) return true
-            val data = g.rom(WILD_BANK * 0x4000L + (ptr - 0x4000), 22) ?: return false
+            val data = g.rom(wildBank * 0x4000L + (ptr - 0x4000), 22) ?: return false
             val grass = data[0].toInt() and 0xFF
             val water = data[if (grass != 0) 21 else 1].toInt() and 0xFF
             if (grass != 0) put(g, grassRate, grass)
@@ -190,44 +197,44 @@ sealed class GbField {
 
         private companion object {
             const val JOY_IGNORE = 0xCD6BL     // the same in every Gen 1 cart
-            const val PC_BANK = 0x18
             const val PARTY_MON_SIZE = 44
             const val NUM_CITY_MAPS = 11
-            const val WILD_BANK = 0x03
         }
     }
 
-    /** Pokémon Crystal (rev 0, rev 1, Australia: one set of addresses): pret/pokecrystal's symbols. */
-    object Crystal : GbField() {
-        private val QUEUE = wramx(1, 0xD45C)              // wMapReentryScriptQueueFlag, Bank, Address (lo, hi)
-        private const val PC_SCRIPT_BANK = 0x2F
-        private const val PC_SCRIPT = 0x41A9              // PCScript (the standard script every PC runs)
-        private const val FLY_SCRIPT_BANK = 0x03
-        private const val FLY_SCRIPT = 0x4AA3             // FlyFunction.FlyScript
-        private val SCRIPT_RUNNING = wramx(1, 0xD438)
-        private val MAP_EVENT_STATUS = wramx(1, 0xD433)   // MAPEVENTS_ON 0
-        private val BATTLE_MODE = wramx(1, 0xD22D)
+    /** Crystal's engine: the addresses a game keeps them at. */
+    open class CrystalEngine(
+        private val cfg: Gen2Config,
+        /** wMapReentryScriptQueueFlag, then Bank, Address (lo, hi). */
+        private val QUEUE: Long,
+        /** PCScript (the standard script every PC runs). */
+        private val PC_SCRIPT: Int,
+        /** FlyFunction.FlyScript. */
+        private val FLY_SCRIPT: Int,
+        private val SCRIPT_RUNNING: Long,
+        /** MAPEVENTS_ON 0. */
+        private val MAP_EVENT_STATUS: Long,
+        private val VISITED_SPAWNS: Long,
+        /** bit 5: ENGINE_STORMBADGE. */
+        private val JOHTO_BADGES: Long,
+        /** TOWN 1, ROUTE 2: CheckOutdoorMap. */
+        private val ENVIRONMENT: Long,
+        private val PARTY_MON1_MOVES: Long,
+        /** wWildEncounterCooldown. */
+        private val COOLDOWN: Long,
+        private val FLYPOINTS: Long,
+        override val signatures: List<Pair<Long, String>>,
+    ) : GbField() {
+        private val BATTLE_MODE = cfg.battleMode
         private val DEFAULT_SPAWN = wramx(1, 0xD001)
-        private val VISITED_SPAWNS = wramx(1, 0xDCA5)
-        private val JOHTO_BADGES = wramx(1, 0xD857)       // bit 5: ENGINE_STORMBADGE
-        private val ENVIRONMENT = wramx(1, 0xD19A)        // TOWN 1, ROUTE 2: CheckOutdoorMap
-        private val PARTY_COUNT = wramx(1, 0xDCD7)        // then wPartySpecies
-        private val PARTY_MON1_MOVES = wramx(1, 0xDCE1)
-        private const val PARTY_MON_SIZE = 0x30
-        private const val EGG = 0xFD
-        private val COOLDOWN = wramx(1, 0xD452)           // wWildEncounterCooldown
-        private const val FLYPOINTS = 0x24 * 0x4000L + (0x5C5E - 0x4000)
-        private const val KANTO_LANDMARK = 47
-        private const val KANTO_FLYPOINT = 12
-        private const val SPAWN_INDIGO = 13
-
-        override val signatures = listOf(
-            0x25 * 0x4000L + (0x7C30 - 0x4000) to "fa5cd4a7c8215ed42a666ffa5dd4cd1f", // RunMemScript
-            0x2F * 0x4000L + (PC_SCRIPT - 0x4000) to "470f1c00499185",               // opentext, special, closetext, end
-            0x03 * 0x4000L + (FLY_SCRIPT - 0x4000) to "7c0e0016300f3500",            // the Fly script's first commands
-            0x25 * 0x4000L + (0x68C7 - 0x4000) to "2152d47ea7c835c837c9",           // CheckWildEncounterCooldown
-            FLYPOINTS to "010e030f",                                                  // NEW BARK, CHERRYGROVE
-        )
+        private val PARTY_COUNT = cfg.partyCount          // then wPartySpecies
+        private val PC_SCRIPT_BANK = 0x2F
+        private val FLY_SCRIPT_BANK = 0x03
+        private val PARTY_MON_SIZE = 0x30
+        private val EGG = 0xFD
+        private val KANTO_LANDMARK = 47
+        private val KANTO_FLYPOINT = 12
+        private val SPAWN_INDIGO = 13
 
         private fun free(g: GameCalls) = u8(g, SCRIPT_RUNNING) == 0 && u8(g, MAP_EVENT_STATUS) == 0 &&
             u8(g, BATTLE_MODE) == 0 && u8(g, QUEUE) == 0
@@ -268,7 +275,6 @@ sealed class GbField {
 
         /** FlyMap's choice of map: Kanto's points from a Kanto landmark once Indigo Plateau is visited, else Johto's. */
         private fun shownPoints(g: GameCalls): List<Pair<Int, Int>> {
-            val cfg = GEN2_CRYSTAL
             val map = g.read(cfg.mapGroup, 2)
             val backup = g.read(cfg.backupMapGroup, 2)
             val landmark = gen2Landmark(cfg, map[0].toInt() and 0xFF, map[1].toInt() and 0xFF, backup[0].toInt() and 0xFF, backup[1].toInt() and 0xFF)
@@ -298,6 +304,54 @@ sealed class GbField {
             if (u8(g, COOLDOWN) < 3) put(g, COOLDOWN, 5)
         }
     }
+
+    /** Pokémon Crystal (rev 0, rev 1, Australia: one set of addresses): pret/pokecrystal's symbols. */
+    object Crystal : CrystalEngine(
+        cfg = GEN2_CRYSTAL,
+        QUEUE = wramx(1, 0xD45C), PC_SCRIPT = 0x41A9, FLY_SCRIPT = 0x4AA3, SCRIPT_RUNNING = wramx(1, 0xD438),
+        MAP_EVENT_STATUS = wramx(1, 0xD433), VISITED_SPAWNS = wramx(1, 0xDCA5), JOHTO_BADGES = wramx(1, 0xD857),
+        ENVIRONMENT = wramx(1, 0xD19A), PARTY_MON1_MOVES = wramx(1, 0xDCE1), COOLDOWN = wramx(1, 0xD452),
+        FLYPOINTS = 0x24 * 0x4000L + (0x5C5E - 0x4000),
+        signatures = listOf(
+            0x25 * 0x4000L + (0x7C30 - 0x4000) to "fa5cd4a7c8215ed42a666ffa5dd4cd1f", // RunMemScript
+            0x2F * 0x4000L + (0x41A9 - 0x4000) to "470f1c00499185",                  // opentext, special, closetext, end
+            0x03 * 0x4000L + (0x4AA3 - 0x4000) to "7c0e0016300f3500",                // the Fly script's first commands
+            0x25 * 0x4000L + (0x68C7 - 0x4000) to "2152d47ea7c835c837c9",           // CheckWildEncounterCooldown
+            0x24 * 0x4000L + (0x5C5E - 0x4000) to "010e030f",                         // Flypoints: NEW BARK, CHERRYGROVE
+        ),
+    )
+
+    /** German Crystal (Kristall): English Crystal's RAM and scripts, its Flypoints table 0x1E later. */
+    object CrystalDe : CrystalEngine(
+        cfg = GEN2_CRYSTAL_DE,
+        QUEUE = wramx(1, 0xD45C), PC_SCRIPT = 0x41A9, FLY_SCRIPT = 0x4AA3, SCRIPT_RUNNING = wramx(1, 0xD438),
+        MAP_EVENT_STATUS = wramx(1, 0xD433), VISITED_SPAWNS = wramx(1, 0xDCA5), JOHTO_BADGES = wramx(1, 0xD857),
+        ENVIRONMENT = wramx(1, 0xD19A), PARTY_MON1_MOVES = wramx(1, 0xDCE1), COOLDOWN = wramx(1, 0xD452),
+        FLYPOINTS = 0x24 * 0x4000L + (0x5C7C - 0x4000),
+        signatures = listOf(
+            0x25 * 0x4000L + (0x7C31 - 0x4000) to "fa5cd4a7c8215ed42a666ffa5dd4cd09", // RunMemScript
+            0x2F * 0x4000L + (0x41A9 - 0x4000) to "470f1c00499185",                  // opentext, special, closetext, end
+            0x03 * 0x4000L + (0x4AA3 - 0x4000) to "7c0e0000300f3500",                // the Fly script's first commands
+            0x25 * 0x4000L + (0x68C7 - 0x4000) to "2152d47ea7c835c837c9",           // CheckWildEncounterCooldown
+            0x24 * 0x4000L + (0x5C7C - 0x4000) to "010e030f",                         // Flypoints: NEUBORKIA, ROSALIA CITY
+        ),
+    )
+
+    /** Crystal Legacy v1.3.1 (its pokecrystal.sym): Crystal's scripts and rules at its own addresses. */
+    object CrystalLegacy : CrystalEngine(
+        cfg = GEN2_CRYSTAL_LEGACY,
+        QUEUE = wramx(1, 0xD467), PC_SCRIPT = 0x41E3, FLY_SCRIPT = 0x4AEC, SCRIPT_RUNNING = wramx(1, 0xD443),
+        MAP_EVENT_STATUS = wramx(1, 0xD43E), VISITED_SPAWNS = wramx(1, 0xDCB0), JOHTO_BADGES = wramx(1, 0xD862),
+        ENVIRONMENT = wramx(1, 0xD1A5), PARTY_MON1_MOVES = wramx(1, 0xDCEC), COOLDOWN = wramx(1, 0xD45D),
+        FLYPOINTS = 0x24 * 0x4000L + (0x5D18 - 0x4000),
+        signatures = listOf(
+            0x25 * 0x4000L + (0x7C8F - 0x4000) to "fa67d4a7c82169d42a666ffa68d4cde8", // RunMemScript
+            0x2F * 0x4000L + (0x41E3 - 0x4000) to "470f1c00499185",                  // opentext, special, closetext, end
+            0x03 * 0x4000L + (0x4AEC - 0x4000) to "7c0e00df2f0f3700",                // the Fly script's first commands
+            0x25 * 0x4000L + (0x68D9 - 0x4000) to "215dd47ea7c835c837c9",           // CheckWildEncounterCooldown
+            0x24 * 0x4000L + (0x5D18 - 0x4000) to "010e030f",                         // Flypoints: NEW BARK, CHERRYGROVE
+        ),
+    )
 }
 
 /** MOVE_FLY in Gen 1 and 2 (19, as in Gen 3). */
@@ -389,6 +443,24 @@ val GB_FIELD_YELLOW_ES = GbField.Gen1(
         0x1510L to "e52134d4cbfe21f2c136ffe1c9",
     ),
 )
+/** Yellow Legacy v1.0.10 (its pokeyellow.sym): Yellow's ways in at its own addresses. */
+val GB_FIELD_YELLOW_LEGACY = GbField.Gen1(
+    loopAfterWait = 0x0242, bankswitch = 0x3E87, pcRoutine = 0x6733,
+    walkCounter = 0xCFC4L, flags5 = 0xD72FL, inBattle = 0xD057L, badges = 0xD3A3L,
+    tileset = 0xD3B4L, townsVisited = 0xD70AL, destination = 0xD719L, flags6 = 0xD731L, pikachuFlags = 0xD47DL, pikachuImage = 0xC1F2L,
+    partyCount = 0xD162L, partyMoves = 0xD172L, curMap = 0xD3ABL, grassRate = 0xD886L,
+    waterRate = 0xD8A3L, wildDataPointers = 0x4C35,
+    signatures = listOf(
+        0x23FL to "cd051ecd1534cd101ecd0810fac4cfa7c2c303cd",
+        0x3E87L to "f0b8f578e0b8ea0020cd9b3e",
+        0x3F39L to "e08c21663fcd533f2111cfcb",
+        0x6272DL to "fa09c1fe04c0cd2e3c3e01ea0ccf3e21c3393ff9",
+        0x71154L to "7eea19d72131d7cbde23cbfe",
+        0x7119BL to "213dcd36ff23fa0ad75ffa0bd75701",
+        0xCC02L to "21354cfaabd34f060009092a666f2aea86d8",
+        0x151CL to "e5217dd4cbfe21f2c136ffe1c9",
+    ),
+)
 val GB_FIELD_RED_BLUE = GbField.Gen1(
     loopAfterWait = 0x0405, bankswitch = 0x35D6, pcRoutine = 0x651C,
     walkCounter = 0xCFC5L, flags5 = 0xD730L, inBattle = 0xD057L, badges = 0xD356L,
@@ -404,4 +476,32 @@ val GB_FIELD_RED_BLUE = GbField.Gen1(
         0x71070L to "213dcd36ff23fa0bd75ffa0cd75701",
         0xCEB8L to "21eb4efa5ed34f060009092a666f2aea87d8",
     ),
+)
+
+/**
+ * PureRed / PureBlue v2.7.6 (pureRGB's pokered.sym; both carts the same code at the same places): Red's ways in at its own
+ * addresses. Its overworld loop waits for the frame at OverworldLoop's `rst DelayFrame` and goes on into
+ * OverworldLoopLessDelay (no wait of its own there: GBC double speed), so the PC is called from 0x03D7; its PC routine is
+ * in bank 0x33 (DisableAutoTextBoxDrawing, then the PC's predef text), its wild data in bank 0x2C, and its game state in
+ * WRAM bank 1 (read and written by bank). Checked headless from the converted retail Red save: the PC's menus from
+ * Vermilion's Pokemon Center, FLY's flags taken by the loop (landed in Saffron, then walked), and the game's own FLY menu
+ * landing at the same spots.
+ */
+val GB_FIELD_PURE_RGB = GbField.Gen1(
+    loopAfterWait = 0x03D7, bankswitch = 0x3297, pcRoutine = 0x46B5,
+    walkCounter = 0xCFC5L, flags5 = wramx(1, 0xD738), inBattle = wramx(1, 0xD057), badges = wramx(1, 0xD35E),
+    tileset = wramx(1, 0xD36F), townsVisited = wramx(1, 0xD713), destination = wramx(1, 0xD722), flags6 = wramx(1, 0xD73A),
+    pikachuFlags = -1L, pikachuImage = -1L,
+    partyCount = wramx(1, 0xD16B), partyMoves = wramx(1, 0xD17B), curMap = wramx(1, 0xD366), grassRate = wramx(1, 0xD88F),
+    waterRate = wramx(1, 0xD8AC), wildDataPointers = 0x484A,
+    signatures = listOf(
+        0x3D6L to "d721bd680635c7cdb01efa3ed7cb7728",      // OverworldLoop: rst DelayFrame, callfar GBCSetCPU2xSpeed, ...
+        0x3297L to "f0b8f578cda332cda932c178",               // Bankswitch
+        0xCC6AFL to "fa09c1fe04c0cd9b363e05c37129",           // OpenPokemonCenterPC
+        0x70AE8L to "7eea22d7213ad7cbde23cbfe",               // the town map's FLY pick
+        0x70B2DL to "213dcd3eff22fa13d75ffa14d757",           // BuildFlyLocationsList
+        0xB076AL to "214a484f060009092a666f2aea8fd8",         // LoadWildDataCommon
+    ),
+    pcBank = 0x33,
+    wildBank = 0x2C,
 )
