@@ -55,8 +55,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalDensity
 import com.pokedaisy.app.companion.data.GENDER_SYMBOL_FEMALE
 import com.pokedaisy.app.companion.data.GENDER_SYMBOL_MALE
+import com.pokedaisy.app.companion.data.MonStats
 import com.pokedaisy.app.companion.data.MonView
 import com.pokedaisy.app.companion.data.MoveView
+import com.pokedaisy.app.companion.data.PokedexSource
+import com.pokedaisy.app.companion.data.PokedexTables
 import com.pokedaisy.app.companion.data.TypeMatchup
 import com.pokedaisy.app.companion.ui.theme.AppColors
 
@@ -83,6 +86,8 @@ fun MonDetailScreen(
     index: Int,
     onIndexChange: (Int) -> Unit,
     onBack: () -> Unit,
+    /** A second tap on the active party slot: open that Pokémon's dex entry. */
+    onOpenDex: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
     /** Open on the STATS page (screenshot tests). */
     initialShowStats: Boolean = false,
@@ -106,6 +111,8 @@ fun MonDetailScreen(
     partyOrder: Boolean = true,
     /** Open on SWITCH's party (screenshot tests). */
     initialSwitching: Boolean = false,
+    /** The running game's dex tables, for the STATS page's ABILITY row; null = no row. */
+    dexTables: PokedexTables? = null,
 ) {
     val m = rememberGbaTextMetrics()
     val small = rememberGbaTextMetrics(1f)
@@ -209,8 +216,9 @@ fun MonDetailScreen(
                             Separator(m, Modifier.fillMaxHeight(), vertical = true)
                             val right = Modifier.weight(0.5f).fillMaxHeight().padding(start = gap)
                             val stats = mon.stats
-                            if (showStats && stats != null) MonStatsSection(stats, m, small, right)
-                            else MovesSection(mon, m, small, right)
+                            if (showStats && stats != null) {
+                                MonStatsSection(stats, m, small, right, ability = individualAbility(mon, stats, dexTables))
+                            } else MovesSection(mon, m, small, right)
                         }
                     }
                 }
@@ -235,7 +243,7 @@ fun MonDetailScreen(
         }
     }
     Column(Modifier.width(SummaryButtonSize).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        PartyColumn(party, index, onIndexChange, small, Modifier.weight(1f).fillMaxWidth())
+        PartyColumn(party, index, onIndexChange, small, Modifier.weight(1f).fillMaxWidth(), onOpenDex = onOpenDex)
         BackNavButton(onBack, SummaryButtonSize)
     }
     }
@@ -369,11 +377,34 @@ internal fun NavButton(
     ) { PixelIcon(icon, buttonContent, Modifier.size(size * 26 / 60)) }
 }
 
+/** [mon]'s own ability: Gen 3's aptitude bit picks one of its species' two, read from the dex tables off the UI thread. */
+@Composable
+private fun individualAbility(mon: MonView, stats: MonStats, tables: PokedexTables?): String? {
+    if (tables == null) return null
+    // Formats that don't read the bit (Elite Redux, R.O.W.E.) leave it null: say nothing rather than guess the first.
+    val slot = stats.abilityNum ?: return null
+    return rememberLoaded(
+        tables, mon.species, slot,
+        cached = { null },
+        load = {
+            val national = PokedexSource.nationalOf(tables, mon.species)
+            val names = if (national > 0) {
+                PokedexSource.entry(tables, national)?.abilities.orEmpty().filter { it.isNotBlank() }
+            } else emptyList()
+            names.getOrNull(slot) ?: names.firstOrNull()
+        },
+    )
+}
+
 /** The party as a column of slots on the right, like battle INFO's foe team: the one shown framed in red, a tap on
  * another shows it. As big as the height allows (up to [SummaryButtonSize]). A PC box's (BOXES) shows six of its Pokémon at
  * a time, the one on show among them. */
 @Composable
-private fun PartyColumn(party: List<MonView>, index: Int, onPick: (Int) -> Unit, small: GbaTextMetrics, modifier: Modifier = Modifier) {
+private fun PartyColumn(
+    party: List<MonView>, index: Int, onPick: (Int) -> Unit, small: GbaTextMetrics, modifier: Modifier = Modifier,
+    /** A tap on the active slot again: open its dex entry. */
+    onOpenDex: ((Int) -> Unit)? = null,
+) {
     BoxWithConstraints(modifier, contentAlignment = Alignment.TopCenter) {
         val gap = 4.dp
         val first = (index - STRIP_MAX / 2).coerceIn(0, (party.size - STRIP_MAX).coerceAtLeast(0))
@@ -381,7 +412,9 @@ private fun PartyColumn(party: List<MonView>, index: Int, onPick: (Int) -> Unit,
         val n = shown.size.coerceAtLeast(1)
         val cell = minOf(SummaryButtonSize, (maxHeight - gap * (n - 1)) / n)
         Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-            shown.forEach { (i, mon) -> PartyColumnSlot(mon, current = i == index, small, cell) { onPick(i) } }
+            shown.forEach { (i, mon) -> PartyColumnSlot(mon, current = i == index, small, cell) {
+                if (i == index) onOpenDex?.invoke(i) else onPick(i)
+            } }
         }
     }
 }
